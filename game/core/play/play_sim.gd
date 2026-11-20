@@ -619,14 +619,20 @@ func _choose_target(f: PlayFielder, at: Vector2, held: float, release: float) ->
 ## How much sooner the ball is on runner r's base than he is (positive: he is out).
 func _margin(r: PlayRunner, f: PlayFielder, at: Vector2, held: float, release: float) -> float:
 	var b := _ball_at(f, at, held, release, r.to)
-	return _arrive(r, r.to) - (b.time + (0.0 if r.forced else m.tag))
+	return _arrive(r, r.to) - (b.time + (0.0 if _is_force(r, r.to) else m.tag))
+
+
+## A force play: the next base for a runner the batter pushes on, or first for the batter.
+func _is_force(r: PlayRunner, base: int) -> bool:
+	return (r.forced and base == r.from + 1) or (r == _batter and base == 1)
 
 
 ## Plays on runner r at the base he is running to. True if he is out.
 func _play_on(r: PlayRunner, thrower: PlayFielder, from: Vector2, held: float, release: float) -> bool:
 	var base := r.to
 	var b := _ball_at(thrower, from, held, release, base)
-	var forced := r.forced or r == _batter
+	# A force is only at the next base: a forced runner who goes on past it is tagged.
+	var forced := _is_force(r, base)
 	var need := b.time + (0.0 if forced else m.tag)
 	if not b.by_self and b.distance > 40.0:
 		# A long throw is sometimes off line or on a bad hop.

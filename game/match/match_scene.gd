@@ -216,6 +216,9 @@ func _finish_pitch() -> void:
 	var events := resolver.after_pitch(game, duel)
 	var play := resolver.last_play
 	banner = _pitch_banner(events)
+	if play != null and play.infield_fly:
+		# The umpire declares it while the ball is in the air.
+		banner = "인필드 플라이"
 	banner_time = 2.4
 	if play != null and not play.foul:
 		_play = play
@@ -499,6 +502,19 @@ func _place_cast() -> void:
 	on_deck.visible = next_up.lineup.size() > 0
 
 
+## The catcher sets up where the pitch is meant to go: his body shifts toward the side and
+## his mitt shows the height, from the moment the sign is given until the ball arrives.
+func _show_target() -> void:
+	if _play_time >= 0.0 or game.over:
+		return
+	var showing := state == State.WINDUP or (state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT)
+	var aim := decision.target if showing and decision != null else Vector3(0.0, 0.0, 0.75)
+	if human_pitches() and state != State.LIVE and state != State.WINDUP:
+		aim = target
+	catcher.position = Field.to_world(Vector3(clampf(aim.x * 0.7, -0.45, 0.45), -1.15, 0.0))
+	catcher.apply(PuppetClips.catcher(aim.z))
+
+
 static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 	var d := to - from
 	return -atan2(d.x, d.y)
@@ -508,6 +524,7 @@ static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 
 
 func refresh(delta: float) -> void:
+	_show_target()
 	if _play_time >= 0.0 and _play != null:
 		_frame_time = delta
 		_phase += delta * 2.6

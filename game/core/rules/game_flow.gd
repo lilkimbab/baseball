@@ -126,16 +126,24 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 	var winning_advance := 0
 	out.runner_ids.resize(event.moves.size())
 	out.applied.resize(event.moves.size())
+	# Everyone who moves leaves his base at once; arrivals and outs then follow in order. (A
+	# batter reaching first is often listed before the runner who left first long before.)
+	for m: RunnerMove in event.moves:
+		if m.from > 0 and start[m.from - 1] != null and after[m.from - 1] == start[m.from - 1]:
+			after[m.from - 1] = null
 	for i: int in event.moves.size():
 		var m := event.moves[i]
 		var runner: BaseRunner = batter_runner if m.from == 0 else start[m.from - 1]
 		out.runner_ids[i] = runner.player_id if runner != null else ""
+		if runner == null:
+			continue
 		# Nothing that happens after the third out counts: the half-inning is already over.
-		if runner == null or ends_game or state.outs >= 3:
+		# A runner still on his way is left on base, on the one he was heading for.
+		if ends_game or state.outs >= 3:
+			if m.from > 0 and not ends_game:
+				_leave_on_base(after, runner, m)
 			continue
 		out.applied[i] = 1
-		if m.from > 0 and after[m.from - 1] == runner:
-			after[m.from - 1] = null
 		# A base gained through an error or a passed ball does not count toward earned runs:
 		# if he scores from where he should not have been, the run is unearned.
 		var excused := m.on_error or event.kind == GameEvent.Kind.PASSED_BALL
@@ -185,6 +193,16 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		out.left_on_base = state.runners_on()
 		_end_half(state)
 	out.game_over = state.over
+
+
+## Puts a runner whose move was cut off by the third out on a free base: the one he was
+## running to if he can have it, else the nearest one behind it.
+static func _leave_on_base(after: Array[BaseRunner], runner: BaseRunner, m: RunnerMove) -> void:
+	var furthest := clampi(m.to if m.to > 0 else m.out_at, m.from, 3)
+	for base: int in range(furthest, 0, -1):
+		if after[base - 1] == null:
+			after[base - 1] = runner
+			return
 
 
 static func _walk_off_now(state: GameState) -> bool:

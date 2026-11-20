@@ -78,9 +78,12 @@ static func swing(t: float, lead: float, contact_height: float) -> PuppetPose:
 	return _sample(times, poses, t)
 
 
-static func catcher() -> PuppetPose:
+## Catcher in his crouch. The mitt is held up as a target at `mitt_height` (m above the
+## ground at the plate); the default is the middle of the zone.
+static func catcher(mitt_height: float = 0.72) -> PuppetPose:
 	var a := PuppetPose.at
-	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 24.0, a.call(0.22, 0.55, 0.1), a.call(-0.04, 0.72, 0.5), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
+	var mitt := clampf(mitt_height, 0.35, 1.25)
+	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 24.0, a.call(0.22, 0.55, 0.1), a.call(-0.04, mitt, 0.5), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
 
 
 static func fielder_ready() -> PuppetPose:

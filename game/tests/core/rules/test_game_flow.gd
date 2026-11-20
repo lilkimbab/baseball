@@ -371,3 +371,16 @@ func test_a_run_that_scores_on_a_passed_ball_is_unearned() -> void:
 	assert_eq(out.scored.size(), 1)
 	assert_false(out.scored[0].earned)
 	assert_false(out.scored[0].rbi)
+
+
+func test_a_runner_cut_off_by_the_third_out_is_still_left_on_base() -> void:
+	var s := F.game()
+	s.outs = 2
+	F.put_runners(s, [1, 2])
+	# Single in the order things happened: the batter reaches first, the runner from second is
+	# thrown out at home, and only then would the runner from first have reached third.
+	var moves: Array[RunnerMove] = [F.move(0, 1), RunnerMove.out_at_base(2, 4, TAG), F.move(1, 3)]
+	var out := _apply(s, F.pa(PaResult.Kind.SINGLE, moves))
+	assert_true(out.half_over)
+	assert_eq(out.left_on_base, 2, "the batter and the runner from first")
+	assert_eq(out.scored.size(), 0)

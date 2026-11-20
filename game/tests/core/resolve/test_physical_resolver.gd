@@ -233,3 +233,42 @@ func test_a_batter_has_two_or_three_weak_spots_and_they_stay_put() -> void:
 	assert_eq(cells, AiBatter.weak_cells("kbo-1234"))
 	for c: int in cells:
 		assert_between(c, 0, 8)
+
+
+func test_every_runner_scores_is_put_out_or_is_left_on_base() -> void:
+	var bad := PackedStringArray()
+	for g: int in 24:
+		var sim := _game(300 + g)
+		var reached := PackedInt32Array([0, 0])
+		var runner_outs := PackedInt32Array([0, 0])
+		var uncounted := PackedInt32Array([0, 0])
+		var guard := 0
+		while not sim.state.over and guard < GameSim.MAX_EVENTS:
+			var event := sim.resolver.next_event(sim.state)
+			var batting := sim.state.batting()
+			var out := GameFlow.apply(sim.state, event)
+			sim.scorer.record(sim.state, event, out)
+			sim.manager.note_change(sim.state, event)
+			var crossed := 0
+			for i: int in event.moves.size():
+				var m := event.moves[i]
+				if out.applied.size() > i and out.applied[i] == 0:
+					continue
+				if m.from == 0 and m.to >= 1:
+					reached[batting] += 1
+				elif m.from > 0 and m.is_out():
+					runner_outs[batting] += 1
+				if m.scores():
+					crossed += 1
+			uncounted[batting] += crossed - out.scored.size()
+			guard += 1
+		sim.scorer.finish(sim.state)
+		var s := sim.state
+		for t: int in 2:
+			var walk_off_half := t == 1 and s.winner == GameState.HOME and s.inning >= s.rules.innings and s.line[1].size() == s.inning
+			if walk_off_half:
+				continue
+			var left := reached[t] - s.score[t] - runner_outs[t] - uncounted[t]
+			if left != sim.scorer.book.left_on_base[t]:
+				bad.append("game %d team %d: %d left by count, %d in the box" % [g, t, left, sim.scorer.book.left_on_base[t]])
+	assert_eq(bad, PackedStringArray())
