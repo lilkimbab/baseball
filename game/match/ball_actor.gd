@@ -49,7 +49,3 @@ func show_at(field_pos: Vector3) -> void:
 	_shadow.position = Field.to_world(Vector3(field_pos.x, field_pos.y, 0.045))
 	var fade := clampf(1.0 - field_pos.z / 25.0, 0.25, 1.0)
 	_shadow.scale = Vector3(fade, 1.0, fade)
-
-
-func world_position() -> Vector3:
-	return _ball.global_position

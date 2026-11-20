@@ -1,6 +1,9 @@
 class_name StrikeZone
 extends RefCounted
-## Automatic strike zone scaled to the batter's height (docs/04, section 6).
+## Automatic strike zone scaled to the batter's height, as the KBO's ABS calls it (2026 rules,
+## docs/12 section 5): the top is 55.75% of the batter's height and the bottom 27.04%, the
+## width is the plate plus 2 cm on each side, width is judged at the middle of the plate, and
+## height at both the middle and the back of the plate.
 
 const TOP_RATIO := 0.5575
 const BOTTOM_RATIO := 0.2704
@@ -39,15 +42,20 @@ func distance_outside(x: float, z: float) -> float:
 	return Vector2(across, up).length()
 
 
-## A pitch is a strike if it is inside the zone at both the front and the middle of the plate.
+## A pitch is a strike if it is within the zone's width at the middle of the plate, and within
+## its height both there and at the back of the plate (the apex, where y = 0).
 func is_strike(pitch: PitchFlight) -> bool:
-	var front := pitch.plate_pos
-	if not contains(front.x, front.z):
-		return false
-	var mid := front
-	if absf(pitch.plate_vel.y) > 1e-6:
-		mid += pitch.plate_vel * ((MID_PLANE_Y - Field.PLATE_FRONT_Y) / pitch.plate_vel.y)
-	return contains(mid.x, mid.z)
+	var mid := crossing(pitch, MID_PLANE_Y)
+	var back := crossing(pitch, 0.0)
+	return absf(mid.x) <= half_width and mid.z >= bottom and mid.z <= top and back.z >= bottom and back.z <= top
+
+
+## Where the pitch is as it crosses the plane at distance y from the apex of the plate, carried
+## on in a straight line from the front of the plate.
+static func crossing(pitch: PitchFlight, y: float) -> Vector3:
+	if absf(pitch.plate_vel.y) < 1e-6:
+		return pitch.plate_pos
+	return pitch.plate_pos + pitch.plate_vel * ((y - Field.PLATE_FRONT_Y) / pitch.plate_vel.y)
 
 
 ## Point in the zone for a 0..1 position: u across (0 = third-base edge), v up (0 = bottom).

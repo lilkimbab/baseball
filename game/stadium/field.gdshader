@@ -8,6 +8,8 @@ uniform sampler2D grain_normal : hint_normal, repeat_enable, filter_linear_mipma
 // Fence distance from home (m) for azimuth -45..+45 degrees in one-degree steps.
 uniform float fence_dist[91];
 uniform float track_width = 4.5;
+// Half the width of a chalk line. Lines are 3 inches wide (Field.LINE_WIDTH).
+uniform float line_half_width = 0.0381;
 uniform vec3 grass_light : source_color = vec3(0.19, 0.43, 0.14);
 uniform vec3 grass_dark : source_color = vec3(0.14, 0.36, 0.11);
 uniform vec3 dirt : source_color = vec3(0.56, 0.38, 0.24);
@@ -65,8 +67,8 @@ void fragment() {
 
 	// Chalk: foul lines out to the fence, and the two batter's boxes.
 	float in_play = 1.0 - smoothstep(fence - aa, fence + aa, r);
-	// Lines are 3 inches wide. The foul lines' outer edges run through the apex of home plate.
-	float half_line = 0.0381;
+	// The foul lines' outer edges run through the apex of home plate.
+	float half_line = line_half_width;
 	float foul_line = band((abs(f.x) - f.y) * 0.7071 + half_line, half_line, aa) * step(0.3, f.y) * in_play;
 	// Batter's boxes: 4 ft by 6 ft, 6 in from the plate, centred on its middle.
 	vec2 q = abs(vec2(abs(f.x) - 0.978, f.y - 0.216)) - vec2(0.61, 0.915);

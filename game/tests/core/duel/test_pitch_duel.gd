@@ -271,3 +271,39 @@ func test_the_ai_batter_leaves_pitches_far_from_the_zone_alone() -> void:
 			swings_near += 1
 	assert_eq(swings_far, 0, "nobody swings at a pitch at his head")
 	assert_between(swings_near, 60, 200, "but pitches just off the edge are chased some of the time")
+
+
+# --- The zone as the KBO's automatic system calls it ---
+
+
+func _flight(front: Vector3, velocity: Vector3) -> PitchFlight:
+	var flight := PitchFlight.new()
+	flight.plate_pos = front
+	flight.plate_vel = velocity
+	return flight
+
+
+func test_height_is_judged_at_the_middle_and_the_back_of_the_plate() -> void:
+	var zone := StrikeZone.for_batter(1.82)
+	# Level through the heart of the zone.
+	assert_true(zone.is_strike(_flight(Vector3(0.0, Field.PLATE_FRONT_Y, 0.75), Vector3(0.0, -36.0, 0.0))))
+	# A breaking ball that is in the zone at the middle but has dropped under it by the back.
+	var dropping := _flight(Vector3(0.0, Field.PLATE_FRONT_Y, zone.bottom + 0.045), Vector3(0.0, -30.0, -5.0))
+	assert_gt(StrikeZone.crossing(dropping, StrikeZone.MID_PLANE_Y).z, zone.bottom, "in the zone at the middle")
+	assert_lt(StrikeZone.crossing(dropping, 0.0).z, zone.bottom, "under it at the back")
+	assert_false(zone.is_strike(dropping), "so it is a ball")
+	# A pitch that clips the top at the front but is above the zone at the middle is a ball too.
+	assert_false(zone.is_strike(_flight(Vector3(0.0, Field.PLATE_FRONT_Y, zone.top + 0.03), Vector3(0.0, -36.0, 0.0))))
+
+
+func test_width_is_judged_only_at_the_middle_of_the_plate() -> void:
+	var zone := StrikeZone.for_batter(1.82)
+	assert_almost_eq(zone.half_width * 2.0, 0.4718, 1e-4, "the plate plus 2 cm each side")
+	# Running in: outside the edge at the front, inside it at the middle.
+	var running_in := _flight(Vector3(zone.half_width + 0.02, Field.PLATE_FRONT_Y, 0.75), Vector3(-5.0, -36.0, 0.0))
+	assert_true(zone.is_strike(running_in))
+	# Running away: inside at the front, outside by the middle.
+	var running_out := _flight(Vector3(zone.half_width - 0.02, Field.PLATE_FRONT_Y, 0.75), Vector3(5.0, -36.0, 0.0))
+	assert_false(zone.is_strike(running_out))
+	assert_almost_eq(zone.top / 1.82, 0.5575, 1e-6, "top at 55.75% of height")
+	assert_almost_eq(zone.bottom / 1.82, 0.2704, 1e-6, "bottom at 27.04%")

@@ -226,3 +226,26 @@ func test_the_pitch_cannot_be_aimed_at_the_batter() -> void:
 	assert_almost_eq(scene.target.x, -zone.half_width - DuelScene.AIM_BEYOND_ZONE.x, 1e-4, "held at the edge of the aiming area")
 	assert_almost_eq(scene.target.z, zone.top + DuelScene.AIM_BEYOND_ZONE.y, 1e-4)
 	assert_gt(scene.target.x, scene.batter.position.x + 0.3, "which stops short of where the batter stands")
+
+
+func test_the_mound_is_a_surface_that_faces_up_at_its_regulation_height() -> void:
+	var park := GreyboxField.new()
+	add_child_autofree(park)
+	var mound := park.get_node("Mound") as MeshInstance3D
+	var arrays := mound.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+	var facing_up := 0
+	var top := 0.0
+	for i: int in vertices.size():
+		top = maxf(top, vertices[i].y)
+		if normals[i].y > 0.5:
+			facing_up += 1
+	assert_eq(facing_up, vertices.size(), "every part of the mound faces the sky")
+	assert_almost_eq(top, Field.MOUND_HEIGHT, 1e-4, "ten inches high")
+	# Godot draws the side a triangle winds clockwise on: from above, that is a cross product pointing down.
+	var a := vertices[indices[0]]
+	var b := vertices[indices[1]]
+	var c := vertices[indices[2]]
+	assert_lt((b - a).cross(c - a).y, 0.0, "triangles wind so that the top is the visible side")

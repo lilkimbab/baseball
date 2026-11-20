@@ -11,14 +11,6 @@ const BLUE := Color(0.45, 0.7, 1.0)
 const ORANGE := Color(1.0, 0.6, 0.25)
 const RED := Color(1.0, 0.35, 0.3)
 
-const RESULT_TEXT := {
-	PitchDuel.Result.BALL: "볼",
-	PitchDuel.Result.CALLED_STRIKE: "스트라이크",
-	PitchDuel.Result.SWINGING_STRIKE: "헛스윙",
-	PitchDuel.Result.FOUL: "파울",
-	PitchDuel.Result.IN_PLAY: "인플레이",
-	PitchDuel.Result.HOME_RUN: "홈런",
-}
 const JUDGMENT_TEXT := {&"perfect": "완벽", &"good": "좋음", &"early": "빠름", &"late": "늦음", &"miss": "헛스윙"}
 const MODE_TEXT := {&"bat": "타격", &"pitch": "투구", &"watch": "관전"}
 

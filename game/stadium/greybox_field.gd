@@ -9,8 +9,6 @@ extends Node3D
 var fence := FenceProfile.symmetric(100.0, 116.0, 122.0, 2.6)
 
 const GRASS := Color(0.16, 0.42, 0.17)
-const INFIELD_GRASS := Color(0.2, 0.5, 0.2)
-const DIRT := Color(0.62, 0.42, 0.26)
 const WALL := Color(0.05, 0.2, 0.15)
 const CHALK := Color(0.95, 0.95, 0.95)
 
@@ -54,6 +52,7 @@ func _make_surface_material() -> ShaderMaterial:
 	material.shader = load("res://stadium/field.gdshader") as Shader
 	material.set_shader_parameter("grain", grain_texture(false))
 	material.set_shader_parameter("grain_normal", grain_texture(true))
+	material.set_shader_parameter("line_half_width", Field.LINE_WIDTH * 0.5)
 	var distances := PackedFloat32Array()
 	for degree: int in 91:
 		distances.append(fence.distance_at(-45.0 + float(degree)))
@@ -142,20 +141,22 @@ func _build_mound() -> void:
 			tool.add_vertex(Field.to_world(Vector3(x, y, z)))
 	for spoke: int in SPOKES:
 		var next := (spoke + 1) % SPOKES
+		# Clockwise seen from above, which is the side Godot draws.
 		tool.add_index(0)
-		tool.add_index(1 + next)
 		tool.add_index(1 + spoke)
+		tool.add_index(1 + next)
 		for ring: int in range(1, RINGS):
 			var inner := 1 + (ring - 1) * SPOKES
 			var outer := 1 + ring * SPOKES
 			tool.add_index(inner + spoke)
-			tool.add_index(inner + next)
 			tool.add_index(outer + spoke)
 			tool.add_index(inner + next)
+			tool.add_index(inner + next)
+			tool.add_index(outer + spoke)
 			tool.add_index(outer + next)
-			tool.add_index(outer + spoke)
 	tool.generate_normals()
 	var mound := MeshInstance3D.new()
+	mound.name = "Mound"
 	mound.mesh = tool.commit()
 	mound.material_override = _surface
 	add_child(mound)

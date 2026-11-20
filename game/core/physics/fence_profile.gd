@@ -29,10 +29,6 @@ static func symmetric(corner: float, alley: float, center: float, height: float)
 	return fence
 
 
-func point_count() -> int:
-	return _az.size()
-
-
 func distance_at(az_deg: float) -> float:
 	var n := _az.size()
 	if n == 0:
