@@ -98,6 +98,8 @@ func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
 			_line(col, "1군에 등록됐다!", UiTheme.GOLD)
 		if r.sent_down:
 			_line(col, "2군으로 내려갔다.", UiTheme.RED)
+		for change: String in r.evolved:
+			_line(col, "구종 진화: " + change, UiTheme.GOLD)
 	if message != "":
 		_line(col, message, UiTheme.GOLD, 17)
 	for entry: String in cs.log:
@@ -143,6 +145,29 @@ func _build_growth(col: VBoxContainer, cs: CareerSeason) -> void:
 				Growth.raise(c, rating, cs.rules)
 				refresh())
 			row.add_child(b)
+	if c.is_pitcher():
+		_build_pitches(col, cs)
+
+
+## A pitcher's pitches, how often he has thrown each (they evolve with use), and new ones to
+## learn with pitching points.
+func _build_pitches(col: VBoxContainer, cs: CareerSeason) -> void:
+	var c := cs.career
+	var catalog := cs.season.catalog
+	_line(col, "구종 (많이 던지고 능력치가 오르면 진화)", UiTheme.GOLD, 18)
+	for a: ArsenalPitch in c.player.pitching.arsenal:
+		var t: PitchType = catalog.get(a.type)
+		_line(col, "%s %dkm/h · 변화 %d · 로케이션 %d · %d구" % [t.label if t != null else String(a.type), roundi(a.velo_avg), roundi(a.movement), roundi(a.command), int(c.pitch_uses.get(a.type, 0))], UiTheme.INK, 16)
+	for id: StringName in PitchEvolution.learnable(c, cs.rules):
+		var t: PitchType = catalog.get(id)
+		var b := Button.new()
+		b.text = "새 구종: %s (투구 %d포인트)" % [t.label if t != null else String(id), roundi(cs.rules.new_pitch_gp)]
+		b.disabled = float(c.gp.get("pitching", 0.0)) < cs.rules.new_pitch_gp
+		b.add_theme_font_size_override("font_size", 15)
+		b.pressed.connect(func() -> void:
+			PitchEvolution.learn(c, id, cs.rules, catalog)
+			refresh())
+		col.add_child(b)
 
 
 func _build_table(col: VBoxContainer, cs: CareerSeason) -> void:

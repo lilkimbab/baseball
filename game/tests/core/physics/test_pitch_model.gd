@@ -22,8 +22,8 @@ func before_all() -> void:
 	catalog = PitchCatalogIO.load_default()
 
 
-func test_catalog_has_all_eight_pitch_types() -> void:
-	assert_eq(catalog.size(), 8)
+func test_catalog_has_the_eight_pitch_types_and_four_evolved_ones() -> void:
+	assert_eq(catalog.size(), 12)
 	for id: StringName in EXPECTED:
 		assert_true(catalog.has(id), "missing %s" % id)
 

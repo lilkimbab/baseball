@@ -39,6 +39,21 @@ static func load_default() -> CareerRules:
 	var ratings: Dictionary = root.get("ratings", {})
 	for field: String in ratings:
 		r.ratings[field] = PackedStringArray(ratings[field] as Array)
+	var evolutions: Array = root.get("evolutions", [])
+	for entry: Dictionary in evolutions:
+		var e := CareerRules.Evolution.new()
+		e.from = StringName(str(entry.get("from", "")))
+		e.to = StringName(str(entry.get("to", "")))
+		e.uses = int(entry.get("uses", 0))
+		e.rating = str(entry.get("rating", ""))
+		e.at_least = float(entry.get("at_least", 0.0))
+		r.evolutions.append(e)
+	var learn: Dictionary = root.get("new_pitch", {})
+	r.new_pitch_gp = float(learn.get("gp", r.new_pitch_gp))
+	r.max_pitches = int(learn.get("max", r.max_pitches))
+	var learnable: Array = learn.get("learnable", [])
+	for id: Variant in learnable:
+		r.learnable.append(StringName(str(id)))
 	var goals: Dictionary = root.get("game_goals", {})
 	for key: String in goals:
 		r.game_goals[key] = goals[key]
