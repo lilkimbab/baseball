@@ -35,7 +35,7 @@ func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], 
 ## Builds a team for one game: the best fielder at each position, the best remaining hitter
 ## as designated hitter, and a batting order by the usual roles. Players in `rest` start on
 ## the bench (a day off, a slump) unless nobody else can play the position.
-func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionary[String, bool] = {}) -> TeamInGame:
+func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionary[String, bool] = {}, must: Dictionary[String, bool] = {}) -> TeamInGame:
 	var t := TeamInGame.new()
 	t.team_id = team.id
 	t.name = team.name
@@ -63,7 +63,7 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionar
 				continue
 			if Position.needs_right_hand(kind) and p.throws == &"L":
 				continue
-			var v := overall.batter(p, kind) * (0.6 + 0.4 * p.aptitude(kind)) - (1000.0 if rest.has(p.id) else 0.0)
+			var v := overall.batter(p, kind) * (0.6 + 0.4 * p.aptitude(kind)) - (1000.0 if rest.has(p.id) else 0.0) + (1000.0 if must.has(p.id) and p.aptitude(kind) >= 0.5 else 0.0)
 			if v > best_value or best == null:
 				best_value = v
 				best = p
@@ -74,7 +74,7 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionar
 		var best_dh: Player = null
 		var best_value := -1.0
 		for p: Player in hitters:
-			var v := overall.batter(p, Position.Kind.DH) - (1000.0 if rest.has(p.id) else 0.0)
+			var v := overall.batter(p, Position.Kind.DH) - (1000.0 if rest.has(p.id) else 0.0) + (1000.0 if must.has(p.id) else 0.0)
 			if not used.has(p.id) and (v > best_value or best_dh == null):
 				best_value = v
 				best_dh = p

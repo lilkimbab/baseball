@@ -103,6 +103,7 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
                 #   Esc 일시정지(투구 시간·자동 교체 설정), F 작전·교체, Tab 상세, C 코스 분포, F3 관전
                 #   타격 연습 장면: ./dev play res://match/duel.tscn
                 #   감독 리그(시즌): ./dev play res://league/league_screen.tscn
+                #   커리어(선수 만들기부터): ./dev play res://career/creation_screen.tscn
                 #   감독 지휘 한 경기: ./dev play res://match/manager_match.tscn -- --team home --innings 9
                 #     F 작전·예약, Enter 개입(3회), 1·2·4 속도, Space 멈춤, → 타석·Shift+→ 이닝 넘기기
 ./dev editor    # Windows에서 Godot 에디터 열기
