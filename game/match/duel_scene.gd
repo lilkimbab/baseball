@@ -15,9 +15,10 @@ const ACCURACY_SWEET := 0.75
 const MAX_FOLLOW_TIME := 6.5
 
 const BAT_CAMERA := [Vector3(0.55, -2.7, 0.9), Vector3(-0.2, 18.4, -0.45), 45.0]
-## Far behind the mound with a long lens, like the reference footage: the pitcher's back fills
-## the left of the frame and the batter and catcher are large enough to aim at.
-const PITCH_CAMERA := [Vector3(-0.8, 33.0, 2.7), Vector3(0.15, 0.0, 1.1), 7.5]
+## Far behind the mound with a long lens, like the reference footage: the whole pitcher stands
+## left of centre with his back to the camera, and the batter and catcher sit above him, large
+## enough to aim at. Worked back from a reference frame taken during the pitch gauge.
+const PITCH_CAMERA := [Vector3(-3.9, 54.6, 4.0), Vector3(0.3, 0.0, 0.8), 6.5]
 
 ## &"bat" = player bats, &"pitch" = player pitches, &"watch" = AI against AI.
 @export var mode: StringName = &"bat"
@@ -75,8 +76,8 @@ func _ready() -> void:
 	_ai_rng = _rng.fork(1)
 
 	var park := GreyboxField.new()
-	field_model = AnalyticField.create(park.fence)
 	add_child(park)
+	field_model = park.collision
 	_build_environment()
 	_build_players()
 	ball_actor = BallActor.new()
@@ -321,6 +322,13 @@ func _update_pointer() -> void:
 
 
 func _pose_players() -> void:
+	# The pitcher holds the ball until release and watches the plate; the batter watches the
+	# ball once it is on its way, and the pitcher's hand before that.
+	var ball_out := state == State.LIVE or state == State.RESULT
+	pitcher.right_grip = Puppet.Grip.RELAXED if ball_out else Puppet.Grip.BALL
+	pitcher.look_at_world(Field.to_world(Vector3(0.0, 0.3, 0.9)))
+	var watching := duel.ball.pos if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT else settings.release()
+	batter.look_at_world(Field.to_world(watching))
 	pitcher.apply(PuppetClips.pitch(maxf(_pitch_clock, 0.0)))
 	if _swing_clock >= 0.0:
 		batter.apply(PuppetClips.swing(_swing_clock - _swing_lead, _swing_lead, _swing_height))
@@ -370,20 +378,53 @@ func _move_camera(delta: float) -> void:
 
 
 func _build_environment() -> void:
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color(0.16, 0.34, 0.68)
+	sky_material.sky_horizon_color = Color(0.62, 0.74, 0.88)
+	sky_material.ground_horizon_color = Color(0.5, 0.56, 0.6)
+	sky_material.ground_bottom_color = Color(0.2, 0.22, 0.24)
+	sky_material.sun_angle_max = 25.0
+	sky_material.energy_multiplier = 0.8
 	var sky := Sky.new()
-	sky.sky_material = ProceduralSkyMaterial.new()
+	sky.sky_material = sky_material
+
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ambient_light_energy = 0.85
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 0.95
+	# Contact shadows where things meet the ground, a little bloom on bright surfaces, and
+	# haze that lightens the far outfield. The forward renderer draws all of these; the
+	# lighter renderers used for captures inside WSL skip what they cannot do.
+	env.ssao_enabled = true
+	env.ssao_radius = 1.2
+	env.ssao_intensity = 1.6
+	env.glow_enabled = true
+	env.glow_intensity = 0.35
+	env.glow_bloom = 0.04
+	env.fog_enabled = true
+	env.fog_light_color = Color(0.68, 0.76, 0.86)
+	env.fog_density = 0.0009
+	env.fog_sun_scatter = 0.15
+	env.fog_sky_affect = 0.2
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.06
+	env.adjustment_saturation = 1.08
 	var world_env := WorldEnvironment.new()
 	world_env.environment = env
 	add_child(world_env)
+
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50.0, -35.0, 0.0)
+	sun.rotation_degrees = Vector3(-48.0, -38.0, 0.0)
+	sun.light_color = Color(1.0, 0.96, 0.89)
+	sun.light_energy = 1.35
+	sun.light_angular_distance = 0.6
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 180.0
+	sun.shadow_blur = 1.4
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_max_distance = 140.0
 	add_child(sun)
 
 
@@ -394,6 +435,12 @@ func _build_players() -> void:
 	pitcher = _add_puppet(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), PI, home, Color(0.1, 0.15, 0.35), use_models)
 	batter = _add_puppet(Vector3(-1.05, 0.25, 0.0), -PI / 2.0, away, Color(0.75, 0.12, 0.12), use_models)
 	batter.show_bat = true
+	batter.headgear = &"helmet"
+	batter.left_grip = Puppet.Grip.BAT
+	batter.right_grip = Puppet.Grip.BAT
+	batter.set_back_lettering(27, "한도윤", Color(0.95, 0.95, 0.97))
+	pitcher.left_grip = Puppet.Grip.GLOVE
+	pitcher.set_back_lettering(18, "서강민", Color(0.1, 0.15, 0.35))
 	catcher = _add_puppet(Vector3(0.0, -1.15, 0.0), 0.0, home, Color(0.1, 0.15, 0.35))
 	catcher.apply(PuppetClips.catcher())
 	var spots: Array[Vector3] = [

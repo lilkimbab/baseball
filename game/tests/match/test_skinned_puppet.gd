@@ -78,12 +78,68 @@ func test_team_colours_are_applied_to_the_uniform() -> void:
 	var puppet := SkinnedPuppet.new()
 	puppet.set_colors(Color(0.2, 0.3, 0.8), Color(0.9, 0.9, 0.9), Color(0.8, 0.1, 0.1))
 	add_child_autofree(puppet)
-	var mesh := puppet.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	var seen := {}
-	for surface: int in mesh.mesh.get_surface_count():
-		var name := mesh.mesh.surface_get_material(surface).resource_name
-		seen[name] = (mesh.get_surface_override_material(surface) as StandardMaterial3D).albedo_color
+	for mesh: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
+		for surface: int in mesh.mesh.get_surface_count():
+			var material := mesh.get_surface_override_material(surface) as StandardMaterial3D
+			if material != null:
+				seen[mesh.mesh.surface_get_material(surface).resource_name] = material.albedo_color
 	assert_eq(seen["Jersey"], Color(0.2, 0.3, 0.8))
 	assert_eq(seen["Cap"], Color(0.8, 0.1, 0.1))
+	assert_eq(seen["Helmet"], Color(0.8, 0.1, 0.1))
 	assert_eq(seen["Socks"], Color(0.8, 0.1, 0.1))
 	assert_true(seen.has("Skin") and seen.has("Pants") and seen.has("Shoes") and seen.has("Belt"))
+
+
+func test_headgear_switches_between_cap_and_helmet() -> void:
+	var puppet := _model()
+	var cap := puppet.find_child("Cap", true, false) as MeshInstance3D
+	var helmet := puppet.find_child("Helmet", true, false) as MeshInstance3D
+	puppet.apply(PuppetClips.stance())
+	assert_true(cap.visible and not helmet.visible, "a cap by default")
+	puppet.headgear = &"helmet"
+	puppet.apply(PuppetClips.stance())
+	assert_true(helmet.visible and not cap.visible)
+
+
+func test_a_bat_grip_closes_the_fingers() -> void:
+	var puppet := _model()
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var wrist := skeleton.find_bone("RightHand")
+	var tip := skeleton.find_bone("RightMiddleDistal")
+	puppet.apply(PuppetClips.stance())
+	var open_reach := skeleton.get_bone_global_pose(wrist).origin.distance_to(skeleton.get_bone_global_pose(tip).origin)
+	puppet.right_grip = Puppet.Grip.BAT
+	puppet.apply(PuppetClips.stance())
+	var closed_reach := skeleton.get_bone_global_pose(wrist).origin.distance_to(skeleton.get_bone_global_pose(tip).origin)
+	assert_lt(closed_reach, open_reach * 0.8, "fingertips come back toward the wrist in a fist")
+	assert_gt(closed_reach, 0.02, "but the hand does not collapse")
+
+
+func test_head_turns_toward_what_the_player_is_watching() -> void:
+	var puppet := _model()
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var to_puppet := puppet.global_transform.affine_inverse() * skeleton.global_transform
+	var head := skeleton.find_bone("Head")
+	var rest_forward := skeleton.get_bone_global_rest(head).basis.inverse() * Vector3.BACK
+	# Something off to the puppet's left at head height.
+	puppet.look_target = Vector3(-5.0, 1.6, -1.0)
+	puppet.has_look_target = true
+	puppet.apply(PuppetClips.stance())
+	var facing := to_puppet.basis * (skeleton.get_bone_global_pose(head).basis * rest_forward)
+	assert_lt(facing.x, -0.5, "the face points to the left")
+	puppet.look_target = Vector3(5.0, 1.6, -1.0)
+	puppet.apply(PuppetClips.stance())
+	facing = to_puppet.basis * (skeleton.get_bone_global_pose(head).basis * rest_forward)
+	assert_gt(facing.x, 0.5, "and to the right")
+
+
+func test_name_and_number_are_on_the_back() -> void:
+	var puppet := _model()
+	puppet.set_back_lettering(18, "서강민")
+	var texts: Array[String] = []
+	for label: Label3D in puppet.find_children("*", "Label3D", true, false):
+		texts.append(label.text)
+		var behind := puppet.global_transform.affine_inverse() * label.global_position
+		assert_gt(behind.z, 0.08, "lettering sits behind the spine (the puppet faces -Z)")
+	assert_true(texts.has("18") and texts.has("서강민"))
