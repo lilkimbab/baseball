@@ -7,7 +7,8 @@ extends SceneTree
 ## Options: --out <path prefix>  --plays <n, default 2>  --seed <n>  --speed <time scale,
 ##          default 2: waits between pitches pass faster>  --to-end: play the game out and
 ##          photograph the screen after it  --menus: the player's side, with the pause menu
-##          and the pitch clock
+##          and the pitch clock  --manager: the manager mode (situation board, orders menu,
+##          a ball in play shown from the summary)
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -19,6 +20,7 @@ var _taken := {}
 var _was_playing := false
 var _to_end := false
 var _menus := false
+var _manager := false
 
 
 func _initialize() -> void:
@@ -26,7 +28,8 @@ func _initialize() -> void:
 	_prefix = args.get("out", _prefix)
 	_plays = int(str(args.get("plays", "2")))
 	Engine.time_scale = float(str(args.get("speed", "2")))
-	var packed := load("res://match/match.tscn") as PackedScene
+	_manager = args.has("manager")
+	var packed := load("res://match/manager_match.tscn" if _manager else "res://match/match.tscn") as PackedScene
 	_scene = packed.instantiate() as MatchScene
 	_to_end = args.has("to-end")
 	_menus = args.has("menus")
@@ -46,6 +49,8 @@ func _process(_delta: float) -> bool:
 		return true
 	if _menus:
 		return _menu_shots()
+	if _manager:
+		return _manager_shots()
 	if _to_end:
 		if _scene.game.over and not _taken.has("postgame"):
 			_shoot("postgame")
@@ -90,6 +95,22 @@ func _menu_shots() -> bool:
 		_scene.toggle_menu()
 		_shoot("subs")
 	return _taken.has("subs") and _due.is_empty()
+
+
+## The board between pitches, the orders menu, then a ball in play from the summary.
+func _manager_shots() -> bool:
+	var m := _scene as ManagerMatch
+	if m.board_visible() and m.log.size() >= 4 and not _taken.has("board"):
+		_shoot("board")
+	elif _taken.has("board") and not _taken.has("orders") and _due.is_empty() and m.state == DuelScene.State.PRE_PITCH and m._play_time < 0.0:
+		m.open_orders()
+		_shoot("orders")
+	elif _taken.has("orders") and _due.is_empty() and m.orders.visible:
+		m.orders.close()
+	var playing := m._play_time >= 1.5 and m._play != null and not m._play.foul
+	if _taken.has("orders") and playing and not _taken.has("play"):
+		_shoot("play")
+	return _taken.has("play") and _due.is_empty()
 
 
 func _shoot(tag: String) -> void:
