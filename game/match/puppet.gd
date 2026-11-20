@@ -4,14 +4,18 @@ extends Node3D
 ## out from a PuppetPose with two-bone IK. Joint names follow the final skeleton's bone names
 ## so the same poses can drive the real player model from stage S3b on.
 
-const SPINE := 0.5
-const SHOULDER_HALF := 0.19
-const HIP_HALF := 0.1
-const UPPER_ARM := 0.29
-const LOWER_ARM := 0.27
-const UPPER_LEG := 0.44
-const LOWER_LEG := 0.43
 const HEAD_RADIUS := 0.115
+
+## Body proportions in metres. SkinnedPuppet replaces these with the model's own.
+var spine := 0.5
+var shoulder_half := 0.19
+## How far below the top of the spine the shoulder joints sit.
+var shoulder_drop := 0.07
+var hip_half := 0.1
+var upper_arm := 0.29
+var lower_arm := 0.27
+var upper_leg := 0.44
+var lower_leg := 0.43
 
 @export var jersey := Color(0.9, 0.9, 0.93)
 @export var pants := Color(0.82, 0.82, 0.85)
@@ -27,20 +31,24 @@ var _parts: Dictionary[StringName, MeshInstance3D] = {}
 
 
 func _ready() -> void:
-	_limb(&"Torso", 0.16, SPINE + 0.1, jersey)
+	_limb(&"Torso", 0.16, spine + 0.1, jersey)
 	_ball(&"Hips", 0.15, pants)
 	_ball(&"Head", HEAD_RADIUS, skin)
 	_ball(&"Cap", HEAD_RADIUS * 1.04, cap)
 	for side: String in ["Left", "Right"]:
-		_limb(StringName(side + "UpperArm"), 0.052, UPPER_ARM, jersey)
-		_limb(StringName(side + "LowerArm"), 0.043, LOWER_ARM, skin)
-		_limb(StringName(side + "UpperLeg"), 0.078, UPPER_LEG, pants)
-		_limb(StringName(side + "LowerLeg"), 0.058, LOWER_LEG, pants)
+		_limb(StringName(side + "UpperArm"), 0.052, upper_arm, jersey)
+		_limb(StringName(side + "LowerArm"), 0.043, lower_arm, skin)
+		_limb(StringName(side + "UpperLeg"), 0.078, upper_leg, pants)
+		_limb(StringName(side + "LowerLeg"), 0.058, lower_leg, pants)
 		_ball(StringName(side + "Hand"), 0.05, skin)
 		_box(StringName(side + "Foot"), Vector3(0.1, 0.07, 0.26), Color(0.08, 0.08, 0.08))
+	_build_props()
+	apply(PuppetClips.fielder_ready())
+
+
+func _build_props() -> void:
 	_limb(&"Bat", 0.03, PuppetClips.BAT_LENGTH, Color(0.72, 0.56, 0.36))
 	_ball(&"Glove", 0.085, Color(0.42, 0.25, 0.12))
-	apply(PuppetClips.fielder_ready())
 
 
 func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> void:
@@ -49,12 +57,36 @@ func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> vo
 	cap = cap_color
 
 
+## Frames worked out by solve(), in the puppet's space.
+var hip_basis := Basis.IDENTITY
+var chest_basis := Basis.IDENTITY
+var spine_dir := Vector3.UP
+
+
 func apply(pose: PuppetPose) -> void:
-	var hip_basis := Basis(Vector3.UP, pose.hips_yaw)
-	var chest_basis := Basis(Vector3.UP, pose.hips_yaw + pose.twist)
+	solve(pose)
+	_place_limb(&"Torso", pose.hips - spine_dir * 0.05, joints[&"Chest"] + spine_dir * 0.05)
+	_place(&"Hips", pose.hips)
+	_place(&"Head", joints[&"Head"])
+	_place(&"Cap", joints[&"Head"] + spine_dir * 0.035 + chest_basis * Vector3.FORWARD * 0.012)
+	for side: String in ["Left", "Right"]:
+		_place_limb(StringName(side + "UpperArm"), joints[StringName(side + "UpperArm")], joints[StringName(side + "LowerArm")])
+		_place_limb(StringName(side + "LowerArm"), joints[StringName(side + "LowerArm")], joints[StringName(side + "Hand")])
+		_place(StringName(side + "Hand"), joints[StringName(side + "Hand")])
+		_place_limb(StringName(side + "UpperLeg"), joints[StringName(side + "UpperLeg")], joints[StringName(side + "LowerLeg")])
+		_place_limb(StringName(side + "LowerLeg"), joints[StringName(side + "LowerLeg")], joints[StringName(side + "Foot")])
+		var foot := _parts[StringName(side + "Foot")]
+		foot.transform = Transform3D(hip_basis, joints[StringName(side + "Foot")] + hip_basis * Vector3.FORWARD * 0.07 - Vector3.UP * 0.045)
+	_place_props(pose)
+
+
+## Works out every joint position for a pose with two-bone IK and stores them in `joints`.
+func solve(pose: PuppetPose) -> void:
+	hip_basis = Basis(Vector3.UP, pose.hips_yaw)
+	chest_basis = Basis(Vector3.UP, pose.hips_yaw + pose.twist)
 	var forward := hip_basis * Vector3.FORWARD
-	var spine_dir := (Vector3.UP * cos(pose.lean) + forward * sin(pose.lean)).normalized()
-	var chest_top := pose.hips + spine_dir * SPINE
+	spine_dir = (Vector3.UP * cos(pose.lean) + forward * sin(pose.lean)).normalized()
+	var chest_top := pose.hips + spine_dir * spine
 	var chest_right := chest_basis * Vector3.RIGHT
 	var chest_forward := chest_basis * Vector3.FORWARD
 	var hip_right := hip_basis * Vector3.RIGHT
@@ -62,37 +94,26 @@ func apply(pose: PuppetPose) -> void:
 	joints[&"Hips"] = pose.hips
 	joints[&"Chest"] = chest_top
 	joints[&"Head"] = chest_top + spine_dir * (0.1 + HEAD_RADIUS)
-	_place_limb(&"Torso", pose.hips - spine_dir * 0.05, chest_top + spine_dir * 0.05)
-	_place(&"Hips", pose.hips)
-	_place(&"Head", joints[&"Head"])
-	_place(&"Cap", joints[&"Head"] + spine_dir * 0.035 + chest_forward * 0.012)
-
 	for side: int in [-1, 1] as Array[int]:
 		var name := "Right" if side > 0 else "Left"
-		var shoulder := chest_top - spine_dir * 0.07 + chest_right * (SHOULDER_HALF * side)
+		var shoulder := chest_top - spine_dir * shoulder_drop + chest_right * (shoulder_half * side)
 		var hand_target := pose.r_hand if side > 0 else pose.l_hand
 		var elbow_hint := chest_right * (0.5 * side) - Vector3.UP - chest_forward * 0.5
-		var hand := _reach(shoulder, hand_target, UPPER_ARM + LOWER_ARM)
-		var elbow := _two_bone(shoulder, hand, UPPER_ARM, LOWER_ARM, elbow_hint)
+		var hand := _reach(shoulder, hand_target, upper_arm + lower_arm)
 		joints[StringName(name + "UpperArm")] = shoulder
-		joints[StringName(name + "LowerArm")] = elbow
+		joints[StringName(name + "LowerArm")] = _two_bone(shoulder, hand, upper_arm, lower_arm, elbow_hint)
 		joints[StringName(name + "Hand")] = hand
-		_place_limb(StringName(name + "UpperArm"), shoulder, elbow)
-		_place_limb(StringName(name + "LowerArm"), elbow, hand)
-		_place(StringName(name + "Hand"), hand)
 
-		var hip := pose.hips + hip_right * (HIP_HALF * side)
+		var hip := pose.hips + hip_right * (hip_half * side)
 		var foot_target := pose.r_foot if side > 0 else pose.l_foot
-		var ankle := _reach(hip, foot_target, UPPER_LEG + LOWER_LEG)
-		var knee := _two_bone(hip, ankle, UPPER_LEG, LOWER_LEG, forward + hip_right * (0.3 * side))
+		var ankle := _reach(hip, foot_target, upper_leg + lower_leg)
 		joints[StringName(name + "UpperLeg")] = hip
-		joints[StringName(name + "LowerLeg")] = knee
+		joints[StringName(name + "LowerLeg")] = _two_bone(hip, ankle, upper_leg, lower_leg, forward + hip_right * (0.3 * side))
 		joints[StringName(name + "Foot")] = ankle
-		_place_limb(StringName(name + "UpperLeg"), hip, knee)
-		_place_limb(StringName(name + "LowerLeg"), knee, ankle)
-		var foot := _parts[StringName(name + "Foot")]
-		foot.transform = Transform3D(hip_basis, ankle + forward * 0.07 - Vector3.UP * 0.045)
 
+
+## Places the bat along the pose's bat direction from the hands, and the glove on the left hand.
+func _place_props(pose: PuppetPose) -> void:
 	var bat := _parts[&"Bat"]
 	bat.visible = show_bat and pose.bat_dir.length() > 0.1
 	if bat.visible:
