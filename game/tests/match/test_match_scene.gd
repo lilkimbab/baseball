@@ -134,3 +134,58 @@ func test_a_player_can_play_a_three_inning_game_to_the_end() -> void:
 		assert_eq(b.runs, scene.game.score[t])
 		assert_eq(b.pa, b.ab + b.walks + b.intentional_walks + b.hit_by_pitch + b.sac_bunts + b.sac_flies)
 	assert_eq(book.team_pitching(1).outs, scene.game.line[0].size() * 3, "three outs in every top half")
+
+
+func test_the_pitch_clock_calls_a_ball_when_the_player_takes_too_long() -> void:
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 1
+	scene.innings = 3
+	scene.seed_value = 31
+	scene.use_motion = false
+	add_child_autofree(scene)
+	assert_true(scene.human_pitches())
+	var limit := float(scene.game.rules.pitch_clock_empty)
+	for i: int in roundi((limit - 1.0) / DT):
+		scene.step(DT)
+	assert_eq(scene.game.balls, 0, "still within the clock")
+	assert_gt(scene.pitch_clock, 0.0)
+	for i: int in roundi(2.0 / DT):
+		scene.step(DT)
+	assert_eq(scene.game.balls, 1, "the clock ran out: ball one")
+
+
+func test_the_pause_menu_stops_the_game_and_the_clock_can_be_turned_off() -> void:
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 1
+	scene.innings = 3
+	scene.seed_value = 32
+	scene.use_motion = false
+	add_child_autofree(scene)
+	scene._menu_key(KEY_ESCAPE)
+	assert_true(scene.pause_menu.visible)
+	var before := scene.state_time
+	scene.step(1.0)
+	assert_eq(scene.state_time, before, "paused")
+	scene.pitch_clock_on = false
+	scene._menu_key(KEY_ESCAPE)
+	assert_false(scene.pause_menu.visible)
+	for i: int in roundi(30.0 / DT):
+		scene.step(DT)
+	assert_eq(scene.game.balls, 0, "no clock: the player may take his time")
+
+
+func test_with_manual_changes_the_computer_leaves_the_player_s_pitcher_in() -> void:
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 1
+	scene.innings = 3
+	scene.seed_value = 33
+	scene.use_motion = false
+	add_child_autofree(scene)
+	scene.set_auto_changes(false)
+	assert_eq(scene.manager.manual_team, 1)
+	var g := scene.game
+	# A starter far past his limit would be taken out by the computer manager.
+	g.pitch_counts[g.teams[1].pitcher_id] = 160
+	assert_null(scene.manager.next_change(g), "the player's own pitcher stays until he changes him")
+	scene.set_auto_changes(true)
+	assert_not_null(scene.manager.next_change(g), "with the computer's help he is relieved")

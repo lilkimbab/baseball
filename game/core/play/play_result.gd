@@ -16,5 +16,6 @@ var errors := 0
 ## The infield fly rule was called on this ball.
 var infield_fly := false
 var timeline := PlayTimeline.new()
-## A short description for the play-by-play.
-var note := ""
+## Plays at a base, in order: when, which base, out or safe, and how close (seconds between
+## ball and runner). The scene shows the umpire's call on the close ones.
+var calls: Array[PlayCall] = []

@@ -2,7 +2,7 @@
 
 Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경기에 **결정적인 순간만 직접 뛰어드는 감독 + 액션 하이브리드**와, **선수 한 명으로 뛰는 커리어 모드**가 핵심이다.
 
-- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S5(풀 플레이) 핵심까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료. `./dev play`로 3이닝 경기를 한다(자기 팀의 타격과 투구, 수비·주루는 자동, F 키로 투수 교체·대타·대주자). `./dev sim --physical`은 투구 하나하나를 물리로 시뮬레이션한 경기를 보여 준다. 다음은 S6(경기 화면)이고, 할 일은 [구현 명세](docs/13-implementation-spec.md)에 순서대로 있다.
+- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S6(경기 화면)까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료. `./dev play`로 3이닝 경기를 한다(자기 팀의 타격과 투구, 수비·주루는 자동, 점수 표시·하단 바·투구 기록·화면 속 화면·경기 뒤 화면). `./dev sim --physical`은 투구 하나하나를 물리로 시뮬레이션한 경기를 보여 준다. 다음은 S7(감독 리그)이고, 할 일은 [구현 명세](docs/13-implementation-spec.md)에 순서대로 있다.
 - **엔진**: Godot 4.7.2 (GDScript, Jolt 물리). 씬·스크립트·데이터가 전부 텍스트 파일이라 VSCode에서 작성하고 헤드리스로 테스트한다.
 - **참고작**: 넥슨·2K스포츠의 온라인 야구 게임 「프로야구2K」(2013) / 「프로야구2K14」(2014, 서비스 종료). 조사 내용은 [docs/01-reference-research.md](docs/01-reference-research.md).
 
@@ -100,7 +100,8 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 ./dev check     # 스크립트 문법·타입 검사
 ./dev play      # Windows에서 경기 실행 (GPU). 3이닝 홈팀. 옵션: -- --innings 9 --team away|home|watch
                 #   타격: 왼쪽 클릭 컨택, 오른쪽 클릭 강타, Space 번트 / 투구: 1~5 구종, 누르고 떼고 다시 눌러 힘·정확도
-                #   F 작전·교체, F3 관전 전환. 타격 연습 장면: ./dev play res://match/duel.tscn
+                #   Esc 일시정지(투구 시간·자동 교체 설정), F 작전·교체, Tab 상세, C 코스 분포, F3 관전
+                #   타격 연습 장면: ./dev play res://match/duel.tscn
 ./dev editor    # Windows에서 Godot 에디터 열기
 ./dev shot      # WSL에서 화면 캡처 → build/shot.png
 ./dev model     # 선수 모델 재생성 (Blender + MPFB)

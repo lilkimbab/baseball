@@ -28,6 +28,21 @@ var manager: AiManager
 var scorebug: Scorebug
 var bottom_bar: BottomBar
 var pitch_track: PitchTrack
+var play_overlay: PlayOverlay
+var pause_menu: PauseMenu
+var post_game: PostGame
+## The pitch clock (KBO 2026: 18 s with the bases empty, 23 s with runners) runs only while
+## the player chooses his pitch; seconds left, negative when not running.
+var pitch_clock_on := true
+var pitch_clock := -1.0
+## The computer also makes the player's team's pitching changes and pinch hits.
+var auto_changes := true
+## Where and when a ball in the air first comes down (for the landing ring).
+var landing_known := false
+var landing_point := Vector3.ZERO
+var landing_time := 0.0
+var commentary: Commentary
+var _last_pitch_result: PitchDuel.Result = PitchDuel.Result.NONE
 ## The small second view (docs/13 S6-5).
 var pip_viewport: SubViewport
 var pip_camera: Camera3D
@@ -92,6 +107,18 @@ func _ready() -> void:
 	pitch_track = PitchTrack.new()
 	pitch_track.scene = self
 	layer.add_child(pitch_track)
+	play_overlay = PlayOverlay.new()
+	play_overlay.scene = self
+	layer.add_child(play_overlay)
+	post_game = PostGame.new()
+	post_game.scene = self
+	layer.add_child(post_game)
+	pause_menu = PauseMenu.new()
+	pause_menu.scene = self
+	layer.add_child(pause_menu)
+	pause_menu.wants_substitutions.connect(func() -> void: toggle_menu(true))
+	pause_menu.quit_requested.connect(func() -> void: get_tree().quit())
+	commentary = CommentaryIO.load_default()
 	_build_pip(layer)
 	# The duel's own count and help line give way to the scoreboard and the bottom bar.
 	var duel_hud := hud as DuelHud
@@ -155,8 +182,34 @@ func set_mode(new_mode: StringName) -> void:
 	# F3 toggles watching; the player's side is fixed for the game.
 	if new_mode == &"watch":
 		human_team = -1 if human_team >= 0 else _chosen_team
+		set_auto_changes(auto_changes)
 		_sync_mode()
 		_snap_camera()
+
+
+## The pitch clock: it runs while the player chooses and times his pitch; running out is a
+## ball (KBO 2026 rules; it can be turned off in the pause menu).
+func _run_pitch_clock(delta: float) -> void:
+	var choosing := human_pitches() and _play_time < 0.0 and _between <= 0.0 \
+		and (state == State.PRE_PITCH or state == State.CHARGE or state == State.ACCURACY)
+	if not pitch_clock_on or not choosing:
+		pitch_clock = -1.0
+		return
+	if pitch_clock < 0.0:
+		pitch_clock = float(game.rules.pitch_clock_runners if game.runners_on() > 0 else game.rules.pitch_clock_empty)
+	pitch_clock -= delta
+	if pitch_clock > 0.0:
+		return
+	pitch_clock = -1.0
+	_apply(GameEvent.pitch(GameEvent.Call.BALL))
+	banner = "투구 시간 위반 · 볼"
+	banner_time = 2.0
+	_enter(State.RESULT)
+
+
+## The timing call shows for a moment after the swing, not through the whole play.
+func swing_feedback_visible() -> bool:
+	return _play_time < 0.0 or _play_time < 0.9
 
 
 func help_keys() -> String:
@@ -170,8 +223,14 @@ func selected_type() -> PitchType:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	super._unhandled_input(event)
 	var key := event as InputEventKey
+	if key != null and key.pressed and not key.echo and (key.keycode == KEY_ESCAPE or key.keycode == KEY_ENTER):
+		_menu_key(key.keycode)
+		get_viewport().set_input_as_handled()
+		return
+	if pause_menu.visible or menu.visible:
+		return
+	super._unhandled_input(event)
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_SPACE:
 		bunt()
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F:
@@ -182,13 +241,41 @@ func _unhandled_input(event: InputEvent) -> void:
 		pitch_track.show_spread = not pitch_track.show_spread
 
 
-## Opens or closes the manager's menu. It opens only between pitches; the game waits.
-func toggle_menu() -> void:
+## Esc pauses (or closes what is open, or leaves a finished game); Enter replays one.
+func _menu_key(code: Key) -> void:
+	if game.over:
+		if code == KEY_ENTER:
+			get_tree().reload_current_scene()
+		else:
+			get_tree().quit()
+		return
+	if code != KEY_ESCAPE:
+		return
+	if menu.visible:
+		menu.close()
+	elif pause_menu.visible:
+		pause_menu.close()
+	else:
+		pause_menu.open()
+
+
+## Opens or closes the manager's menu. It opens only between pitches (or from the pause
+## menu); the game waits.
+func toggle_menu(from_pause: bool = false) -> void:
 	if menu.visible:
 		menu.close()
 		return
 	if state == State.PRE_PITCH and _play_time < 0.0 and not game.over:
 		menu.open()
+	elif from_pause:
+		banner = "교체는 투구 사이에만 할 수 있습니다"
+		banner_time = 2.0
+		pause_menu.open()
+
+
+func set_auto_changes(on: bool) -> void:
+	auto_changes = on
+	manager.manual_team = -1 if on or human_team < 0 else human_team
 
 
 ## A substitution the player chose in the menu.
@@ -255,6 +342,8 @@ func _finish_pitch() -> void:
 	if swing_motion != null:
 		swing_motion.relax()
 	_track_pitch()
+	_last_pitch_result = duel.result
+	_note_landing()
 	resolver.last_play = null
 	var events := resolver.after_pitch(game, duel)
 	var play := resolver.last_play
@@ -309,6 +398,9 @@ func _pitch_banner(events: Array[GameEvent]) -> String:
 func step(delta: float) -> void:
 	if menu != null and menu.visible:
 		return
+	if pause_menu != null and pause_menu.visible:
+		return
+	_run_pitch_clock(delta)
 	if game.over:
 		state_time += delta
 		banner_time = maxf(banner_time - delta, 0.0)
@@ -361,21 +453,24 @@ func _apply(e: GameEvent) -> void:
 
 func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 	var team := game.teams[out.batting_before]
+	var pick := log.size()
 	match e.kind:
 		GameEvent.Kind.PLATE_APPEARANCE:
 			var p := team.player(batter_id)
-			var text := "%s: %s" % [p.name if p != null else batter_id, GameSim.play_text(e, out)]
-			if out.scored.size() > 0:
-				text += ", %d점" % out.scored.size()
-			return text
-		GameEvent.Kind.STEAL:
-			return "도루 성공" if not e.moves[0].is_out() else "도루 실패"
-		GameEvent.Kind.PICKOFF:
-			return "견제사"
+			var key := Commentary.key_for(e.result, _last_pitch_result)
+			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, out.scored.size())
+		GameEvent.Kind.STEAL, GameEvent.Kind.PICKOFF:
+			var m := e.moves[0]
+			var runner := team.player(out.runner_ids[0]) if not out.runner_ids.is_empty() else null
+			var who := runner.name if runner != null else ""
+			var base := m.out_at if m.is_out() else m.to
+			if e.kind == GameEvent.Kind.PICKOFF:
+				return commentary.line("pickoff", pick, "", "", "", 0, who, base)
+			return commentary.line("caught_stealing" if m.is_out() else "steal", pick, "", "", "", out.scored.size(), who, mini(base, 4))
 		GameEvent.Kind.WILD_PITCH:
-			return "폭투"
+			return commentary.line("wild_pitch", pick, "", "", "", out.scored.size())
 		GameEvent.Kind.PASSED_BALL:
-			return "포일"
+			return commentary.line("passed_ball", pick, "", "", "", out.scored.size())
 		GameEvent.Kind.SUBSTITUTION:
 			var t := game.teams[e.team]
 			var who := t.player(e.in_id)
@@ -418,7 +513,7 @@ func _drain() -> void:
 		if e == null:
 			return
 		_apply(e)
-		if e.kind != GameEvent.Kind.SUBSTITUTION:
+		if e.kind != GameEvent.Kind.SUBSTITUTION and not game.over:
 			banner = last_text
 			banner_time = 2.2
 
@@ -560,6 +655,48 @@ func _show_target() -> void:
 	catcher.apply(PuppetClips.catcher(aim.z))
 
 
+## The fielder going after the ball in the current play (DH when none).
+func chasing_fielder() -> Position.Kind:
+	if _play == null or _play.direction < 1 or _play.direction > 9:
+		return Position.Kind.DH
+	return (_play.direction - 1) as Position.Kind
+
+
+## The runners (and the batter) in the current play.
+func runner_ids_in_play() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in _runners_at_start:
+		if id != "":
+			ids.append(id)
+	if _batter_at_start != "":
+		ids.append(_batter_at_start)
+	return ids
+
+
+## His place in the batting order (1..9) for the team at bat.
+func order_of(id: String) -> int:
+	return game.batting_team().slot_of(id) + 1
+
+
+func ball_position(t: float) -> Vector3:
+	return _ball_at(_play.timeline, t) if _play != null else Vector3.ZERO
+
+
+## Where the batted ball first comes down, when it goes up in the air.
+func _note_landing() -> void:
+	landing_known = false
+	if duel.path == null or duel.path.events.is_empty() or duel.contact == null:
+		return
+	if duel.contact.launch_deg() < 10.0:
+		return
+	var first := duel.path.events[0]
+	if first.kind != BallEvent.Kind.BOUNCE:
+		return
+	landing_known = true
+	landing_point = first.pos
+	landing_time = first.time
+
+
 static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 	var d := to - from
 	return -atan2(d.x, d.y)
@@ -583,9 +720,14 @@ func refresh(delta: float) -> void:
 
 
 func _redraw_overlays() -> void:
+	# After the game only the scoreboard and the summary remain.
+	hud.visible = not game.over
+	pitch_track.visible = not game.over
 	scorebug.queue_redraw()
 	bottom_bar.queue_redraw()
 	pitch_track.queue_redraw()
+	play_overlay.queue_redraw()
+	post_game.queue_redraw()
 	_update_pip()
 
 

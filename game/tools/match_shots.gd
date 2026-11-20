@@ -5,7 +5,9 @@ extends SceneTree
 ##   ./dev tool-win match_shots build/match/shot --plays 3
 ##
 ## Options: --out <path prefix>  --plays <n, default 2>  --seed <n>  --speed <time scale,
-##          default 2: waits between pitches pass faster>
+##          default 2: waits between pitches pass faster>  --to-end: play the game out and
+##          photograph the screen after it  --menus: the player's side, with the pause menu
+##          and the pitch clock
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -15,6 +17,8 @@ var _frames := 0
 var _due: Array[String] = []
 var _taken := {}
 var _was_playing := false
+var _to_end := false
+var _menus := false
 
 
 func _initialize() -> void:
@@ -24,7 +28,9 @@ func _initialize() -> void:
 	Engine.time_scale = float(str(args.get("speed", "2")))
 	var packed := load("res://match/match.tscn") as PackedScene
 	_scene = packed.instantiate() as MatchScene
-	_scene.human_team = -1
+	_to_end = args.has("to-end")
+	_menus = args.has("menus")
+	_scene.human_team = 1 if _menus else -1
 	_scene.innings = 3
 	_scene.seed_value = int(str(args.get("seed", "20261121")))
 	root.add_child(_scene)
@@ -35,9 +41,15 @@ func _process(_delta: float) -> bool:
 	for name: String in _due:
 		root.get_texture().get_image().save_png("%s_%s.png" % [_prefix, name])
 	_due.clear()
-	if _frames > 20000:
+	if _frames > (200000 if _to_end else 20000):
 		print("match_shots: gave up after %d frames" % _frames)
 		return true
+	if _menus:
+		return _menu_shots()
+	if _to_end:
+		if _scene.game.over and not _taken.has("postgame"):
+			_shoot("postgame")
+		return _taken.has("postgame") and _due.is_empty()
 	if _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _taken.has("pitch"):
 		_shoot("pitch")
 	# The Tab detail cards, once, a moment before the second pitch.
@@ -64,6 +76,20 @@ func _process(_delta: float) -> bool:
 		_shoot("%d_after" % (_seen - 1))
 	_was_playing = playing
 	return _seen >= _plays and _due.is_empty()
+
+
+## The pitch clock running, then the pause menu, then the manager's menu.
+func _menu_shots() -> bool:
+	if _scene.pitch_clock >= 0.0 and _scene.pitch_clock < 12.0 and not _taken.has("clock"):
+		_shoot("clock")
+	elif _taken.has("clock") and not _taken.has("pause") and _due.is_empty():
+		_scene._menu_key(KEY_ESCAPE)
+		_shoot("pause")
+	elif _taken.has("pause") and not _taken.has("subs") and _due.is_empty():
+		_scene.pause_menu.close()
+		_scene.toggle_menu()
+		_shoot("subs")
+	return _taken.has("subs") and _due.is_empty()
 
 
 func _shoot(tag: String) -> void:
