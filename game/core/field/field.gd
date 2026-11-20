@@ -12,10 +12,11 @@ const RUBBER_Y := 18.44
 const MOUND_CENTER_Y := 17.98
 const MOUND_RADIUS := 2.743
 const MOUND_HEIGHT := 0.254
-## The level top of the mound: from 6 inches in front of the rubber to behind it, 5 feet wide.
-const MOUND_TOP_FRONT := 0.152
-const MOUND_TOP_BACK := 0.61
-const MOUND_TOP_HALF_WIDTH := 0.76
+## The level top of the mound is 5 ft wide and 34 in deep: 6 in in front of the rubber, the
+## 6 in rubber, and 22 in behind it. Distances here are from the rubber's front edge.
+const MOUND_TOP_FRONT := 0.1524
+const MOUND_TOP_BACK := 0.7112
+const MOUND_TOP_HALF_WIDTH := 0.762
 const PLATE_WIDTH := 0.4318
 ## Home plate is a pentagon: 17 in across the front, square sides 8.5 in deep, then two 12 in
 ## edges meeting at the rear apex. Corners from the apex round by the third-base side.

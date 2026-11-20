@@ -5,6 +5,9 @@ extends Node3D
 ## so the same poses can drive the real player model from stage S3b on.
 
 const HEAD_RADIUS := 0.115
+## How far along the bat from the knob the hands' midpoint and the sweet spot are (m).
+const BAT_GRIP_FROM_KNOB := 0.09
+const BAT_SWEET_FROM_KNOB := 0.68
 
 ## Body proportions in metres. SkinnedPuppet replaces these with the model's own.
 var spine := 0.5
@@ -37,8 +40,19 @@ var gear: Array[StringName] = []
 var look_target := Vector3.ZERO
 var has_look_target := false
 
+## Seconds between this pose and the one before it. A recorded hand's speed is worked out
+## from it. Set it before posing when frames are not a sixtieth of a second apart.
+var frame_time := 1.0 / 60.0
+
 ## Joint positions from the last apply(), keyed by bone name, in the puppet's space.
 var joints: Dictionary[StringName, Vector3] = {}
+## Pelvis and chest frames and the line of the spine from the last pose, in the puppet's space.
+var hip_basis := Basis.IDENTITY
+var chest_basis := Basis.IDENTITY
+var spine_dir := Vector3.UP
+## Where the bat is held and which way it points, in the puppet's space, from the last pose.
+var bat_grip := Vector3.ZERO
+var bat_dir := Vector3.ZERO
 
 var _parts: Dictionary[StringName, MeshInstance3D] = {}
 
@@ -68,12 +82,6 @@ func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> vo
 	jersey = jersey_color
 	pants = pants_color
 	cap = cap_color
-
-
-## Frames worked out by solve(), in the puppet's space.
-var hip_basis := Basis.IDENTITY
-var chest_basis := Basis.IDENTITY
-var spine_dir := Vector3.UP
 
 
 ## Makes the head face a point given in world space.
@@ -110,11 +118,6 @@ func apply_joints(frame: Dictionary[StringName, Vector3], _source: JointClip, ha
 	joints[&"Chest"] = frame[&"ThoraxTop"]
 	joints[&"Head"] = frame[&"ThoraxTop"] + spine_dir * (0.1 + HEAD_RADIUS)
 	_show(bat_direction(frame))
-
-
-## Seconds between this pose and the one before it. A recorded hand's speed is worked out
-## from it. Set it before posing when frames are not a sixtieth of a second apart.
-var frame_time := 1.0 / 60.0
 
 
 ## Where a ball held in a hand (&"RightHand" or &"LeftHand") is, in the puppet's space.
@@ -181,15 +184,6 @@ func solve(pose: PuppetPose) -> void:
 		joints[StringName(name + "UpperLeg")] = hip
 		joints[StringName(name + "LowerLeg")] = _two_bone(hip, ankle, upper_leg, lower_leg, forward + hip_right * (0.3 * side))
 		joints[StringName(name + "Foot")] = ankle
-
-
-## How far along the bat from the knob the hands' midpoint and the sweet spot are (m).
-const BAT_GRIP_FROM_KNOB := 0.09
-const BAT_SWEET_FROM_KNOB := 0.68
-
-## Where the bat is held and which way it points, in the puppet's space, from the last pose.
-var bat_grip := Vector3.ZERO
-var bat_dir := Vector3.ZERO
 
 
 ## Places the bat along its direction from the hands, and the glove on the left hand.

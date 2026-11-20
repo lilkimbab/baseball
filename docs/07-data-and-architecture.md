@@ -265,6 +265,7 @@ baseball/
 ./dev props       # 장비(글러브, 미트, 배트, 공 겉면)를 실제 규격으로 재생성 (tools/blender/make_props.py)
 ./dev mocap       # 모션캡처 자료(OBP)를 받아 투구·스윙 클립으로 변환 → content-local/animations/
 ./dev video       # 타격·투구 시연 영상 녹화 (Windows GPU) → build/demo/dugout-demo.mp4
+./dev tool-win <도구> <출력 접두어> [인자]   # game/tools의 스크립트를 Windows GPU로 실행
                   # 동작 점검: res://tools/motion_shots.gd(시각별 촬영), motion_report.gd(튀는 뼈 찾기)
                   # 목표 장면 촬영: Godot으로 res://tools/closeup_shot.gd 실행 (Windows GPU 권장)
 ```

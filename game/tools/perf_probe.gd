@@ -1,7 +1,7 @@
 extends SceneTree
 ## Runs a scene for a fixed time and reports frame-rate statistics, then quits.
 ##
-##   godot --path game --disable-vsync --script res://tools/perf_probe.gd -- --scene res://boot/boot.tscn --seconds 5
+##   godot --path game --disable-vsync --script res://tools/perf_probe.gd -- --scene res://match/duel.tscn --seconds 5
 ##
 ## Options: --scene <res path>  --seconds <n, default 5>  --warmup <seconds, default 1>
 ## Run on the machine and GPU you care about (Windows for this project); software
@@ -15,7 +15,7 @@ var _frame_ms: PackedFloat32Array = PackedFloat32Array()
 
 func _initialize() -> void:
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
-	var scene_path: String = args.get("scene", "res://boot/boot.tscn")
+	var scene_path: String = args.get("scene", "res://match/duel.tscn")
 	_seconds = float(str(args.get("seconds", "5")))
 	_warmup = float(str(args.get("warmup", "1")))
 

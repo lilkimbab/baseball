@@ -1,6 +1,6 @@
 # 04. 물리
 
-공의 비행·충돌·바운드, 선수의 운동 모델, Godot 물리와의 관계. 수식과 상수는 [prototypes/physics-check](../prototypes/physics-check/check.mjs)로 검증했고, Godot 구현 가능성은 [prototypes/godot-spike](../prototypes/godot-spike/)로 확인했다.
+공의 비행·충돌·바운드, 선수의 운동 모델, Godot 물리와의 관계. 수식과 상수는 [prototypes/physics-check](../prototypes/physics-check/check.mjs)로 검증했고, 게임의 구현이 그 값과 일치하는지는 `game/tests/core/physics/`의 테스트가 확인한다.
 
 ## 1. 원칙
 
@@ -141,9 +141,9 @@ Cl = 1.05 · S / (0.583 + 2.333 · S)
 | 상단 | 신장 × 0.5575 |
 | 하단 | 신장 × 0.2704 |
 | 좌우 | 홈플레이트 폭 + 양쪽 2cm = 47.18cm |
-| 판정 면 | 플레이트 앞면(y = 0.432)과 중간면(y = 0.216). 두 면을 모두 지나야 스트라이크 |
+| 판정 면 | 좌우는 중간면(y = 0.216)에서, 상하는 중간면과 끝면(y = 0, 꼭짓점) 두 곳 모두에서 기준을 만족해야 스트라이크 |
 
-값은 `RuleSet`에 두어 바꿀 수 있다. KBO 자동 판정 기준(2025)을 따른 것이며 구현 시 공식 규정으로 다시 확인한다.
+값은 `RuleSet`에 두어 바꿀 수 있다. KBO 공식 "2026 주요 규정·규칙"으로 확인했다([12](12-baseball-reference.md#5-kbo-규칙-2026)). 처음 구현은 앞면과 중간면으로 판정했는데 규정과 달라 고쳤다.
 
 ## 7. 배트-공 충돌
 

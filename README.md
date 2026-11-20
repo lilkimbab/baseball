@@ -2,7 +2,7 @@
 
 Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경기에 **결정적인 순간만 직접 뛰어드는 감독 + 액션 하이브리드**와, **선수 한 명으로 뛰는 커리어 모드**가 핵심이다.
 
-- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S3b까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료. `./dev play`로 타격·투구를 해 볼 수 있다. 투수와 타자는 모션캡처 동작으로 움직인다(`./dev mocap`으로 자료를 받은 PC에서. 없으면 손으로 잡은 자세). 다음은 S4(규칙·통계 해석기).
+- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S3b까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료. `./dev play`로 타격·투구를 해 볼 수 있다. 투수와 타자는 모션캡처 동작으로 움직인다(`./dev mocap`으로 자료를 받은 PC에서. 없으면 손으로 잡은 자세). 다음은 S4(규칙·통계 해석기)이고, 할 일은 [구현 명세](docs/13-implementation-spec.md)에 순서대로 있다.
 - **엔진**: Godot 4.7.2 (GDScript, Jolt 물리). 씬·스크립트·데이터가 전부 텍스트 파일이라 VSCode에서 작성하고 헤드리스로 테스트한다.
 - **참고작**: 넥슨·2K스포츠의 온라인 야구 게임 「프로야구2K」(2013) / 「프로야구2K14」(2014, 서비스 종료). 조사 내용은 [docs/01-reference-research.md](docs/01-reference-research.md).
 
@@ -55,10 +55,12 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 | [05 조작·카메라·UI](docs/05-controls-camera-ui.md) | 입력 설계, 타이밍 창, 카메라 리그, HUD, 화면 흐름 |
 | [06 3D 아트 파이프라인](docs/06-3d-art-pipeline.md) | 선수 모델·리그, 애니메이션 목록과 동기화, 구장 생성기, 관중, 조명, 성능 예산 |
 | [07 데이터·아키텍처](docs/07-data-and-architecture.md) | 프로젝트 구조, 클래스, 능력치 산식, 로스터 팩, 저장, 테스트, 작업 흐름 |
-| [08 구현 파이프라인](docs/08-roadmap.md) | 6구간 20단계, 단계별 완료 기준, 최종 상태의 정의, 위험 요소 |
+| [08 구현 파이프라인](docs/08-roadmap.md) | 6구간 20단계, 단계별 완료 기준, 최종 상태의 정의, 위험 요소, 진행 기록 |
 | [09 콘텐츠 확보](docs/09-content-acquisition.md) | 모션캡처·얼굴·실제 구장·선수 기록을 구하는 경로와 변환 과정, 로컬 콘텐츠 팩 |
 | [10 참고 영상 분석](docs/10-reference-video-notes.md) | 플레이 영상 2개에서 읽은 화면 구성·흐름·타이밍·소리 구조, 최종 점검표 |
 | [11 소리·관중·중계 연출](docs/11-audio-and-atmosphere.md) | 관중 음향과 흥분도 모델, 응원, 음악, 효과음, 음성, 연출 목록 |
+| [12 실제 야구 기준 자료](docs/12-baseball-reference.md) | 구장·장비·신체 규격, KBO 2026 규칙, 선수 운동 수치, 리그 통계 목표. 값마다 근거 표시 |
+| [13 구현 명세](docs/13-implementation-spec.md) | S4부터 끝까지 작업 단위의 순서, 지켜야 할 야구의 사정, 테스트와 완료 조건, 작업 규칙 |
 
 ## 왜 Godot인가
 
@@ -113,13 +115,10 @@ Godot 실행 파일은 `.tools/`에 있다(Linux용은 테스트·검사, Window
 | 폴더 | 확인한 것 |
 |---|---|
 | [prototypes/physics-check](prototypes/physics-check/check.mjs) | 엔진과 무관한 기준 계산(Node). 구종별 궤적, 타구 비거리, 충돌 모델 수치 |
-| [prototypes/godot-spike](prototypes/godot-spike/run.sh) | Godot 4.7.2가 WSL에서 헤드리스로 동작, GDScript 공 시뮬레이션이 기준 계산과 일치, 한 프레임 안에서 궤적 전체 예측, 화면 캡처 저장 |
 
 ```bash
 # 기준 계산
 cd prototypes/physics-check && npm install && npm run check
-# Godot 검증
-prototypes/godot-spike/run.sh
 ```
 
 결과 해석은 [docs/04-physics.md](docs/04-physics.md#12-검증-결과).

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Renders a scene for a few frames and saves the viewport as a PNG, then quits.
 ##
-##   godot --path game --script res://tools/screenshot.gd -- --scene res://boot/boot.tscn --out /tmp/shot.png
+##   godot --path game --script res://tools/screenshot.gd -- --scene res://match/duel.tscn --out /tmp/shot.png
 ##
 ## Options: --scene <res path>  --out <file>  --frames <n, default 30>
 ## Needs a real rendering driver, so do not combine with --headless.
@@ -12,7 +12,7 @@ var _out_path := "user://screenshot.png"
 
 func _initialize() -> void:
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
-	var scene_path: String = args.get("scene", "res://boot/boot.tscn")
+	var scene_path: String = args.get("scene", "res://match/duel.tscn")
 	_out_path = args.get("out", _out_path)
 	_frames_left = int(str(args.get("frames", "30")))
 

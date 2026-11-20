@@ -46,7 +46,7 @@ case "$cmd" in
   shot)
     # ./dev shot [out.png] [res://scene.tscn]   Software-rendered capture inside WSL.
     out="${1:-$ROOT/build/shot.png}"
-    scene="${2:-res://boot/boot.tscn}"
+    scene="${2:-res://match/duel.tscn}"
     mkdir -p "$(dirname "$out")"
     "$GODOT" --path "$GAME" --rendering-method mobile --rendering-driver vulkan --resolution 1280x720 \
       --script res://tools/screenshot.gd -- --scene "$scene" --out "$out"
@@ -129,10 +129,21 @@ case "$cmd" in
     rm -f "$raw"
     echo "video: $out ($(du -h "$out" | cut -f1))"
     ;;
+  tool-win)
+    # ./dev tool-win <tool> <out prefix> [args...]   Runs a script from game/tools on Windows
+    # with the GPU. The output prefix is relative to the project folder, for example:
+    #   ./dev tool-win motion_shots build/motion/pitch --who pitch --view side
+    #   ./dev tool-win duel_shots build/duel/bat --mode bat --pitches 2
+    tool="$1"; out="$2"; shift 2
+    mkdir -p "$(dirname "$ROOT/$out")"
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution "${RES:-1280x720}" \
+      --script "res://tools/$tool.gd" -- --out "$(wslpath -w "$ROOT/$(dirname "$out")")\\$(basename "$out")" "$@" 2>&1 \
+      | grep -E "^[a-z_]+:|ERROR|SCRIPT" || true
+    ;;
   shot-win)
     # ./dev shot-win [out.png] [res://scene.tscn]   GPU-rendered capture on Windows.
     out="${1:-$ROOT/build/shot-win.png}"
-    scene="${2:-res://boot/boot.tscn}"
+    scene="${2:-res://match/duel.tscn}"
     mkdir -p "$(dirname "$out")"
     "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution 1920x1080 \
       --script res://tools/screenshot.gd -- --scene "$scene" --out "$(wslpath -w "$out")"
@@ -153,6 +164,7 @@ Usage: ./dev <command>
   perf        measure frame rate on Windows                    [--scene ..] [--seconds ..]
   shot-win    save a GPU-rendered screenshot on Windows        [out.png] [scene]
   video       record a scripted batting and pitching demo      [out.mp4] [--bat n] [--pitch n]
+  tool-win    run a script from game/tools on Windows (GPU)    <tool> <out prefix> [args]
 EOF
     ;;
 esac

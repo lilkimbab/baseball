@@ -51,6 +51,12 @@ var _mesh: MeshInstance3D
 var _cap: MeshInstance3D
 var _helmet: MeshInstance3D
 var _model: Node3D
+var _gear_parts: Dictionary[StringName, MeshInstance3D] = {}
+## Finger curls for the grips they were last worked out for, and bones that the first posing
+## pass can skip (arms, legs and fingers hang off the joints that pass is run to find).
+var _curls: Dictionary[int, Basis] = {}
+var _curls_for := -1
+var _is_limb: PackedByteArray = PackedByteArray()
 ## Axis (skeleton space, at rest) each finger bone curls about, by bone index.
 var _curl_axis: Dictionary[int, Vector3] = {}
 ## Skeleton space -> puppet space, and back.
@@ -101,6 +107,10 @@ func _ready() -> void:
 	model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
+	for piece: StringName in OPTIONAL_GEAR:
+		var part := model.find_child(piece, true, false) as MeshInstance3D
+		if part != null:
+			_gear_parts[piece] = part
 	var node: Node3D = _skeleton
 	while node != self:
 		_to_puppet = node.transform * _to_puppet
@@ -155,7 +165,7 @@ func apply(pose: PuppetPose) -> void:
 
 	# First pass: bend the spine, then read where the model's own shoulders and hips ended
 	# up and solve the arms and legs again from there, so hands and feet land on target.
-	var globals := _walk(basis_for, curl, pose.hips)
+	var globals := _walk(basis_for, curl, pose.hips, true)
 	if has_look_target:
 		_aim_head(basis_for, _to_puppet * globals[_bone[&"Head"]].origin)
 	var elbow_out := chest_basis * Vector3.RIGHT
@@ -220,7 +230,7 @@ func apply_joints(frame: Dictionary[StringName, Vector3], source: JointClip, han
 	# First pass places the trunk; arms and legs are then solved from where the model's own
 	# shoulders and hips are. Hands are placed relative to the middle of the shoulders, so the
 	# distance between them is the recorded one.
-	var globals := _walk(basis_for, curl, hips)
+	var globals := _walk(basis_for, curl, hips, true)
 	_face_target(basis_for, _to_puppet * globals[_bone[&"Head"]].origin, chest)
 	var recorded_mid := frame[&"LeftUpperArm"].lerp(frame[&"RightUpperArm"], 0.5)
 	var model_mid := _to_puppet * globals[_bone[&"LeftUpperArm"]].origin.lerp(globals[_bone[&"RightUpperArm"]].origin, 0.5)
@@ -302,10 +312,8 @@ func _place_props(direction: Vector3) -> void:
 func _show_gear() -> void:
 	_cap.visible = headgear != &"helmet"
 	_helmet.visible = headgear == &"helmet"
-	for piece: StringName in OPTIONAL_GEAR:
-		var node := _model.find_child(piece, true, false) as MeshInstance3D
-		if node != null:
-			node.visible = gear.has(piece)
+	for piece: StringName in _gear_parts:
+		_gear_parts[piece].visible = gear.has(piece)
 
 
 ## Sets the bones from pelvis to upper chest, spreading the turn and lean between the two
@@ -498,18 +506,23 @@ func _face_target(basis_for: Dictionary[int, Basis], head_at: Vector3, chest: Ba
 
 ## Global transform of every bone (skeleton space) for the given target orientations,
 ## walking parent-first. Bones without a target keep their rest pose relative to the parent.
-func _walk(basis_for: Dictionary[int, Basis], curl: Dictionary[int, Basis], hips_at: Vector3) -> Array[Transform3D]:
+## With trunk_only the bones below the shoulders and hips are left out: the first pass only
+## needs to know where those joints and the head are.
+func _walk(basis_for: Dictionary[int, Basis], curl: Dictionary[int, Basis], hips_at: Vector3, trunk_only: bool = false) -> Array[Transform3D]:
 	var globals: Array[Transform3D] = []
 	globals.resize(_rest.size())
 	var hips := _bone[&"Hips"]
 	for i: int in _rest.size():
+		if trunk_only and _is_limb[i] == 1:
+			continue
 		var parent_global := Transform3D.IDENTITY if _parent[i] < 0 else globals[_parent[i]]
 		var g := parent_global * _local_rest[i]
 		if basis_for.has(i):
 			g.basis = basis_for[i]
 		elif curl.has(i):
-			# A curl is given in rest space; carry it along with however the parent has moved.
-			g.basis = parent_global.basis * _rest[_parent[i]].basis.inverse() * curl[i] * _rest[i].basis
+			# A curl is the bone's orientation relative to its parent; carry it along with
+			# however the parent has moved.
+			g.basis = parent_global.basis * curl[i]
 		if i == hips:
 			g.origin = _to_skeleton * hips_at + g.basis * (_rest[i].basis.inverse() * _hips_offset)
 		globals[i] = g
@@ -527,8 +540,13 @@ func _aim_head(basis_for: Dictionary[int, Basis], head_at: Vector3) -> void:
 	_turn(basis_for, &"Neck", chest_basis * Basis(Vector3.UP, -yaw * 0.5) * Basis(Vector3.RIGHT, pitch * 0.5))
 
 
-## Rest-space rotations that close the fingers for the current grips.
+## Orientations of the finger bones relative to their parents that close the fingers for the
+## current grips. Worked out again only when a grip changes.
 func _finger_curls() -> Dictionary[int, Basis]:
+	var grips := int(left_grip) * 16 + int(right_grip)
+	if grips == _curls_for:
+		return _curls
+	_curls_for = grips
 	var out: Dictionary[int, Basis] = {}
 	for side: String in ["Left", "Right"]:
 		var grip: Grip = left_grip if side == "Left" else right_grip
@@ -540,6 +558,7 @@ func _finger_curls() -> Dictionary[int, Basis]:
 				_add_curl(out, StringName(side + finger + parts[part]), BALL_TUCK[part] if tucked else float(degrees[part]))
 		for part: String in ["ThumbMetacarpal", "ThumbProximal", "ThumbDistal"]:
 			_add_curl(out, StringName(side + part), degrees[3])
+	_curls = out
 	return out
 
 
@@ -548,7 +567,8 @@ func _add_curl(out: Dictionary[int, Basis], bone: StringName, degrees: float) ->
 		return
 	var index := _bone[bone]
 	if _curl_axis.has(index):
-		out[index] = Basis(_curl_axis[index], deg_to_rad(degrees))
+		# Stored relative to the parent bone, ready to be carried along by it.
+		out[index] = _rest[_parent[index]].basis.inverse() * Basis(_curl_axis[index], deg_to_rad(degrees)) * _rest[index].basis
 
 
 ## Finds, for each finger bone, the axis it bends about. The resting hand is slightly curled,
@@ -606,6 +626,17 @@ func _measure() -> void:
 		var from: StringName = pair[0]
 		var to: StringName = pair[1]
 		_aim_rest[from] = (_origin(to) - _origin(from)).normalized()
+	# Everything below an upper arm or an upper leg.
+	_is_limb.resize(count)
+	for i: int in count:
+		var above := _parent[i]
+		_is_limb[i] = 0
+		while above >= 0:
+			var name := _skeleton.get_bone_name(above)
+			if name.ends_with("UpperArm") or name.ends_with("UpperLeg"):
+				_is_limb[i] = 1
+				break
+			above = _parent[above]
 
 	# Lengths are measured on the skeleton and used in the puppet's space, where the model
 	# has been scaled to the player's height.

@@ -13,6 +13,8 @@ const ACCURACY_TIME := 0.85
 ## Fraction of the accuracy sweep at which the ring is exactly on target.
 const ACCURACY_SWEET := 0.75
 const MAX_FOLLOW_TIME := 6.5
+## How far outside the strike zone the pointer can be put: to the side, and above or below.
+const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
 
 const BAT_CAMERA := [Vector3(0.55, -2.7, 0.9), Vector3(-0.2, 18.4, -0.45), 45.0]
 ## Far behind the mound with a long lens, like the reference footage: the whole pitcher stands
@@ -56,8 +58,6 @@ var aim_point := Vector3.ZERO
 ## Where the pointer is on screen. Tools and tests set this to aim without a mouse; while it
 ## is Vector2.INF the real mouse is used.
 var pointer_override := Vector2.INF
-## How far outside the strike zone the pointer can be put: to the side, and above or below.
-const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
 
 var camera: Camera3D
 var pitcher: Puppet
