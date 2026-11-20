@@ -11,7 +11,7 @@ var to_first := Vector2(26.8, 25.8)
 var path_factor := 1.045
 var rounding := 0.25
 var slide_gain := 0.6
-var leads := Vector3(3.4, 4.5, 3.0)
+var leads := Vector3(3.7, 4.5, 3.0)
 var secondary_lead := 1.2
 var runner_read := Vector2(0.30, 0.12)
 var two_out_jump := 0.25
@@ -48,10 +48,10 @@ var comfortable_slack := 0.25
 var running_catch := Vector2(0.92, 0.45)
 var diving_catch := Vector2(0.50, 0.10)
 var diving_slack := -0.15
-var fly_drop := 0.008
-var ground_bobble := 0.022
+var fly_drop := 0.010
+var ground_bobble := 0.040
 var hard_bobble_extra := 0.03
-var bad_throw := 0.012
+var bad_throw := 0.024
 var rushed_throw := 2.0
 var aggression := Vector2(0.20, -0.05)
 var long_throw_scatter := 0.12
@@ -65,10 +65,10 @@ var block := Vector2(0.95, 0.995)
 var wild_get_away := 2.2
 ## The batter's body for hit-by-pitch: a standing cylinder.
 var body_radius := 0.22
-var body_offset := 0.75
+var body_offset := 0.72
 var body_ankle := 0.12
 var body_shoulder_share := 0.80
-var dodge_chance := 0.35
+var dodge_chance := 0.25
 
 
 static func lerp_rating(range_pair: Vector2, rating: float) -> float:

@@ -268,3 +268,14 @@ func test_plays_are_quick_to_work_out() -> void:
 		_run(paths[i], [1, 2], 1, i)
 	var per := float(Time.get_ticks_usec() - start) / paths.size() / 1000.0
 	assert_lt(per, 8.0, "ms per play")
+
+
+func test_the_motion_defaults_match_the_data_file() -> void:
+	# The defaults in MotionModel are only a fallback, but they should not tell a different story.
+	var loaded := MotionIO.load_file(MotionIO.DEFAULT_PATH)
+	var plain := MotionModel.new()
+	for prop: Dictionary in plain.get_property_list():
+		if (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) == 0:
+			continue
+		var n: String = prop["name"]
+		assert_eq(str(plain.get(n)), str(loaded.get(n)), n)
