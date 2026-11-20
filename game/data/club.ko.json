@@ -38,7 +38,7 @@
       "breaking": ["movement"]
     }
   },
-  "points": {"win": 30, "tie": 15, "loss": 10, "postseason_win": 60, "release": 5, "scout_report": 60},
+  "points": {"win": 30, "tie": 15, "loss": 10, "postseason_win": 60, "release": 5, "scout_report": 60, "trait": 80},
   "trait_tiers": [1.0, 1.75, 2.5],
   "traits": [
     {"id": "precision", "name": "정교함", "kind": "batter", "effect": {"contact": 2.0}, "note": "컨택 상승, 삼진 감소"},

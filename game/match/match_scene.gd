@@ -278,6 +278,11 @@ func set_auto_changes(on: bool) -> void:
 	manager.manual_team = -1 if on or own_team() < 0 else own_team()
 
 
+## What the screen after the game says the keys do.
+func post_game_hint() -> String:
+	return "Enter 다시 하기   ·   Esc 끝내기"
+
+
 ## The player's club (0 away, 1 home), or −1 when he only watches.
 func own_team() -> int:
 	return human_team

@@ -71,6 +71,27 @@ func merge(i: int, j: int, rules: ClubRules) -> bool:
 	return true
 
 
+## Buys a random first-tier trait for the bag with points (docs/02 section 5.4: traits come
+## as rewards; until there are other rewards, points buy them). Returns its index or −1.
+func buy_trait(rules: ClubRules, rng: Rng) -> int:
+	var price := int(rules.points.get("trait", 0))
+	if points < price or rules.traits.is_empty():
+		return -1
+	points -= price
+	var pick := rng.next_int(rules.traits.size())
+	bag.append(Vector2i(pick, 0))
+	return pick
+
+
+## The first two bag items that can be merged, or (−1, −1).
+func mergeable(rules: ClubRules) -> Vector2i:
+	for i: int in bag.size():
+		for j: int in range(i + 1, bag.size()):
+			if bag[i] == bag[j] and bag[i].y < rules.trait_tiers.size() - 1:
+				return Vector2i(i, j)
+	return Vector2i(-1, -1)
+
+
 ## Rating changes from a player's trait.
 func trait_deltas(p: Player, rules: ClubRules) -> Dictionary[String, float]:
 	var out: Dictionary[String, float] = {}
