@@ -59,7 +59,8 @@ func step() -> bool:
 	var out := GameFlow.apply(state, event)
 	scorer.record(state, event, out)
 	manager.note_change(state, event)
-	if keep_log:
+	# Single pitches (the physical resolver) are not lines of their own in the play-by-play.
+	if keep_log and event.kind != GameEvent.Kind.PITCH:
 		log.append(_describe(event, out, inning, top, outs, bases, batter))
 	return not state.over
 
