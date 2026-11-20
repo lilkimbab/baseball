@@ -1,0 +1,92 @@
+{
+  "note": "League environment for the stat resolver (docs/03 section 6, docs/12 section 8). Rates are per plate appearance. 'basis' says where each group of numbers comes from: K = KBO record page, A = assumption to be tuned with ./dev sim.",
+  "default": "kbo_2025",
+  "presets": {
+    "kbo_2025": {
+      "label": "KBO 2025 정규시즌",
+      "basis": "Strikeouts, walks (incl. intentional), hit batsmen, hits and home runs from the 2025 KBO team pitching totals (K): 11024 SO, 5123 BB, 806 HBP, 12824 H, 1191 HR over an estimated 55,700 plate appearances. Doubles and triples split is A.",
+      "pa": {"K": 0.198, "BB": 0.092, "HBP": 0.0145, "1B": 0.1635, "2B": 0.0413, "3B": 0.0041, "HR": 0.0214},
+      "targets": {
+        "avg": 0.262, "runs_per_team_game": 4.73, "era": 4.31,
+        "errors_per_team_game": 0.673, "double_plays_per_team_game": 0.840,
+        "steal_attempts_per_team_game": 0.842, "steal_success": 0.745,
+        "passed_balls_per_team_game": 0.056, "pickoffs_per_team_game": 0.042,
+        "wild_pitches_per_team_game": 0.40
+      }
+    }
+  },
+  "coefficients": {
+    "note": "rate = league_rate * exp(k * (rating - 50) / 15) (docs/03 section 6.3)",
+    "batter": {
+      "K": {"contact": -0.28},
+      "BB": {"eye": 0.30},
+      "HR": {"power": 0.45},
+      "2B": {"power": 0.18, "speed": 0.10},
+      "3B": {"power": 0.05, "speed": 0.40},
+      "1B": {"contact": 0.06, "speed": 0.03}
+    },
+    "pitcher": {
+      "K": {"stuff": 0.28},
+      "BB": {"control": -0.32},
+      "HR": {"stuff": -0.20},
+      "1B": {"stuff": -0.05},
+      "2B": {"stuff": -0.08}
+    },
+    "defence_hits": -0.05,
+    "clutch": 0.04,
+    "platoon": {"same_hand": {"K": 1.06, "BB": 0.95, "HR": 0.92, "1B": 0.97}, "opposite_hand": {"K": 0.96, "BB": 1.03, "HR": 1.05, "1B": 1.02}},
+    "fatigue": {"K": -0.20, "BB": 0.30, "HR": 0.35, "1B": 0.10}
+  },
+  "calibration": {
+    "note": "Multipliers on the league rates when drawing outcomes, tuned with ./dev sim so that the simulated totals match the targets. They make up for effects that do not average out (tired pitchers, managers' choices). 1 = no correction.",
+    "K": 0.985, "BB": 0.93, "HBP": 1.03, "1B": 0.975, "2B": 0.98, "3B": 1.0, "HR": 0.86
+  },
+  "in_play": {
+    "basis": "A",
+    "out_types": {"ground": 0.45, "fly": 0.30, "line": 0.12, "popup": 0.13},
+    "reached_on_error": 0.031,
+    "extra_base_error_on_hit": 0.02,
+    "double_play_on_ground_force": 0.44,
+    "fielders_choice_on_ground_force": 0.32,
+    "runner_2nd_to_3rd_on_ground": 0.50,
+    "runner_3rd_scores_on_ground": 0.52,
+    "sac_fly_runner_3rd": 0.62,
+    "runner_2nd_to_3rd_on_fly": 0.22,
+    "doubled_off_on_line": 0.06,
+    "single_runner_1st_to_3rd": 0.30,
+    "single_runner_1st_to_3rd_two_outs": 0.34,
+    "single_runner_2nd_scores": 0.70,
+    "single_runner_2nd_scores_two_outs": 0.86,
+    "double_runner_1st_scores": 0.44,
+    "double_runner_1st_scores_two_outs": 0.62,
+    "thrown_out_advancing": 0.06
+  },
+  "running": {
+    "basis": "A, tuned so that the totals match the targets above",
+    "steal_attempt_1st": 0.066,
+    "steal_attempt_2nd": 0.006,
+    "steal_success": 0.74,
+    "pickoff": 0.0045,
+    "wild_pitch": 0.021,
+    "passed_ball": 0.0028
+  },
+  "pitches_per_pa": {"basis": "A", "K": 4.8, "BB": 5.6, "HBP": 3.2, "in_play": 3.3},
+  "manager": {
+    "basis": "A",
+    "starter_runs_early_hook": 5,
+    "starter_hook_inning": 5,
+    "reliever_runs_hook": 3,
+    "pinch_hit_from_inning": 7,
+    "pinch_hit_margin": 2,
+    "pinch_hit_gap": 10,
+    "pinch_run_from_inning": 8,
+    "pinch_run_speed_below": 40,
+    "pinch_run_speed_bench": 70,
+    "bunt_from_inning": 7,
+    "bunt_contact_below": 45,
+    "intentional_walk_gap": 22,
+    "intentional_walk_from_inning": 6,
+    "save_lead": 3
+  },
+  "home_advantage": {"basis": "A, set so the home side wins about 53% of decided games", "hits": 1.045}
+}

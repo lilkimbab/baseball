@@ -101,6 +101,21 @@ case "$cmd" in
       python3 "$convert" swing 48_2 "$ROOT/content-local/animations/swing/default.json"
     fi
     ;;
+  sim)
+    # Simulated games with the stat resolver (headless).
+    #   ./dev sim                      one game: play-by-play and box score
+    #   ./dev sim --seed 3 --quiet     another game, box score only
+    #   ./dev sim --games 4000         league totals against data/league_env.json targets
+    #   ./dev sim league               rebuild the fictional league (data/rosters/fiction-2026.json)
+    if [ "${1:-}" = "league" ]; then
+      shift
+      "$GODOT" --headless --path "$GAME" --script res://tools/gen_league.gd -- "$@" 2>&1 | grep -E "gen_league|ERROR|SCRIPT"
+    elif printf '%s\n' "$@" | grep -q -- "--games"; then
+      "$GODOT" --headless --path "$GAME" --script res://tools/sim_batch.gd -- "$@" 2>&1 | grep -v "^Godot Engine" | grep -v "^$"
+    else
+      "$GODOT" --headless --path "$GAME" --script res://tools/sim_game.gd -- "$@" 2>&1 | grep -v "^Godot Engine"
+    fi
+    ;;
   play)
     # Run the game on Windows with the real GPU.
     "$GODOT_WIN" --path "$(win_game_path)" "$@"
@@ -158,6 +173,7 @@ Usage: ./dev <command>
   shot        save a software-rendered screenshot inside WSL   [out.png] [scene]
   model       rebuild the player model (Blender + MPFB) and import it
   props       rebuild the glove, mitt, bat and ball cover to real sizes (Blender)
+  sim         simulate games (stat resolver)                    [--games n] [--seed n] | league
   mocap       fetch and convert recorded deliveries and swings   [list pitch|swing] | [pitch|swing <trial> [form]]
   play        run the game on Windows (GPU)
   editor      open the Godot editor on Windows
