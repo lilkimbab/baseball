@@ -8,4 +8,4 @@ assets-src/
 build/
 content-local/
 *.import.tmp
-reference/
+/reference/

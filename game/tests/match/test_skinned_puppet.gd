@@ -380,3 +380,17 @@ func test_a_held_ball_sits_in_the_fingers_not_inside_the_hand() -> void:
 	var knuckle := _bone_at(puppet, "RightMiddleProximal")
 	var ball := puppet.ball_spot(&"RightHand")
 	assert_between(ball.distance_to(knuckle), 0.04, 0.07, "one ball radius and a finger's thickness from the knuckles")
+
+
+func test_head_size_and_belt_height_are_in_proportion() -> void:
+	var puppet := _model()
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	var eyes := puppet.find_child("Eyes", true, false) as MeshInstance3D
+	var pants := puppet.find_child("Pants", true, false) as MeshInstance3D
+	var top := body.get_aabb().end.y
+	# Eyes sit a little above the middle of the head, so top-to-eyes is about 0.54 of the head
+	# height. A grown man is 7.5 to 8.2 head-heights tall.
+	var eyes_down := (top - eyes.get_aabb().get_center().y) / top
+	assert_between(eyes_down, 0.54 / 8.2, 0.54 / 7.5, "head size: top of the head to the eyes")
+	# Baseball trousers are worn on the hips: the top of the belt at about 59% of height.
+	assert_between(pants.get_aabb().end.y / top, 0.575, 0.605, "top of the belt")
