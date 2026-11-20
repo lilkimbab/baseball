@@ -19,8 +19,10 @@ const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
 const BAT_CAMERA := [Vector3(0.55, -2.7, 0.9), Vector3(-0.2, 18.4, -0.45), 45.0]
 ## Far behind the mound with a long lens, like the reference footage: the whole pitcher stands
 ## left of centre with his back to the camera, and the batter and catcher sit above him, large
-## enough to aim at. Worked back from a reference frame taken during the pitch gauge.
-const PITCH_CAMERA := [Vector3(-3.9, 54.6, 4.0), Vector3(0.3, 0.0, 0.8), 6.5]
+## enough to aim at. Solved from a reference frame (reference/target-pitchview.png) by fitting
+## where the pitcher, batter and umpire appear: about 61 m behind the pitcher, which makes the
+## batter look nearly as tall as the pitcher (1.3 to 1), as in the reference.
+const PITCH_CAMERA := [Vector3(-7.2, 79.2, 4.6), Vector3(0.17, 3.37, 0.9), 3.6]
 
 ## &"bat" = player bats, &"pitch" = player pitches, &"watch" = AI against AI.
 @export var mode: StringName = &"bat"

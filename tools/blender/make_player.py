@@ -25,18 +25,27 @@ ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT_GLB = ARGS[0] if ARGS else "player_base.glb"
 PREVIEW = ARGS[1] if len(ARGS) > 1 else None
 
-# Body shape: an athletic adult man.
-MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.64, "weight": 0.56, "height": 0.6, "proportions": 0.55}
-# Corrections to limb proportions, checked against anthropometric tables (de Leva 1996, male:
-# shoulder to wrist 31.6% of height, hip to ankle 49.2%). The body above comes out with legs
-# at 49.4% and arms at 29.9%, so the arms are lengthened to 31.8%.
-SHAPE = {"measure-upperarm-length-incr": 0.25, "measure-lowerarm-length-incr": 0.25}
+# Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/12, section 4). More
+# muscle and weight than an average man of that height: chest depth about 14% of height.
+MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.9, "weight": 0.65, "height": 0.6, "proportions": 0.55}
+# Corrections checked against anthropometric tables (docs/12, section 4). Arms: the body above
+# comes out at 29.9% of height from shoulder to wrist against 31.6%, so they are lengthened.
+# Head: it comes out about 8.5 head-heights tall against 7.8 for a grown man, so the head is
+# enlarged by about 7%.
+SHAPE = {
+    "measure-upperarm-length-incr": 0.25, "measure-lowerarm-length-incr": 0.25,
+    "head-scale-vert-incr": 0.4, "head-scale-horiz-incr": 0.4, "head-scale-depth-incr": 0.4,
+}
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
 
 # Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
 SLEEVE_HEM = 0.62
 PANTS_HEM = 0.9
 BELT_HALF = 0.024
+# Centre of the belt as a fraction of standing height. Baseball trousers are worn on the hips,
+# with the top of the belt at about the top of the hip bones (59% of height), not at the
+# narrowest part of the waist (62%).
+BELT_CENTRE = 0.575
 # How far skin continues under a hem before it is removed, so no gap shows.
 TUCK = 0.05
 
@@ -138,7 +147,8 @@ class Anatomy:
         self.rig = rig
         self.deform = bm.verts.layers.deform.verify()
         self.bone_of_group = {g.index: g.name for g in body.vertex_groups if g.name in rig.data.bones}
-        self.waist = rig.data.bones["spine_01"].head_local.z + 0.035
+        # The body stands on the ground, so its highest point is its height.
+        self.waist = max(v.co.z for v in bm.verts) * BELT_CENTRE
         neck = rig.data.bones["neck_01"]
         head = rig.data.bones["head"]
         self.collar_n = (head.head_local - neck.head_local).normalized()

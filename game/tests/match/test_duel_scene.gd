@@ -249,3 +249,18 @@ func test_the_mound_is_a_surface_that_faces_up_at_its_regulation_height() -> voi
 	var b := vertices[indices[1]]
 	var c := vertices[indices[2]]
 	assert_lt((b - a).cross(c - a).y, 0.0, "triangles wind so that the top is the visible side")
+
+
+func test_the_pitching_camera_shows_batter_and_pitcher_at_reference_sizes() -> void:
+	var scene := _start(&"pitch")
+	scene.refresh(DT)
+	var camera := scene.camera
+	var tall := func(at: Vector3, height: float) -> float:
+		return camera.unproject_position(Field.to_world(at)).y - camera.unproject_position(Field.to_world(at + Vector3(0.0, 0.0, height))).y
+	var view := float(scene.get_viewport().get_visible_rect().size.y)
+	var pitcher: float = tall.call(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), 1.83) / view
+	var batter: float = tall.call(Vector3(-0.95, 0.3, 0.0), 1.83) / view
+	# reference/target-pitchview.png: the pitcher is close to half the picture's height and the
+	# batter nearly as tall (tools/reference/pitch_view.json).
+	assert_between(pitcher, 0.40, 0.52, "pitcher's share of the picture height")
+	assert_between(pitcher / batter, 1.2, 1.4, "pitcher against batter")

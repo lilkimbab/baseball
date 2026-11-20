@@ -1,0 +1,13 @@
+{
+  "source": "reference/target-pitchview.png, enlarged to 1500 x 933. Left-handed batter.",
+  "width": 1500,
+  "height": 933,
+  "look_height": 0.9,
+  "points": [
+    {"what": "pitcher's feet", "field": [0.0, 18.2, 0.254], "pixel": [440, 790]},
+    {"what": "top of pitcher's cap", "field": [0.0, 18.2, 2.054], "pixel": [445, 360]},
+    {"what": "batter's feet", "field": [0.95, 0.3, 0.0], "pixel": [655, 625]},
+    {"what": "top of batter's helmet", "field": [0.95, 0.3, 1.7], "pixel": [690, 285]},
+    {"what": "top of umpire's head", "field": [-0.3, -2.4, 1.78], "pixel": [915, 245]}
+  ]
+}
