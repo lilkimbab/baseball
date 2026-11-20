@@ -11,6 +11,9 @@ var overall: Overall
 ## changes the rules force on it (a pinch hitter taking the field), not its pitching changes
 ## or pinch hitters.
 var manual_team := -1
+## Each pitcher's overall as he is, not as he feels today (a season sets it): bullpen roles
+## (closer, set-up men) follow it, so a closer having a bad day is still the closer.
+var role_overall: Dictionary[String, float] = {}
 
 ## Bullpen roles per team, decided when the game starts: closer first, then set-up men.
 var _closer: Array[String] = ["", ""]
@@ -131,10 +134,16 @@ func start_game(state: GameState) -> void:
 		var team := state.teams[t]
 		var relievers: Array[String] = team.bullpen.duplicate()
 		relievers.sort_custom(func(a: String, b: String) -> bool:
-			return Overall.pitcher(team.player(a), catalog) > Overall.pitcher(team.player(b), catalog))
+			return _role_value(team, a) > _role_value(team, b))
 		_closer[t] = relievers[0] if relievers.size() > 0 else ""
 		_setup[t] = PackedStringArray(relievers.slice(1, 3))
 		_note_entry(state, team.pitcher_id)
+
+
+func _role_value(team: TeamInGame, id: String) -> float:
+	if role_overall.has(id):
+		return role_overall[id]
+	return Overall.pitcher(team.player(id), catalog)
 
 
 # --- Decisions during the game ---

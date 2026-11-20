@@ -92,9 +92,11 @@ func is_foreign() -> bool:
 
 
 ## A copy for one game with his ratings scaled by `factor` (1 as he is; 0.94 for a bad day,
-## 1.06 for a good one, docs/02 section 5.4). Pitch speeds drop or rise far less than the
-## ratings: a tired arm loses a km/h or two, not 6%.
-func with_form(factor: float) -> Player:
+## 1.06 for a good one, docs/02 section 5.4) and then moved by `deltas` (rating name → points:
+## contact, power, eye, speed, baserunning, clutch, range, hands, arm, accuracy, control,
+## composure, stamina, movement, command; velocity in km/h), for traits and team colours.
+## Pitch speeds drop or rise far less than the ratings: a tired arm loses a km/h or two, not 6%.
+func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	var p := Player.new()
 	p.id = id
 	p.name = name
@@ -107,39 +109,39 @@ func with_form(factor: float) -> Player:
 	p.positions = positions.duplicate()
 	p.forms = forms.duplicate()
 	p.origin = origin
-	var s := func(v: float) -> float: return clampf(v * factor, 1.0, 99.0)
+	var s := func(v: float, key: String) -> float: return clampf(v * factor + float(deltas.get(key, 0.0)), 1.0, 99.0)
 	var b := BattingRatings.new()
-	b.contact_r = s.call(batting.contact_r)
-	b.contact_l = s.call(batting.contact_l)
-	b.power_r = s.call(batting.power_r)
-	b.power_l = s.call(batting.power_l)
-	b.eye = s.call(batting.eye)
-	b.speed = s.call(batting.speed)
-	b.baserunning = s.call(batting.baserunning)
-	b.bunt = s.call(batting.bunt)
-	b.clutch = batting.clutch
+	b.contact_r = s.call(batting.contact_r, "contact")
+	b.contact_l = s.call(batting.contact_l, "contact")
+	b.power_r = s.call(batting.power_r, "power")
+	b.power_l = s.call(batting.power_l, "power")
+	b.eye = s.call(batting.eye, "eye")
+	b.speed = s.call(batting.speed, "speed")
+	b.baserunning = s.call(batting.baserunning, "baserunning")
+	b.bunt = s.call(batting.bunt, "bunt")
+	b.clutch = clampf(batting.clutch + float(deltas.get("clutch", 0.0)), 1.0, 99.0)
 	p.batting = b
 	var f := FieldingRatings.new()
-	f.range = s.call(fielding.range)
-	f.hands = s.call(fielding.hands)
-	f.arm = s.call(fielding.arm)
-	f.accuracy = s.call(fielding.accuracy)
+	f.range = s.call(fielding.range, "range")
+	f.hands = s.call(fielding.hands, "hands")
+	f.arm = s.call(fielding.arm, "arm")
+	f.accuracy = s.call(fielding.accuracy, "accuracy")
 	p.fielding = f
 	if pitching != null:
 		var r := PitchingRatings.new()
-		r.stamina = pitching.stamina
-		r.control = s.call(pitching.control)
-		r.composure = pitching.composure
+		r.stamina = clampf(pitching.stamina + float(deltas.get("stamina", 0.0)), 1.0, 99.0)
+		r.control = s.call(pitching.control, "control")
+		r.composure = clampf(pitching.composure + float(deltas.get("composure", 0.0)), 1.0, 99.0)
 		r.hold = pitching.hold
-		r.fielding = s.call(pitching.fielding)
-		var kmh := (factor - 1.0) * 25.0
+		r.fielding = s.call(pitching.fielding, "fielding")
+		var kmh := (factor - 1.0) * 25.0 + float(deltas.get("velocity", 0.0))
 		for a: ArsenalPitch in pitching.arsenal:
 			var c := ArsenalPitch.new()
 			c.type = a.type
 			c.velo_avg = a.velo_avg + kmh
 			c.velo_max = a.velo_max + kmh
-			c.movement = s.call(a.movement)
-			c.command = s.call(a.command)
+			c.movement = s.call(a.movement, "movement")
+			c.command = s.call(a.command, "command")
 			c.usage = a.usage
 			r.arsenal.append(c)
 		p.pitching = r

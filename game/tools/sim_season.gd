@@ -8,6 +8,7 @@ extends SceneTree
 ##
 ## Options: --pack <res://data/rosters/x.json>  --division <1..3, default 2>  --seed <n>
 ##          --games <36|72|144, default 144>  --all (every division's summary)
+##          --no-condition (everyone always at 보통)
 
 
 func _initialize() -> void:
@@ -17,7 +18,7 @@ func _initialize() -> void:
 	var games := int(str(args.get("games", "144")))
 	var seed_value := int(str(args.get("seed", "99")))
 	var teams := RosterIO.load_pack(pack)
-	var season := Season.create(teams, 10, games, seed_value, RuleSet.kbo_2026(), LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), LeagueEnvIO.load_overall())
+	var season := Season.create(teams, 10, games, seed_value, RuleSet.kbo_2026(), LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), LeagueEnvIO.load_overall(), null if args.has("no-condition") else ClubIO.load_default())
 	var started := Time.get_ticks_msec()
 	season.play_to_end()
 	print("%d games per club, %d days, %.1f s" % [games, season.total_days(), (Time.get_ticks_msec() - started) / 1000.0])

@@ -11,7 +11,9 @@ extends RefCounted
 ##   yesterday plays below his best;
 ## - regulars get a day off now and then (one or two a month, catchers more), and a regular in
 ##   a slump (low OPS over his last 20 games) sits for a few games;
-## - only the first team (1군 엔트리) dresses.
+## - only the first team (1군 엔트리) dresses;
+## - everyone plays at today's condition (최악 to 최상, ratings −6% to +6%), and the player's
+##   club with its traits and team colours (docs/13 S7-9).
 
 const RECENT_GAMES := 20
 ## A day off for a regular, per game (about one or two a month; catchers more) (A).
@@ -24,9 +26,9 @@ const SLUMP_MIN_PA := 60
 const SLUMP_DAYS := 5
 ## A regular hitting under COLD_AVG for the season, after COLD_MIN_PA plate appearances,
 ## sits this share of games (A).
-const COLD_AVG := 0.215
+const COLD_AVG := 0.225
 const COLD_MIN_PA := 150
-const COLD_REST_CHANCE := 0.35
+const COLD_REST_CHANCE := 0.4
 ## Chance a reliever who pitched yesterday is kept out of today's game (A).
 const TIRED_HELD_OUT := 0.6
 
@@ -55,15 +57,27 @@ var usage := PitcherUsage.new()
 var recent: Dictionary[String, Array] = {}
 ## Hitters sitting out a slump, until (and including) this day.
 var sitting: Dictionary[String, int] = {}
-## The club the player manages ("" for none).
+## The club the player manages ("" for none), and its management.
 var my_team := ""
+var club: Club
+var club_rules: ClubRules
+## Clubs under management (the player's): team colours, traits and training count for them
+## only. The computer's clubs are not managed this way, so the league stays as calibrated.
+var clubs: Dictionary[String, Club] = {}
+## Condition per player: index into ClubRules.condition_levels (2 = 보통). Games played in a
+## row by each position player (a long run makes a bad day more likely).
+var condition: Dictionary[String, int] = {}
+var streak: Dictionary[String, int] = {}
+var season_year := 2026
 ## Decided once per game and club: "day:team" → starter id, and who has the day off.
 var _starters: Dictionary[String, String] = {}
+var _names: NameTable
 var _resting: Dictionary[String, Dictionary] = {}
 
 
-static func create(clubs: Array[Team], per_division: int, games: int, seed_value: int, rule_set: RuleSet, league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], overall: Overall) -> Season:
+static func create(clubs: Array[Team], per_division: int, games: int, seed_value: int, rule_set: RuleSet, league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], overall: Overall, management: ClubRules = null) -> Season:
 	var s := Season.new()
+	s.club_rules = management
 	s.rules = rule_set
 	s.env = league
 	s.catalog = pitch_catalog
@@ -150,10 +164,23 @@ func my_game_today() -> ScheduledGame:
 ## A game ready to play with the stat resolver (or the physical one): today's line-ups.
 func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	var manager := AiManager.new(env, catalog, ovr)
+	for side: String in [game.away, game.home]:
+		for p: Player in (teams[side] as Team).first_team():
+			if p.is_pitcher():
+				manager.role_overall[p.id] = _pitcher_overall(p)
 	var game_rules := rules_for(game)
 	var a := lineup_for(game.away, game.day, manager, game_rules)
 	var h := lineup_for(game.home, game.day, manager, game_rules)
 	return GameSim.with_lineups(a, h, game_rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
+
+
+var _overall_cache: Dictionary[String, float] = {}
+
+
+func _pitcher_overall(p: Player) -> float:
+	if not _overall_cache.has(p.id):
+		_overall_cache[p.id] = Overall.pitcher(p, catalog)
+	return _overall_cache[p.id]
 
 
 ## A club's line-up for the day, made by its manager.
@@ -176,10 +203,15 @@ func squad_for(team: Team, on_day: int, starter_id: String) -> Team:
 	view.accent = team.accent
 	view.steal_style = team.steal_style
 	view.bunt_style = team.bunt_style
+	var managed: Club = clubs.get(team.id)
+	var actives: Array[ClubRules.ColorDef] = []
+	if managed != null:
+		actives = TeamColors.active(team, managed, club_rules, ovr, catalog)
 	# Relievers in order of rest, so a manager's "anybody else" is the freshest arm.
 	var first := team.first_team()
 	first.sort_custom(func(a: Player, b: Player) -> bool: return usage.rest_days(a.id, on_day) > usage.rest_days(b.id, on_day))
 	for p: Player in first:
+		var factor := 1.0
 		if p.is_pitcher() and p.id != starter_id:
 			if p.role() == &"SP":
 				continue
@@ -190,10 +222,75 @@ func squad_for(team: Team, on_day: int, starter_id: String) -> Team:
 					# Managers keep a reliever who pitched yesterday out about half the time.
 					if rng.chance(TIRED_HELD_OUT):
 						continue
-					view.players.append(p.with_form(PitcherUsage.TIRED_FORM))
-					continue
-		view.players.append(p)
+					factor = PitcherUsage.TIRED_FORM
+		factor += condition_effect(p.id)
+		var deltas: Dictionary[String, float] = {}
+		if managed != null:
+			deltas = managed.trait_deltas(p, club_rules)
+			var colour := TeamColors.deltas(p, actives, team, managed, club_rules, ovr, catalog)
+			for key: String in colour:
+				deltas[key] = float(deltas.get(key, 0.0)) + colour[key]
+		view.players.append(p if is_equal_approx(factor, 1.0) and deltas.is_empty() else p.with_form(factor, deltas))
 	return view
+
+
+## Today's condition as a rating change (−0.06 to +0.06); 0 without club rules.
+func condition_effect(id: String) -> float:
+	if club_rules == null:
+		return 0.0
+	return club_rules.condition_effect[int(condition.get(id, ClubRules.NORMAL))]
+
+
+func condition_name(id: String) -> String:
+	if club_rules == null:
+		return "보통"
+	return club_rules.condition_levels[int(condition.get(id, ClubRules.NORMAL))]
+
+
+## Overnight: condition drifts (back toward 보통 more often than away from it; a position
+## player in a long run of games more likely down), the player's club trains, and new
+## scouting candidates arrive.
+func _overnight() -> void:
+	if club_rules == null:
+		return
+	for t: Team in teams.values():
+		for p: Player in t.first_team():
+			var level := int(condition.get(p.id, ClubRules.NORMAL))
+			var drop := club_rules.streak_drop if int(streak.get(p.id, 0)) >= club_rules.streak_games else 0.0
+			if rng.chance(drop):
+				level -= 1
+			elif rng.chance(club_rules.condition_change):
+				if level != ClubRules.NORMAL and rng.chance(club_rules.toward_normal):
+					level += 1 if level < ClubRules.NORMAL else -1
+				else:
+					level += 1 if rng.chance(0.5) else -1
+			condition[p.id] = clampi(level, 0, club_rules.condition_levels.size() - 1)
+	if club == null:
+		return
+	var team: Team = teams[club.team_id]
+	var actives := TeamColors.active(team, club, club_rules, ovr, catalog)
+	club.train(team, func(p: Player) -> int: return season_year - p.born, club_rules, ovr, catalog, TeamColors.training_boost(actives))
+	refresh_candidates()
+
+
+## Today's scouting candidates for the player's club.
+func refresh_candidates() -> void:
+	if club == null or club_rules == null:
+		return
+	if _names == null:
+		_names = RosterIO.load_names()
+	var gen := LeagueGenerator.new(_names, catalog, hash("scout:%d:%d" % [season_year, day]))
+	club.candidates = Scouting.candidates(gen, division_of(club.team_id), club.scout_level, club_rules)
+	club.signed_today = false
+
+
+## The player takes charge of a club: its management starts.
+func manage(team_id: String) -> void:
+	my_team = team_id
+	if club_rules != null:
+		club = Club.for_team(teams[team_id])
+		clubs[team_id] = club
+		refresh_candidates()
 
 
 ## The day's starter: the next one in the rotation who has had his rest, otherwise the one
@@ -262,11 +359,19 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 		var d := division_of(game.home)
 		if d >= 0:
 			standings[d].record(game)
+	var played: Dictionary[String, bool] = {}
 	for id: String in game_book.batting:
 		var line: BattingLine = game_book.batting[id]
 		target.bat(id).add(line)
+		played[id] = true
 		if playoff == null:
 			_note_recent(id, line, game.day)
+	for side: String in [game.away, game.home]:
+		for p: Player in (teams[side] as Team).first_team():
+			if not p.is_pitcher():
+				streak[p.id] = int(streak.get(p.id, 0)) + 1 if played.has(p.id) else 0
+	if club != null and game.involves(club.team_id):
+		club.earn(signi(game.runs_of(club.team_id) - game.runs_against(club.team_id)), playoff != null, club_rules)
 	for id: String in game_book.pitching:
 		var line: PitchingLine = game_book.pitching[id]
 		target.pitch(id).add(line)
@@ -320,6 +425,7 @@ func play_day(include_mine: bool = false) -> ScheduledGame:
 ## every division has its champion the season is over.
 func advance() -> void:
 	day += 1
+	_overnight()
 	if phase == Phase.REGULAR and regular_season_over():
 		phase = Phase.POSTSEASON
 		postseasons.clear()
