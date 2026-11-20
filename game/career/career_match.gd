@@ -10,6 +10,9 @@ extends ManagerMatch
 
 ## Pitch to every batter, not just the ones that matter.
 var pitch_all := false
+## The position camera: metres behind and above him.
+const POSITION_BACK := 3.5
+const POSITION_HEIGHT := 2.1
 var me := ""
 var goal: SceneGoal
 var game_goal: GameGoal
@@ -164,6 +167,31 @@ func show_in_summary(play: PlayResult) -> bool:
 		if part == number or part == "E" + number:
 			return true
 	return play.direction == int(number)
+
+
+## A ball hit his way is watched from where he plays (docs/02 section 6.2, docs/13 S8-4): just
+## behind and above him, turning with the ball. He fields it automatically until the fielding
+## controls come (S12).
+func _move_camera_play(delta: float) -> void:
+	if _play == null or game.fielding() != my_team or not show_in_summary(_play):
+		super._move_camera_play(delta)
+		return
+	var kind := CareerSession.career_season.career.player.primary_position()
+	if CareerSession.career_season.career.is_pitcher():
+		kind = Position.Kind.P
+	var key := "F:%s" % Position.code(kind)
+	if not _play.timeline.tracks.has(key):
+		super._move_camera_play(delta)
+		return
+	var me_at := _play.timeline.position(key, _play_time)
+	var out := Vector2(me_at.x, me_at.y)
+	out = out.normalized() if out.length() > 0.5 else Vector2(0.0, 1.0)
+	var from := Vector3(me_at.x + out.x * POSITION_BACK, me_at.y + out.y * POSITION_BACK, POSITION_HEIGHT)
+	var ball := _ball_at(_play.timeline, _play_time)
+	_follow_target = _follow_target.lerp(ball, clampf(delta * 5.0, 0.0, 1.0))
+	camera.position = camera.position.lerp(Field.to_world(from), clampf(delta * 6.0, 0.0, 1.0))
+	camera.fov = lerpf(camera.fov, 62.0, clampf(delta * 3.0, 0.0, 1.0))
+	camera.look_at(Field.to_world(_follow_target))
 
 
 func live() -> bool:

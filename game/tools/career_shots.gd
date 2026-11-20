@@ -9,6 +9,8 @@ var _step := 0
 var _node: Node
 var _match: CareerMatch
 var _card_frames := 0
+var _field_frames := 0
+var _shots := {}
 
 
 func _initialize() -> void:
@@ -31,10 +33,19 @@ func _process(delta: float) -> bool:
 		if _match.paused and _match.my_scene_now() and _frames > 10:
 			_card_frames += 1
 			# The screen texture is the frame drawn before this one.
-			if _card_frames == 4:
+			if _card_frames == 4 and not _shots.has("card"):
 				_shot("card")
+				_shots["card"] = true
+			if _card_frames >= 4:
+				_card_frames = 0
+				_match.intervene()
+		var p := _match._play
+		if p != null and _match._play_time > 1.2 and _match.game.fielding() == _match.my_team and _match.show_in_summary(p):
+			_field_frames += 1
+			if _field_frames == 3:
+				_shot("fielding")
 				return true
-		return _frames > 20000
+		return _frames > 60000 or _match.game.over
 	if _frames % 10 != 0:
 		return false
 	match _step:
