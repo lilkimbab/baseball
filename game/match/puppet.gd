@@ -112,6 +112,16 @@ func apply_joints(frame: Dictionary[StringName, Vector3], _source: JointClip, ha
 	_show(bat_direction(frame))
 
 
+## Seconds between this pose and the one before it. A recorded hand's speed is worked out
+## from it. Set it before posing when frames are not a sixtieth of a second apart.
+var frame_time := 1.0 / 60.0
+
+
+## Where a ball held in a hand (&"RightHand" or &"LeftHand") is, in the puppet's space.
+func ball_spot(hand: StringName) -> Vector3:
+	return joints[hand]
+
+
 ## Forgets anything carried over from earlier recorded frames. The mannequin keeps nothing.
 func reset_motion() -> void:
 	pass

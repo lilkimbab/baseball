@@ -17,6 +17,16 @@ const MOUND_TOP_FRONT := 0.152
 const MOUND_TOP_BACK := 0.61
 const MOUND_TOP_HALF_WIDTH := 0.76
 const PLATE_WIDTH := 0.4318
+## Home plate is a pentagon: 17 in across the front, square sides 8.5 in deep, then two 12 in
+## edges meeting at the rear apex. Corners from the apex round by the third-base side.
+const PLATE_OUTLINE: Array[Vector2] = [
+	Vector2(0.0, 0.0), Vector2(-0.2159, 0.2159), Vector2(-0.2159, 0.4318), Vector2(0.2159, 0.4318), Vector2(0.2159, 0.2159),
+]
+## Bases are 18 in square (KBO since 2024, MLB since 2023) and 3 to 5 in thick.
+const BASE_SIZE := 0.4572
+const BASE_THICKNESS := 0.09
+## Chalk lines are 3 in wide.
+const LINE_WIDTH := 0.0762
 const PLATE_FRONT_Y := 0.4318
 const INFIELD_ARC_RADIUS := 28.96
 
@@ -52,3 +62,17 @@ static func ground_height(x: float, y: float) -> float:
 	var dx := maxf(absf(x) - MOUND_TOP_HALF_WIDTH, 0.0)
 	var dy := maxf(maxf(RUBBER_Y - MOUND_TOP_FRONT - y, y - RUBBER_Y - MOUND_TOP_BACK), 0.0)
 	return MOUND_HEIGHT * to_edge / (to_edge + Vector2(dx, dy).length())
+
+
+## Centre of a base bag. First and third lie wholly inside the diamond with two edges on the
+## lines; second is centred on its point.
+static func base_centre(base: int) -> Vector3:
+	var inset := BASE_SIZE * 0.5 * sqrt(2.0)
+	match base:
+		1:
+			return FIRST_BASE + Vector3(-inset, 0.0, 0.0)
+		2:
+			return SECOND_BASE
+		3:
+			return THIRD_BASE + Vector3(inset, 0.0, 0.0)
+	return Vector3.ZERO

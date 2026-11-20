@@ -53,6 +53,11 @@ var decision: PitchDecision
 ## Batting input.
 var aim_enabled := false
 var aim_point := Vector3.ZERO
+## Where the pointer is on screen. Tools and tests set this to aim without a mouse; while it
+## is Vector2.INF the real mouse is used.
+var pointer_override := Vector2.INF
+## How far outside the strike zone the pointer can be put: to the side, and above or below.
+const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
 
 var camera: Camera3D
 var pitcher: Puppet
@@ -75,11 +80,13 @@ var _swing_lead := 0.11
 var _swing_height := 0.8
 var _follow_target := Vector3.ZERO
 var _load_started := false
+var _throwing_hand: StringName = &"RightHand"
 var _swing_shown := false
 ## The barrel's sweet spot at contact in the recorded swing, in the batter's space, and how
 ## far the hands have to move from the recording for this swing to go where it is aimed.
 var _recorded_contact := Vector3.ZERO
 var _reach := Vector3.ZERO
+var _frame_time := 1.0 / 60.0
 
 
 func _ready() -> void:
@@ -136,9 +143,10 @@ func set_motion(pitch_clip: JointClip, swing_clip: JointClip) -> void:
 		on_rubber.y -= 0.06
 		pitcher.position = Field.to_world(on_rubber)
 		pitcher.reset_motion()
+		_throwing_hand = &"LeftHand" if pitch_clip.side == &"L" else &"RightHand"
+		pitcher.right_grip = Puppet.Grip.BALL
 		pitcher.apply_joints(pitch_motion.frame(pitch_motion.release_time), pitch_clip)
-		var hand: StringName = &"LeftHand" if pitch_clip.side == &"L" else &"RightHand"
-		settings.release_point = Field.to_field(pitcher.global_transform * pitcher.joints[hand])
+		settings.release_point = Field.to_field(pitcher.global_transform * pitcher.ball_spot(_throwing_hand))
 		pitcher.reset_motion()
 	else:
 		pitcher.position = Field.to_world(on_rubber)
@@ -290,6 +298,7 @@ func _process(delta: float) -> void:
 
 ## Updates everything that is only for show: poses, ball, camera, HUD.
 func refresh(delta: float) -> void:
+	_frame_time = delta
 	_update_pointer()
 	_pose_players()
 	_show_ball()
@@ -378,7 +387,7 @@ func _finish_pitch() -> void:
 
 
 func _update_pointer() -> void:
-	var mouse := get_viewport().get_mouse_position()
+	var mouse := pointer_override if pointer_override.is_finite() else get_viewport().get_mouse_position()
 	var origin := camera.project_ray_origin(mouse)
 	var dir := camera.project_ray_normal(mouse)
 	var plane := Plane(Vector3.BACK, -Field.PLATE_FRONT_Y)
@@ -389,8 +398,8 @@ func _update_pointer() -> void:
 		return
 	var at := Field.to_field(hit)
 	var zone := duel.zone
-	at.x = clampf(at.x, -zone.half_width - 0.35, zone.half_width + 0.35)
-	at.z = clampf(at.z, zone.bottom - 0.4, zone.top + 0.4)
+	at.x = clampf(at.x, -zone.half_width - AIM_BEYOND_ZONE.x, zone.half_width + AIM_BEYOND_ZONE.x)
+	at.z = clampf(at.z, zone.bottom - AIM_BEYOND_ZONE.y, zone.top + AIM_BEYOND_ZONE.y)
 	at.y = Field.PLATE_FRONT_Y
 	if human_pitches() and state == State.PRE_PITCH:
 		target = at
@@ -406,6 +415,8 @@ func _pose_players() -> void:
 	pitcher.look_at_world(Field.to_world(Vector3(0.0, 0.3, 0.9)))
 	var watching := duel.ball.pos if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT else settings.release()
 	batter.look_at_world(Field.to_world(watching))
+	pitcher.frame_time = _frame_time
+	batter.frame_time = _frame_time
 	if pitch_motion != null:
 		pitcher.apply_joints(pitch_motion.frame(_pitch_clock), pitch_motion.clip)
 	else:
@@ -423,7 +434,7 @@ func _show_ball() -> void:
 		State.LIVE, State.RESULT:
 			ball_actor.show_at(duel.ball.pos)
 		State.WINDUP:
-			var hand: Vector3 = pitcher.global_transform * pitcher.joints[&"RightHand"]
+			var hand: Vector3 = pitcher.global_transform * pitcher.ball_spot(_throwing_hand)
 			ball_actor.show_at(Field.to_field(hand))
 		_:
 			ball_actor.visible = false
@@ -535,6 +546,8 @@ func _build_players() -> void:
 	_dress(batter, visitors, 27, "한도윤", true)
 	catcher = _add_puppet(Vector3(0.0, -1.15, 0.0), 0.0, home, Color(0.1, 0.15, 0.35), use_models)
 	catcher.left_grip = Puppet.Grip.GLOVE
+	if catcher is SkinnedPuppet:
+		(catcher as SkinnedPuppet).glove_kind = &"mitt"
 	catcher.headgear = &"helmet"
 	catcher.gear = [&"Mask", &"ChestProtector", &"ShinGuards"]
 	_dress(catcher, UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"), 22, "오세현", false)

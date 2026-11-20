@@ -50,3 +50,27 @@ func test_the_ground_is_flat_off_the_mound() -> void:
 	for i: int in 40:
 		var x := -3.0 + i * 0.15
 		assert_between(Field.ground_height(x, Field.RUBBER_Y - 0.9), 0.0, Field.MOUND_HEIGHT)
+
+
+func test_home_plate_is_the_regulation_pentagon() -> void:
+	var outline := Field.PLATE_OUTLINE
+	assert_eq(outline.size(), 5)
+	assert_eq(outline[0], Vector2.ZERO, "the rear apex is the origin of the field")
+	assert_almost_eq(outline[2].distance_to(outline[3]), 0.4318, 1e-4, "17 in across the front")
+	assert_almost_eq(outline[1].distance_to(outline[2]), 0.2159, 1e-4, "8.5 in sides")
+	assert_almost_eq(outline[0].distance_to(outline[1]), 0.3048, 0.001, "12 in edges to the apex")
+	assert_almost_eq(outline[0].distance_to(outline[4]), 0.3048, 0.001)
+	assert_almost_eq(outline[3].y, Field.PLATE_FRONT_Y, 1e-6)
+
+
+func test_first_and_third_base_lie_inside_the_lines_and_second_on_its_point() -> void:
+	var half_diagonal := Field.BASE_SIZE * 0.5 * sqrt(2.0)
+	var first := Field.base_centre(1)
+	var third := Field.base_centre(3)
+	# The outer corner of the bag is the 90 ft point, so the whole bag is in fair territory.
+	assert_almost_eq(first.x + half_diagonal, Field.FIRST_BASE.x, 1e-5)
+	assert_almost_eq(first.y, Field.FIRST_BASE.y, 1e-5)
+	assert_true(Field.is_fair(first + Vector3(half_diagonal - 0.001, 0.0, 0.0)), "outer corner on the line")
+	assert_almost_eq(third.x, -first.x, 1e-6)
+	assert_eq(Field.base_centre(2), Field.SECOND_BASE)
+	assert_almost_eq(Field.BASE_SIZE, 0.4572, 1e-6, "18 in bases")

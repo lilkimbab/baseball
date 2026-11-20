@@ -130,8 +130,10 @@ func test_the_ball_starts_from_the_pitchers_hand() -> void:
 	var scene := _start_with_motion(&"watch")
 	var default_point := DuelSettings.new().release_point
 	assert_gt(scene.settings.release_point.distance_to(default_point), 0.05, "the release point comes from the motion")
+	scene.pitcher.right_grip = Puppet.Grip.BALL
+	scene.pitcher.reset_motion()
 	scene.pitcher.apply_joints(scene.pitch_motion.frame(scene.release_time()), scene.pitch_motion.clip)
-	var hand := Field.to_field(scene.pitcher.global_transform * scene.pitcher.joints[&"RightHand"])
+	var hand := Field.to_field(scene.pitcher.global_transform * scene.pitcher.ball_spot(&"RightHand"))
 	assert_almost_eq(scene.settings.release_point, hand, Vector3.ONE * 0.01)
 	assert_between(scene.settings.release_point.y, Field.RUBBER_Y - 2.5, Field.RUBBER_Y - 0.5, "in front of the rubber")
 	assert_gt(scene.settings.release_point.z, Field.MOUND_HEIGHT + 1.0)
@@ -199,3 +201,28 @@ func test_without_clips_the_scene_goes_back_to_key_poses() -> void:
 	assert_eq(scene.settings.release_point, DuelSettings.new().release_point)
 	_advance(scene, 1500)
 	assert_gt(scene.pitches_thrown(), 1)
+
+
+# --- Aiming ---
+
+
+func test_a_tool_can_aim_the_pitch_without_a_mouse() -> void:
+	var scene := _start(&"pitch")
+	var zone := scene.duel.zone
+	var spot := Vector3(zone.half_width * 0.5, Field.PLATE_FRONT_Y, zone.bottom + 0.1)
+	scene.refresh(DT)
+	scene.pointer_override = scene.camera.unproject_position(Field.to_world(spot))
+	scene.refresh(DT)
+	assert_almost_eq(scene.target, spot, Vector3.ONE * 0.02, "the target follows the pointer")
+
+
+func test_the_pitch_cannot_be_aimed_at_the_batter() -> void:
+	var scene := _start(&"pitch")
+	var zone := scene.duel.zone
+	scene.refresh(DT)
+	# Pointer on the batter's head: a metre inside and well above the zone.
+	scene.pointer_override = scene.camera.unproject_position(Field.to_world(Vector3(-1.0, Field.PLATE_FRONT_Y, 1.7)))
+	scene.refresh(DT)
+	assert_almost_eq(scene.target.x, -zone.half_width - DuelScene.AIM_BEYOND_ZONE.x, 1e-4, "held at the edge of the aiming area")
+	assert_almost_eq(scene.target.z, zone.top + DuelScene.AIM_BEYOND_ZONE.y, 1e-4)
+	assert_gt(scene.target.x, scene.batter.position.x + 0.3, "which stops short of where the batter stands")

@@ -213,3 +213,61 @@ func test_ai_against_ai_produces_a_believable_mix_of_results() -> void:
 	assert_between(float(fouls) / pitches, 0.07, 0.25, "fouls")
 	assert_between(float(in_play) / pitches, 0.12, 0.30, "balls in play")
 	assert_between(exit_speed / contacts, 118.0, 156.0, "mean exit speed (km/h)")
+
+
+# --- Pitches nobody can hit ---
+
+
+func test_distance_outside_the_zone_is_measured_from_its_edge() -> void:
+	var zone := StrikeZone.for_batter(1.82)
+	assert_eq(zone.distance_outside(0.0, 0.75), 0.0, "inside")
+	assert_almost_eq(zone.distance_outside(zone.half_width + 0.1, 0.75), 0.1, 1e-5, "off the side")
+	assert_almost_eq(zone.distance_outside(0.0, zone.top + 0.2), 0.2, 1e-5, "above")
+	assert_almost_eq(zone.distance_outside(-zone.half_width - 0.3, zone.top + 0.4), 0.5, 1e-5, "up and in")
+
+
+func test_a_perfectly_timed_swing_cannot_hit_a_pitch_at_the_batters_head() -> void:
+	var misses := 0
+	for seed_value: int in 20:
+		var duel := _duel(seed_value)
+		var zone := duel.zone
+		duel.throw_pitch(_pitch(&"four_seam", Vector3(-zone.half_width - 0.3, Field.PLATE_FRONT_Y, zone.top + 0.4)), true)
+		duel.swing_at(duel.ideal_contact_time, SwingAttempt.Kind.POWER)
+		_run(duel)
+		if duel.result == PitchDuel.Result.SWINGING_STRIKE and duel.swing.judgment == &"miss" and not duel.swing.made_contact:
+			misses += 1
+	assert_eq(misses, 20, "out of reach is a swing and a miss every time")
+
+
+func test_a_pitch_just_off_the_plate_can_still_be_reached() -> void:
+	var contacts := 0
+	for seed_value: int in 40:
+		var duel := _duel(seed_value)
+		var zone := duel.zone
+		var target := Vector3(zone.half_width + 0.1, Field.PLATE_FRONT_Y, 0.75)
+		duel.throw_pitch(_pitch(&"four_seam", target), true)
+		duel.swing_at(duel.ideal_contact_time, SwingAttempt.Kind.CONTACT, Vector2(duel.ideal_contact_pos.x, duel.ideal_contact_pos.z), true)
+		_run(duel)
+		if duel.swing.made_contact:
+			contacts += 1
+	assert_gt(contacts, 30, "ten centimetres outside is within a bat's reach")
+
+
+func test_the_ai_batter_leaves_pitches_far_from_the_zone_alone() -> void:
+	var rng := Rng.new(77)
+	var swings_far := 0
+	var swings_near := 0
+	for i: int in 300:
+		var far := PitchDuel.new(cfg, field, DuelSettings.new(), rng.fork(i))
+		var zone := far.zone
+		far.throw_pitch(_pitch(&"four_seam", Vector3(-zone.half_width - 0.3, Field.PLATE_FRONT_Y, zone.top + 0.4)), true)
+		AiBatter.react(far, rng)
+		if far.swing != null:
+			swings_far += 1
+		var near := PitchDuel.new(cfg, field, DuelSettings.new(), rng.fork(1000 + i))
+		near.throw_pitch(_pitch(&"four_seam", Vector3(zone.half_width + 0.06, Field.PLATE_FRONT_Y, 0.75)), true)
+		AiBatter.react(near, rng)
+		if near.swing != null:
+			swings_near += 1
+	assert_eq(swings_far, 0, "nobody swings at a pitch at his head")
+	assert_between(swings_near, 60, 200, "but pitches just off the edge are chased some of the time")

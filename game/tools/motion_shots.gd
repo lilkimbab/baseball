@@ -108,7 +108,14 @@ func _pose(time: float) -> void:
 	if _who == "pitch":
 		_scene.pitcher.right_grip = Puppet.Grip.BALL if time < _scene.pitch_motion.release_time else Puppet.Grip.RELAXED
 		_scene.pitcher.look_at_world(Field.to_world(Vector3(0.0, 0.3, 0.9)))
+		# Pose the instant before as well: how a moving hand is turned depends on its speed.
+		_scene.pitcher.frame_time = 1.0 / 60.0
+		_scene.pitcher.reset_motion()
+		_scene.pitcher.apply_joints(_scene.pitch_motion.frame(time - 1.0 / 60.0), _scene.pitch_motion.clip)
 		_scene.pitcher.apply_joints(_scene.pitch_motion.frame(time), _scene.pitch_motion.clip)
+		_scene.ball_actor.visible = time > 0.0 and time < _scene.pitch_motion.release_time + 0.004
+		_scene.ball_actor.show_at(Field.to_field(_scene.pitcher.global_transform * _scene.pitcher.ball_spot(&"RightHand")))
+		_scene.ball_actor.visible = time > 0.0 and time < _scene.pitch_motion.release_time + 0.004
 	else:
 		var motion := _scene.swing_motion
 		var weight := smoothstep(motion.launch - 0.03, motion.contact, time) * (1.0 - smoothstep(motion.contact, motion.contact + 0.22, time))

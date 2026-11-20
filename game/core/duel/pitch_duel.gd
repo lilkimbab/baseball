@@ -142,6 +142,9 @@ func _resolve_swing() -> void:
 	# happens to be at this instant: the swing plane follows the pitch, so being early or
 	# late changes direction (yaw), not whether the barrel is on the ball's line.
 	var ball_at := Vector2(ideal_contact_pos.x, ideal_contact_pos.z)
+	if not SwingModel.reachable(zone, ball_at):
+		swing.judgment = &"miss"
+		return
 	var aim := swing.aim
 	if not swing.has_aim:
 		var read := SwingModel.read_sigma(settings, decision.type.family)

@@ -88,18 +88,38 @@ func _build_ground() -> void:
 
 func _build_infield() -> void:
 	_build_mound()
+	# Pitcher's plate: 24 by 6 inches, its front edge 60 ft 6 in from the apex of home plate.
 	var rubber := BoxMesh.new()
-	rubber.size = Vector3(0.61, 0.03, 0.15)
-	_add(rubber, CHALK, Vector3(0.0, Field.RUBBER_Y + 0.075, Field.MOUND_HEIGHT + 0.015))
+	rubber.size = Vector3(0.6096, 0.03, 0.1524)
+	_add(rubber, CHALK, Vector3(0.0, Field.RUBBER_Y + 0.0762, Field.MOUND_HEIGHT + 0.005))
 
 	var base := BoxMesh.new()
-	base.size = Vector3(0.457, 0.08, 0.457)
-	var bases: Array[Vector3] = [Field.FIRST_BASE, Field.SECOND_BASE, Field.THIRD_BASE]
-	for b: Vector3 in bases:
-		_add(base, CHALK, b + Vector3(0.0, 0.0, 0.04), PI / 4.0)
-	var plate := BoxMesh.new()
-	plate.size = Vector3(Field.PLATE_WIDTH, 0.02, Field.PLATE_FRONT_Y)
-	_add(plate, CHALK, Vector3(0.0, Field.PLATE_FRONT_Y * 0.5, 0.01))
+	base.size = Vector3(Field.BASE_SIZE, Field.BASE_THICKNESS, Field.BASE_SIZE)
+	for number: int in [1, 2, 3] as Array[int]:
+		_add(base, CHALK, Field.base_centre(number) + Vector3(0.0, 0.0, Field.BASE_THICKNESS * 0.5), PI / 4.0)
+	_build_plate()
+
+
+## Home plate: a five-sided slab of white rubber set level with the ground.
+func _build_plate() -> void:
+	const RISE := 0.012
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var outline := Field.PLATE_OUTLINE
+	var count := outline.size()
+	var middle := Vector3(0.0, 0.25, RISE)
+	for i: int in count:
+		var a := Vector3(outline[i].x, outline[i].y, RISE)
+		var b := Vector3(outline[(i + 1) % count].x, outline[(i + 1) % count].y, RISE)
+		for corner: Vector3 in [middle, a, b, a, Vector3(a.x, a.y, 0.0), b, b, Vector3(a.x, a.y, 0.0), Vector3(b.x, b.y, 0.0)] as Array[Vector3]:
+			tool.add_vertex(Field.to_world(corner))
+	tool.generate_normals()
+	var plate := MeshInstance3D.new()
+	plate.mesh = tool.commit()
+	var rubber := _material(CHALK, 0.7)
+	rubber.cull_mode = BaseMaterial3D.CULL_DISABLED
+	plate.material_override = rubber
+	add_child(plate)
 
 
 ## The mound as a surface over Field.ground_height(), so its slope is the one pitchers stride
