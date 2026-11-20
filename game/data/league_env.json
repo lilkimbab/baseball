@@ -20,10 +20,10 @@
     "batter": {
       "K": {"contact": -0.28},
       "BB": {"eye": 0.30},
-      "HR": {"power": 0.45},
+      "HR": {"power": 0.55},
       "2B": {"power": 0.18, "speed": 0.10},
       "3B": {"power": 0.05, "speed": 0.40},
-      "1B": {"contact": 0.06, "speed": 0.03}
+      "1B": {"contact": 0.10, "speed": 0.05}
     },
     "pitcher": {
       "K": {"stuff": 0.28},
@@ -39,31 +39,32 @@
   },
   "calibration": {
     "note": "Multipliers on the league rates when drawing outcomes, tuned with ./dev sim so that the simulated totals match the targets. They make up for effects that do not average out (tired pitchers, managers' choices). 1 = no correction.",
-    "K": 0.985, "BB": 0.93, "HBP": 1.03, "1B": 0.975, "2B": 0.98, "3B": 1.0, "HR": 0.86
+    "K": 0.96, "BB": 0.99, "HBP": 1.0, "1B": 1.0, "2B": 1.04, "3B": 1.0, "HR": 0.90
   },
   "in_play": {
     "basis": "A",
     "out_types": {"ground": 0.45, "fly": 0.30, "line": 0.12, "popup": 0.13},
-    "reached_on_error": 0.031,
-    "extra_base_error_on_hit": 0.02,
-    "double_play_on_ground_force": 0.44,
+    "reached_on_error": 0.025,
+    "extra_base_error_on_hit": 0.034,
+    "double_play_on_ground_force": 0.42,
     "fielders_choice_on_ground_force": 0.32,
-    "runner_2nd_to_3rd_on_ground": 0.50,
-    "runner_3rd_scores_on_ground": 0.52,
-    "sac_fly_runner_3rd": 0.62,
-    "runner_2nd_to_3rd_on_fly": 0.22,
+    "runner_2nd_to_3rd_on_ground": 0.58,
+    "runner_3rd_scores_on_ground": 0.58,
+    "sac_fly_runner_3rd": 0.66,
+    "runner_2nd_to_3rd_on_fly": 0.28,
     "doubled_off_on_line": 0.06,
-    "single_runner_1st_to_3rd": 0.30,
+    "single_runner_1st_to_3rd": 0.32,
     "single_runner_1st_to_3rd_two_outs": 0.34,
-    "single_runner_2nd_scores": 0.70,
+    "single_runner_2nd_scores": 0.73,
     "single_runner_2nd_scores_two_outs": 0.86,
-    "double_runner_1st_scores": 0.44,
+    "double_runner_1st_scores": 0.52,
     "double_runner_1st_scores_two_outs": 0.62,
     "thrown_out_advancing": 0.06
   },
   "running": {
     "basis": "A, tuned so that the totals match the targets above",
-    "steal_attempt_1st": 0.066,
+    "steal_attempt_1st": 0.082,
+    "steal_speed_k": 0.85,
     "steal_attempt_2nd": 0.006,
     "steal_success": 0.74,
     "pickoff": 0.0045,

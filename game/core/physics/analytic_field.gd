@@ -33,6 +33,11 @@ static func create(fence: FenceProfile, backstop: float = 16.5, foul_width_base:
 	return field
 
 
+## Distance from home to the nearest part of the boundary (fence, foul-area walls, backstop).
+func min_boundary() -> float:
+	return _min_radius
+
+
 func boundary_distance(az_deg: float) -> float:
 	return _radius[_index(az_deg)]
 

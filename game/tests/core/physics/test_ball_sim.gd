@@ -14,24 +14,67 @@ func _fly(ev_kmh: float, launch_deg: float, backspin_rpm: float) -> Vector2:
 	return Vector2(ball.pos.y, t)
 
 
-func test_fly_ball_160_kmh_28_deg_carries_about_121_m() -> void:
-	var r := _fly(160.0, 28.0, 2000.0)
-	assert_between(r.x, 118.0, 124.0, "carry (m)")
-	assert_between(r.y, 4.8, 5.4, "hang time (s)")
+## Distance (ft) by launch angle and exit speed (80, 85 ... 115 mph) from A. Nathan's
+## trajectory calculator, whose drag and lift were fitted to 2015 Statcast batted balls
+## (baseball.physics.illinois.edu, TrajectoryCalculator-new.xlsx: sea level, 78 F, 50 %
+## humidity, contact 3 ft up, backspin 2072 rpm x (mph / 100) x (angle - 7.2) / 20.3).
+const STATCAST_CARRY := {
+	15: [202, 224, 248, 273, 298, 325, 352, 381],
+	20: [243, 269, 296, 324, 353, 382, 412, 443],
+	25: [268, 295, 323, 351, 379, 408, 437, 466],
+	30: [280, 306, 333, 359, 385, 412, 438, 464],
+	35: [280, 305, 329, 352, 376, 399, 422, 444],
+	40: [271, 293, 314, 335, 355, 374, 393, 411],
+}
+## Hang time (s) for 30 degrees at the same speeds.
+const STATCAST_HANG_30: Array[float] = [4.23, 4.53, 4.83, 5.13, 5.44, 5.75, 6.06, 6.38]
 
 
-func test_fly_ball_170_kmh_28_deg() -> void:
-	assert_between(_fly(170.0, 28.0, 2200.0).x, 126.0, 134.0, "carry (m)")
+func _statcast_ball(mph: float, launch_deg: float) -> BallSim:
+	var air := PhysicsConfigIO.load_file(PhysicsConfigIO.DEFAULT_PATH)
+	air.air_density = 1.175
+	air.finalize()
+	var ball := BallSim.new(air)
+	var launch := deg_to_rad(launch_deg)
+	var speed := mph * 0.44704
+	ball.pos = Vector3(0.0, 0.0, 0.9144)
+	ball.vel = Vector3(0.0, speed * cos(launch), speed * sin(launch))
+	var spin := 2072.0 * (mph / 100.0) * (launch_deg - 7.2) / (27.5 - 7.2)
+	ball.spin = Vector3(1.0, 0.0, 0.0) * rpm(spin)
+	ball.hit()
+	return ball
 
 
-func test_fly_ball_150_kmh_30_deg() -> void:
-	assert_between(_fly(150.0, 30.0, 2200.0).x, 108.0, 116.0, "carry (m)")
+func _land(ball: BallSim) -> Vector2:
+	var t := 0.0
+	while t < 15.0:
+		var before := ball.pos
+		ball.pos = ball.integrate(BallFlight.DT)
+		t += BallFlight.DT
+		if ball.pos.z <= 0.0:
+			var f := before.z / (before.z - ball.pos.z)
+			return Vector2(lerpf(before.y, ball.pos.y, f), t - BallFlight.DT * (1.0 - f))
+	return Vector2(ball.pos.y, t)
 
 
-func test_pop_up_130_kmh_45_deg() -> void:
-	var r := _fly(130.0, 45.0, 3000.0)
-	assert_between(r.x, 81.0, 89.0, "carry (m)")
-	assert_between(r.y, 5.2, 5.8, "hang time (s)")
+func test_batted_balls_carry_as_far_as_statcast_says() -> void:
+	for angle: int in STATCAST_CARRY:
+		for i: int in 8:
+			var mph := 80.0 + 5.0 * i
+			var feet := _land(_statcast_ball(mph, float(angle))).x / 0.3048
+			var want: float = STATCAST_CARRY[angle][i]
+			assert_almost_eq(feet, want, want * 0.02, "%d mph at %d deg (ft)" % [int(mph), angle])
+
+
+func test_hang_times_match_statcast() -> void:
+	for i: int in 8:
+		var t := _land(_statcast_ball(80.0 + 5.0 * i, 30.0)).y
+		assert_almost_eq(t, STATCAST_HANG_30[i], 0.12, "%d mph at 30 deg (s)" % (80 + 5 * i))
+
+
+func test_a_hundred_mph_at_twenty_eight_degrees_goes_about_383_ft() -> void:
+	var r := _fly(160.9, 28.0, 2100.0)
+	assert_between(r.x / 0.3048, 370.0, 395.0, "carry (ft)")
 
 
 func test_backspin_adds_carry() -> void:

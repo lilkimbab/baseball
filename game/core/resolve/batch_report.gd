@@ -22,15 +22,21 @@ var plate_appearances := 0
 var starter_outs := 0
 var saves := 0
 var failures := 0
+## Pitch-by-pitch counts when the games were played with the physical resolver.
+var tally: PitchTally
 var _rows := PackedStringArray()
 
 
-static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng) -> BatchReport:
+static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, physical: bool = false) -> BatchReport:
 	var r := BatchReport.new()
+	if physical:
+		r.tally = PitchTally.new()
 	for g: int in game_count:
 		var away := teams[g % teams.size()]
 		var home := teams[(g + 1 + (g / teams.size()) % (teams.size() - 1)) % teams.size()]
-		var sim := GameSim.create(away, home, rules, env, catalog, ovr, rng.fork(g))
+		var sim := GameSim.create(away, home, rules, env, catalog, ovr, rng.fork(g), null, null, physical)
+		if physical:
+			(sim.resolver as PhysicalResolver).tally = r.tally
 		var counter := EventCounter.new()
 		var guard := 0
 		while not sim.state.over and guard < GameSim.MAX_EVENTS:
@@ -43,6 +49,31 @@ static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: League
 		sim.scorer.finish(sim.state)
 		r._add(sim, counter)
 	return r
+
+
+## Adds another batch's totals to this one.
+func merge(other: BatchReport) -> void:
+	games += other.games
+	batting.add(other.batting)
+	pitching.add(other.pitching)
+	runs += other.runs
+	errors += other.errors
+	double_plays += other.double_plays
+	steal_attempts += other.steal_attempts
+	steals += other.steals
+	pickoffs += other.pickoffs
+	wild_pitches += other.wild_pitches
+	passed_balls += other.passed_balls
+	ties += other.ties
+	home_wins += other.home_wins
+	decided += other.decided
+	extra_innings += other.extra_innings
+	starter_outs += other.starter_outs
+	saves += other.saves
+	if other.tally != null:
+		if tally == null:
+			tally = PitchTally.new()
+		tally.merge(other.tally)
 
 
 func _add(sim: GameSim, counter: EventCounter) -> void:
@@ -82,6 +113,7 @@ func text(env: LeagueEnv) -> String:
 	_check("타율", batting.average(), env.targets.get("avg", 0.0), 0.008, "%.3f")
 	_check("득점/팀·경기", runs / team_games, env.targets.get("runs_per_team_game", 0.0), 0.25, "%.2f")
 	_check("평균자책점", pitching.era(), env.targets.get("era", 0.0), 0.30, "%.2f")
+	_check("비자책점 비율", 1.0 - float(pitching.earned_runs) / maxi(pitching.runs, 1), 1.0 - 6115.0 / 6813.0, 0.025, "%.3f")
 	_check("삼진/타석", (batting.strikeouts) / pa, env.rates[LeagueEnv.Outcome.K], 0.010, "%.3f")
 	_check("볼넷/타석", (batting.walks + batting.intentional_walks) / pa, env.rates[LeagueEnv.Outcome.BB], 0.007, "%.3f")
 	_rows.append("%-22s %9.3f" % ["  고의사구/팀·경기", batting.intentional_walks / team_games])
@@ -106,6 +138,10 @@ func text(env: LeagueEnv) -> String:
 	_rows.append("%-22s %9.2f" % ["선발 이닝/경기", starter_outs / team_games / 3.0])
 	_rows.append("%-22s %9.3f" % ["연장 비율", float(extra_innings) / games])
 	_rows.append("%-22s %9.3f" % ["세이브/경기", float(saves) / games])
+	if tally != null:
+		_rows.append("")
+		_rows.append(tally.text())
+		failures += tally.failures
 	return "\n".join(_rows)
 
 

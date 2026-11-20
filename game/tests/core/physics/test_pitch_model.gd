@@ -56,7 +56,7 @@ func test_aim_solver_puts_every_pitch_on_target() -> void:
 		for target: Vector3 in targets:
 			var flight := PitchModel.throw_type(cfg, catalog[id], RELEASE, target)
 			var miss := Vector2(flight.plate_pos.x - target.x, flight.plate_pos.z - target.z).length()
-			assert_lt(miss, 0.001, "%s residual miss (m)" % id)
+			assert_lt(miss, PitchModel.AIM_TOLERANCE, "%s residual miss (m)" % id)
 
 
 func test_left_hander_mirrors_the_break() -> void:
@@ -98,6 +98,6 @@ func test_execution_error_spreads_with_sigma_and_is_reproducible() -> void:
 
 
 func test_better_command_means_a_smaller_miss() -> void:
-	assert_almost_eq(PitchModel.command_sigma(0.0), 0.34, 0.001)
-	assert_almost_eq(PitchModel.command_sigma(100.0), 0.12, 0.001)
+	assert_almost_eq(PitchModel.command_sigma(0.0), 0.26, 0.001)
+	assert_almost_eq(PitchModel.command_sigma(100.0), 0.09, 0.001)
 	assert_gt(PitchModel.command_sigma(40.0), PitchModel.command_sigma(80.0))

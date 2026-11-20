@@ -1,0 +1,59 @@
+extends SceneTree
+## Plays the match scene (computer against computer) and saves screenshots: before a pitch
+## and at moments during the first balls in play, to check the stage without a person.
+##
+##   ./dev tool-win match_shots build/match/shot --plays 3
+##
+## Options: --out <path prefix>  --plays <n, default 2>  --seed <n>  --speed <time scale,
+##          default 2: waits between pitches pass faster>
+
+var _scene: MatchScene
+var _prefix := "user://match"
+var _plays := 2
+var _seen := 0
+var _frames := 0
+var _due: Array[String] = []
+var _taken := {}
+var _was_playing := false
+
+
+func _initialize() -> void:
+	var args := CmdArgs.parse(OS.get_cmdline_user_args())
+	_prefix = args.get("out", _prefix)
+	_plays = int(str(args.get("plays", "2")))
+	Engine.time_scale = float(str(args.get("speed", "2")))
+	var packed := load("res://match/match.tscn") as PackedScene
+	_scene = packed.instantiate() as MatchScene
+	_scene.human_team = -1
+	_scene.innings = 3
+	_scene.seed_value = int(str(args.get("seed", "20261121")))
+	root.add_child(_scene)
+
+
+func _process(_delta: float) -> bool:
+	_frames += 1
+	for name: String in _due:
+		root.get_texture().get_image().save_png("%s_%s.png" % [_prefix, name])
+	_due.clear()
+	if _frames > 20000:
+		print("match_shots: gave up after %d frames" % _frames)
+		return true
+	if _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _taken.has("pitch"):
+		_shoot("pitch")
+	var playing := _scene._play_time >= 0.0 and _scene._play != null and not _scene._play.foul
+	if playing:
+		for at: float in [0.5, 1.5, 3.0, 5.0]:
+			var tag := "%d_play_%.1f" % [_seen, at]
+			if _scene._play_time >= at and not _taken.has(tag) and _scene._play_time < _scene._play.timeline.duration + 0.5:
+				_shoot(tag)
+	if _was_playing and not playing:
+		_seen += 1
+		_shoot("%d_after" % (_seen - 1))
+	_was_playing = playing
+	return _seen >= _plays and _due.is_empty()
+
+
+func _shoot(tag: String) -> void:
+	_taken[tag] = true
+	_due.append(tag)
+	print("match_shots: %s  %s  %s" % [tag, _scene.banner, _scene.last_text])

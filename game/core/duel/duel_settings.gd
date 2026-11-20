@@ -16,8 +16,28 @@ var command := 55.0
 var timing_window := 0.065
 ## How much of an aiming error on screen becomes a bat-ball offset (docs/05: 0.035-0.10).
 var aim_scale := 0.05
+## A person's small errors are forgiven and large ones count in full (SwingModel.error_scale);
+## off, the whole error is scaled by aim_scale (the computer batter, whose error is its read).
+var aim_forgiving := true
+## With aim_forgiving off: the share of the error across the plate that moves the contact
+## point along the bat (the computer batter's misread puts balls off the end or the handle).
+var aim_across := 1.0
+## Random spread of the bat's angle at contact (degrees, one sd): the computer batter's
+## natural variation. A person's spray comes from his own timing.
+var yaw_spread := 0.0
 ## Pitcher's release point for a right-hander; mirrored for a left-hander.
 var release_point := Vector3(-0.55, 16.76, 1.80)
+## Rules the pitch is called under (the strike zone's size).
+var rules := RuleSet.kbo_2026()
+## The batter's body for a hit by pitch: a standing cylinder this far from the middle of the
+## plate (to the third-base side for a right-handed batter), from the ankles to the shoulders.
+var body_offset := 0.72
+var body_radius := 0.22
+var body_ankle := 0.12
+var body_shoulder_share := 0.80
+## Chance the batter gets out of the way of a pitch that would hit him (the computer batter;
+## a person dodges with the controls).
+var dodge := 0.0
 
 
 func release() -> Vector3:

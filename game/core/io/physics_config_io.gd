@@ -37,6 +37,12 @@ static func from_dict(d: Dictionary) -> PhysicsConfig:
 	cfg.cl1 = aero.get("cl1", 0.0)
 	cfg.cl2 = aero.get("cl2", 0.0)
 	cfg.spin_decay_tau = aero.get("spin_decay_tau", 0.0)
+	var batted: Dictionary = d.get("batted_aero", {})
+	cfg.bat_cd0 = batted.get("cd0", cfg.cd0)
+	cfg.bat_cd_per_mph = batted.get("cd_per_mph_below_100", 0.0)
+	cfg.bat_cd_spin = batted.get("cd_spin", 0.0)
+	cfg.bat_cl_a = batted.get("cl_a", 0.0)
+	cfg.bat_cl_b = batted.get("cl_b", 0.0)
 
 	cfg.bat_radius = contact.get("bat_radius", 0.0)
 	cfg.efficiency_max = contact.get("efficiency_max", 0.0)

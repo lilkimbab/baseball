@@ -54,7 +54,7 @@ func record(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		GameEvent.Kind.STEAL:
 			for i: int in event.moves.size():
 				var id := out.runner_ids[i]
-				if id == "":
+				if id == "" or out.applied[i] == 0:
 					continue
 				if event.moves[i].is_out():
 					book.bat(id).caught_stealing += 1
@@ -78,12 +78,12 @@ func record(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 
 
 func _plate_appearance(event: GameEvent, out: FlowOutcome, batting: int, fielding: int) -> void:
-	var b := book.bat(out.batter_id)
-	var p := book.pitch(out.pitcher_id)
+	var b := book.bat(out.charged_batter_id)
+	var p := book.pitch(out.charged_pitcher_id)
 	var result := event.result
 	b.pa += 1
 	p.batters_faced += 1
-	p.pitches += event.pitches
+	book.pitch(out.pitcher_id).pitches += event.pitches
 	if PaResult.is_at_bat(result):
 		b.ab += 1
 	match result:
@@ -124,9 +124,11 @@ func _plate_appearance(event: GameEvent, out: FlowOutcome, batting: int, fieldin
 				p.home_runs += 1
 	if PaResult.is_walk(result) or result == PaResult.Kind.HIT_BY_PITCH:
 		book.bases_on_balls[batting] += 1
+	# Runs batted in always go to the batter who finished the plate appearance.
+	var finisher := book.bat(out.batter_id)
 	for run: ScoredRun in out.scored:
 		if run.rbi:
-			b.rbi += 1
+			finisher.rbi += 1
 
 
 func _has_error(event: GameEvent) -> bool:

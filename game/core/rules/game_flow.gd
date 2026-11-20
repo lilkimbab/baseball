@@ -22,6 +22,8 @@ static func apply(state: GameState, event: GameEvent) -> FlowOutcome:
 	out.batter_id = state.batter_id()
 	out.pitcher_id = state.pitcher_id()
 	out.score_before = state.score.duplicate()
+	out.charged_batter_id = out.batter_id
+	out.charged_pitcher_id = out.pitcher_id
 	if state.over:
 		return out
 	match event.kind:
@@ -58,10 +60,16 @@ static func _pitch(state: GameState, event: GameEvent, out: FlowOutcome) -> void
 
 static func _substitute(state: GameState, event: GameEvent) -> void:
 	var team := state.teams[event.team]
+	var mid_count := state.balls > 0 or state.strikes > 0
 	match event.change:
 		GameEvent.Change.PITCHER:
+			if mid_count and state.count_pitcher_id == "" and event.team == state.fielding():
+				state.count_pitcher_id = event.out_id
+				state.count_at_relief = Vector2i(state.balls, state.strikes)
 			team.change_pitcher(event.in_id)
 		GameEvent.Change.PINCH_HITTER:
+			if state.strikes == 2 and state.count_batter_id == "" and event.out_id == state.batter_id():
+				state.count_batter_id = event.out_id
 			team.pinch(team.slot_of(event.out_id), event.in_id)
 		GameEvent.Change.PINCH_RUNNER:
 			team.pinch(team.slot_of(event.out_id), event.in_id, true)
@@ -84,7 +92,13 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 	var result := event.result
 	var batter_runner: BaseRunner = null
 	if is_pa:
-		batter_runner = BaseRunner.make(state.batter_id(), pitcher, result, result == PaResult.Kind.REACHED_ON_ERROR)
+		if state.count_batter_id != "" and PaResult.is_strikeout(result):
+			out.charged_batter_id = state.count_batter_id
+		var relief := state.count_at_relief
+		var batters_count := (relief.x >= 2 and relief.x > relief.y) or relief == Vector2i(3, 2)
+		if state.count_pitcher_id != "" and batters_count and PaResult.is_walk(result):
+			out.charged_pitcher_id = state.count_pitcher_id
+		batter_runner = BaseRunner.make(state.batter_id(), out.charged_pitcher_id, result, result == PaResult.Kind.REACHED_ON_ERROR)
 		if result == PaResult.Kind.REACHED_ON_ERROR:
 			# Rebuild the inning as if the error had not happened: the batter was out.
 			state.phantom_outs += 1
@@ -104,21 +118,29 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		if m.is_out():
 			outs_after += 1
 			if outs_after == 3:
-				no_runs = m.out_kind == RunnerMove.OutKind.FORCE or m.from == 0 or m.out_kind == RunnerMove.OutKind.FLY or m.out_kind == RunnerMove.OutKind.STRIKEOUT
+				no_runs = m.out_kind == RunnerMove.OutKind.FORCE or m.batter_out_before_first() or m.out_kind == RunnerMove.OutKind.FLY or m.out_kind == RunnerMove.OutKind.STRIKEOUT
 
 	var start := state.bases.duplicate()
 	var after: Array[BaseRunner] = state.bases.duplicate()
 	var ends_game := false
 	var winning_advance := 0
 	out.runner_ids.resize(event.moves.size())
+	out.applied.resize(event.moves.size())
 	for i: int in event.moves.size():
 		var m := event.moves[i]
 		var runner: BaseRunner = batter_runner if m.from == 0 else start[m.from - 1]
 		out.runner_ids[i] = runner.player_id if runner != null else ""
-		if runner == null or ends_game:
+		# Nothing that happens after the third out counts: the half-inning is already over.
+		if runner == null or ends_game or state.outs >= 3:
 			continue
+		out.applied[i] = 1
 		if m.from > 0 and after[m.from - 1] == runner:
 			after[m.from - 1] = null
+		# A base gained through an error or a passed ball does not count toward earned runs:
+		# if he scores from where he should not have been, the run is unearned.
+		var excused := m.on_error or event.kind == GameEvent.Kind.PASSED_BALL
+		if excused and not m.is_out():
+			runner.unearned = true
 		if m.is_out():
 			state.outs += 1
 			out.outs_made += 1
@@ -142,6 +164,9 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 	state.bases = after
 
 	if is_pa:
+		state.count_batter_id = ""
+		state.count_pitcher_id = ""
+		state.count_at_relief = Vector2i(-1, -1)
 		var bases := PaResult.hit_bases(result)
 		out.credited_bases = bases
 		if ends_game and bases > 0 and bases < 4:
@@ -207,3 +232,38 @@ static func _open_half(state: GameState) -> void:
 static func _finish(state: GameState, winner: int) -> void:
 	state.over = true
 	state.winner = winner
+
+
+## Walk, hit batsman, dropped third strike: the batter to first and only the runners who are
+## forced move up, lead runner first.
+static func forced_moves(state: GameState) -> Array[RunnerMove]:
+	var moves: Array[RunnerMove] = []
+	if not state.base_empty(1):
+		if not state.base_empty(2):
+			if not state.base_empty(3):
+				moves.append(RunnerMove.make(3, 4))
+			moves.append(RunnerMove.make(2, 3))
+		moves.append(RunnerMove.make(1, 2))
+	moves.append(RunnerMove.make(0, 1))
+	return moves
+
+
+## Wild pitch, passed ball, balk: every runner moves up one base, lead runner first.
+static func everyone_advances(state: GameState, on_error: bool = false) -> Array[RunnerMove]:
+	var moves: Array[RunnerMove] = []
+	for base: int in [3, 2, 1]:
+		if not state.base_empty(base):
+			moves.append(RunnerMove.make(base, base + 1, RunnerMove.OutKind.NONE, on_error))
+	return moves
+
+
+## A batter may run on a dropped third strike only with first base open or with two out.
+static func third_strike_can_run(state: GameState) -> bool:
+	return state.base_empty(1) or state.outs == 2
+
+
+## The infield fly rule is on: fewer than two out with runners on first and second (or the
+## bases loaded). A fair fly an infielder can catch with ordinary effort is then an out
+## whether caught or not, and runners may advance at their own risk.
+static func infield_fly_applies(state: GameState) -> bool:
+	return state.outs < 2 and not state.base_empty(1) and not state.base_empty(2)

@@ -77,9 +77,11 @@ baseball/
 | `PitchModel` | core/physics | 구종 정의 → 릴리스 상태. 조준 해법, 실행 오차 |
 | `ContactModel` | core/physics | 접촉 파라미터 → 타구 속도·회전 |
 | `CollisionProvider` | core/physics | 충돌 질의 인터페이스. `AnalyticField`가 기본 구현 |
-| `FielderMotion`, `RunnerMotion` | core/motion | 이동·포구·송구의 시간 계산 |
-| `Controller` | core/control | 투수·타자·수비·주자·감독의 결정 인터페이스 |
-| `AiPitcher`, `AiBatter`, `AiFielding`, `AiRunning`, `AiManager` | core/ai | AI 구현 |
+| `MotionModel`, `FieldingAlignment` | core/motion | 이동·포구·송구의 시간 계산(하나로 모았다), 수비 위치와 시프트 제한 |
+| `PlaySim`, `PlayContext`, `PlayResult`, `PlayTimeline` | core/play | 타구가 나간 뒤: 요격·포구·송구·주자·실책, 장면용 키 프레임 |
+| `Umpire`, `SubstitutionOptions` | core/rules | 페어·파울·인정 2루타·홈런 판정, 교체 가능 선수와 검사 |
+| `Controller`, `AiController` | core/control | 투구·스윙·번트·도루 결정의 인터페이스와 AI 구현. 사람은 장면이 직접 조작한다 |
+| `AiPitcher`, `AiBatter`, `AiManager` | core/ai | AI 구현. 수비·주루 판단은 `PlaySim` 안에 있다 |
 | `Player`, `Ratings`, `PitchArsenal` | core/ratings | 선수 데이터 |
 | `Team`, `Roster`, `Lineup` | core/league | 구단과 편성 |
 | `League`, `Season`, `Schedule`, `Standings` | core/league | 리그 진행 |
@@ -268,6 +270,7 @@ baseball/
 ./dev sim         # 통계 해석기로 한 경기 (문자 중계, 박스 스코어). --seed, --quiet, --pack, --away, --home
 ./dev sim --games 4000   # 리그 분포를 data/league_env.json의 목표와 비교. 범위를 벗어나면 !! 표시, 종료 코드 1
 ./dev sim league  # 가상 리그 로스터 팩 생성 → game/data/rosters/fiction-2026.json
+./dev sim season  # 한 부(10팀) 144경기: 팀 승률 분포와 개인 기록 상위권을 KBO 2025와 비교
 ./dev tool-win <도구> <출력 접두어> [인자]   # game/tools의 스크립트를 Windows GPU로 실행
                   # 동작 점검: res://tools/motion_shots.gd(시각별 촬영), motion_report.gd(튀는 뼈 찾기)
                   # 목표 장면 촬영: Godot으로 res://tools/closeup_shot.gd 실행 (Windows GPU 권장)

@@ -85,7 +85,8 @@ func test_a_fly_ball_short_of_the_fence_lands_and_stops_in_play() -> void:
 	assert_false(path.is_home_run())
 	var landing := path.first_event(BallEvent.Kind.BOUNCE)
 	assert_not_null(landing)
-	assert_between(Trajectory.ground_distance(landing.pos), 108.0, 116.0)
+	# Statcast: 93 mph at 30 degrees carries about 350 ft (107 m).
+	assert_between(Trajectory.ground_distance(landing.pos), 102.0, 110.0)
 	assert_not_null(path.first_event(BallEvent.Kind.STOP), "comes to rest")
 	assert_false(field.is_out_of_play(path.end_point()))
 
@@ -124,7 +125,7 @@ func test_a_foul_pop_behind_the_plate_goes_out_of_play_or_stays_short() -> void:
 
 func test_prediction_equals_the_real_flight() -> void:
 	var real := batted_ball(155.0, 18.0, 1500.0, -12.0)
-	var predicted := BallFlight.run(real.clone(), field)
+	var predicted := BallFlight.run(real.clone(), field, 15.0, BallFlight.DT, false)
 	var steps := 0
 	while not real.stopped and steps < 5000:
 		real.advance(BallFlight.DT, field)
@@ -136,6 +137,22 @@ func test_trajectory_lookup_by_time_and_distance() -> void:
 	var path := BallFlight.run(batted_ball(150.0, -5.0, -1500.0, 0.0, 0.8), field)
 	var t40 := path.time_at_distance(40.0)
 	assert_gt(t40, 0.0)
-	assert_almost_eq(Trajectory.ground_distance(path.position_at(t40)), 40.0, 0.3)
+	# Rolling balls are sampled every 1/60 s, so within one step of 40 m.
+	assert_almost_eq(Trajectory.ground_distance(path.position_at(t40)), 40.0, 0.7)
 	assert_eq(path.time_at_distance(500.0), -1.0)
 	assert_eq(path.position_at(-1.0), path.points[0])
+
+
+func test_longer_steps_where_nothing_can_be_hit_land_in_the_same_place() -> void:
+	var worst := 0.0
+	for speed_kmh: float in [100.0, 140.0, 170.0] as Array[float]:
+		for launch: float in [-5.0, 10.0, 25.0, 45.0] as Array[float]:
+			for spray: float in [-35.0, 0.0, 30.0] as Array[float]:
+				var fine := BallFlight.run(batted_ball(speed_kmh, launch, 1800.0, spray), field, 15.0, BallFlight.DT, false)
+				var quick := BallFlight.run(batted_ball(speed_kmh, launch, 1800.0, spray), field)
+				if fine.events.is_empty() or quick.events.is_empty():
+					continue
+				worst = maxf(worst, fine.events[0].pos.distance_to(quick.events[0].pos))
+	# Over flights of up to 130 m this is a thousandth of the distance: far below anything a
+	# fielder or a ruling could notice.
+	assert_lt(worst, 0.15, "first landing within 15 cm of the fine-step flight")

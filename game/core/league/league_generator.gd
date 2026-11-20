@@ -5,8 +5,16 @@ extends RefCounted
 
 ## Average talent per division, top division first.
 const DIVISION_MEANS: Array[float] = [56.0, 50.0, 44.0]
-const TEAM_SPREAD := 11.0
-const ABILITY_SPREAD := 9.0
+## A player's overall talent varies by this much (sd, rating points) and each ability by this
+## much more on its own. Most of the spread is in the separate abilities: real hitters are
+## rarely elite at everything, so the abilities are only loosely tied together (about 25%).
+const TEAM_SPREAD := 6.5
+const ABILITY_SPREAD := 11.5
+## Hitting style, also per player: power hitters strike out more and run less (sd of the shift).
+const STYLE_SPREAD := 5.0
+## Nobody below this makes a professional roster as a hitter: contact and batting eye are
+## never lower (a regular with less would hit well under .200).
+const HITTING_FLOOR := 32.0
 ## Roster shape: starters, relievers, catchers, infielders by main position, outfielders.
 ## Players marked "+" are regulars; the rest are back-ups. A rating of 50 means the average of
 ## the players who actually play, so back-ups are made weaker than regulars.
@@ -67,7 +75,7 @@ func team(index: int, mean: float, city: int = -1, nickname: int = -1) -> Team:
 	t.secondary = palette[1]
 	t.accent = palette[2]
 	# Managers differ a lot in how often they run: real clubs range from 31 to 214 attempts.
-	t.steal_style = clampf(exp(rng.next_normal() * 0.5), 0.25, 2.2)
+	t.steal_style = clampf(exp(rng.next_normal() * 0.45), 0.35, 1.9)
 	t.bunt_style = clampf(exp(rng.next_normal() * 0.3), 0.5, 1.8)
 	var numbers: Dictionary[int, bool] = {}
 	for entry: String in ROSTER:
@@ -111,16 +119,17 @@ func _hitter(p: Player, parts: PackedStringArray, talent: float) -> void:
 	var contact_shift: float = s[1]
 	var speed_shift: float = s[2]
 	var field_shift: float = s[3]
-	var contact := _ability(talent, contact_shift)
-	var power := _ability(talent, power_shift)
+	var style := rng.next_normal() * STYLE_SPREAD
+	var contact := _ability(talent, contact_shift - style * 0.8)
+	var power := _ability(talent, power_shift + style)
 	# The usual edge against opposite-handed pitchers is applied by the league environment;
 	# here each hitter only gets his own small difference between the two.
-	p.batting.contact_r = clampf(contact + rng.next_normal() * 3.0, 20.0, 99.0)
-	p.batting.contact_l = clampf(contact + rng.next_normal() * 3.0, 20.0, 99.0)
+	p.batting.contact_r = clampf(contact + rng.next_normal() * 3.0, HITTING_FLOOR, 99.0)
+	p.batting.contact_l = clampf(contact + rng.next_normal() * 3.0, HITTING_FLOOR, 99.0)
 	p.batting.power_r = clampf(power + rng.next_normal() * 3.0, 20.0, 99.0)
 	p.batting.power_l = clampf(power + rng.next_normal() * 3.0, 20.0, 99.0)
-	p.batting.eye = _ability(talent)
-	p.batting.speed = _ability(talent - 2.0, speed_shift)
+	p.batting.eye = maxf(_ability(talent), HITTING_FLOOR)
+	p.batting.speed = _ability(talent - 2.0, speed_shift - style * 0.6)
 	p.batting.baserunning = clampf(p.batting.speed * 0.6 + _ability(talent) * 0.4, 20.0, 99.0)
 	p.batting.bunt = _ability(talent - 4.0, speed_shift * 0.5)
 	p.batting.clutch = _ability(50.0)
@@ -146,13 +155,16 @@ func _pitcher(p: Player, role: String, talent: float) -> void:
 	r.hold = _ability(50.0)
 	r.fielding = _ability(45.0)
 	r.stamina = _ability(talent, 12.0 if role == "SP" else -12.0)
+	# How hard he is to hit is one trait of the pitcher, shared by all his pitches: averaging
+	# separately drawn pitches would make every pitcher look alike.
+	var stuff := talent + rng.next_normal() * 11.5
 	# Fastball: league average 144 km/h, a standard deviation of 3.5 (A); better pitchers throw
 	# a little harder, relievers a little harder still.
 	var fastball := ArsenalPitch.new()
 	fastball.type = &"four_seam" if rng.chance(0.85) else &"two_seam"
-	fastball.velo_avg = clampf(144.0 + rng.next_normal() * 3.5 + (talent - 50.0) * 0.08 + (1.0 if role == "RP" else 0.0), 130.0, 158.0)
+	fastball.velo_avg = clampf(144.0 + rng.next_normal() * 3.0 + (stuff - 50.0) * 0.12 + (1.0 if role == "RP" else 0.0), 130.0, 158.0)
 	fastball.velo_max = fastball.velo_avg + 4.0 + absf(rng.next_normal()) * 1.5
-	fastball.movement = _ability(talent)
+	fastball.movement = clampf(stuff + rng.next_normal() * 6.0, 20.0, 99.0)
 	fastball.command = _ability(talent)
 	r.arsenal.append(fastball)
 	var count := 2 + (1 if role == "SP" else 0) + (1 if rng.chance(0.45) else 0) + (1 if role == "SP" and rng.chance(0.3) else 0)
@@ -168,7 +180,7 @@ func _pitcher(p: Player, role: String, talent: float) -> void:
 		var reference: float = catalog[type].speed_kmh if catalog.has(type) else 132.0
 		pitch.velo_avg = clampf(reference + (fastball.velo_avg - 145.0) * 0.8 + rng.next_normal() * 2.0, 100.0, 152.0)
 		pitch.velo_max = pitch.velo_avg + 3.0 + absf(rng.next_normal())
-		pitch.movement = _ability(talent)
+		pitch.movement = clampf(stuff + rng.next_normal() * 6.0, 20.0, 99.0)
 		pitch.command = _ability(talent - 3.0)
 		r.arsenal.append(pitch)
 	# Usage: the fastball about half, the rest falling off.

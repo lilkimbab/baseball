@@ -78,7 +78,7 @@ func test_a_well_timed_swing_puts_the_ball_in_play() -> void:
 			fair += 1
 			if duel.contact.exit_speed_kmh() > 130.0:
 				assert_lt(absf(duel.contact.spray_deg()), 12.0, "a well-struck, well-timed ball goes up the middle")
-	assert_gt(fair, total * 0.6, "perfect timing is usually a fair ball")
+	assert_gt(float(fair), total * 0.6, "perfect timing is usually a fair ball")
 
 
 func test_swinging_far_too_early_or_late_misses() -> void:
@@ -127,7 +127,8 @@ func test_power_swings_hit_harder_and_higher_than_contact_swings() -> void:
 				speed[kind] += duel.contact.exit_speed_kmh()
 				angle[kind] += duel.contact.launch_deg()
 				count[kind] += 1
-	assert_gt(speed[1] / count[1], speed[0] / count[0] + 8.0, "exit speed")
+	# The power swing is faster but aims higher on the ball, which gives some speed back.
+	assert_gt(speed[1] / count[1], speed[0] / count[0] + 2.0, "exit speed")
 	assert_gt(angle[1] / count[1], angle[0] / count[0] + 3.0, "launch angle")
 
 
@@ -164,11 +165,21 @@ func test_the_live_ball_follows_the_forecast() -> void:
 	var duel := _duel(7)
 	duel.throw_pitch(_pitch(&"four_seam", duel.zone.center()), true)
 	duel.swing_at(duel.ideal_contact_time, SwingAttempt.Kind.POWER)
+	while duel.phase == PitchDuel.Phase.FLIGHT:
+		duel.tick(1.0 / 240.0)
+	if duel.path == null:
+		pass_test("no contact with this seed")
+		return
+	assert_almost_eq(duel.path.times[0], 0.0, 1e-9, "the forecast's clock starts at contact")
+	var contact_at := duel.time
+	for i: int in 48:
+		duel.tick(1.0 / 240.0)
+	# A fifth of a second after contact the ball is where the forecast says, not still at the bat.
+	assert_lt(duel.ball.pos.distance_to(duel.path.position_at(duel.time - contact_at)), 0.01)
+	assert_gt(duel.ball.pos.distance_to(duel.path.points[0]), 2.0, "the ball has left the bat")
 	_run(duel)
-	if duel.path != null and duel.result != PitchDuel.Result.FOUL:
+	if duel.result != PitchDuel.Result.FOUL:
 		assert_almost_eq(Trajectory.ground_distance(duel.ball.pos), Trajectory.ground_distance(duel.path.end_point()), 0.05)
-	else:
-		pass_test("foul or no contact with this seed")
 
 
 func test_same_seed_replays_the_same_pitch() -> void:
@@ -203,10 +214,12 @@ func test_ai_against_ai_produces_a_believable_mix_of_results() -> void:
 	var whiffs: int = counts.get(PitchDuel.Result.SWINGING_STRIKE, 0)
 	var fouls: int = counts.get(PitchDuel.Result.FOUL, 0)
 	var in_play: int = counts.get(PitchDuel.Result.IN_PLAY, 0) + int(counts.get(PitchDuel.Result.HOME_RUN, 0))
-	gut.p("balls %d, called %d, whiffs %d, fouls %d, in play %d (home runs %d), mean exit speed %.0f km/h" % [
-		balls, called, whiffs, fouls, in_play, int(counts.get(PitchDuel.Result.HOME_RUN, 0)), exit_speed / maxi(contacts, 1)])
+	var hit_by: int = counts.get(PitchDuel.Result.HIT_BY_PITCH, 0)
+	var tips: int = counts.get(PitchDuel.Result.FOUL_TIP, 0)
+	gut.p("balls %d, called %d, whiffs %d, fouls %d, tips %d, hit by pitch %d, in play %d (home runs %d), mean exit speed %.0f km/h" % [
+		balls, called, whiffs, fouls, tips, hit_by, in_play, int(counts.get(PitchDuel.Result.HOME_RUN, 0)), exit_speed / maxi(contacts, 1)])
 	# Loose bounds: this minimal AI only has to be plausible. Stage S5 calibrates it properly.
-	assert_eq(balls + called + whiffs + fouls + in_play, pitches, "every pitch has a result")
+	assert_eq(balls + called + whiffs + fouls + tips + hit_by + in_play, pitches, "every pitch has a result")
 	assert_between(float(balls) / pitches, 0.28, 0.44, "balls")
 	assert_between(float(called) / pitches, 0.10, 0.26, "called strikes")
 	assert_between(float(whiffs) / pitches, 0.05, 0.16, "swinging strikes")

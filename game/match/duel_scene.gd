@@ -262,7 +262,7 @@ func step(delta: float) -> void:
 	match state:
 		State.PRE_PITCH:
 			if not human_pitches() and state_time >= AI_PITCH_DELAY:
-				decision = AiPitcher.choose(catalog, duel.zone, _ai_rng)
+				decision = _ai_pitch_decision()
 				_begin_windup()
 		State.CHARGE:
 			power = minf(power + delta / CHARGE_TIME, 1.0)
@@ -285,13 +285,13 @@ func step(delta: float) -> void:
 			if duel.swing != null and not _swing_shown and duel.time >= duel.swing.contact_time - SwingModel.swing_time(duel.swing.kind):
 				_begin_swing_pose()
 			var following := duel.phase == PitchDuel.Phase.IN_PLAY and state_time > MAX_FOLLOW_TIME
-			if duel.is_over() or following:
+			var hit := duel.phase == PitchDuel.Phase.IN_PLAY and _finish_on_contact()
+			if duel.is_over() or following or hit:
 				_finish_pitch()
 		State.RESULT:
 			var hold := 2.6 if duel.result == PitchDuel.Result.HOME_RUN else 1.5
 			if state_time >= hold:
-				_new_duel()
-				_enter(State.PRE_PITCH)
+				_after_result()
 
 
 func _process(delta: float) -> void:
@@ -336,8 +336,32 @@ func _begin_windup() -> void:
 func _release() -> void:
 	duel.throw_pitch(decision)
 	if not human_bats():
-		AiBatter.react(duel, _ai_rng)
+		_ai_react()
 	_enter(State.LIVE)
+
+
+# --- Hooks a full game (MatchScene) replaces ---
+
+
+## The computer's pitch when the player is not pitching.
+func _ai_pitch_decision() -> PitchDecision:
+	return AiPitcher.choose(catalog, duel.zone, _ai_rng)
+
+
+## The computer batter's reaction right after release.
+func _ai_react() -> void:
+	AiBatter.react(duel, _ai_rng)
+
+
+## Hand the pitch over as soon as the ball is hit, instead of following it to rest.
+func _finish_on_contact() -> bool:
+	return false
+
+
+## After the result has been shown: the next pitch.
+func _after_result() -> void:
+	_new_duel()
+	_enter(State.PRE_PITCH)
 
 
 func _begin_swing_pose() -> void:
@@ -561,6 +585,12 @@ func _build_players() -> void:
 	umpire.show_glove = false
 	umpire.gear = [&"Mask"]
 	umpire.apply(PuppetClips.umpire())
+	_build_fielders()
+
+
+## The seven fielders behind the battery (for show in the duel).
+func _build_fielders() -> void:
+	var home := Color(0.93, 0.93, 0.95)
 	var spots: Array[Vector3] = [
 		Vector3(21.0, 24.0, 0.0), Vector3(9.0, 36.0, 0.0), Vector3(-21.0, 24.0, 0.0), Vector3(-9.0, 36.0, 0.0),
 		Vector3(-45.0, 75.0, 0.0), Vector3(0.0, 95.0, 0.0), Vector3(45.0, 75.0, 0.0),

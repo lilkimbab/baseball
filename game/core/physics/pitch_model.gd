@@ -4,7 +4,8 @@ extends RefCounted
 
 const DT := 1.0 / 240.0
 const MAX_AIM_ITERATIONS := 8
-const AIM_TOLERANCE := 0.0005
+## Close enough (m): far below any pitcher's precision.
+const AIM_TOLERANCE := 0.002
 
 
 ## Spin vector for a pitch travelling along `dir` (unit vector from release toward the plate).
@@ -20,8 +21,9 @@ static func spin_vector(dir: Vector3, spin_rpm: float, efficiency: float, tilt_d
 	return active - gyro if throws_left else active + gyro
 
 
-## Flies a ball from release until it crosses the front edge of the plate.
-static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3, spin: Vector3) -> PitchFlight:
+## Flies a ball from release until it crosses the front edge of the plate, noting on the way
+## where it crosses the plane at `contact_y` (if that is in front of the plate).
+static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3, spin: Vector3, contact_y: float = -INF) -> PitchFlight:
 	var ball := BallSim.new(cfg)
 	ball.pos = release
 	ball.vel = velocity
@@ -36,6 +38,10 @@ static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3
 		var prev_pos := ball.pos
 		var prev_vel := ball.vel
 		var new_pos := ball.integrate(DT)
+		if prev_pos.y > contact_y and new_pos.y <= contact_y:
+			var g := (prev_pos.y - contact_y) / (prev_pos.y - new_pos.y)
+			out.contact_pos = prev_pos.lerp(new_pos, g)
+			out.contact_time = t + DT * g
 		if new_pos.y <= Field.PLATE_FRONT_Y:
 			var f := (prev_pos.y - Field.PLATE_FRONT_Y) / (prev_pos.y - new_pos.y)
 			out.plate_pos = prev_pos.lerp(new_pos, f)
@@ -53,20 +59,22 @@ static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3
 ## Solves for the release direction that makes the pitch cross the plate at `target`
 ## (a point on the plane of the plate's front edge), allowing for gravity, drag and break.
 static func throw_at(cfg: PhysicsConfig, release: Vector3, target: Vector3, speed_kmh: float,
-		spin_rpm: float, efficiency: float, tilt_deg: float, throws_left: bool = false) -> PitchFlight:
+		spin_rpm: float, efficiency: float, tilt_deg: float, throws_left: bool = false,
+		contact_y: float = -INF, with_movement: bool = true) -> PitchFlight:
 	var speed := speed_kmh / 3.6
 	var aim := target
 	var flight: PitchFlight = null
 	for i: int in MAX_AIM_ITERATIONS:
 		var dir := (aim - release).normalized()
 		var spin := spin_vector(dir, spin_rpm, efficiency, tilt_deg, throws_left)
-		flight = fly_to_plate(cfg, release, dir * speed, spin)
+		flight = fly_to_plate(cfg, release, dir * speed, spin, contact_y)
 		var miss := Vector3(target.x - flight.plate_pos.x, 0.0, target.z - flight.plate_pos.z)
 		if miss.length() < AIM_TOLERANCE:
 			break
 		aim += miss
-	var no_spin := fly_to_plate(cfg, release, flight.release_vel, Vector3.ZERO)
-	flight.movement = Vector2(flight.plate_pos.x - no_spin.plate_pos.x, flight.plate_pos.z - no_spin.plate_pos.z)
+	if with_movement:
+		var no_spin := fly_to_plate(cfg, release, flight.release_vel, Vector3.ZERO)
+		flight.movement = Vector2(flight.plate_pos.x - no_spin.plate_pos.x, flight.plate_pos.z - no_spin.plate_pos.z)
 	return flight
 
 
@@ -83,4 +91,4 @@ static func apply_execution_error(target: Vector3, sigma_m: float, rng: Rng) -> 
 
 ## Miss size (metres, per axis) from the command rating (1-99), per docs/04 section 5.2.
 static func command_sigma(command: float) -> float:
-	return lerpf(0.34, 0.12, clampf(command / 100.0, 0.0, 1.0))
+	return lerpf(0.26, 0.09, clampf(command / 100.0, 0.0, 1.0))

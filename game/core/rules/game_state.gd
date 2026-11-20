@@ -27,6 +27,12 @@ var batters_faced: Dictionary[String, int] = {}
 ## Outs that would have been made this half-inning but for errors. Runs that score once
 ## outs + phantom_outs reaches three are not earned.
 var phantom_outs := 0
+## The batter and pitcher who started the current count, when either was replaced during it
+## ("" otherwise). Official scoring charges some results to them (docs/12 section 5.3).
+var count_batter_id := ""
+var count_pitcher_id := ""
+## Balls and strikes when the pitcher was replaced during the count.
+var count_at_relief := Vector2i(-1, -1)
 var over := false
 ## 0 visitors won, 1 home won, -1 a tie. Meaningful once over.
 var winner := -1
@@ -107,6 +113,9 @@ func duplicate_state() -> GameState:
 	s.pitch_counts = pitch_counts.duplicate()
 	s.batters_faced = batters_faced.duplicate()
 	s.phantom_outs = phantom_outs
+	s.count_batter_id = count_batter_id
+	s.count_pitcher_id = count_pitcher_id
+	s.count_at_relief = count_at_relief
 	s.over = over
 	s.winner = winner
 	return s
