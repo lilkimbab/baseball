@@ -12,9 +12,17 @@ const MAX_YAW_DEG := 50.0
 const ATTACK_DEG := 8.0
 ## Furthest the barrel can be from the ball along the bat and still touch it (m from tip).
 const BAT_LENGTH_USABLE := 0.6
+## How far outside the strike zone a batter can still get the bat on the ball. Beyond this a
+## swing meets nothing, however well it is timed.
+const REACH_OUTSIDE_ZONE := 0.22
 
 
 ## Seconds from starting the swing to the barrel reaching the ball.
+## True if a pitch crossing at (x across, y up) is somewhere a bat can get to.
+static func reachable(zone: StrikeZone, crossing: Vector2) -> bool:
+	return zone.distance_outside(crossing.x, crossing.y) <= REACH_OUTSIDE_ZONE
+
+
 static func swing_time(kind: SwingAttempt.Kind) -> float:
 	return 0.13 if kind == SwingAttempt.Kind.POWER else 0.11
 

@@ -65,11 +65,18 @@ void fragment() {
 
 	// Chalk: foul lines out to the fence, and the two batter's boxes.
 	float in_play = 1.0 - smoothstep(fence - aa, fence + aa, r);
-	float foul_line = band((abs(f.x) - f.y) * 0.7071, 0.05, aa) * step(0.3, f.y) * in_play;
+	// Lines are 3 inches wide. The foul lines' outer edges run through the apex of home plate.
+	float half_line = 0.0381;
+	float foul_line = band((abs(f.x) - f.y) * 0.7071 + half_line, half_line, aa) * step(0.3, f.y) * in_play;
+	// Batter's boxes: 4 ft by 6 ft, 6 in from the plate, centred on its middle.
 	vec2 q = abs(vec2(abs(f.x) - 0.978, f.y - 0.216)) - vec2(0.61, 0.915);
 	float box_edge = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0);
-	float boxes = band(box_edge, 0.04, aa);
-	colour = mix(colour, chalk * (0.9 + 0.1 * grit), clamp(max(foul_line, boxes), 0.0, 1.0) * 0.9);
+	float boxes = band(box_edge + half_line, half_line, aa);
+	// Catcher's box: 43 in wide, from the back of the batter's boxes to 8 ft behind the apex.
+	float behind = step(f.y, -0.699) * step(-2.438, f.y);
+	float catcher = band(abs(f.x) - 0.546 + half_line, half_line, aa) * behind;
+	catcher = max(catcher, band(f.y + 2.438 - half_line, half_line, aa) * step(abs(f.x), 0.546));
+	colour = mix(colour, chalk * (0.9 + 0.1 * grit), clamp(max(max(foul_line, boxes), catcher), 0.0, 1.0) * 0.9);
 	colour = mix(colour, apron, beyond);
 
 	ALBEDO = colour;

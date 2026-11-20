@@ -12,6 +12,7 @@ GODOT="${GODOT:-$ROOT/.tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64}"
 BLENDER="${BLENDER:-$ROOT/.tools/blender-5.3.0/blender}"
 GODOT_WIN="${GODOT_WIN:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64.exe}"
 GODOT_WIN_CONSOLE="${GODOT_WIN_CONSOLE:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64_console.exe}"
+FFMPEG="${FFMPEG:-$ROOT/.tools/ffmpeg/node_modules/ffmpeg-static/ffmpeg}"
 
 win_game_path() { wslpath -w "$GAME"; }
 
@@ -59,6 +60,12 @@ case "$cmd" in
       "$GAME/assets/characters/player_base.glb" "$ROOT/build/player_preview.png" 2>&1 | grep -E "make_player|Error|Traceback"
     "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
     echo "model: rebuilt game/assets/characters/player_base.glb (preview: build/player_preview.png)"
+    ;;
+  props)
+    # Rebuild the equipment (glove, catcher's mitt, bat, ball cover) to real sizes with Blender.
+    export BLENDER_USER_RESOURCES="$ROOT/.tools/blender-user"
+    "$BLENDER" -b --python "$ROOT/tools/blender/make_props.py" -- "$GAME/assets/props" 2>&1 | grep -E "make_props|Error|Traceback"
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
     ;;
   mocap)
     # Recorded deliveries and swings from the Driveline OpenBiomechanics Project
@@ -108,6 +115,20 @@ case "$cmd" in
     "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --disable-vsync --resolution 1920x1080 \
       --script res://tools/perf_probe.gd -- "$@"
     ;;
+  video)
+    # ./dev video [out.mp4] [--bat 2] [--pitch 2] [--seed n]   Records a scripted demonstration
+    # on Windows (GPU): the player bats at a few pitches, then throws a few. Godot writes every
+    # frame at a steady 60 a second, so the video is smooth however fast the PC renders.
+    out="$ROOT/build/demo/dugout-demo.mp4"
+    if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then out="$1"; shift; fi
+    mkdir -p "$(dirname "$out")"
+    raw="${out%.mp4}.avi"
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution "${RES:-1280x720}" \
+      --write-movie "$(wslpath -w "$raw")" --script res://tools/demo_reel.gd -- "$@" 2>&1 | grep -E "demo_reel|ERROR|SCRIPT" || true
+    "$FFMPEG" -y -loglevel error -i "$raw" -an -c:v libx264 -preset slow -crf 21 -pix_fmt yuv420p -movflags +faststart "$out"
+    rm -f "$raw"
+    echo "video: $out ($(du -h "$out" | cut -f1))"
+    ;;
   shot-win)
     # ./dev shot-win [out.png] [res://scene.tscn]   GPU-rendered capture on Windows.
     out="${1:-$ROOT/build/shot-win.png}"
@@ -125,11 +146,13 @@ Usage: ./dev <command>
   test        run the headless test suite (GUT)
   shot        save a software-rendered screenshot inside WSL   [out.png] [scene]
   model       rebuild the player model (Blender + MPFB) and import it
+  props       rebuild the glove, mitt, bat and ball cover to real sizes (Blender)
   mocap       fetch and convert recorded deliveries and swings   [list pitch|swing] | [pitch|swing <trial> [form]]
   play        run the game on Windows (GPU)
   editor      open the Godot editor on Windows
   perf        measure frame rate on Windows                    [--scene ..] [--seconds ..]
   shot-win    save a GPU-rendered screenshot on Windows        [out.png] [scene]
+  video       record a scripted batting and pitching demo      [out.mp4] [--bat n] [--pitch n]
 EOF
     ;;
 esac

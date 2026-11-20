@@ -100,7 +100,9 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 ./dev editor    # Windows에서 Godot 에디터 열기
 ./dev shot      # WSL에서 화면 캡처 → build/shot.png
 ./dev model     # 선수 모델 재생성 (Blender + MPFB)
+./dev props     # 장비(글러브, 미트, 배트, 공)를 실제 규격으로 재생성
 ./dev mocap     # 모션캡처 투구·스윙 받기와 변환 (비상업 자료, git 제외)
+./dev video     # 타격·투구 시연 영상 녹화 → build/demo/dugout-demo.mp4
 ./dev help      # 전체 명령
 ```
 

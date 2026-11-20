@@ -32,6 +32,13 @@ func contains(x: float, z: float, margin: float = 0.0) -> bool:
 	return absf(x) <= half_width + margin and z >= bottom - margin and z <= top + margin
 
 
+## How far outside the zone a ball centre at (x, z) is, in metres; zero inside it.
+func distance_outside(x: float, z: float) -> float:
+	var across := maxf(absf(x) - half_width, 0.0)
+	var up := maxf(maxf(z - top, bottom - z), 0.0)
+	return Vector2(across, up).length()
+
+
 ## A pitch is a strike if it is inside the zone at both the front and the middle of the plate.
 func is_strike(pitch: PitchFlight) -> bool:
 	var front := pitch.plate_pos

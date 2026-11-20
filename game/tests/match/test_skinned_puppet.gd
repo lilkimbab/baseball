@@ -123,7 +123,9 @@ func test_batting_gloves_cover_the_hands() -> void:
 		if body.mesh.surface_get_material(surface).resource_name == "Hands":
 			hands = surface
 	assert_gt(hands, -1, "the hands are their own surface")
-	assert_null(body.get_surface_override_material(hands), "bare hands keep the skin")
+	var bare := body.get_surface_override_material(hands) as StandardMaterial3D
+	assert_not_null(bare.albedo_texture, "bare hands keep the skin texture")
+	assert_eq(bare.transparency, BaseMaterial3D.TRANSPARENCY_DISABLED, "and skin is drawn solid")
 	puppet.gloves = true
 	puppet.repaint()
 	var glove := body.get_surface_override_material(hands) as StandardMaterial3D
@@ -332,3 +334,49 @@ func test_the_mannequin_shows_recorded_joints_as_they_are() -> void:
 	assert_eq(puppet.joints[&"RightHand"], frame[&"RightHand"])
 	assert_eq(puppet.joints[&"LeftFoot"], frame[&"LeftFoot"])
 	assert_almost_eq(puppet.joints[&"Hips"], frame[&"LeftUpperLeg"].lerp(frame[&"RightUpperLeg"], 0.5), Vector3.ONE * 1e-5)
+
+
+# --- Real sizes ---
+
+
+func test_limbs_are_in_proportion_to_height() -> void:
+	var puppet := _model()
+	var arm := (puppet.upper_arm + puppet.lower_arm) / puppet.height
+	var leg := (puppet.upper_leg + puppet.lower_leg) / puppet.height
+	assert_between(arm, 0.305, 0.33, "shoulder to wrist is about 31.6% of height")
+	assert_between(leg, 0.48, 0.505, "hip to ankle is about 49.2% of height")
+	assert_between(puppet.shoulder_half * 2.0 / puppet.height, 0.19, 0.23, "shoulder joints about a fifth of height apart")
+
+
+func test_equipment_is_real_size() -> void:
+	var puppet := _model()
+	puppet.show_bat = true
+	puppet.apply(PuppetClips.stance())
+	var bat := (puppet.get("_parts") as Dictionary)[&"Bat"] as MeshInstance3D
+	var bat_box := bat.mesh.get_aabb().size
+	assert_almost_eq(bat_box.y, 0.851, 0.003, "a 33.5 in bat")
+	assert_almost_eq(bat_box.x, 0.0662, 0.002, "2.61 in barrel")
+	puppet.show_bat = false
+	puppet.apply(PuppetClips.fielder_ready())
+	var glove := (puppet.get("_parts") as Dictionary)[&"Glove"] as MeshInstance3D
+	assert_almost_eq(glove.mesh.get_aabb().size.y, 0.305, 0.004, "a 12 in glove")
+	puppet.glove_kind = &"mitt"
+	puppet.apply(PuppetClips.catcher())
+	assert_almost_eq(glove.mesh.get_aabb().size.y, 0.33, 0.004, "a catcher's mitt")
+	assert_gt(glove.mesh.get_aabb().size.x, 0.26, "which is rounder than a fielder's glove")
+
+
+func test_the_ball_is_drawn_at_its_real_size() -> void:
+	var ball := BallActor.new()
+	add_child_autofree(ball)
+	var sphere := (ball.get_child(0) as MeshInstance3D).mesh as SphereMesh
+	assert_almost_eq(sphere.radius * 2.0, 0.0732, 0.0005, "73 mm across")
+
+
+func test_a_held_ball_sits_in_the_fingers_not_inside_the_hand() -> void:
+	var puppet := _model()
+	puppet.right_grip = Puppet.Grip.BALL
+	puppet.apply(PuppetClips.pitch(PuppetClips.PITCH_RELEASE))
+	var knuckle := _bone_at(puppet, "RightMiddleProximal")
+	var ball := puppet.ball_spot(&"RightHand")
+	assert_between(ball.distance_to(knuckle), 0.04, 0.07, "one ball radius and a finger's thickness from the knuckles")

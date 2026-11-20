@@ -21,13 +21,20 @@ const FINGERS: Array[String] = ["Index", "Middle", "Ring", "Little"]
 const CURL := {
 	Grip.RELAXED: [18.0, 22.0, 14.0, 10.0],
 	Grip.BAT: [72.0, 84.0, 58.0, 34.0],
-	Grip.BALL: [38.0, 44.0, 28.0, 30.0],
-	Grip.GLOVE: [26.0, 30.0, 20.0, 16.0],
+	Grip.BALL: [32.0, 44.0, 30.0, 38.0],
+	Grip.GLOVE: [14.0, 8.0, 5.0, 12.0],
 }
 ## Recorded trunk axes lean forward of the true ones (the markers sit on the front of the
 ## body), so the pelvis and ribcage are tipped back by this much, in radians.
 const PELVIS_UPRIGHT := 0.0
 const CHEST_UPRIGHT := 0.0
+
+## Curl of the ring and little fingers [base, middle, tip] around a ball: they tuck in beside
+## it while the index and middle fingers lie over the top.
+const BALL_TUCK: Array[float] = [78.0, 88.0, 60.0]
+## Equipment built to real sizes by tools/blender/make_props.py. Gloves are modelled in the
+## hand's own frame (see _hand_frame), for the left hand.
+const PROPS := {&"glove": "res://assets/props/glove.glb", &"mitt": "res://assets/props/mitt.glb", &"bat": "res://assets/props/bat.glb"}
 
 ## Team look and lettering. Change it and call repaint().
 var uniform := UniformStyle.new()
@@ -35,6 +42,9 @@ var uniform := UniformStyle.new()
 var gloves := false
 ## Standing height in metres; the model is scaled to it. Set before adding to the scene.
 var height := 1.83
+## &"glove" for a fielder's glove, &"mitt" for the catcher's.
+var glove_kind: StringName = &"glove"
+var _glove_shown: StringName = &""
 
 var _skeleton: Skeleton3D
 var _mesh: MeshInstance3D
@@ -67,6 +77,13 @@ var _toe_rest: Dictionary[String, Vector3] = {}
 ## straight limb does not say how it is twisted, so the twist carries over from when it bent.
 var _hinge_last: Dictionary[StringName, Vector3] = {}
 var _dir_last: Dictionary[StringName, Vector3] = {}
+## The way each palm faces at rest (skeleton space), and each wrist's place in the last
+## recorded frame shown (puppet space), from which the hand's speed is worked out.
+var _palm_rest: Dictionary[String, Vector3] = {}
+var _wrist_last: Dictionary[String, Vector3] = {}
+## Each hand as posed, in the puppet's space: origin in the palm, X across it toward the
+## index finger, Y along the fingers, Z out of the palm.
+var _hand_frame: Dictionary[String, Transform3D] = {}
 
 
 static func available() -> bool:
@@ -233,6 +250,53 @@ func apply_joints(frame: Dictionary[StringName, Vector3], source: JointClip, han
 func reset_motion() -> void:
 	_hinge_last.clear()
 	_dir_last.clear()
+	_wrist_last.clear()
+
+
+## A held ball sits against the base of the index and middle fingers, on the palm side.
+func ball_spot(hand: StringName) -> Vector3:
+	var side := "Left" if hand == &"LeftHand" else "Right"
+	if not _hand_frame.has(side):
+		return joints[hand]
+	var frame := _hand_frame[side]
+	return frame.origin + frame.basis.y * 0.03 + frame.basis.z * 0.044
+
+
+func _build_props() -> void:
+	super._build_props()
+	_use_prop(&"Bat", &"bat", Color(0.74, 0.57, 0.36), 0.42, 26.0)
+
+
+## Replaces a stand-in shape with the real piece of equipment, if it has been built.
+func _use_prop(part: StringName, prop: StringName, colour: Color, roughness: float, grain_scale: float) -> void:
+	var path: String = PROPS[prop]
+	if not ResourceLoader.exists(path):
+		return
+	var scene := (load(path) as PackedScene).instantiate()
+	var source := scene.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+	var surface := StandardMaterial3D.new()
+	surface.albedo_color = colour
+	surface.roughness = roughness
+	surface.normal_enabled = true
+	surface.normal_texture = _grain()
+	surface.normal_scale = 0.6
+	surface.uv1_triplanar = true
+	surface.uv1_scale = Vector3.ONE * grain_scale
+	_parts[part].mesh = source.mesh
+	_parts[part].material_override = surface
+	scene.free()
+
+
+func _place_props(direction: Vector3) -> void:
+	super._place_props(direction)
+	var glove := _parts[&"Glove"]
+	if not glove.visible or not _hand_frame.has("Left"):
+		return
+	if _glove_shown != glove_kind:
+		_glove_shown = glove_kind
+		_use_prop(&"Glove", glove_kind, Color(0.35, 0.19, 0.085), 0.58, 12.0)
+	# The glove is worn: it sits in the hand's frame, knuckles at its origin.
+	glove.transform = _hand_frame["Left"]
 
 
 func _show_gear() -> void:
@@ -265,8 +329,13 @@ func _pose_bones(globals: Array[Transform3D]) -> void:
 		_skeleton.set_bone_pose_rotation(i, local.basis.get_rotation_quaternion())
 	for side: String in JointClip.SIDES:
 		var hand := StringName(side + "Hand")
-		var middle: int = _bone.get(StringName(side + "MiddleProximal"), _bone[hand])
-		joints[hand] = _to_puppet * globals[_bone[hand]].origin.lerp(globals[middle].origin, 0.7)
+		var index := _bone[hand]
+		var middle: int = _bone.get(StringName(side + "MiddleProximal"), index)
+		joints[hand] = _to_puppet * globals[index].origin.lerp(globals[middle].origin, 0.7)
+		var turn := _to_puppet.basis.orthonormalized() * (globals[index].basis * _rest[index].basis.inverse())
+		var fingers := (turn * _hand_rest[side]).normalized()
+		var palm := _square_to(turn * _palm_rest[side], fingers)
+		_hand_frame[side] = Transform3D(Basis(fingers.cross(palm), fingers, palm), _to_puppet * globals[middle].origin)
 
 
 ## A recorded point moved to where it belongs for this model: scaled about the origin on the
@@ -373,7 +442,21 @@ func _orient_hand(basis_for: Dictionary[int, Basis], side: String, frame: Dictio
 			var rest_across := _square_to(_hand_rest[side], _grip_rest[side])
 			basis_for[hand] = _align(along, across.normalized(), _grip_rest[side], rest_across) * _rest[hand].basis
 			return
-	basis_for[hand] = Basis(Quaternion(straight, want)) * forearm_turn * _rest[hand].basis
+	var turned := Basis(Quaternion(straight, want)) * forearm_turn
+	# The recording does not say how the forearm is rolled. A free hand moving fast leads with
+	# its palm: the throwing hand is behind the ball as it comes forward, not beside it.
+	var wrist := joints[StringName(side + "Hand")]
+	if _wrist_last.has(side) and frame_time > 0.0:
+		var moved := wrist - _wrist_last[side]
+		var weight := smoothstep(1.5, 6.0, moved.length() / frame_time)
+		var push := _to_skeleton.basis * moved
+		push -= want * push.dot(want)
+		if weight > 0.0 and push.length() > 1e-6:
+			var palm := _square_to(turned * _palm_rest[side], want)
+			var roll := clampf(palm.signed_angle_to(push.normalized(), want), -1.9, 1.9)
+			turned = Basis(want, roll * weight) * turned
+	_wrist_last[side] = wrist
+	basis_for[hand] = turned * _rest[hand].basis
 
 
 ## A foot near the ground lies flat, pointing where the knee points; a lifted foot follows
@@ -448,11 +531,13 @@ func _aim_head(basis_for: Dictionary[int, Basis], head_at: Vector3) -> void:
 func _finger_curls() -> Dictionary[int, Basis]:
 	var out: Dictionary[int, Basis] = {}
 	for side: String in ["Left", "Right"]:
-		var degrees: Array = CURL[left_grip if side == "Left" else right_grip]
+		var grip: Grip = left_grip if side == "Left" else right_grip
+		var degrees: Array = CURL[grip]
 		for finger: String in FINGERS:
+			var tucked := grip == Grip.BALL and (finger == "Ring" or finger == "Little")
 			var parts: Array[String] = ["Proximal", "Intermediate", "Distal"]
 			for part: int in parts.size():
-				_add_curl(out, StringName(side + finger + parts[part]), degrees[part])
+				_add_curl(out, StringName(side + finger + parts[part]), BALL_TUCK[part] if tucked else float(degrees[part]))
 		for part: String in ["ThumbMetacarpal", "ThumbProximal", "ThumbDistal"]:
 			_add_curl(out, StringName(side + part), degrees[3])
 	return out
@@ -483,6 +568,7 @@ func _measure_fingers() -> void:
 			var across := _origin(StringName(side + "IndexProximal")) - _origin(StringName(side + "LittleProximal"))
 			palm = across.cross(_origin(StringName(side + "MiddleProximal")) - hand) * (1.0 if side == "Left" else -1.0)
 		palm = palm.normalized()
+		_palm_rest[side] = palm
 		for finger: String in FINGERS:
 			var chain: Array[StringName] = [StringName(side + finger + "Proximal"), StringName(side + finger + "Intermediate"), StringName(side + finger + "Distal")]
 			for i: int in chain.size():
@@ -576,13 +662,39 @@ func _paint() -> void:
 	}
 	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in part.mesh.get_surface_count():
-			var source := part.mesh.surface_get_material(surface).resource_name
+			var original := part.mesh.surface_get_material(surface)
+			var source := original.resource_name
 			if source == "Jersey" or source == "Pants":
 				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
 			elif source == "Hands":
-				part.set_surface_override_material(surface, _glove_material() if gloves else null)
+				part.set_surface_override_material(surface, _glove_material() if gloves else _solid(original, false))
+			elif source == "Skin" or part.name == &"Eyes":
+				part.set_surface_override_material(surface, _solid(original, false))
+			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
+				part.set_surface_override_material(surface, _solid(original, true))
+				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif plain.has(source):
 				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
+
+
+static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
+
+
+## The model's own materials arrive marked see-through, which draws skin with speckled edges
+## and dark patches where brows and lashes lie over it. Skin and eyes are made solid; brows
+## and lashes become cut-outs.
+static func _solid(original: Material, cutout: bool) -> Material:
+	var base := original as StandardMaterial3D
+	if base == null:
+		return original
+	var key := base.get_instance_id() * 2 + int(cutout)
+	if not _solid_copies.has(key):
+		var copy := base.duplicate() as StandardMaterial3D
+		copy.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR if cutout else BaseMaterial3D.TRANSPARENCY_DISABLED
+		copy.alpha_scissor_threshold = 0.35
+		copy.cull_mode = BaseMaterial3D.CULL_DISABLED if cutout else BaseMaterial3D.CULL_BACK
+		_solid_copies[key] = copy
+	return _solid_copies[key]
 
 
 func _plain_material(source: String, colour: Color) -> StandardMaterial3D:

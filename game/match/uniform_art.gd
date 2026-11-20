@@ -70,13 +70,13 @@ func _draw_jersey(half_px: float) -> void:
 	if style.wordmark != "":
 		_centred(style.wordmark, Vector2(front, _m(0.2)), 0.075, style.ink, style.trim.lerp(style.jersey, 0.15), -0.07)
 	if style.number > 0:
-		_centred(str(style.number), Vector2(front + _m(0.085), _m(0.31)), 0.07, style.ink)
+		_centred(str(style.number), Vector2(front + _m(0.085), _m(0.31)), 0.1, style.ink)
 	# Back: name above a large number.
 	var back := half_px * 1.5
 	if style.player_name != "":
-		_centred(style.player_name, Vector2(back, _m(0.15)), 0.055, style.ink)
+		_centred(style.player_name, Vector2(back, _m(0.15)), 0.07, style.ink)
 	if style.number > 0:
-		_centred(str(style.number), Vector2(back, _m(0.31)), 0.19, style.ink)
+		_centred(str(style.number), Vector2(back, _m(0.33)), 0.2, style.ink)
 
 
 func _draw_pants(_half_px: float) -> void:

@@ -27,6 +27,10 @@ PREVIEW = ARGS[1] if len(ARGS) > 1 else None
 
 # Body shape: an athletic adult man.
 MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.64, "weight": 0.56, "height": 0.6, "proportions": 0.55}
+# Corrections to limb proportions, checked against anthropometric tables (de Leva 1996, male:
+# shoulder to wrist 31.6% of height, hip to ankle 49.2%). The body above comes out with legs
+# at 49.4% and arms at 29.9%, so the arms are lengthened to 31.8%.
+SHAPE = {"measure-upperarm-length-incr": 0.25, "measure-lowerarm-length-incr": 0.25}
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
 
 # Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
@@ -556,8 +560,13 @@ def main():
     macro["race"] = dict(RACE)
     # feet_on_ground is left off: it moves the mesh but not the rig that is fitted afterwards.
     # Both are moved to the ground together below.
-    body = HumanService.create_human(mask_helpers=True, detailed_helpers=False, extra_vertex_groups=True,
+    # detailed_helpers must be on: it adds the joint markers the rig is fitted to. Without them
+    # the rig keeps the joint positions of the default body, and its bones do not line up with
+    # this body's shoulders, elbows, hips and knees.
+    body = HumanService.create_human(mask_helpers=True, detailed_helpers=True, extra_vertex_groups=True,
                                      feet_on_ground=False, scale=0.1, macro_detail_dict=macro)
+    for name, weight in SHAPE.items():
+        TargetService.load_target(body, TargetService.target_full_path(name), weight=weight, name=name)
     rig = HumanService.add_builtin_rig(body, "game_engine", import_weights=True)
     face_parts = add_skin_and_face(body)
     TargetService.bake_targets(body)
