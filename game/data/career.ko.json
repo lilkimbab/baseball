@@ -1,0 +1,52 @@
+{
+  "note": "Career mode (docs/02 section 6, docs/13 S8). A new player starts at second-team level: every rating at base, his type's strengths higher, its weak side lower. Numbers marked A in the docs are assumptions to tune by play.",
+  "base": 40,
+  "strength": 14,
+  "weakness": -4,
+  "positions": ["SP", "RP", "CL", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"],
+  "position_names": {"SP": "선발", "RP": "구원", "CL": "마무리", "C": "포수", "1B": "1루수", "2B": "2루수", "3B": "3루수", "SS": "유격수", "LF": "좌익수", "CF": "중견수", "RF": "우익수"},
+  "batter_types": [
+    {"id": "contact", "name": "정교형", "strengths": ["contact", "eye"], "weak": ["power"]},
+    {"id": "power", "name": "거포형", "strengths": ["power"], "weak": ["speed", "contact"]},
+    {"id": "speed", "name": "쌕쌕이형", "strengths": ["speed", "baserunning"], "weak": ["power"]},
+    {"id": "defence", "name": "수비형", "strengths": ["range", "hands", "arm"], "weak": ["power"]},
+    {"id": "all_round", "name": "만능형", "strengths": [], "weak": [], "all": 5}
+  ],
+  "pitcher_types": [
+    {"id": "power_arm", "name": "강속구형", "strengths": ["velocity", "stuff"], "weak": ["control"], "pitches": ["four_seam", "slider"], "velocity": 148},
+    {"id": "control", "name": "제구형", "strengths": ["control", "command"], "weak": ["velocity"], "pitches": ["four_seam", "changeup", "curve"], "velocity": 140},
+    {"id": "finesse", "name": "기교형", "strengths": ["movement"], "weak": ["velocity"], "pitches": ["four_seam", "slider", "curve", "changeup"], "velocity": 139},
+    {"id": "ground_ball", "name": "땅볼형", "strengths": ["movement", "control"], "weak": ["stamina"], "pitches": ["two_seam", "changeup", "slider"], "velocity": 142},
+    {"id": "fly_ball", "name": "뜬공형", "strengths": ["velocity", "command"], "weak": ["movement"], "pitches": ["four_seam", "curve", "splitter"], "velocity": 145}
+  ],
+  "bodies": [
+    {"id": "lean", "name": "날렵", "height": 180, "weight": 78},
+    {"id": "standard", "name": "보통", "height": 183, "weight": 88},
+    {"id": "solid", "name": "건장", "height": 185, "weight": 97},
+    {"id": "big", "name": "거구", "height": 188, "weight": 108}
+  ],
+  "skins": ["밝은", "보통", "어두운"],
+  "hairs": ["짧은 머리", "스포츠머리", "긴 머리", "삭발"],
+  "beards": ["없음", "콧수염", "턱수염"],
+  "gp": {
+    "batting": {"single": 6, "double": 9, "triple": 12, "home_run": 15, "walk": 3, "rbi": 4, "plate_appearance": 1},
+    "running": {"stolen_base": 6, "run": 3, "times_on_base": 1},
+    "fielding": {"chance": 4, "error": 1},
+    "pitching": {"out": 2, "strikeout": 3, "scoreless_inning": 5, "win": 10, "save": 10, "hold": 6},
+    "scene_goal": 10,
+    "game_goal": 25,
+    "clutch": 1.5,
+    "cost_base": 10,
+    "type_discount": 0.2
+  },
+  "ratings": {
+    "batting": ["contact", "power", "eye"],
+    "running": ["speed", "baserunning"],
+    "fielding": ["range", "hands", "arm", "accuracy"],
+    "pitching": ["control", "stamina", "velocity", "movement", "command"]
+  },
+  "game_goals": {
+    "contact": ["hits", 2], "power": ["extra_bases", 1], "speed": ["runs_or_steals", 2], "defence": ["times_on_base", 1], "all_round": ["times_on_base", 2],
+    "SP": ["quality_start", 1], "RP": ["scoreless", 1], "CL": ["scoreless", 1]
+  }
+}
