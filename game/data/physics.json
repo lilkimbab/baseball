@@ -1,0 +1,38 @@
+{
+  "format": 1,
+  "ball": {
+    "mass": 0.145,
+    "radius": 0.0366
+  },
+  "air": {
+    "density": 1.2,
+    "gravity": 9.81
+  },
+  "aero": {
+    "cd0": 0.33,
+    "cd_per_1000_rpm": 0.02,
+    "cl0": 0.583,
+    "cl1": 2.333,
+    "cl2": 1.05,
+    "spin_decay_tau": 25.0
+  },
+  "contact": {
+    "bat_radius": 0.033,
+    "efficiency_max": 0.2,
+    "efficiency_min": -0.1,
+    "sweet_spot_from_tip": 0.15,
+    "sweet_spot_width": 0.22,
+    "friction_transfer": 0.55,
+    "spin_memory": 0.1
+  },
+  "surfaces": {
+    "grass": {"restitution": 0.45, "friction": 0.45, "roll_decel": 2.8, "roll_drag": 0.22, "ground": true},
+    "dirt": {"restitution": 0.5, "friction": 0.42, "roll_decel": 1.8, "roll_drag": 0.12, "ground": true},
+    "turf": {"restitution": 0.55, "friction": 0.4, "roll_decel": 1.8, "roll_drag": 0.12, "ground": true},
+    "track": {"restitution": 0.45, "friction": 0.45, "roll_decel": 2.2, "roll_drag": 0.15, "ground": true},
+    "wall_pad": {"restitution": 0.35, "friction": 0.5, "roll_decel": 0.0, "roll_drag": 0.0, "ground": false},
+    "wall_hard": {"restitution": 0.55, "friction": 0.4, "roll_decel": 0.0, "roll_drag": 0.0, "ground": false},
+    "net": {"restitution": 0.05, "friction": 0.8, "roll_decel": 0.0, "roll_drag": 0.0, "ground": false},
+    "base": {"restitution": 0.4, "friction": 0.5, "roll_decel": 1.8, "roll_drag": 0.12, "ground": true}
+  }
+}

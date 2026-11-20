@@ -5,27 +5,20 @@ extends GutTest
 
 const CORE_DIR := "res://core"
 
-## Substrings that must not appear in code (comments are stripped before checking).
+## Patterns that must not appear in code (comments are stripped before checking).
+## Engine singletons are matched as whole words so names like "LAST_POS." do not trip them.
 const FORBIDDEN: Array[String] = [
 	"extends Node",
-	"Node3D",
-	"SceneTree",
-	"get_tree(",
-	"Input.",
-	"Engine.",
-	"RenderingServer",
-	"PhysicsServer",
-	"DisplayServer",
-	"AudioServer",
-	"OS.",
-	"Time.",
-	"randf(",
-	"randi(",
-	"randf_range(",
-	"randi_range(",
-	"randfn(",
-	"randomize(",
-	"RandomNumberGenerator",
+	"\\bNode3D\\b",
+	"\\bSceneTree\\b",
+	"\\bget_tree\\(",
+	"\\bInput\\.",
+	"\\bEngine\\.",
+	"\\bOS\\.",
+	"\\bTime\\.",
+	"\\b(Rendering|Physics|Display|Audio)Server\\b",
+	"\\b(randf|randi|randf_range|randi_range|randfn|randomize|seed)\\(",
+	"\\bRandomNumberGenerator\\b",
 ]
 
 
@@ -55,14 +48,36 @@ func test_core_contains_scripts() -> void:
 
 
 func test_core_scripts_use_no_scene_engine_or_random_apis() -> void:
+	var patterns: Array[RegEx] = []
+	for source: String in FORBIDDEN:
+		patterns.append(RegEx.create_from_string(source))
 	var violations: Array[String] = []
 	for path: String in _scripts_under(CORE_DIR):
 		var lines := _code_lines(path)
 		for i: int in lines.size():
-			for token: String in FORBIDDEN:
-				if lines[i].contains(token):
-					violations.append("%s:%d uses '%s'" % [path, i + 1, token])
+			for pattern: RegEx in patterns:
+				var found := pattern.search(lines[i])
+				if found != null:
+					violations.append("%s:%d uses '%s'" % [path, i + 1, found.get_string()])
 	assert_eq(violations, [] as Array[String], "core/ must stay free of scene and engine APIs")
+
+
+func test_the_purity_patterns_catch_what_they_should() -> void:
+	var bad: Array[String] = ["var x := randf()", "Engine.get_frames_per_second()", "extends Node3D", "OS.get_name()", "get_tree().quit()"]
+	var fine: Array[String] = ["var last_pos := LAST_POS.x", "rng.next_float()", "extends RefCounted", "flight_time += dt", "push_error(\"x\")"]
+	var patterns: Array[RegEx] = []
+	for source: String in FORBIDDEN:
+		patterns.append(RegEx.create_from_string(source))
+	for line: String in bad:
+		var caught := false
+		for pattern: RegEx in patterns:
+			caught = caught or pattern.search(line) != null
+		assert_true(caught, "should be rejected: %s" % line)
+	for line: String in fine:
+		var caught := false
+		for pattern: RegEx in patterns:
+			caught = caught or pattern.search(line) != null
+		assert_false(caught, "should be allowed: %s" % line)
 
 
 func test_core_scripts_declare_a_class_name() -> void:

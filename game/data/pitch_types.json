@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it.",
+  "types": [
+    { "id": "four_seam", "label": "포심 패스트볼", "family": "fastball", "speed_kmh": 145, "spin_rpm": 2300, "efficiency": 0.9, "tilt_deg": -12 },
+    { "id": "two_seam", "label": "투심 패스트볼", "family": "fastball", "speed_kmh": 142, "spin_rpm": 2150, "efficiency": 0.88, "tilt_deg": -50 },
+    { "id": "cutter", "label": "커터", "family": "fastball", "speed_kmh": 138, "spin_rpm": 2350, "efficiency": 0.5, "tilt_deg": 25 },
+    { "id": "slider", "label": "슬라이더", "family": "breaking", "speed_kmh": 132, "spin_rpm": 2400, "efficiency": 0.35, "tilt_deg": 75 },
+    { "id": "sweeper", "label": "스위퍼", "family": "breaking", "speed_kmh": 128, "spin_rpm": 2600, "efficiency": 0.6, "tilt_deg": 85 },
+    { "id": "curve", "label": "커브", "family": "breaking", "speed_kmh": 120, "spin_rpm": 2500, "efficiency": 0.75, "tilt_deg": 160 },
+    { "id": "changeup", "label": "체인지업", "family": "offspeed", "speed_kmh": 130, "spin_rpm": 1750, "efficiency": 0.88, "tilt_deg": -60 },
+    { "id": "splitter", "label": "스플리터", "family": "offspeed", "speed_kmh": 132, "spin_rpm": 1300, "efficiency": 0.35, "tilt_deg": -40 }
+  ]
+}
