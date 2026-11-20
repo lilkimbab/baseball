@@ -18,6 +18,10 @@ var run_matters := false
 var infield_in := false
 ## Full count with two out: forced runners go with the pitch.
 var running_with_pitch := false
+## Seconds the runners add to their own arrival when judging an extra base (Tactics: safe +,
+## aggressive −), and a squeeze: the runner on third breaks with the pitch.
+var running_shift := 0.0
+var squeeze := false
 
 
 ## A context for the batter now up in `state`, with the fielders at `positions`.

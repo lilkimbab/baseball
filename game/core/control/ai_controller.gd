@@ -10,6 +10,8 @@ const STEAL_GO := 1.0
 var manager: AiManager
 var catalog: Dictionary[StringName, PitchType]
 var rng: Rng
+## The manager's orders for this side (the pitcher's approach), or null.
+var tactics: Tactics
 
 var _options: Dictionary[String, Array] = {}
 var _memory: Dictionary[String, AiPitcher.Memory] = {}
@@ -34,7 +36,9 @@ func choose_pitch(state: GameState, duel: PitchDuel) -> PitchDecision:
 	if options.is_empty():
 		return AiPitcher.choose(catalog, duel.zone, rng)
 	var weak := AiBatter.weak_cells(state.batter_id())
-	return AiPitcher.decide(options, duel.zone, state.balls, state.strikes, duel.settings.bats_left, weak, _memory[pitcher_id], rng)
+	var factor := tactics.zone_factor() if tactics != null else 1.0
+	var bonus := tactics.zone_bonus() if tactics != null else 0.0
+	return AiPitcher.decide(options, duel.zone, state.balls, state.strikes, duel.settings.bats_left, weak, _memory[pitcher_id], rng, factor, bonus)
 
 
 func react(state: GameState, duel: PitchDuel) -> void:

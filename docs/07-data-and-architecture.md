@@ -84,7 +84,7 @@ baseball/
 | `AiPitcher`, `AiBatter`, `AiManager` | core/ai | AI 구현. 수비·주루 판단은 `PlaySim` 안에 있다 |
 | `Player`, `Ratings`, `PitchArsenal` | core/ratings | 선수 데이터 |
 | `Team`, `Roster`, `Lineup` | core/league | 구단과 편성 |
-| `League`, `Season`, `Schedule`, `Standings` | core/league | 리그 진행 |
+| `Season`, `Schedule`, `ScheduledGame`, `Standings`, `StandingsRow`, `PitcherUsage` | core/league | 리그 진행: 일정, 순위, 하루 진행, 투수 휴식(S7). `Team.registered`가 1군 엔트리 |
 | `Scouting`, `Training`, `Economy` | core/league | 운영 시스템 |
 | `CareerPlayer`, `Growth`, `Goals` | core/career | 커리어 진행 |
 | `GameEvent`, `EventLog`, `StatBook` | core/stats | 이벤트와 기록 |

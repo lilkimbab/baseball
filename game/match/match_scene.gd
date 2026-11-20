@@ -330,7 +330,7 @@ func _ai_pitch_decision() -> PitchDecision:
 func _ai_react() -> void:
 	if resolver.is_bunting():
 		AiBatter.bunt(duel, _ai_rng)
-	else:
+	elif not resolver.batter_takes(game):
 		resolver.controllers[game.batting()].react(game, duel)
 
 
@@ -601,7 +601,7 @@ func _style_for(team: int) -> UniformStyle:
 ## Puts everyone where they stand before a pitch.
 func _place_cast() -> void:
 	var bats_left := settings.bats_left
-	var at := resolver.alignment.positions(game, resolver.fence, bats_left, resolver.is_bunting())
+	var at := resolver.alignment.positions(game, resolver.fence, bats_left, resolver.is_bunting(), resolver.tactics[game.fielding()])
 	for kind: Position.Kind in fielders:
 		if kind == Position.Kind.P or kind == Position.Kind.C:
 			continue

@@ -23,8 +23,27 @@ const ROSTER: Array[String] = [
 	"+RP", "+RP", "+RP", "+RP", "RP", "RP", "RP", "RP",
 	"+C", "C",
 	"+1B", "+2B", "+3B", "+SS", "2B/SS", "3B/1B", "SS/3B",
-	"+LF", "+CF", "+RF", "CF/LF", "RF/1B", "+1B/DH",
+	"+LF", "+CF", "+RF", "CF/LF", "RF/1B", "+1B/DH", "RP",
 ]
+## The second team (2군): prospects and fringe players, further below the regulars (A).
+const FARM: Array[String] = ["SP", "SP", "RP", "RP", "RP", "RP", "C", "2B/SS", "3B/1B", "CF/RF", "LF/1B"]
+const FARM_GAP := 13.0
+## Foreign players (docs/13 S7, A). KBO clubs carry three, usually two starters and a hitter,
+## plus one Asia-quota player; most of the league's home run leaders are the foreign hitters.
+## Starters get more talent, the hitter more power, the Asia-quota reliever a little more.
+const FOREIGN_STARTER := 7.0
+const FOREIGN_POWER := 10.0
+const ASIA_TALENT := 4.0
+## Where the foreign hitter plays.
+const FOREIGN_HITTER_SPOTS: Array[String] = ["+1B", "+3B", "+LF", "+RF", "+1B/DH"]
+## The local players are drawn this much lower so that a club still averages 50 over the
+## plate appearances and batters faced (power over nine regulars, talent over a staff whose
+## starters pitch about 60% of the innings). Measured with ./dev sim, see docs/13 S7.
+const LOCAL_POWER_SHIFT := -1.1
+## Power above the knee counts for this share (A: measured with ./dev sim season, docs/13 S7).
+const POWER_KNEE := 76.0
+const POWER_ABOVE_KNEE := 0.5
+const LOCAL_PITCHER_SHIFT := -1.7
 ## How much weaker a back-up is than a regular (rating points, A).
 const BACKUP_GAP := 8.0
 ## Talent offsets so that a club made around 50 averages 50 where it counts: over the plate
@@ -78,22 +97,51 @@ func team(index: int, mean: float, city: int = -1, nickname: int = -1) -> Team:
 	t.steal_style = clampf(exp(rng.next_normal() * 0.45), 0.35, 1.9)
 	t.bunt_style = clampf(exp(rng.next_normal() * 0.3), 0.5, 1.8)
 	var numbers: Dictionary[int, bool] = {}
+	# Which first-team places go to foreign players: the first two regular starters, one of
+	# the regular corner bats, one regular reliever (the Asia quota).
+	var foreign_hitter: String = FOREIGN_HITTER_SPOTS[rng.next_int(FOREIGN_HITTER_SPOTS.size())]
+	var asia_reliever := rng.next_int(4)
+	var starters := 0
+	var relievers := 0
 	for entry: String in ROSTER:
 		var regular := entry.begins_with("+")
 		var role := entry.trim_prefix("+")
-		var p := player(role, mean + rng.next_normal() * 3.0 - (0.0 if regular else BACKUP_GAP))
+		var origin: StringName = &""
+		if entry == "+SP":
+			starters += 1
+			if starters <= 2:
+				origin = &"foreign"
+		elif entry == "+RP":
+			if relievers == asia_reliever:
+				origin = &"asia"
+			relievers += 1
+		elif entry == foreign_hitter:
+			origin = &"foreign"
+		var p := player(role, mean + rng.next_normal() * 3.0 - (0.0 if regular else BACKUP_GAP), origin)
+		p.number = _number(p, numbers)
+		t.players.append(p)
+		t.registered.append(p.id)
+	for entry: String in FARM:
+		var p := player(entry, mean + rng.next_normal() * 3.0 - FARM_GAP, &"", true)
 		p.number = _number(p, numbers)
 		t.players.append(p)
 	return t
 
 
-func player(role: String, team_mean: float) -> Player:
+## One player. `origin` makes him one of the club's foreign players (&"foreign", &"asia");
+## `prospect` a young second-team player.
+func player(role: String, team_mean: float, origin: StringName = &"", prospect: bool = false) -> Player:
 	_player_serial += 1
 	var p := Player.new()
 	p.id = "p%05d" % _player_serial
-	p.name = names.person(rng)
+	p.origin = origin
+	p.name = names.person(rng) if origin == &"" else names.foreigner(rng, origin == &"asia")
 	var talent := team_mean + rng.next_normal() * TEAM_SPREAD
 	var age := clampi(roundi(27.5 + rng.next_normal() * 4.0), 19, 38)
+	if origin != &"":
+		age = clampi(roundi(29.5 + rng.next_normal() * 2.5), 24, 36)
+	elif prospect:
+		age = clampi(roundi(22.5 + rng.next_normal() * 2.5), 19, 33)
 	p.born = 2026 - age
 	# Players peak at 27 to 30.
 	var age_factor := -0.6 * maxf(24.0 - age, 0.0) - 0.8 * maxf(age - 31.0, 0.0)
@@ -101,9 +149,14 @@ func player(role: String, team_mean: float) -> Player:
 	var parts := role.split("/")
 	var main := parts[0]
 	if main == "SP" or main == "RP":
-		_pitcher(p, main, talent + PITCHER_OFFSET)
+		var bonus := LOCAL_PITCHER_SHIFT
+		if origin == &"foreign":
+			bonus = FOREIGN_STARTER
+		elif origin == &"asia":
+			bonus = ASIA_TALENT
+		_pitcher(p, main, talent + PITCHER_OFFSET + bonus)
 	else:
-		_hitter(p, parts, talent + HITTER_OFFSET)
+		_hitter(p, parts, talent + HITTER_OFFSET, FOREIGN_POWER if origin == &"foreign" else LOCAL_POWER_SHIFT)
 	return p
 
 
@@ -111,7 +164,7 @@ func _ability(talent: float, shift: float = 0.0) -> float:
 	return clampf(talent + shift + rng.next_normal() * ABILITY_SPREAD, 20.0, 99.0)
 
 
-func _hitter(p: Player, parts: PackedStringArray, talent: float) -> void:
+func _hitter(p: Player, parts: PackedStringArray, talent: float, power_bonus: float = 0.0) -> void:
 	var main := parts[0]
 	var shifts := {"C": [0.0, 0.0, -10.0, 6.0], "1B": [6.0, 0.0, -6.0, -4.0], "DH": [7.0, 2.0, -8.0, -8.0], "SS": [-3.0, 0.0, 4.0, 8.0], "CF": [-2.0, 0.0, 6.0, 8.0], "2B": [-3.0, 2.0, 3.0, 4.0], "3B": [3.0, 0.0, -2.0, 2.0]}
 	var s: Array = shifts.get(main, [0.0, 0.0, 0.0, 0.0])
@@ -121,7 +174,11 @@ func _hitter(p: Player, parts: PackedStringArray, talent: float) -> void:
 	var field_shift: float = s[3]
 	var style := rng.next_normal() * STYLE_SPREAD
 	var contact := _ability(talent, contact_shift - style * 0.8)
-	var power := _ability(talent, power_shift + style)
+	var power := _ability(talent, power_shift + style + power_bonus)
+	# Big power is rarer than the other gifts: a KBO season has only a handful of 30-homer
+	# hitters, so the top of the scale is pressed together.
+	if power > POWER_KNEE:
+		power = POWER_KNEE + (power - POWER_KNEE) * POWER_ABOVE_KNEE
 	# The usual edge against opposite-handed pitchers is applied by the league environment;
 	# here each hitter only gets his own small difference between the two.
 	p.batting.contact_r = clampf(contact + rng.next_normal() * 3.0, HITTING_FLOOR, 99.0)

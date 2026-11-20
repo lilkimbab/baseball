@@ -19,6 +19,8 @@ const JOG := 6.5
 const HIT_READ := 0.9
 ## A runner shuffling in his secondary lead at contact is this much ahead of a standing start.
 const ROLLING_START := 0.15
+## Metres a runner on third has gone toward home on a squeeze when the bunt is down (A).
+const SQUEEZE_BREAK := 7.0
 ## Throws shorter than this are a flip or a feed, quicker to let go of than a full throw.
 const SHORT_THROW := 18.0
 const SHORT_THROW_RELEASE := 0.6
@@ -138,6 +140,9 @@ func _setup(context: PlayContext, random: Rng) -> void:
 			r.start = -m.two_out_jump
 		if context.running_with_pitch and r.forced:
 			r.gap += 6.0
+			r.start = 0.0
+		elif context.squeeze and base == 3:
+			r.gap += SQUEEZE_BREAK
 			r.start = 0.0
 		_runners.append(r)
 	_batter = context.batter
@@ -792,7 +797,7 @@ func _hit_starts() -> void:
 
 
 func _aggression() -> float:
-	return m.aggression.y if _outs == 2 else m.aggression.x
+	return (m.aggression.y if _outs == 2 else m.aggression.x) + ctx.running_shift
 
 
 func _judgment(r: PlayRunner) -> float:
