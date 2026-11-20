@@ -21,7 +21,7 @@ func _draw() -> void:
 	_decisions(rect.position + Vector2(40.0, 270.0), g, book)
 	_mvp(rect.position + Vector2(40.0, 360.0), g, book)
 	_best_hitters(rect.position + Vector2(40.0, 470.0), g, book)
-	text(Vector2(rect.position.x, rect.end.y - 24.0), "Enter 다시 하기   ·   Esc 끝내기", 20, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x)
+	text(Vector2(rect.position.x, rect.end.y - 24.0), scene.post_game_hint(), 20, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x)
 
 
 func _line_score(at: Vector2, g: GameState, book: StatBook) -> void:

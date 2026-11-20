@@ -13,7 +13,9 @@ extends MatchScene
 ## - 1·2·4 speed, Space pause, → skip this plate appearance, Shift+→ skip the half-inning.
 ##
 ## Start it with  ./dev play res://match/manager_match.tscn -- --team home|away
-## (--postseason for five interventions, --interventions n with −1 for no limit).
+## (--postseason for five interventions, --interventions n with −1 for no limit). From the
+## league screen it plays the player's game of the day (LeagueSession) and reports the result
+## back to the season.
 
 const INTERVENTIONS := 3
 const POSTSEASON_INTERVENTIONS := 5
@@ -39,6 +41,9 @@ var leverage := 1.0
 var board: SituationBoard
 var orders: OrdersPanel
 var alert := ""
+## The season game being played, when started from the league screen.
+var league_game: ScheduledGame
+var _recorded := false
 
 ## Skipping ahead: 0 no, 1 to the end of this plate appearance, 2 to the end of this half.
 var _skip := 0
@@ -77,8 +82,57 @@ func _read_arguments() -> void:
 		interventions_left = int(str(args["interventions"]))
 
 
+## A game from the league: the season's line-ups for the day (rotation, rest, condition).
+func _start_game() -> void:
+	var s := LeagueSession.season
+	var g := LeagueSession.pending
+	if s == null or g == null:
+		super._start_game()
+		return
+	league_game = g
+	var sim := s.prepare(g, true)
+	game = sim.state
+	resolver = sim.resolver as PhysicalResolver
+	scorer = sim.scorer
+	manager = sim.manager
+	innings = game.rules.innings
+	my_team = 0 if g.away == s.my_team else 1
+	if s.postseason_of(g) != null:
+		interventions_left = POSTSEASON_INTERVENTIONS
+	_chosen_team = my_team
+	balls = 0
+	strikes = 0
+
+
 func own_team() -> int:
 	return my_team
+
+
+func post_game_hint() -> String:
+	if league_game != null:
+		return "Enter · Esc 리그로 돌아가기"
+	return super.post_game_hint()
+
+
+func _menu_key(code: Key) -> void:
+	if game.over and league_game != null:
+		back_to_league()
+		return
+	super._menu_key(code)
+
+
+## The result goes into the season once the game is over; then back to the league screen.
+func _record_result() -> void:
+	if _recorded or league_game == null or not game.over:
+		return
+	_recorded = true
+	LeagueSession.season.record(league_game, game, scorer.book)
+	LeagueSession.pending = null
+
+
+func back_to_league() -> void:
+	_record_result()
+	get_tree().change_scene_to_file(LeagueSession.SCREEN)
 
 
 ## The player's side never changes in this mode; F3 does nothing.
@@ -241,6 +295,8 @@ func _apply(e: GameEvent) -> void:
 	super._apply(e)
 	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
 		_pa_over = true
+	if game.over:
+		_record_result()
 
 
 func _after_result() -> void:
