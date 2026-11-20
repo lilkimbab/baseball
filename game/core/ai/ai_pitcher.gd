@@ -7,8 +7,8 @@ extends RefCounted
 
 ## Chance of aiming inside the zone, by balls and strikes.
 const ZONE_INTENT := [
-	[0.66, 0.55, 0.27],
-	[0.66, 0.59, 0.41],
+	[0.67, 0.56, 0.28],
+	[0.67, 0.60, 0.42],
 	[0.73, 0.67, 0.55],
 	[0.94, 0.90, 0.82],
 ]

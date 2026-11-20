@@ -41,7 +41,7 @@
   "errors": {
     "basis": "A, tuned with the error target (0.673 per team per game)",
     "fly_drop": 0.010,
-    "ground_bobble": 0.042,
+    "ground_bobble": 0.040,
     "hard_ground_bobble_extra": 0.03,
     "bad_throw": 0.024,
     "rushed_throw_factor": 2.0

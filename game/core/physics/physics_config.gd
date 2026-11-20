@@ -37,6 +37,16 @@ var aero_k := 0.0
 var _fallback_surface := SurfaceParams.new()
 
 
+## A separate copy (for a different day's air, say).
+func duplicate_config() -> PhysicsConfig:
+	var c := PhysicsConfig.new()
+	for prop: Dictionary in get_property_list():
+		var name: String = prop["name"]
+		if (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE) != 0:
+			c.set(name, get(name))
+	return c
+
+
 ## Computes derived values. Call once after the fields are filled.
 func finalize() -> void:
 	aero_k = air_density * PI * ball_radius * ball_radius / (2.0 * ball_mass)

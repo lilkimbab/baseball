@@ -3,7 +3,7 @@ extends Controller
 ## The computer's decisions on the field, from AiPitcher, AiBatter and the manager.
 
 ## A steal is tried only when the runner reads that he beats the throw by this much...
-const STEAL_MARGIN := 0.06
+const STEAL_MARGIN := 0.05
 ## ...and then in this share of the plate appearances where that holds.
 const STEAL_GO := 1.0
 
@@ -13,6 +13,8 @@ var rng: Rng
 
 var _options: Dictionary[String, Array] = {}
 var _memory: Dictionary[String, AiPitcher.Memory] = {}
+## Speed of the last pitch the batter saw in this plate appearance.
+var _last_kmh := -1.0
 
 
 func _init(ai: AiManager, pitch_catalog: Dictionary[StringName, PitchType], random: Rng) -> void:
@@ -38,7 +40,11 @@ func choose_pitch(state: GameState, duel: PitchDuel) -> PitchDecision:
 func react(state: GameState, duel: PitchDuel) -> void:
 	var pitcher := state.fielding_team().player(state.pitcher_id())
 	var fastball := pitcher.pitching.fastball_speed() if pitcher != null and pitcher.pitching != null else 145.0
-	AiBatter.decide(duel, state.balls, state.strikes, AiBatter.weak_cells(state.batter_id()), fastball, rng)
+	if state.balls == 0 and state.strikes == 0:
+		_last_kmh = -1.0
+	var expect := AiBatter.expected_speed(fastball, _last_kmh)
+	AiBatter.decide(duel, state.balls, state.strikes, AiBatter.weak_cells(state.batter_id()), expect, rng)
+	_last_kmh = duel.decision.type.speed_kmh * duel.decision.effort
 
 
 func wants_bunt(state: GameState) -> bool:

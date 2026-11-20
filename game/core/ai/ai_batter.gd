@@ -23,16 +23,19 @@ const CHASE := [
 const CHASE_RANGE := 0.30
 ## Timing error (standard deviation) as a fraction of the timing window.
 const TIMING_SPREAD := 0.50
-## A pitch slower than the fastball he is geared for makes him early by this share of the
-## window for every 10 km/h of difference, less with a good eye.
+## A pitch slower than the speed he is geared for makes him early by this share of the
+## window for every 10 km/h of difference, and a faster one late; less with a good eye.
 const FOOLED_PER_10KMH := 0.20
+## What he is geared for: the pitcher's fastball, pulled toward the last pitch he saw in this
+## plate appearance by this share (a fastball after a curve looks quicker).
+const LAST_PITCH_PULL := 0.4
 ## A breaking ball or change-up drops more than he expects: he aims this far above it
 ## (metres, at an average eye), topping it or swinging over it.
 const FOOLED_DROP := 0.010
 const FOOLED_DROP_SPREAD := 0.012
 ## Batters tend to be a touch early: the share of the window by which the average swing
 ## leads the ball (it pulls more balls than it pushes).
-const EARLY := 0.08
+const EARLY := 0.15
 ## Weak spots: worse read and timing there.
 const WEAK_READ := 1.5
 const WEAK_TIMING := 1.3
@@ -43,9 +46,17 @@ static func react(duel: PitchDuel, rng: Rng) -> void:
 	decide(duel, 1, 1, PackedInt32Array(), duel.decision.type.speed_kmh, rng)
 
 
+## The speed a batter is geared for: the pitcher's fastball, moved toward the last pitch of
+## this plate appearance (none yet: negative).
+static func expected_speed(fastball_kmh: float, last_kmh: float) -> float:
+	if last_kmh <= 0.0:
+		return fastball_kmh
+	return lerpf(fastball_kmh, last_kmh, LAST_PITCH_PULL)
+
+
 ## Call right after the pitch is released. Schedules a swing on the duel, or leaves it alone.
-## `fastball_kmh` is the speed he is geared for (the pitcher's fastball).
-static func decide(duel: PitchDuel, balls: int, strikes: int, weak: PackedInt32Array, fastball_kmh: float, rng: Rng) -> void:
+## `expect_kmh` is the speed he is geared for (expected_speed).
+static func decide(duel: PitchDuel, balls: int, strikes: int, weak: PackedInt32Array, expect_kmh: float, rng: Rng) -> void:
 	var settings := duel.settings
 	var crossing := Vector3(duel.pitch.plate_pos.x, Field.PLATE_FRONT_Y, duel.pitch.plate_pos.z)
 	var in_weak := weak.has(AiPitcher.cell_of(duel.zone, crossing))
@@ -67,7 +78,8 @@ static func decide(duel: PitchDuel, balls: int, strikes: int, weak: PackedInt32A
 	power_share *= lerpf(0.6, 1.4, clampf(settings.power / 99.0, 0.0, 1.0))
 	var kind := SwingAttempt.Kind.POWER if rng.chance(power_share) else SwingAttempt.Kind.CONTACT
 	var window := SwingModel.timing_window(settings, kind)
-	var fooled := maxf(fastball_kmh - duel.decision.type.speed_kmh * duel.decision.effort, 0.0) / 10.0 \
+	# Positive: slower than he expected, so he is early; negative: quicker, so he is late.
+	var fooled := (expect_kmh - duel.decision.type.speed_kmh * duel.decision.effort) / 10.0 \
 		* FOOLED_PER_10KMH * lerpf(1.3, 0.6, clampf(settings.eye / 99.0, 0.0, 1.0))
 	var spread := TIMING_SPREAD * (WEAK_TIMING if in_weak else 1.0)
 	var contact_time := duel.ideal_contact_time + (rng.next_normal() * spread - fooled - EARLY) * window
