@@ -40,6 +40,9 @@ class Report:
 	var sent_down := false
 	var line := ""
 	var evolved := PackedStringArray()
+	var rating := 0.0
+	var medal := 0
+	var reward := ""
 
 
 var season: Season
@@ -50,6 +53,15 @@ var futures: Dictionary[String, Team] = {}
 var futures_book := StatBook.new()
 var futures_games := 0
 var _futures_day := -1
+## The all-star break: held once at mid-season. Who was picked, whether the career player's
+## all-star game and derby turn are still to come, the derby's home runs.
+var all_star_done := false
+var all_star_selected: Array[String] = []
+var all_star_today := false
+var derby: Dictionary[String, int] = {}
+var derby_waiting := false
+## "all_star" while the all-star game is the game being played.
+var special := ""
 static var _names: NameTable
 ## Popularity from games.
 var log := PackedStringArray()
@@ -95,6 +107,75 @@ func has_game() -> bool:
 func next_day() -> void:
 	season.advance()
 	start_day()
+	_check_all_star()
+
+
+## Mid-season: the all-star picks and the derby. The career player's part waits for him; the
+## rest is settled at once.
+func _check_all_star() -> void:
+	var share := float(rules.all_star.get("at_share", 0.5))
+	if all_star_done or season.phase != Season.Phase.REGULAR or season.day < int(season.total_days() * share):
+		return
+	all_star_done = true
+	var d := season.division_of(career.team_id)
+	all_star_selected = AllStar.select(season, d, career, int(rules.all_star.get("players", 22)))
+	var me := career.player.id
+	if all_star_selected.has(me):
+		all_star_today = true
+		career.popularity += 5.0
+		log.append("%d일: 올스타 선정" % (season.day + 1))
+	var field := AllStar.derby_field(season, d, career, all_star_selected, int(rules.all_star.get("derby", 8)))
+	var outs := int(rules.all_star.get("derby_outs", 10))
+	var rng := Rng.new(hash("derby:%d" % season.season_year))
+	for id: String in field:
+		if id == me:
+			derby_waiting = true
+			continue
+		var p := _find(id)
+		derby[id] = AllStar.derby_swings(p.batting.power() if p != null else 50.0, outs, rng)
+	if not derby_waiting:
+		_derby_winner()
+
+
+func _find(id: String) -> Player:
+	for t: Team in season.teams.values():
+		var p := t.player(id)
+		if p != null:
+			return p
+	return null
+
+
+func _derby_winner() -> String:
+	var best := ""
+	for id: String in derby:
+		if best == "" or derby[id] > derby[best]:
+			best = id
+	if best != "":
+		var p := _find(best)
+		log.append("홈런 더비 우승: %s (%d개)" % [p.name if p != null else best, derby[best]])
+		if best == career.player.id:
+			career.popularity += 8.0
+			career.points += 80
+	return best
+
+
+## The career player's derby turn is over (played on screen or at once).
+func finish_derby(home_runs: int) -> String:
+	derby[career.player.id] = home_runs
+	derby_waiting = false
+	return _derby_winner()
+
+
+func quick_derby() -> String:
+	var outs := int(rules.all_star.get("derby_outs", 10))
+	return finish_derby(AllStar.derby_swings(career.player.batting.power(), outs, Rng.new(hash("mine:%d" % season.season_year))))
+
+
+## Which side he is on in a game being played.
+func my_side(state: GameState) -> int:
+	if special == "all_star":
+		return 0 if state.teams[0].players.has(career.player.id) else 1
+	return 0 if club_game().away == career.team_id else 1
 
 
 # --- His game ---
@@ -103,6 +184,10 @@ func next_day() -> void:
 ## Today's game for him, ready to play: the first-team game with the season's line-ups, or a
 ## second-team game between the two clubs' second teams.
 func prepare(physical: bool) -> GameSim:
+	if special == "all_star":
+		var d := season.division_of(career.team_id)
+		var sides := AllStar.teams(season, d, all_star_selected, career)
+		return GameSim.create(sides[0], sides[1], RuleSet.kbo_2026(), season.env, season.catalog, season.ovr, season.rng.fork(hash("allstar:%d" % season.season_year)), null, null, physical)
 	var g := club_game()
 	if career.first_team:
 		season.featured = career.player.id
@@ -145,7 +230,7 @@ func quick() -> Report:
 	var sim := prepare(false)
 	var chances := 0
 	var errors := 0
-	var my_team := 0 if club_game().away == career.team_id else 1
+	var my_team := my_side(sim.state)
 	var guard := 0
 	while not sim.state.over and guard < GameSim.MAX_EVENTS:
 		var fielding := sim.state.fielding()
@@ -184,8 +269,10 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	var report := Report.new()
 	report.played = true
 	report.first_team = career.first_team
-	var g := club_game()
 	var id := career.player.id
+	if special == "all_star":
+		return _finish_all_star(state, book, report)
+	var g := club_game()
 	if career.first_team:
 		season.record(g, state, book)
 	else:
@@ -209,6 +296,11 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	report.gp = gp
 	career.popularity += (1.0 if career.first_team else 0.3) * (1.0 + clutch + (1.0 if report.goal_met else 0.0))
 	report.line = _line_text(bat, pitch)
+	if (bat != null and bat.pa > 0) or (pitch != null and pitch.outs > 0):
+		report.rating = GameRating.rate(bat, pitch, chances, errors, report.goal_met, clutch, rules)
+		report.medal = GameRating.medal(report.rating, rules)
+		report.reward = GameRating.open_box(career, report.medal, rules, Rng.new(hash("box:%d:%d" % [season.season_year, season.day])))
+		career.ratings.append(report.rating)
 	if pitch != null:
 		PitchEvolution.note_game(career, pitch.pitches, pitches_seen)
 	report.evolved = PitchEvolution.check(career, rules, season.catalog)
@@ -221,6 +313,35 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 		send_down()
 		report.sent_down = true
 	return report
+
+
+## The all-star game counts for nothing in the season; it brings popularity, a few growth
+## points, and for its MVP a prize.
+func _finish_all_star(state: GameState, book: StatBook, report: Report) -> Report:
+	special = ""
+	all_star_today = false
+	var id := career.player.id
+	var bat: BattingLine = book.batting.get(id)
+	var pitch: PitchingLine = book.pitching.get(id)
+	var gp := Growth.from_game(bat, pitch, 0, 0, rules)
+	Growth.add(career, gp)
+	report.gp = gp
+	report.goal = "올스타전"
+	report.line = _line_text(bat, pitch)
+	career.popularity += 3.0
+	var mvp := GameMvp.pick(state, book)
+	if mvp == id:
+		career.popularity += 10.0
+		career.points += 100
+		report.reward = "올스타전 MVP: 포인트 +100"
+	log.append("올스타전 %s %d : %d %s%s" % [AllStar.TEAM_NAMES[0], state.score[0], state.score[1], AllStar.TEAM_NAMES[1], "  (MVP)" if mvp == id else ""])
+	return report
+
+
+## Plays the all-star game at once.
+func quick_all_star() -> Report:
+	special = "all_star"
+	return quick()
 
 
 func _line_text(bat: BattingLine, pitch: PitchingLine) -> String:

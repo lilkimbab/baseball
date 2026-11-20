@@ -55,8 +55,7 @@ func _start_game() -> void:
 	scorer = sim.scorer
 	manager = sim.manager
 	innings = game.rules.innings
-	var g := cs.club_game()
-	my_team = 0 if g.away == cs.career.team_id else 1
+	my_team = cs.my_side(game)
 	me = cs.career.player.id
 	game_goal = GameGoal.for_player(cs.career, cs.rules)
 	interventions_left = 0

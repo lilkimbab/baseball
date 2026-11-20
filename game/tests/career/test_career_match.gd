@@ -52,3 +52,31 @@ func test_a_hitter_s_game_stops_for_his_scenes_and_reports_back() -> void:
 	assert_not_null(scene.report, "the result went to the career")
 	assert_eq(CareerSession.last_report, scene.report)
 	assert_eq(CareerSession.career_season.futures_games, 1, "a second-team game")
+
+
+func test_the_derby_throws_batting_practice_and_ends_after_ten_outs() -> void:
+	_start("1B", "power")
+	var cs := CareerSession.career_season
+	cs.derby_waiting = true
+	var scene := (load(CareerSession.DERBY) as PackedScene).instantiate() as HomeRunDerby
+	scene.use_motion = false
+	add_child_autofree(scene)
+	assert_true(scene.human_bats())
+	var d := scene._ai_pitch_decision()
+	assert_eq(d.type.id, &"four_seam")
+	assert_almost_eq(d.type.speed_kmh * d.effort, 112.0, 0.5)
+	assert_almost_eq(scene.settings.power, cs.career.player.batting.power(), 0.01)
+	var guard := 0
+	while not scene.done and guard < 60:
+		scene._new_duel()
+		scene.duel.throw_pitch(scene._ai_pitch_decision())
+		# A swing far too late: never a home run.
+		scene.duel.swing_at(scene.duel.ideal_contact_time + 0.25, SwingAttempt.Kind.CONTACT)
+		while scene.duel.phase == PitchDuel.Phase.FLIGHT:
+			scene.duel.tick(DuelScene.TICK)
+		scene._finish_pitch()
+		guard += 1
+	assert_true(scene.done)
+	assert_eq(scene.outs, scene.limit)
+	assert_false(cs.derby_waiting, "his count went back to the career")
+	assert_true(cs.derby.has(cs.career.player.id))
