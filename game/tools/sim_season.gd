@@ -98,6 +98,26 @@ func _report(season: Season, d: int, brief: bool) -> void:
 	print("SO: " + top.call(all_p, func(id: String) -> float: return pit[id].strikeouts, 5) + "   (KBO 2025 leader ~245)")
 	print("IP top: " + top.call(all_p, func(id: String) -> float: return pit[id].outs / 3.0, 5) + "   (KBO top starters ~170-190)")
 	print("G (pitchers): " + top.call(all_p, func(id: String) -> float: return pit[id].games, 5) + "   (KBO 2025 most ~75)")
+	if season.postseasons.size() > d:
+		var p := season.postseasons[d]
+		print("\npostseason seeds: %s" % ", ".join(Array(p.seeds).map(func(id: String) -> String: return season.teams[id].short_name)))
+		for r: int in p.rounds.size():
+			var sr := p.rounds[r]
+			print("  %s: %s %d - %d %s (%d games)" % [Postseason.ROUND_NAMES[r], season.teams[sr.high].short_name, sr.high_wins, sr.low_wins, season.teams[sr.low].short_name, sr.games.size()])
+		print("  champion %s, runner-up %s" % [season.teams[p.champion()].name, season.teams[p.runner_up()].name])
+	var moves := season.movements()
+	print("up: %s   down: %s" % [", ".join(Array(moves[d][0]).map(func(id: String) -> String: return season.teams[id].short_name)), ", ".join(Array(moves[d][1]).map(func(id: String) -> String: return season.teams[id].short_name))])
+	var awards := SeasonAwards.for_division(season, d)
+	print("\n" + awards.line(awards.mvp))
+	print(awards.line(awards.pitcher))
+	if awards.rookie != null:
+		print(awards.line(awards.rookie))
+	for a: SeasonAwards.Award in awards.best:
+		print("  " + awards.line(a))
+	var t := PackedStringArray()
+	for a: SeasonAwards.Award in awards.titles:
+		t.append("%s %s %s" % [a.title, names.get(a.player_id, a.player_id), a.text])
+	print("titles: " + " / ".join(t))
 
 
 ## HR, SV, HLD leaders, most games pitched and the lowest qualified average, on one line.

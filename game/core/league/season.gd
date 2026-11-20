@@ -1,8 +1,9 @@
 class_name Season
 extends RefCounted
-## A season of the manager league (docs/13 S7-3 to S7-5): every division's schedule, played a
-## day at a time. The player's own game is handed out to be played on screen; the others are
-## worked out at once by the stat resolver.
+## A season of the manager league (docs/13 S7-3 to S7-8): every division's schedule, played a
+## day at a time, then each division's postseason, then promotion and relegation. The
+## player's own game is handed out to be played on screen; the others are worked out at once
+## by the stat resolver.
 ##
 ## Before each game the club's manager sets who can play:
 ## - the next starter in the rotation who has had his rest (PitcherUsage);
@@ -29,6 +30,8 @@ const COLD_REST_CHANCE := 0.35
 ## Chance a reliever who pitched yesterday is kept out of today's game (A).
 const TIRED_HELD_OUT := 0.6
 
+enum Phase { REGULAR, POSTSEASON, OVER }
+
 var rules: RuleSet
 var env: LeagueEnv
 var catalog: Dictionary[StringName, PitchType]
@@ -42,8 +45,11 @@ var standings: Array[Standings] = []
 var games_per_team := 144
 ## Calendar day, 0 = opening day.
 var day := 0
-## Season totals per player.
+var phase := Phase.REGULAR
+## Season totals per player (regular season), and the postseason's apart, as the KBO keeps them.
 var book := StatBook.new()
+var postseason_book := StatBook.new()
+var postseasons: Array[Postseason] = []
 var usage := PitcherUsage.new()
 ## Per hitter: his lines from his last RECENT_GAMES games, oldest first.
 var recent: Dictionary[String, Array] = {}
@@ -80,11 +86,17 @@ func total_days() -> int:
 	return schedules[0].days if not schedules.is_empty() else 0
 
 
-func finished() -> bool:
+## The regular season is over.
+func regular_season_over() -> bool:
 	for s: Schedule in schedules:
 		if not s.finished():
 			return false
 	return true
+
+
+## Everything is over, postseason included.
+func finished() -> bool:
+	return phase == Phase.OVER
 
 
 func division_of(team_id: String) -> int:
@@ -96,9 +108,30 @@ func division_of(team_id: String) -> int:
 
 func games_today() -> Array[ScheduledGame]:
 	var out: Array[ScheduledGame] = []
-	for s: Schedule in schedules:
-		out.append_array(s.games_on(day))
+	if phase == Phase.REGULAR:
+		for s: Schedule in schedules:
+			out.append_array(s.games_on(day))
+	elif phase == Phase.POSTSEASON:
+		for p: Postseason in postseasons:
+			var g := p.game_on(day)
+			if g != null:
+				out.append(g)
 	return out
+
+
+## The postseason a game belongs to, or null for a regular-season game.
+func postseason_of(game: ScheduledGame) -> Postseason:
+	if phase != Phase.POSTSEASON:
+		return null
+	for p: Postseason in postseasons:
+		var s := p.series()
+		if s != null and s.games.has(game):
+			return p
+	return null
+
+
+func rules_for(game: ScheduledGame) -> RuleSet:
+	return Postseason.rules(rules) if postseason_of(game) != null else rules
 
 
 ## The player's game today, or null (an off day, or no club).
@@ -117,16 +150,17 @@ func my_game_today() -> ScheduledGame:
 ## A game ready to play with the stat resolver (or the physical one): today's line-ups.
 func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	var manager := AiManager.new(env, catalog, ovr)
-	var a := lineup_for(game.away, game.day, manager)
-	var h := lineup_for(game.home, game.day, manager)
-	return GameSim.with_lineups(a, h, rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
+	var game_rules := rules_for(game)
+	var a := lineup_for(game.away, game.day, manager, game_rules)
+	var h := lineup_for(game.home, game.day, manager, game_rules)
+	return GameSim.with_lineups(a, h, game_rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
 
 
 ## A club's line-up for the day, made by its manager.
-func lineup_for(team_id: String, on_day: int, manager: AiManager) -> TeamInGame:
+func lineup_for(team_id: String, on_day: int, manager: AiManager, game_rules: RuleSet = null) -> TeamInGame:
 	var team: Team = teams[team_id]
 	var starter := starter_for(team, on_day)
-	return manager.make_lineup(squad_for(team, on_day, starter.id), rules, starter.id, resting(team, on_day))
+	return manager.make_lineup(squad_for(team, on_day, starter.id), game_rules if game_rules != null else rules, starter.id, resting(team, on_day))
 
 
 ## The first team as it can play today: the starter, the relievers who may pitch (a tired one
@@ -219,16 +253,23 @@ func resting(team: Team, on_day: int) -> Dictionary[String, bool]:
 
 func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 	game.finish(state.score[0], state.score[1], state.inning)
-	var d := division_of(game.home)
-	if d >= 0:
-		standings[d].record(game)
+	var playoff := postseason_of(game)
+	var target := book
+	if playoff != null:
+		target = postseason_book
+		playoff.record(game, day)
+	else:
+		var d := division_of(game.home)
+		if d >= 0:
+			standings[d].record(game)
 	for id: String in game_book.batting:
 		var line: BattingLine = game_book.batting[id]
-		book.bat(id).add(line)
-		_note_recent(id, line, game.day)
+		target.bat(id).add(line)
+		if playoff == null:
+			_note_recent(id, line, game.day)
 	for id: String in game_book.pitching:
 		var line: PitchingLine = game_book.pitching[id]
-		book.pitch(id).add(line)
+		target.pitch(id).add(line)
 		usage.note(id, game.day, line.pitches)
 
 
@@ -275,16 +316,78 @@ func play_day(include_mine: bool = false) -> ScheduledGame:
 	return mine
 
 
-## To the next day.
+## To the next day. The day after the last regular-season game the postseason begins; when
+## every division has its champion the season is over.
 func advance() -> void:
 	day += 1
+	if phase == Phase.REGULAR and regular_season_over():
+		phase = Phase.POSTSEASON
+		postseasons.clear()
+		for d: int in divisions.size():
+			postseasons.append(Postseason.from_standings(standings[d], day + Postseason.REST_BETWEEN))
+	elif phase == Phase.POSTSEASON:
+		var done := true
+		for p: Postseason in postseasons:
+			if not p.finished():
+				done = false
+		if done:
+			phase = Phase.OVER
 
 
-## Plays out the rest of the regular season, the player's games included.
+## Plays out the rest of the season, postseason included, the player's games too.
 func play_to_end() -> void:
-	while day < total_days():
+	var guard := 0
+	while phase != Phase.OVER and guard < 1000:
 		play_day(true)
 		advance()
+		guard += 1
+
+
+## Plays out the regular season only.
+func play_regular_season() -> void:
+	while phase == Phase.REGULAR:
+		play_day(true)
+		advance()
+
+
+# --- After the season ---
+
+
+## Clubs going up and down (docs/02 section 4.1): each division's postseason champion and
+## runner-up go up, its bottom two of the regular season go down. Per division: [up, down].
+func movements() -> Array[Array]:
+	var out: Array[Array] = []
+	for d: int in divisions.size():
+		var up := PackedStringArray()
+		var down := PackedStringArray()
+		if d > 0 and d < postseasons.size() and postseasons[d].finished():
+			up.append(postseasons[d].champion())
+			up.append(postseasons[d].runner_up())
+		if d < divisions.size() - 1:
+			var order := standings[d].ranked()
+			for i: int in 2:
+				down.append(order[order.size() - 1 - i].team_id)
+		out.append([up, down])
+	return out
+
+
+## Next season's divisions after the movements.
+func next_divisions() -> Array[PackedStringArray]:
+	var moves := movements()
+	var out: Array[PackedStringArray] = []
+	for d: int in divisions.size():
+		var ids := PackedStringArray()
+		var up: PackedStringArray = moves[d][0]
+		var down: PackedStringArray = moves[d][1]
+		for id: String in divisions[d]:
+			if not up.has(id) and not down.has(id):
+				ids.append(id)
+		if d + 1 < divisions.size():
+			ids.append_array(moves[d + 1][0])
+		if d > 0:
+			ids.append_array(moves[d - 1][1])
+		out.append(ids)
+	return out
 
 
 ## Plate appearances needed to qualify for the batting title: 3.1 per team game.
