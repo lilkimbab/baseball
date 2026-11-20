@@ -69,7 +69,7 @@ func _running_play(state: GameState) -> GameEvent:
 
 func _wants_steal(state: GameState, base: int, speed: float) -> bool:
 	var key := "steal_attempt_1st" if base == 1 else "steal_attempt_2nd"
-	var chance := env.value(key) * state.batting_team().steal_style * exp(0.9 * (speed - 50.0) / 15.0)
+	var chance := env.value(key) * state.batting_team().steal_style * exp(env.value("steal_speed_k", 0.6) * (speed - 50.0) / 15.0)
 	# Not when far behind late, nor when a big lead makes it pointless.
 	var lead := state.lead_of(state.batting())
 	if absi(lead) >= 5 or (state.inning >= state.rules.innings - 1 and lead <= -3):
@@ -85,13 +85,8 @@ func _steal(base: int, speed: float, catcher_arm: float, hold: float) -> GameEve
 	return GameEvent.running(GameEvent.Kind.STEAL, [m] as Array[RunnerMove])
 
 
-## Every runner moves up one base, lead runner first.
 func _everyone_advances(state: GameState, on_error: bool) -> Array[RunnerMove]:
-	var moves: Array[RunnerMove] = []
-	for base: int in [3, 2, 1]:
-		if not state.base_empty(base):
-			moves.append(RunnerMove.make(base, base + 1, RunnerMove.OutKind.NONE, on_error))
-	return moves
+	return GameFlow.everyone_advances(state, on_error)
 
 
 # --- The plate appearance ---
@@ -162,8 +157,12 @@ func _pitcher_stuff(pitcher: Player) -> float:
 	return _stuff[pitcher.id]
 
 
-## 0 while fresh, 1 at the end of his limit, more beyond it.
 func _fatigue(state: GameState, team: TeamInGame, pitcher: Player) -> float:
+	return fatigue(state, team, pitcher)
+
+
+## 0 while fresh, 1 at the end of his limit, more beyond it.
+static func fatigue(state: GameState, team: TeamInGame, pitcher: Player) -> float:
 	var pitches: int = state.pitch_counts.get(pitcher.id, 0)
 	var limit := pitcher.pitching.starter_limit() if pitcher.id == team.starter_id else pitcher.pitching.reliever_limit()
 	var fresh := limit * 0.7
@@ -209,17 +208,8 @@ func _resolve(state: GameState, outcome: LeagueEnv.Outcome) -> GameEvent:
 	return _out_in_play(state)
 
 
-## Walk or hit batsman: the batter to first and only the runners who are forced move up.
 func _forced(state: GameState) -> Array[RunnerMove]:
-	var moves: Array[RunnerMove] = []
-	if not state.base_empty(1):
-		if not state.base_empty(2):
-			if not state.base_empty(3):
-				moves.append(RunnerMove.make(3, 4))
-			moves.append(RunnerMove.make(2, 3))
-		moves.append(RunnerMove.make(1, 2))
-	moves.append(RunnerMove.make(0, 1))
-	return moves
+	return GameFlow.forced_moves(state)
 
 
 func _hit(state: GameState, bases: int) -> GameEvent:

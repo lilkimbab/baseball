@@ -224,3 +224,89 @@ func test_a_roster_pack_reads_back_the_same() -> void:
 			assert_eq(b.pitching.arsenal.size(), a.pitching.arsenal.size())
 			assert_almost_eq(b.pitching.arsenal[0].velo_avg, a.pitching.arsenal[0].velo_avg, 0.06)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func test_an_all_average_player_is_fifty_overall() -> void:
+	var p := _average_player("x")
+	for kind: Position.Kind in [Position.Kind.C, Position.Kind.SS, Position.Kind.CF, Position.Kind.DH] as Array[Position.Kind]:
+		p.positions[Position.code(kind)] = 100.0
+		assert_almost_eq(F.overall().batter(p, kind), 50.0, 0.01, Position.code(kind))
+
+
+func test_a_switch_hitter_bats_from_the_other_side() -> void:
+	var p := _average_player("x")
+	p.bats = &"S"
+	assert_eq(p.batting_side(&"R"), &"L")
+	assert_eq(p.batting_side(&"L"), &"R")
+	p.bats = &"L"
+	assert_eq(p.batting_side(&"L"), &"L")
+
+
+func test_league_environments_load_by_name_and_add_up() -> void:
+	var env := LeagueEnvIO.load_default("kbo_2025")
+	assert_eq(env.name, "kbo_2025")
+	var total := 0.0
+	for r: float in env.rates:
+		total += r
+	assert_almost_eq(total, 1.0, 1e-9)
+	assert_almost_eq(env.rates[LeagueEnv.Outcome.K], 0.198, 1e-6)
+	assert_almost_eq(env.targets["era"], 4.31, 1e-6)
+
+
+func test_a_thousand_games_keep_every_invariant() -> void:
+	var gen := LeagueGenerator.new(RosterIO.load_names(), F.catalog(), 31)
+	var teams: Array[Team] = []
+	for i: int in 6:
+		teams.append(gen.team(i, 50.0))
+	var bad := PackedStringArray()
+	for g: int in 1000:
+		var sim := GameSim.create(teams[g % 6], teams[(g + 1 + g / 6) % 6] if (g + 1 + g / 6) % 6 != g % 6 else teams[(g + 2) % 6], RuleSet.kbo_2026(), F.env(), F.catalog(), F.overall(), Rng.new(7000 + g))
+		var reached := PackedInt32Array([0, 0])
+		var runner_outs := PackedInt32Array([0, 0])
+		var uncounted := PackedInt32Array([0, 0])
+		var guard := 0
+		while not sim.state.over and guard < GameSim.MAX_EVENTS:
+			var event := sim.resolver.next_event(sim.state)
+			var batting := sim.state.batting()
+			var out := GameFlow.apply(sim.state, event)
+			sim.scorer.record(sim.state, event, out)
+			sim.manager.note_change(sim.state, event)
+			var crossed := 0
+			for i: int in event.moves.size():
+				var m := event.moves[i]
+				if out.applied.size() > i and out.applied[i] == 0:
+					continue
+				if m.from == 0 and m.to >= 1:
+					reached[batting] += 1
+				elif m.from > 0 and m.is_out():
+					runner_outs[batting] += 1
+				if m.scores():
+					crossed += 1
+			# A runner who crossed the plate on a play that ended with a force for the third out
+			# is neither a run nor left on base.
+			uncounted[batting] += crossed - out.scored.size()
+			guard += 1
+		sim.scorer.finish(sim.state)
+		var s := sim.state
+		var book := sim.scorer.book
+		for t: int in 2:
+			var line_runs := 0
+			for r: int in s.line[t]:
+				line_runs += r
+			if line_runs != s.score[t]:
+				bad.append("game %d: line score" % g)
+			# Every runner who reaches either scores, is put out on the bases, or is left on.
+			# The last half-inning of a walk-off leaves its runners neither out nor left on.
+			var left := reached[t] - s.score[t] - runner_outs[t] - uncounted[t]
+			if t == 0 or not (s.winner == GameState.HOME and s.inning >= s.rules.innings and s.line[1].size() == s.inning):
+				if left != book.left_on_base[t]:
+					bad.append("game %d team %d: reached %d - runs %d - outs on bases %d - uncounted %d = %d, box says %d left on" % [g, t, reached[t], s.score[t], runner_outs[t], uncounted[t], left, book.left_on_base[t]])
+			if book.team_batting(t).pa != book.team_batting(t).ab + book.team_batting(t).walks + book.team_batting(t).intentional_walks + book.team_batting(t).hit_by_pitch + book.team_batting(t).sac_bunts + book.team_batting(t).sac_flies:
+				bad.append("game %d: plate appearances" % g)
+		if book.team_pitching(1).outs != s.line[0].size() * 3:
+			bad.append("game %d: home pitchers' outs %d for %d top halves" % [g, book.team_pitching(1).outs, s.line[0].size()])
+		if s.winner >= 0 and (book.winner_id == "" or book.loser_id == ""):
+			bad.append("game %d: no decision" % g)
+		if bad.size() > 5:
+			break
+	assert_eq(bad, PackedStringArray())

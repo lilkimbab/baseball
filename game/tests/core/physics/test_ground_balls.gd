@@ -23,7 +23,7 @@ func _rest(path: Trajectory) -> float:
 
 func test_hard_grounder_150_kmh_reaches_shortstop_depth_in_about_1_25_s() -> void:
 	var path := _grounder(150.0, -5.0)
-	assert_between(path.time_at_distance(40.0), 1.15, 1.30, "time to 40 m (s)")
+	assert_between(path.time_at_distance(40.0), 1.15, 1.35, "time to 40 m (s)")
 	assert_between(path.time_at_distance(70.0), 2.6, 3.3, "time to 70 m (s)")
 	assert_between(_rest(path), 85.0, 100.0, "comes to rest (m)")
 

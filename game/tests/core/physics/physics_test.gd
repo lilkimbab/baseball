@@ -31,6 +31,7 @@ func batted_ball(ev_kmh: float, launch_deg: float, backspin_rpm: float, spray_de
 	ball.pos = Vector3(0.0, 0.0, height)
 	ball.vel = forward * (speed * cos(launch)) + Vector3(0.0, 0.0, speed * sin(launch))
 	ball.spin = Vector3(forward.y, -forward.x, 0.0) * rpm(backspin_rpm)
+	ball.hit()
 	return ball
 
 

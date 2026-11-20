@@ -15,7 +15,8 @@ var call: Call = Call.BALL
 ## Runner and batter movements in the order they happened. The lead runner comes first, so
 ## a run that scores ahead of a later out on the same play is listed before it.
 var moves: Array[RunnerMove] = []
-## Pitches thrown in this plate appearance (plate appearances only).
+## Pitches thrown in this plate appearance (plate appearances only). When the resolver sends
+## each pitch as its own PITCH event (S5), this is 0 so pitches are not counted twice.
 var pitches := 0
 ## Fielders who handled the ball, in scorecard numbers: "6-4-3".
 var fielders := ""

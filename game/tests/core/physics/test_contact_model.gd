@@ -80,5 +80,5 @@ func test_bat_efficiency_peaks_at_the_sweet_spot_and_is_clamped() -> void:
 
 
 func test_more_power_means_a_faster_bat() -> void:
-	assert_almost_eq(ContactModel.bat_speed_from_power(0.0) * 3.6, 98.0, 0.01)
-	assert_almost_eq(ContactModel.bat_speed_from_power(100.0) * 3.6, 124.0, 0.01)
+	assert_almost_eq(ContactModel.bat_speed_from_power(0.0) * 3.6, 104.5, 0.01)
+	assert_almost_eq(ContactModel.bat_speed_from_power(100.0) * 3.6, 128.5, 0.01)

@@ -199,3 +199,63 @@ func test_a_box_score_adds_up() -> void:
 	assert_eq(scorer.book.left_on_base[0], 1)
 	var text := scorer.book.box_score(state)
 	assert_string_contains(text, "R  H  E  B")
+
+
+func test_a_strikeout_finished_by_a_pinch_hitter_with_two_strikes_is_the_first_batter_s() -> void:
+	_new_game()
+	var first := state.batter_id()
+	_play(GameEvent.pitch(GameEvent.Call.CALLED_STRIKE))
+	_play(GameEvent.pitch(GameEvent.Call.CALLED_STRIKE))
+	var pinch := state.batting_team().bench[0]
+	_play(GameEvent.substitution(0, GameEvent.Change.PINCH_HITTER, first, pinch, Position.Kind.PH))
+	_play(F.pa(PaResult.Kind.STRIKEOUT, [F.move(0, -1, RunnerMove.OutKind.STRIKEOUT)] as Array[RunnerMove]))
+	assert_eq(scorer.book.bat(first).strikeouts, 1)
+	assert_eq(scorer.book.bat(first).ab, 1)
+	assert_eq(scorer.book.bat(pinch).strikeouts, 0)
+
+
+func test_a_walk_after_relieving_in_a_batter_s_count_is_the_first_pitcher_s() -> void:
+	_new_game()
+	var starter := state.pitcher_id()
+	_play(GameEvent.pitch(GameEvent.Call.BALL))
+	_play(GameEvent.pitch(GameEvent.Call.BALL))
+	_play(GameEvent.pitch(GameEvent.Call.BALL))
+	var reliever := state.fielding_team().bullpen[0]
+	_change_pitcher(1, reliever)
+	_play(F.pa(PaResult.Kind.WALK, [F.move(0, 1)] as Array[RunnerMove]))
+	assert_eq(scorer.book.pitch(starter).walks, 1, "the walk is the starter's")
+	assert_eq(scorer.book.pitch(reliever).walks, 0)
+	assert_eq(state.runner_on(1).responsible_pitcher_id, starter, "and so is the runner")
+
+
+func test_a_save_for_coming_in_with_the_tying_run_on_deck() -> void:
+	_new_game()
+	_run_scores(4)
+	_half()
+	for i: int in 8:
+		_half()
+		_half()
+	# Bottom of the ninth, 4-0, two out and the bases loaded: the tying run is on deck.
+	_outs(2)
+	F.put_runners(state, [1, 2, 3])
+	var closer := state.teams[0].bullpen[1]
+	_change_pitcher(0, closer)
+	_outs(1)
+	scorer.finish(state)
+	assert_eq(scorer.book.save_id, closer, "one out, but the tying run was on deck")
+
+
+func test_a_save_for_three_innings_with_any_lead() -> void:
+	_new_game()
+	_run_scores(8)
+	_half()
+	for i: int in 6:
+		_half()
+		_half()
+	# Bottom of the seventh, 8-0: the long man finishes three innings.
+	var long_man := state.teams[0].bullpen[3]
+	_change_pitcher(0, long_man)
+	while not state.over:
+		_half()
+	scorer.finish(state)
+	assert_eq(scorer.book.save_id, long_man)

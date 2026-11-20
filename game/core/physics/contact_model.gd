@@ -43,4 +43,4 @@ static func resolve(cfg: PhysicsConfig, ball_vel: Vector3, ball_spin: Vector3, b
 
 ## Barrel speed (m/s) at the sweet spot from the power rating (1-99), docs/04 section 7.2.
 static func bat_speed_from_power(power: float) -> float:
-	return lerpf(98.0, 124.0, clampf(power / 100.0, 0.0, 1.0)) / 3.6
+	return lerpf(104.5, 128.5, clampf(power / 100.0, 0.0, 1.0)) / 3.6

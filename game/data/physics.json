@@ -16,6 +16,14 @@
     "cl2": 1.05,
     "spin_decay_tau": 25.0
   },
+  "batted_aero": {
+    "basis": "A. Nathan's trajectory calculator, drag and lift fitted to 2015 Statcast batted balls (baseball.physics.illinois.edu, TrajectoryCalculator-new.xlsx): Cd = cd0 (1 + cd_per_mph (100 - launch mph)) (1 + cd_spin S^2), Cl = 1 / (cl_a + cl_b / S). Batted balls fly shorter than the pitch-tracking coefficients above predict, so the two are kept apart",
+    "cd0": 0.4105,
+    "cd_per_mph_below_100": 0.0044,
+    "cd_spin": 0.2017,
+    "cl_a": 2.32,
+    "cl_b": 0.4
+  },
   "contact": {
     "bat_radius": 0.033,
     "efficiency_max": 0.2,

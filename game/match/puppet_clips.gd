@@ -92,3 +92,12 @@ static func fielder_ready() -> PuppetPose:
 static func umpire() -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.8, 0.0), 0.0, 0.0, 30.0, a.call(0.2, 0.56, 0.24), a.call(-0.2, 0.56, 0.24), a.call(0.26, 0.08, 0.0), a.call(-0.26, 0.08, 0.0))
+
+
+## Running, for fielders and runners until stage S12 brings recorded motion: two strides
+## blended back and forth. phase advances one stride per unit.
+static func run(phase: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var left := _pose(a.call(0.0, 0.92, 0.05), 0.0, 8.0, 16.0, a.call(0.22, 1.12, 0.3), a.call(-0.22, 0.88, -0.25), a.call(0.12, 0.3, -0.42), a.call(-0.12, 0.1, 0.42))
+	var right := _pose(a.call(0.0, 0.92, 0.05), 0.0, -8.0, 16.0, a.call(0.22, 0.88, -0.25), a.call(-0.22, 1.12, 0.3), a.call(0.12, 0.1, 0.42), a.call(-0.12, 0.3, -0.42))
+	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))

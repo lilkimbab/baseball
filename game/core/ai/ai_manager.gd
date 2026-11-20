@@ -11,8 +11,7 @@ var overall: Overall
 ## Bullpen roles per team, decided when the game starts: closer first, then set-up men.
 var _closer: Array[String] = ["", ""]
 var _setup: Array[PackedStringArray] = [PackedStringArray(), PackedStringArray()]
-## Outs and runs at the moment each pitcher came in, to judge how his outing is going.
-var _entry_outs: Dictionary[String, int] = {}
+## Runs and inning at the moment each pitcher came in, to judge how his outing is going.
 var _entry_runs: Dictionary[String, int] = {}
 var _entry_inning: Dictionary[String, int] = {}
 
@@ -348,4 +347,3 @@ func _note_entry(state: GameState, id: String) -> void:
 	_entry_inning[id] = state.inning
 	var t := 0 if state.teams[0].pitcher_id == id else 1
 	_entry_runs[id] = state.score[1 - t]
-	_entry_outs[id] = state.outs

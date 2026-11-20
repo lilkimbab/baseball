@@ -17,7 +17,7 @@ var keep_log := false
 
 ## A game between two clubs with the stat resolver. The starters come from each rotation
 ## unless given.
-static func create(away: Team, home: Team, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, away_starter: Player = null, home_starter: Player = null) -> GameSim:
+static func create(away: Team, home: Team, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, away_starter: Player = null, home_starter: Player = null, physical: bool = false) -> GameSim:
 	var sim := GameSim.new()
 	sim.manager = AiManager.new(env, catalog, ovr)
 	sim.state = GameState.new()
@@ -25,7 +25,10 @@ static func create(away: Team, home: Team, rules: RuleSet, env: LeagueEnv, catal
 	var a_start := away_starter if away_starter != null else away.next_starter()
 	var h_start := home_starter if home_starter != null else home.next_starter()
 	sim.state.teams = [sim.manager.make_lineup(away, rules, a_start.id), sim.manager.make_lineup(home, rules, h_start.id)]
-	sim.resolver = StatResolver.new(env, catalog, sim.manager, rng)
+	if physical:
+		sim.resolver = PhysicalResolver.new(env, catalog, sim.manager, rng)
+	else:
+		sim.resolver = StatResolver.new(env, catalog, sim.manager, rng)
 	sim.scorer = Scorer.new()
 	GameFlow.start(sim.state)
 	sim.scorer.start(sim.state)

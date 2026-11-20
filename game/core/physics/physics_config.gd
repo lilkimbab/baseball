@@ -14,6 +14,12 @@ var cl0 := 0.0
 var cl1 := 0.0
 var cl2 := 0.0
 var spin_decay_tau := 0.0
+## Batted balls (docs/04 section 4.2): Nathan's fit to Statcast.
+var bat_cd0 := 0.0
+var bat_cd_per_mph := 0.0
+var bat_cd_spin := 0.0
+var bat_cl_a := 0.0
+var bat_cl_b := 0.0
 
 var bat_radius := 0.0
 var efficiency_max := 0.0

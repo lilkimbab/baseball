@@ -1,0 +1,21 @@
+{
+  "note": "Where fielders stand before the pitch, as distance from the apex of home plate (m) and direction (degrees, 0 = centre field, + = first-base side). Basis A: close to MLB average starting positions (docs/13 S5-2). Variants move players from the normal spots.",
+  "normal": {
+    "P":  [18.2, 0.0],
+    "C":  [-1.1, 0.0],
+    "1B": [33.5, 36.0],
+    "2B": [45.5, 13.0],
+    "3B": [36.0, -33.0],
+    "SS": [45.0, -13.0],
+    "LF": [90.5, -27.0],
+    "CF": [97.5, 0.0],
+    "RF": [90.0, 27.0]
+  },
+  "double_play": {"2B": [-3.0, -2.0], "SS": [-3.0, 2.0]},
+  "infield_in": {"1B": [-7.0, 0.0], "2B": [-10.0, 0.0], "3B": [-7.0, 0.0], "SS": [-10.0, 0.0]},
+  "no_doubles": {"LF": [6.0, -2.0], "CF": [6.0, 0.0], "RF": [6.0, 2.0], "1B": [0.0, 4.0], "3B": [0.0, -4.0]},
+  "bunt": {"1B": [-10.0, 0.0], "3B": [-11.0, 0.0], "2B": [-2.0, 6.0]},
+  "holding_runner": {"1B": [27.4, 44.0]},
+  "pull_shift_deg": {"note": "Infielders lean toward the batter's pull side by this many degrees (left-handed batter: + toward first)", "value": 3.0},
+  "outfield_margin_m": {"note": "Outfielders stand at least this far inside the fence", "value": 8.0}
+}

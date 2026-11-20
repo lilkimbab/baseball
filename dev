@@ -106,10 +106,38 @@ case "$cmd" in
     #   ./dev sim                      one game: play-by-play and box score
     #   ./dev sim --seed 3 --quiet     another game, box score only
     #   ./dev sim --games 4000         league totals against data/league_env.json targets
+    #   ./dev sim --physical --games 800 --jobs 8
+    #                                  pitch-by-pitch games (S5), split over 8 processes
     #   ./dev sim league               rebuild the fictional league (data/rosters/fiction-2026.json)
+    #   ./dev sim season               a 144-game season in one division: leaders and team spread
     if [ "${1:-}" = "league" ]; then
       shift
       "$GODOT" --headless --path "$GAME" --script res://tools/gen_league.gd -- "$@" 2>&1 | grep -E "gen_league|ERROR|SCRIPT"
+    elif [ "${1:-}" = "season" ]; then
+      shift
+      "$GODOT" --headless --path "$GAME" --script res://tools/sim_season.gd -- "$@" 2>&1 | grep -v "^Godot Engine" | grep -v "^$"
+    elif printf '%s\n' "$@" | grep -q -- "--jobs"; then
+      # Split the batch over separate processes (one per core), then add the totals up.
+      #   ./dev sim --physical --games 800 --jobs 8
+      jobs=1; games=1000; seed=2026; rest=(); tmp=""
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          --jobs) jobs="$2"; shift 2 ;;
+          --games) games="$2"; shift 2 ;;
+          --seed) seed="$2"; shift 2 ;;
+          *) rest+=("$1"); shift ;;
+        esac
+      done
+      tmp="$(mktemp -d)"
+      files=()
+      for j in $(seq 0 $((jobs - 1))); do
+        files+=("$tmp/part$j.json")
+        "$GODOT" --headless --path "$GAME" --script res://tools/sim_batch.gd -- --games $((games / jobs)) --leagues 1 \
+          --seed $((seed + j * 7919)) --dump "$tmp/part$j.json" "${rest[@]}" >/dev/null 2>&1 &
+      done
+      wait
+      "$GODOT" --headless --path "$GAME" --script res://tools/sim_batch.gd -- --merge "$(IFS=,; echo "${files[*]}")" "${rest[@]}" 2>&1 | grep -v "^Godot Engine" | grep -v "^$"
+      rm -rf "$tmp"
     elif printf '%s\n' "$@" | grep -q -- "--games"; then
       "$GODOT" --headless --path "$GAME" --script res://tools/sim_batch.gd -- "$@" 2>&1 | grep -v "^Godot Engine" | grep -v "^$"
     else

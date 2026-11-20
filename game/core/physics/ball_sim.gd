@@ -18,6 +18,9 @@ var vel := Vector3.ZERO
 var spin := Vector3.ZERO
 var rolling := false
 var stopped := false
+## Off the bat: flies by the batted-ball coefficients, which depend on the launch speed.
+var batted := false
+var _batted_cd := 0.0
 ## Seconds simulated by advance().
 var time := 0.0
 
@@ -31,10 +34,19 @@ func clone() -> BallSim:
 	copy.pos = pos
 	copy.vel = vel
 	copy.spin = spin
+	copy.batted = batted
+	copy._batted_cd = _batted_cd
 	copy.rolling = rolling
 	copy.stopped = stopped
 	copy.time = time
 	return copy
+
+
+## Marks the ball as just hit at its present velocity (sets the batted-ball drag).
+func hit() -> void:
+	batted = true
+	var mph := vel.length() / 0.44704
+	_batted_cd = cfg.bat_cd0 * (1.0 + cfg.bat_cd_per_mph * (100.0 - mph))
 
 
 ## Aerodynamic acceleration (drag + Magnus), without gravity.
@@ -42,6 +54,8 @@ func aero(v: Vector3, w: Vector3) -> Vector3:
 	var sp := v.length()
 	if sp < 1e-6:
 		return Vector3.ZERO
+	if batted:
+		return _batted_aero(v, w, sp)
 	var vh := v / sp
 	var w_perp := w - vh * w.dot(vh)
 	var w_rpm := w.length() * 60.0 / TAU
@@ -52,6 +66,21 @@ func aero(v: Vector3, w: Vector3) -> Vector3:
 		var s := cfg.ball_radius * wp / sp
 		var cl := cfg.cl2 * s / (cfg.cl0 + cfg.cl1 * s)
 		acc += w_perp.cross(v).normalized() * (cfg.aero_k * cl * sp * sp)
+	return acc
+
+
+## Nathan's Statcast fit: Cd = cd0 (1 + k (100 - launch mph)) (1 + c S^2), Cl = 1/(a + b/S).
+func _batted_aero(v: Vector3, w: Vector3, sp: float) -> Vector3:
+	var wl := w.length()
+	var s := cfg.ball_radius * wl / sp
+	var cd := _batted_cd * (1.0 + cfg.bat_cd_spin * s * s)
+	var acc := v * (-cfg.aero_k * cd * sp)
+	if s > 1e-6:
+		var cl := 1.0 / (cfg.bat_cl_a + cfg.bat_cl_b / s)
+		var lift := w.cross(v)
+		var n := lift.length()
+		if n > 1e-9:
+			acc += lift * (cfg.aero_k * cl * sp * sp / n)
 	return acc
 
 

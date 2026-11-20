@@ -15,10 +15,13 @@ var bottom := 0.5
 var half_width := (Field.PLATE_WIDTH + 2.0 * SIDE_MARGIN) * 0.5
 
 
-static func for_batter(height_m: float) -> StrikeZone:
+## The zone for a batter of this height, under these rules (KBO 2026 when none are given).
+static func for_batter(height_m: float, rules: RuleSet = null) -> StrikeZone:
 	var zone := StrikeZone.new()
-	zone.top = height_m * TOP_RATIO
-	zone.bottom = height_m * BOTTOM_RATIO
+	zone.top = height_m * (rules.zone_top_ratio if rules != null else TOP_RATIO)
+	zone.bottom = height_m * (rules.zone_bottom_ratio if rules != null else BOTTOM_RATIO)
+	if rules != null:
+		zone.half_width = Field.PLATE_WIDTH * 0.5 + rules.zone_side_margin
 	return zone
 
 
