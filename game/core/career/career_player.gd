@@ -16,6 +16,11 @@ var first_team := false
 var appearance: Dictionary[String, String] = {}
 var gp: Dictionary[String, float] = {"batting": 0.0, "fielding": 0.0, "running": 0.0, "pitching": 0.0}
 var popularity := 0.0
+## Points from reward boxes, and gear he has (name → rating it adds to).
+var points := 0
+var gear: Dictionary[String, String] = {}
+## Game ratings this season.
+var ratings := PackedFloat64Array()
 var pitch_uses: Dictionary[StringName, int] = {}
 
 

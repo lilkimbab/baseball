@@ -53,6 +53,29 @@
     {"from": "changeup", "to": "circle_change", "uses": 250, "rating": "movement", "at_least": 55}
   ],
   "new_pitch": {"gp": 150, "max": 6, "learnable": ["two_seam", "cutter", "slider", "curve", "changeup", "splitter", "sweeper"]},
+  "rating": {
+    "base": 5.5,
+    "batting": {"hit": 0.9, "extra_base": 0.5, "home_run": 0.9, "walk": 0.4, "rbi": 0.5, "run": 0.3, "stolen_base": 0.5, "out": -0.3, "strikeout": -0.2},
+    "fielding": {"chance": 0.15, "error": -0.8},
+    "pitching": {"out": 0.13, "strikeout": 0.12, "walk": -0.25, "hit": -0.15, "run": -0.6, "win": 0.5, "save": 0.7, "hold": 0.4},
+    "goal": 0.6,
+    "clutch": 0.5,
+    "medals": [6.0, 7.5, 9.0]
+  },
+  "rewards": {
+    "points": [30, 60, 100],
+    "gp": [8, 16, 30],
+    "gear": [
+      {"name": "가벼운 배트", "rating": "contact", "amount": 1},
+      {"name": "묵직한 배트", "rating": "power", "amount": 1},
+      {"name": "가죽 장갑", "rating": "hands", "amount": 1},
+      {"name": "스파이크", "rating": "speed", "amount": 1},
+      {"name": "보호대", "rating": "eye", "amount": 1},
+      {"name": "투수 글러브", "rating": "control", "amount": 1},
+      {"name": "로진백", "rating": "command", "amount": 1}
+    ]
+  },
+  "all_star": {"at_share": 0.5, "players": 22, "derby": 8, "derby_outs": 10, "derby_speed": 112},
   "game_goals": {
     "contact": ["hits", 2], "power": ["extra_bases", 1], "speed": ["runs_or_steals", 2], "defence": ["times_on_base", 1], "all_round": ["times_on_base", 2],
     "SP": ["quality_start", 1], "RP": ["scoreless", 1], "CL": ["scoreless", 1]

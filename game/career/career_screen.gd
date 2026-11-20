@@ -64,7 +64,11 @@ func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
 	_title(col, "%s  #%d" % [p.name, p.number])
 	_line(col, "%s · %s · %s %s" % [cs.rules.position_names.get(c.position, c.position), type.name if type != null else "", team.name, "1군" if c.first_team else "2군"], UiTheme.GOLD)
 	var phase: String = ["정규 시즌", "포스트시즌", "시즌 종료"][s.phase]
-	_line(col, "%d년 %s · %d일째 · 인기도 %d" % [s.season_year, phase, s.day + 1, roundi(c.popularity)], UiTheme.INK)
+	var avg := 0.0
+	for x: float in c.ratings:
+		avg += x
+	avg = avg / c.ratings.size() if not c.ratings.is_empty() else 0.0
+	_line(col, "%d년 %s · %d일째 · 인기도 %d · 포인트 %d%s" % [s.season_year, phase, s.day + 1, roundi(c.popularity), c.points, ("  · 평균 평점 %.1f" % avg) if avg > 0.0 else ""], UiTheme.INK)
 	var gp := PackedStringArray()
 	for field: String in CareerPlayer.FIELDS:
 		gp.append("%s %d" % [FIELD_NAMES[field], roundi(float(c.gp.get(field, 0.0)))])
@@ -73,6 +77,20 @@ func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
 	var futures := _lines(cs.futures_book, p.id)
 	_line(col, "1군: " + first, UiTheme.DIM, 17)
 	_line(col, "2군: " + futures, UiTheme.DIM, 17)
+	if cs.all_star_today:
+		_line(col, "올스타전에 뽑혔다!", UiTheme.GOLD)
+		_button(col, "올스타전 하기 (내 장면만)", func() -> void:
+			cs.special = "all_star"
+			get_tree().change_scene_to_file(CareerSession.MATCH))
+		_button(col, "올스타전 빠른 진행", func() -> void:
+			CareerSession.last_report = cs.quick_all_star()
+			refresh())
+	if cs.derby_waiting:
+		_line(col, "홈런 더비에 나간다 (아웃 %d개까지)" % int(cs.rules.all_star.get("derby_outs", 10)), UiTheme.GOLD)
+		_button(col, "홈런 더비 직접 치기", func() -> void: get_tree().change_scene_to_file(CareerSession.DERBY))
+		_button(col, "홈런 더비 빠른 결과", func() -> void:
+			cs.quick_derby()
+			refresh())
 	if cs.has_game():
 		var g := cs.club_game()
 		var other: Team = s.teams[g.opponent_of(c.team_id)]
@@ -93,6 +111,9 @@ func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
 			if r.gp[field] > 0.0:
 				earned.append("%s +%d" % [FIELD_NAMES[field], roundi(r.gp[field])])
 		_line(col, "지난 경기: %s · 목표 %s %s" % [r.line, r.goal, "달성" if r.goal_met else "실패"], UiTheme.INK, 17)
+		if r.rating > 0.0:
+			var medal := GameRating.MEDALS[r.medal]
+			_line(col, "평점 %.1f%s%s" % [r.rating, ("  %s메달" % medal) if medal != "" else "", ("  · 보상 " + r.reward) if r.reward != "" else ""], UiTheme.GOLD if r.medal > 0 else UiTheme.INK, 18)
 		_line(col, "얻은 성장 포인트: " + (", ".join(earned) if not earned.is_empty() else "없음"), UiTheme.INK, 17)
 		if r.called_up:
 			_line(col, "1군에 등록됐다!", UiTheme.GOLD)
@@ -206,6 +227,10 @@ func to_end() -> void:
 	var cs := CareerSession.career_season
 	var guard := 0
 	while not cs.season.finished() and guard < 500:
+		if cs.all_star_today:
+			cs.quick_all_star()
+		if cs.derby_waiting:
+			cs.quick_derby()
 		if cs.has_game():
 			CareerSession.last_report = cs.quick()
 		cs.next_day()

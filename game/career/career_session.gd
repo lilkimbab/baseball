@@ -6,6 +6,7 @@ extends RefCounted
 const CREATE := "res://career/creation_screen.tscn"
 const HUB := "res://career/career_screen.tscn"
 const MATCH := "res://career/career_match.tscn"
+const DERBY := "res://career/home_run_derby.tscn"
 
 static var career: CareerPlayer
 static var season: Season

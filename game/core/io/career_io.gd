@@ -54,6 +54,15 @@ static func load_default() -> CareerRules:
 	var learnable: Array = learn.get("learnable", [])
 	for id: Variant in learnable:
 		r.learnable.append(StringName(str(id)))
+	r.rating = root.get("rating", {})
+	r.medals = PackedFloat64Array(r.rating.get("medals", [6.0, 7.5, 9.0]) as Array)
+	var rewards: Dictionary = root.get("rewards", {})
+	r.reward_points = PackedInt32Array(rewards.get("points", [30, 60, 100]) as Array)
+	r.reward_gp = PackedInt32Array(rewards.get("gp", [8, 16, 30]) as Array)
+	var gear: Array = rewards.get("gear", [])
+	for g: Dictionary in gear:
+		r.gear.append(g)
+	r.all_star = root.get("all_star", {})
 	var goals: Dictionary = root.get("game_goals", {})
 	for key: String in goals:
 		r.game_goals[key] = goals[key]

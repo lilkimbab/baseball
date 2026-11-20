@@ -55,6 +55,15 @@ var ratings: Dictionary[String, PackedStringArray] = {}
 ## Type id or pitching position → [what, how many].
 var game_goals: Dictionary[String, Array] = {}
 var evolutions: Array[Evolution] = []
+## Game rating: base, per-event weights by field, goal and clutch bonuses, medal lines (bronze,
+## silver, gold).
+var rating: Dictionary = {}
+var medals := PackedFloat64Array([6.0, 7.5, 9.0])
+## Reward boxes by medal: points, growth points, gear (name, rating, amount).
+var reward_points := PackedInt32Array([30, 60, 100])
+var reward_gp := PackedInt32Array([8, 16, 30])
+var gear: Array[Dictionary] = []
+var all_star: Dictionary = {}
 var new_pitch_gp := 150.0
 var max_pitches := 6
 var learnable: Array[StringName] = []
