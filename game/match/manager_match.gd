@@ -27,6 +27,11 @@ const SUMMARY_RESULT := 1.3
 
 var my_team := 1
 var interventions_left := INTERVENTIONS
+## Seconds on the board between summary pitches, after one that decides nothing, and after a
+## plate appearance's result (a mode may go faster).
+var summary_gap := SUMMARY_GAP
+var summary_pitch_time := SUMMARY_PITCH
+var summary_result_time := SUMMARY_RESULT
 var intervening := false
 var speed := 1.0
 var paused := false
@@ -167,6 +172,19 @@ func live() -> bool:
 	return show_every_pitch or leverage >= WinExpectancy.HIGH
 
 
+## The card over the board while the game waits for the player (a reservation's alert): title
+## first, then the lines under it.
+func card_lines() -> PackedStringArray:
+	if alert == "" or not paused:
+		return PackedStringArray()
+	return PackedStringArray(["예약", alert])
+
+
+## The line at the right of the board's footer.
+func board_note() -> String:
+	return "개입 %s회 남음" % ("∞" if interventions_left < 0 else str(interventions_left))
+
+
 func board_visible() -> bool:
 	return not live() and (_play_time < 0.0 or _skip > 0) and not game.over
 
@@ -194,10 +212,10 @@ func step(delta: float) -> void:
 	banner_time = maxf(banner_time - d, 0.0)
 	match state:
 		State.PRE_PITCH:
-			if state_time >= SUMMARY_GAP:
+			if state_time >= summary_gap:
 				summary_pitch()
 		State.RESULT:
-			if state_time >= (SUMMARY_RESULT if _pa_over else SUMMARY_PITCH):
+			if state_time >= (summary_result_time if _pa_over else summary_pitch_time):
 				_after_result()
 		_:
 			super.step(d)
@@ -212,8 +230,13 @@ func summary_pitch() -> void:
 	while duel.phase == PitchDuel.Phase.FLIGHT:
 		duel.tick(TICK)
 	_finish_pitch()
-	if _play != null and (_play.foul or _skip > 0):
+	if _play != null and (_play.foul or _skip > 0 or not show_in_summary(_play)):
 		_end_play()
+
+
+## Whether a ball in play during the summary is shown on the field (here: all of them).
+func show_in_summary(_play_result: PlayResult) -> bool:
+	return true
 
 
 ## Plays on without showing anything until the plate appearance or the half-inning is over.
@@ -295,8 +318,8 @@ func _note_plate_appearance() -> void:
 
 func _notify(label: String) -> void:
 	alert = "예약: %s   Enter 개입 · Space 계속" % label
-	banner = alert
-	banner_time = 1e9
+	banner = ""
+	banner_time = 0.0
 	paused = true
 	_skip = 0
 

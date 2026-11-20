@@ -69,6 +69,10 @@ var clubs: Dictionary[String, Club] = {}
 var condition: Dictionary[String, int] = {}
 var streak: Dictionary[String, int] = {}
 var season_year := 2026
+## A player who plays whenever he is on the first team (the career player): he starts at his
+## position, a starter takes his turn, a closer closes and a reliever sets up.
+var featured := ""
+var featured_role := ""
 ## Decided once per game and club: "day:team" → starter id, and who has the day off.
 var _starters: Dictionary[String, String] = {}
 var _names: NameTable
@@ -165,9 +169,14 @@ func my_game_today() -> ScheduledGame:
 func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	var manager := AiManager.new(env, catalog, ovr)
 	for side: String in [game.away, game.home]:
+		var best_relief := 0.0
 		for p: Player in (teams[side] as Team).first_team():
 			if p.is_pitcher():
 				manager.role_overall[p.id] = _pitcher_overall(p)
+				if p.role() == &"RP" and p.id != featured:
+					best_relief = maxf(best_relief, manager.role_overall[p.id])
+		if featured != "" and manager.role_overall.has(featured):
+			manager.role_overall[featured] = best_relief + (1.0 if featured_role == "CL" else -0.01)
 	var game_rules := rules_for(game)
 	var a := lineup_for(game.away, game.day, manager, game_rules)
 	var h := lineup_for(game.home, game.day, manager, game_rules)
@@ -187,7 +196,12 @@ func _pitcher_overall(p: Player) -> float:
 func lineup_for(team_id: String, on_day: int, manager: AiManager, game_rules: RuleSet = null) -> TeamInGame:
 	var team: Team = teams[team_id]
 	var starter := starter_for(team, on_day)
-	return manager.make_lineup(squad_for(team, on_day, starter.id), game_rules if game_rules != null else rules, starter.id, resting(team, on_day))
+	var rest := resting(team, on_day)
+	var must: Dictionary[String, bool] = {}
+	if featured != "" and team.player(featured) != null and team.is_registered(featured):
+		must[featured] = true
+		rest.erase(featured)
+	return manager.make_lineup(squad_for(team, on_day, starter.id), game_rules if game_rules != null else rules, starter.id, rest, must)
 
 
 ## The first team as it can play today: the starter, the relievers who may pitch (a tired one

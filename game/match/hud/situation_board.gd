@@ -26,6 +26,20 @@ func _draw() -> void:
 		_lineup(Rect2(Vector2(x, 110.0), Vector2(400.0, 560.0)), g, t)
 	_middle(Rect2(Vector2(view.x * 0.5 - 420.0, 256.0), Vector2(840.0, 520.0)), g)
 	_footer(Rect2(Vector2(view.x * 0.5 - 520.0, 790.0), Vector2(1040.0, 64.0)), g)
+	_card(scene.card_lines())
+
+
+## The card the game waits on (a scene to play, a reservation's alert).
+func _card(lines: PackedStringArray) -> void:
+	if lines.is_empty():
+		return
+	var rect := Rect2(Vector2(view.x * 0.5 - 360.0, 360.0), Vector2(720.0, 70.0 + 46.0 * (lines.size() - 1)))
+	panel(rect, Color(0.08, 0.1, 0.2, 0.97))
+	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 4.0)), UiTheme.GOLD)
+	text(rect.position + Vector2(0.0, 48.0), lines[0], 30, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 700)
+	for i: int in range(1, lines.size()):
+		var last := i == lines.size() - 1
+		text(rect.position + Vector2(0.0, 48.0 + 44.0 * i), lines[i], 22 if not last else 20, UiTheme.INK if not last else UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x)
 
 
 func _line_score(rect: Rect2, g: GameState) -> void:
@@ -123,5 +137,5 @@ func _footer(rect: Rect2, g: GameState) -> void:
 	bar(Rect2(rect.position + Vector2(250.0, 28.0), Vector2(160.0, 12.0)), mine, UiTheme.BLUE)
 	var key := scene.leverage >= WinExpectancy.HIGH
 	text(rect.position + Vector2(440.0, 40.0), "레버리지 %.1f%s" % [scene.leverage, "  승부처" if key else ""], 20, UiTheme.RED if key else UiTheme.DIM)
-	text(rect.position + Vector2(660.0, 40.0), "개입 %d회 남음" % scene.interventions_left, 20, UiTheme.GOLD)
+	text(rect.position + Vector2(660.0, 40.0), scene.board_note(), 20, UiTheme.GOLD)
 	text(rect.position + Vector2(840.0, 40.0), "×%d" % roundi(scene.speed), 20, UiTheme.DIM)

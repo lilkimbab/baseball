@@ -64,6 +64,8 @@ var menu: SubstitutionPanel
 ## One line per event, for the play-by-play panel.
 var log := PackedStringArray()
 var last_text := ""
+## What the last event did (runs, outs), for modes that judge it.
+var last_outcome: FlowOutcome
 
 var fielders: Dictionary[Position.Kind, Puppet] = {}
 var runner_puppets: Array[Puppet] = []
@@ -445,6 +447,7 @@ func _end_play() -> void:
 func _apply(e: GameEvent) -> void:
 	var batter := game.batter_id()
 	var out := GameFlow.apply(game, e)
+	last_outcome = out
 	scorer.record(game, e, out)
 	manager.note_change(game, e)
 	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
