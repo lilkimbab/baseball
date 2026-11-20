@@ -47,8 +47,9 @@ for side, name in (("l", "Left"), ("r", "Right")):
 MATERIALS = [
     ("Skin", (0.80, 0.60, 0.46)), ("Jersey", (0.92, 0.92, 0.94)), ("Pants", (0.88, 0.88, 0.90)),
     ("Shoes", (0.05, 0.05, 0.06)), ("Belt", (0.04, 0.04, 0.05)), ("Socks", (0.10, 0.15, 0.35)),
-    ("Cap", (0.10, 0.15, 0.35)),
 ]
+# Headgear is exported as separate meshes so the game can show a cap or a batting helmet.
+HEADGEAR = [("Cap", (0.10, 0.15, 0.35)), ("Helmet", (0.10, 0.15, 0.35))]
 SLOT = {name: i for i, (name, _) in enumerate(MATERIALS)}
 # How far each clothed region is pushed out from the skin (metres).
 PUFF = {"Jersey": 0.009, "Pants": 0.007, "Shoes": 0.006, "Belt": 0.011, "Socks": 0.002}
@@ -63,8 +64,8 @@ def make_material(name, rgb):
     mat = bpy.data.materials.new(name)
     bsdf = mat.node_tree.nodes.get("Principled BSDF")
     bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
-    bsdf.inputs["Roughness"].default_value = 0.55 if name == "Skin" else 0.8
-    mat.use_backface_culling = name != "Cap"
+    bsdf.inputs["Roughness"].default_value = {"Skin": 0.55, "Helmet": 0.25}.get(name, 0.8)
+    mat.use_backface_culling = name not in ("Cap", "Helmet")
     return mat
 
 
@@ -169,65 +170,85 @@ def dress(body, rig):
     return head
 
 
-def make_cap(head_points, rig):
-    """A simple fitted cap: a dome over the skull and a brim over the eyes."""
+def head_box(head_points):
     xs = [p.x for p in head_points]
     ys = [p.y for p in head_points]
     zs = [p.z for p in head_points]
-    top = max(zs)
-    height = top - min(zs)
-    rx = (max(xs) - min(xs)) * 0.5 + 0.010
-    ry = (max(ys) - min(ys)) * 0.5 + 0.010
-    rz = height * 0.40
-    centre = Vector(((max(xs) + min(xs)) * 0.5, (max(ys) + min(ys)) * 0.5, top - rz + 0.012))
+    centre = Vector(((max(xs) + min(xs)) * 0.5, (max(ys) + min(ys)) * 0.5, 0.0))
+    return centre, (max(xs) - min(xs)) * 0.5, (max(ys) - min(ys)) * 0.5, max(zs), max(zs) - min(zs)
 
-    bm = bmesh.new()
-    rings, segments = 7, 20
+
+def dome(bm, centre, rx, ry, rz, down, face_open=None):
+    """Half-ellipsoid shell reaching `down` radians below its equator. If face_open is a
+    height, vertices on the front (-Y) half are not allowed below it, leaving the face clear."""
+    rings, segments = 9, 24
     rows = []
     for r in range(rings + 1):
-        phi = (math.pi * 0.5 + 0.22) * r / rings          # 0 at the crown, past the equator at the rim
+        phi = (math.pi * 0.5 + down) * r / rings
         row = []
-        for s in range(segments):
-            theta = 2.0 * math.pi * s / segments
-            row.append(bm.verts.new(centre + Vector((rx * math.sin(phi) * math.cos(theta),
-                                                     ry * math.sin(phi) * math.sin(theta),
-                                                     rz * math.cos(phi)))))
+        for seg in range(segments):
+            theta = 2.0 * math.pi * seg / segments
+            p = centre + Vector((rx * math.sin(phi) * math.cos(theta), ry * math.sin(phi) * math.sin(theta), rz * math.cos(phi)))
+            if face_open is not None and math.sin(theta) < -0.25:
+                p.z = max(p.z, face_open)
+            row.append(bm.verts.new(p))
         rows.append(row)
     for r in range(rings):
-        for s in range(segments):
-            n = (s + 1) % segments
-            bm.faces.new((rows[r][s], rows[r][n], rows[r + 1][n], rows[r + 1][s]))
+        for seg in range(segments):
+            n = (seg + 1) % segments
+            bm.faces.new((rows[r][seg], rows[r][n], rows[r + 1][n], rows[r + 1][seg]))
 
-    # Brim: a curved strip in front of the face (-Y is forward in Blender).
-    brim_z = centre.z + rz * math.cos(math.pi * 0.5 + 0.12)
+
+def brim(bm, centre, rx, ry, z, reach, spread_deg):
+    """Curved strip in front of the face (-Y is forward in Blender)."""
     inner, outer = [], []
-    for i in range(11):
-        a = math.radians(-70.0 + 14.0 * i)
-        inner.append(bm.verts.new(Vector((centre.x + rx * 0.98 * math.sin(a), centre.y - ry * 0.98 * math.cos(a), brim_z))))
-        reach = 0.075 * math.cos(a) ** 0.6
-        outer.append(bm.verts.new(Vector((centre.x + (rx + 0.012) * math.sin(a), centre.y - (ry * math.cos(a) + reach), brim_z - 0.012))))
-    for i in range(10):
+    steps = 10
+    for i in range(steps + 1):
+        a = math.radians(-spread_deg + 2.0 * spread_deg * i / steps)
+        inner.append(bm.verts.new(Vector((centre.x + rx * 0.98 * math.sin(a), centre.y - ry * 0.98 * math.cos(a), z))))
+        out = reach * math.cos(a) ** 0.6
+        outer.append(bm.verts.new(Vector((centre.x + (rx + 0.012) * math.sin(a), centre.y - (ry * math.cos(a) + out), z - 0.012))))
+    for i in range(steps):
         bm.faces.new((inner[i], inner[i + 1], outer[i + 1], outer[i]))
+
+
+def finish_headgear(bm, name, rig):
     for face in bm.faces:
         face.smooth = True
-
-    mesh = bpy.data.meshes.new("Cap")
+    mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
-    cap = bpy.data.objects.new("Cap", mesh)
-    bpy.context.scene.collection.objects.link(cap)
-    return cap
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mesh.materials.append(bpy.data.materials[name])
+    obj.vertex_groups.new(name="head").add(list(range(len(mesh.vertices))), 1.0, 'REPLACE')
+    obj.parent = rig
+    obj.modifiers.new("Armature", 'ARMATURE').object = rig
+    return obj
 
 
-def join_cap(body, cap, rig):
-    for name, _ in MATERIALS:
-        cap.data.materials.append(bpy.data.materials[name])
-    for poly in cap.data.polygons:
-        poly.material_index = SLOT["Cap"]
-    group = cap.vertex_groups.new(name="head")
-    group.add(list(range(len(cap.data.vertices))), 1.0, 'REPLACE')
-    with bpy.context.temp_override(active_object=body, object=body, selected_editable_objects=[body, cap], selected_objects=[body, cap]):
-        bpy.ops.object.join()
+def make_cap(head_points, rig):
+    """Fitted cap: a dome over the skull and a brim over the eyes."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    rx, ry, rz = half_w + 0.010, half_d + 0.010, height * 0.40
+    centre.z = top - rz + 0.012
+    bm = bmesh.new()
+    dome(bm, centre, rx, ry, rz, 0.22)
+    brim(bm, centre, rx, ry, centre.z + rz * math.cos(math.pi * 0.5 + 0.12), 0.075, 70.0)
+    return finish_headgear(bm, "Cap", rig)
+
+
+def make_helmet(head_points, rig):
+    """Batting helmet: a larger shell that comes down over the ears and the back of the head,
+    open at the face, with a short brim."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    rx, ry, rz = half_w + 0.024, half_d + 0.026, height * 0.46
+    centre.z = top - rz + 0.022
+    brow = centre.z - 0.012
+    bm = bmesh.new()
+    dome(bm, centre, rx, ry, rz, 0.62, face_open=brow)
+    brim(bm, centre, rx, ry, brow, 0.055, 62.0)
+    return finish_headgear(bm, "Helmet", rig)
 
 
 def render_preview(path, target_z):
@@ -269,7 +290,9 @@ def main():
     stand_on_ground(body, rig)
 
     head_points = dress(body, rig)
-    join_cap(body, make_cap(head_points, rig), rig)
+    for name, rgb in HEADGEAR:
+        make_material(name, rgb)
+    headgear = [make_cap(head_points, rig), make_helmet(head_points, rig)]
     for old, new in BONE_NAMES.items():
         if old in rig.data.bones:
             rig.data.bones[old].name = new
@@ -281,12 +304,13 @@ def main():
         height, len(body.data.vertices), len(body.data.polygons), len(rig.data.bones)))
 
     for obj in bpy.data.objects:
-        obj.select_set(obj in (body, rig))
+        obj.select_set(obj in (body, rig, *headgear))
     bpy.context.view_layer.objects.active = rig
     bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB', use_selection=True, export_apply=False,
                               export_yup=True, export_skins=True, export_animations=False, export_morph=False)
     print("make_player: wrote", OUT_GLB)
     if PREVIEW:
+        headgear[1].hide_render = True
         render_preview(PREVIEW, height * 0.5)
         print("make_player: preview", PREVIEW)
 

@@ -24,6 +24,17 @@ var lower_leg := 0.43
 @export var show_bat := false
 @export var show_glove := true
 
+## How a hand is held. Only the skinned model has fingers; the mannequin ignores this.
+enum Grip { RELAXED, BAT, BALL, GLOVE }
+
+var left_grip: Grip = Grip.RELAXED
+var right_grip: Grip = Grip.RELAXED
+## &"cap" or &"helmet".
+var headgear: StringName = &"cap"
+## Point the head should face, in the puppet's space. Used when has_look_target is true.
+var look_target := Vector3.ZERO
+var has_look_target := false
+
 ## Joint positions from the last apply(), keyed by bone name, in the puppet's space.
 var joints: Dictionary[StringName, Vector3] = {}
 
@@ -61,6 +72,17 @@ func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> vo
 var hip_basis := Basis.IDENTITY
 var chest_basis := Basis.IDENTITY
 var spine_dir := Vector3.UP
+
+
+## Makes the head face a point given in world space.
+func look_at_world(world_point: Vector3) -> void:
+	look_target = to_local(world_point)
+	has_look_target = true
+
+
+## Name and number shown on the back of the jersey. The mannequin has no jersey to print on.
+func set_back_lettering(_number: int, _player_name: String, _ink: Color = Color.BLACK) -> void:
+	pass
 
 
 func apply(pose: PuppetPose) -> void:
