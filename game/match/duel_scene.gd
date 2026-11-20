@@ -56,6 +56,7 @@ var camera: Camera3D
 var pitcher: Puppet
 var batter: Puppet
 var catcher: Puppet
+var umpire: Puppet
 var ball_actor: BallActor
 var hud: DuelHud
 
@@ -370,11 +371,14 @@ func _move_camera(delta: float) -> void:
 		camera.fov = lerpf(camera.fov, 40.0, clampf(delta * 3.0, 0.0, 1.0))
 		camera.look_at(Field.to_world(_follow_target))
 		catcher.visible = true
+		umpire.visible = true
 		return
 	_follow_target = Vector3(0.0, 10.0, 1.0)
 	_snap_camera()
-	# The batting camera sits where the catcher crouches, so he is only drawn from elsewhere.
+	# The batting camera sits where the catcher crouches, so he and the umpire are only
+	# drawn from elsewhere.
 	catcher.visible = human_pitches()
+	umpire.visible = human_pitches()
 
 
 func _build_environment() -> void:
@@ -438,18 +442,53 @@ func _build_players() -> void:
 	batter.headgear = &"helmet"
 	batter.left_grip = Puppet.Grip.BAT
 	batter.right_grip = Puppet.Grip.BAT
-	batter.set_back_lettering(27, "한도윤", Color(0.95, 0.95, 0.97))
 	pitcher.left_grip = Puppet.Grip.GLOVE
-	pitcher.set_back_lettering(18, "서강민", Color(0.1, 0.15, 0.35))
-	catcher = _add_puppet(Vector3(0.0, -1.15, 0.0), 0.0, home, Color(0.1, 0.15, 0.35))
+	# Fictional clubs: a home side in white with navy trim, visitors in black and orange.
+	_dress(pitcher, UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"), 18, "서강민", false)
+	var visitors := UniformStyle.make(Color(0.08, 0.08, 0.09), Color(0.9, 0.9, 0.91), Color(0.95, 0.45, 0.08), Color(0.95, 0.45, 0.08), "Comets")
+	visitors.cap = Color(0.07, 0.07, 0.08)
+	visitors.pants_pinstripes = true
+	_dress(batter, visitors, 27, "한도윤", true)
+	catcher = _add_puppet(Vector3(0.0, -1.15, 0.0), 0.0, home, Color(0.1, 0.15, 0.35), use_models)
+	catcher.left_grip = Puppet.Grip.GLOVE
+	catcher.headgear = &"helmet"
+	catcher.gear = [&"Mask", &"ChestProtector", &"ShinGuards"]
+	_dress(catcher, UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"), 22, "오세현", false)
 	catcher.apply(PuppetClips.catcher())
+	# The plate umpire stands behind the catcher in black and grey.
+	umpire = _add_puppet(Vector3(0.25, -2.3, 0.0), 0.0, Color(0.08, 0.08, 0.09), Color(0.05, 0.05, 0.06), use_models)
+	var officials := UniformStyle.make(Color(0.07, 0.07, 0.08), Color(0.34, 0.35, 0.37), Color(0.07, 0.07, 0.08), Color(0.07, 0.07, 0.08), "")
+	_dress(umpire, officials, 0, "", false)
+	umpire.show_glove = false
+	umpire.gear = [&"Mask"]
+	umpire.apply(PuppetClips.umpire())
 	var spots: Array[Vector3] = [
 		Vector3(21.0, 24.0, 0.0), Vector3(9.0, 36.0, 0.0), Vector3(-21.0, 24.0, 0.0), Vector3(-9.0, 36.0, 0.0),
 		Vector3(-45.0, 75.0, 0.0), Vector3(0.0, 95.0, 0.0), Vector3(45.0, 75.0, 0.0),
 	]
-	for spot: Vector3 in spots:
+	var home_style := UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor")
+	var names: Array[String] = ["문지호", "강태윤", "이서준", "박하람", "정우성", "최민재", "윤도현"]
+	var numbers: Array[int] = [3, 7, 5, 6, 9, 51, 24]
+	for i: int in spots.size():
+		var spot := spots[i]
 		var facing := atan2(spot.x, spot.y) + PI
-		_add_puppet(spot, -facing + PI + PI, home, Color(0.1, 0.15, 0.35)).apply(PuppetClips.fielder_ready())
+		var fielder := _add_puppet(spot, -facing + PI + PI, home, Color(0.1, 0.15, 0.35), use_models)
+		fielder.left_grip = Puppet.Grip.GLOVE
+		var style := UniformStyle.make(home_style.jersey, home_style.pants, home_style.trim, home_style.ink, home_style.wordmark)
+		_dress(fielder, style, numbers[i], names[i], false)
+		fielder.look_at_world(Field.to_world(Vector3(0.0, 0.0, 1.0)))
+		fielder.apply(PuppetClips.fielder_ready())
+
+
+func _dress(puppet: Puppet, style: UniformStyle, number: int, player_name: String, with_gloves: bool) -> void:
+	var model := puppet as SkinnedPuppet
+	if model == null:
+		return
+	style.number = number
+	style.player_name = player_name
+	model.uniform = style
+	model.gloves = with_gloves
+	model.repaint()
 
 
 func _add_puppet(field_pos: Vector3, yaw: float, jersey: Color, cap: Color, skinned: bool = false) -> Puppet:

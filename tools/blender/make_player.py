@@ -3,11 +3,14 @@
 Run through ./dev model, or directly:
     blender -b --python tools/blender/make_player.py -- <out.glb> [preview.png]
 
-A human body is generated with MPFB (MakeHuman), rigged, given a painted-on uniform by
-assigning materials per body region, fitted with a cap, and its bones are renamed to the
-names the game uses (Godot's humanoid profile). The output of MakeHuman/MPFB is CC0.
+A human body is generated with MPFB (MakeHuman) and rigged. The uniform is cut from the body
+along straight hem lines, lifted off the skin and smoothed into separate jersey and pants
+meshes with front/back UVs for lettering and stripes. Shoes are convex shells around the
+feet. A cap and a batting helmet are added, and bones are renamed to the names the game uses
+(Godot's humanoid profile). The output of MakeHuman/MPFB is CC0.
 """
 import math
+import os
 import sys
 
 import bmesh
@@ -15,6 +18,7 @@ import bpy
 from mathutils import Vector
 
 from bl_ext.user_default.mpfb.services.humanservice import HumanService
+from bl_ext.user_default.mpfb.services.locationservice import LocationService
 from bl_ext.user_default.mpfb.services.targetservice import TargetService
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
@@ -24,6 +28,15 @@ PREVIEW = ARGS[1] if len(ARGS) > 1 else None
 # Body shape: an athletic adult man.
 MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.64, "weight": 0.56, "height": 0.6, "proportions": 0.55}
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
+
+# Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
+SLEEVE_HEM = 0.62
+PANTS_HEM = 0.9
+BELT_HALF = 0.024
+# How far skin continues under a hem before it is removed, so no gap shows.
+TUCK = 0.05
+
+SKIN, HANDS, JERSEY, BELT, PANTS, SOCKS, SHOES = range(7)
 
 BONE_NAMES = {
     "Root": "Root", "pelvis": "Hips", "spine_01": "Spine", "spine_02": "Chest", "spine_03": "UpperChest",
@@ -42,17 +55,13 @@ for side, name in (("l", "Left"), ("r", "Right")):
         for n, part in (("01", "Proximal"), ("02", "Intermediate"), ("03", "Distal")):
             BONE_NAMES[f"{src}_{n}_{side}"] = f"{name}{dst}{part}"
 
-# Material slots, in order. Colours are placeholders: the game recolours jersey, pants,
-# socks and cap per team.
-MATERIALS = [
-    ("Skin", (0.80, 0.60, 0.46)), ("Jersey", (0.92, 0.92, 0.94)), ("Pants", (0.88, 0.88, 0.90)),
-    ("Shoes", (0.05, 0.05, 0.06)), ("Belt", (0.04, 0.04, 0.05)), ("Socks", (0.10, 0.15, 0.35)),
-]
-# Headgear is exported as separate meshes so the game can show a cap or a batting helmet.
-HEADGEAR = [("Cap", (0.10, 0.15, 0.35)), ("Helmet", (0.10, 0.15, 0.35))]
-SLOT = {name: i for i, (name, _) in enumerate(MATERIALS)}
-# How far each clothed region is pushed out from the skin (metres).
-PUFF = {"Jersey": 0.009, "Pants": 0.007, "Shoes": 0.006, "Belt": 0.011, "Socks": 0.002}
+# Placeholder colours; the game recolours and textures everything per team.
+COLOURS = {
+    "Skin": (0.80, 0.60, 0.46), "Hands": (0.80, 0.60, 0.46), "Jersey": (0.92, 0.92, 0.94),
+    "Pants": (0.88, 0.88, 0.90), "Belt": (0.04, 0.04, 0.05), "Socks": (0.10, 0.15, 0.35),
+    "Shoes": (0.05, 0.05, 0.06), "Cap": (0.10, 0.15, 0.35), "Helmet": (0.10, 0.15, 0.35),
+    "Collar": (0.10, 0.15, 0.35), "Gear": (0.08, 0.10, 0.20), "Bars": (0.10, 0.10, 0.11),
+}
 
 
 def clear_scene():
@@ -60,47 +69,20 @@ def clear_scene():
         bpy.data.objects.remove(obj, do_unlink=True)
 
 
-def make_material(name, rgb):
-    mat = bpy.data.materials.new(name)
-    bsdf = mat.node_tree.nodes.get("Principled BSDF")
-    bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
-    bsdf.inputs["Roughness"].default_value = {"Skin": 0.55, "Helmet": 0.25}.get(name, 0.8)
-    mat.use_backface_culling = name not in ("Cap", "Helmet")
+def material(name):
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        mat = bpy.data.materials.new(name)
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        bsdf.inputs["Base Color"].default_value = (*COLOURS[name], 1.0)
+        bsdf.inputs["Roughness"].default_value = {"Skin": 0.55, "Hands": 0.55, "Helmet": 0.25}.get(name, 0.8)
+        mat.use_backface_culling = name in ("Skin", "Hands", "Socks", "Shoes")
     return mat
-
-
-def along_bone(rig, bone_name, point):
-    """0 at the bone's joint, 1 at the next joint down the limb. The child's position is
-    used rather than the bone's own tail, which in this rig does not reach the next joint."""
-    child = {"upperarm": "lowerarm", "calf": "foot", "thigh": "calf", "lowerarm": "hand"}
-    stem, side = bone_name.rsplit("_", 1)
-    start = rig.data.bones[bone_name].head_local
-    end = rig.data.bones["%s_%s" % (child[stem], side)].head_local
-    axis = end - start
-    return (point - start).dot(axis) / axis.length_squared
-
-
-def region_of(bone_name, point, rig, waist_z):
-    if bone_name in ("head", "neck_01"):
-        return "Skin"
-    if bone_name.startswith(("spine_", "clavicle_")) or bone_name == "pelvis":
-        if abs(point.z - waist_z) < 0.03:
-            return "Belt"
-        return "Jersey" if point.z > waist_z else "Pants"
-    if bone_name.startswith("upperarm_"):
-        return "Jersey" if along_bone(rig, bone_name, point) < 0.58 else "Skin"
-    if bone_name.startswith("thigh_"):
-        return "Pants"
-    if bone_name.startswith("calf_"):
-        return "Pants" if along_bone(rig, bone_name, point) < 0.42 else "Socks"
-    if bone_name.startswith(("foot_", "ball_")):
-        return "Shoes"
-    return "Skin"
 
 
 def stand_on_ground(body, rig):
     """Moves the rig (and the mesh parented to it) so the soles are at height zero, then
-    bakes the move into both so the exported skeleton has its origin on the ground."""
+    bakes the move into both so mesh and bones share one coordinate system."""
     bpy.context.view_layer.update()
     body_group = body.vertex_groups["body"].index
     lowest = min((body.matrix_world @ v.co).z for v in body.data.vertices
@@ -108,66 +90,371 @@ def stand_on_ground(body, rig):
     rig.location.z -= lowest
     bpy.context.view_layer.update()
     for obj in bpy.data.objects:
-        obj.select_set(obj in (body, rig))
+        obj.select_set(obj == rig or obj.parent == rig)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     bpy.context.view_layer.update()
-    knee = (rig.matrix_world @ rig.data.bones["calf_l"].head_local).z
-    ankle = (rig.matrix_world @ rig.data.bones["foot_l"].head_local).z
-    print("make_player: moved up %.3f m; knee at %.3f m, ankle at %.3f m" % (-lowest, knee, ankle))
+    print("make_player: moved up %.3f m; knee at %.3f m" % (-lowest, rig.data.bones["calf_l"].head_local.z))
 
 
-def dress(body, rig):
-    """Removes MakeHuman's helper geometry, then paints and pads the uniform."""
+SKIN_FILE = "skins/young_asian_male/young_asian_male.mhmat"
+FACE_ASSETS = [("eyes/low-poly/low-poly.mhclo", "Eyes"), ("eyebrows/eyebrow001/eyebrow001.mhclo", "Eyebrows"),
+               ("eyelashes/eyelashes01/eyelashes01.mhclo", "Eyelashes")]
+
+
+def add_skin_and_face(body):
+    """Gives the body a painted skin texture and adds eyes, eyebrows and eyelashes from the
+    MakeHuman asset pack (CC0), if the pack is installed. Returns the extra objects."""
+    data = LocationService.get_user_data()
+    skin = os.path.join(data, SKIN_FILE)
+    if not os.path.exists(skin):
+        print("make_player: asset pack not installed, using a plain skin colour")
+        return []
+    HumanService.set_character_skin(skin, body, skin_type="GAMEENGINE", material_instances=False)
+    extras = []
+    for path, kind in FACE_ASSETS:
+        full = os.path.join(data, path)
+        if not os.path.exists(full):
+            continue
+        before = set(bpy.data.objects)
+        HumanService.add_mhclo_asset(full, body, asset_type=kind, subdiv_levels=0, material_type="GAMEENGINE")
+        for obj in set(bpy.data.objects) - before:
+            obj.name = obj.data.name = kind
+            extras.append(obj)
+    print("make_player: skin texture and", [o.name for o in extras])
+    return extras
+
+
+class Anatomy:
+    """Answers "which part of the body is this face" from bone weights and positions."""
+
+    CHILD = {"upperarm": "lowerarm", "calf": "foot", "thigh": "calf", "lowerarm": "hand"}
+
+    def __init__(self, body, rig, bm):
+        self.rig = rig
+        self.deform = bm.verts.layers.deform.verify()
+        self.bone_of_group = {g.index: g.name for g in body.vertex_groups if g.name in rig.data.bones}
+        self.waist = rig.data.bones["spine_01"].head_local.z + 0.035
+        neck = rig.data.bones["neck_01"]
+        head = rig.data.bones["head"]
+        self.collar_n = (head.head_local - neck.head_local).normalized()
+        self.collar_co = neck.head_local + self.collar_n * 0.012
+
+    def bone(self, face):
+        totals = {}
+        for v in face.verts:
+            for group, weight in v[self.deform].items():
+                name = self.bone_of_group.get(group)
+                if name:
+                    totals[name] = totals.get(name, 0.0) + weight
+        return max(totals, key=totals.get) if totals else "head"
+
+    def along(self, bone_name, point):
+        stem, side = bone_name.rsplit("_", 1)
+        start = self.rig.data.bones[bone_name].head_local
+        end = self.rig.data.bones["%s_%s" % (self.CHILD[stem], side)].head_local
+        axis = end - start
+        return (point - start).dot(axis) / axis.length_squared
+
+    def plane(self, bone_name, fraction):
+        stem, side = bone_name.rsplit("_", 1)
+        start = self.rig.data.bones[bone_name].head_local
+        end = self.rig.data.bones["%s_%s" % (self.CHILD[stem], side)].head_local
+        return start.lerp(end, fraction), (end - start).normalized()
+
+    NECK_RADIUS = 0.082
+
+    def outside_neckline(self, point):
+        """Distance (m) from the neck opening; 0 or less means bare neck. The opening is a
+        cylinder around the neck, so the tops of the shoulders stay covered."""
+        rel = point - self.collar_co
+        up = rel.dot(self.collar_n)
+        radial = (rel - self.collar_n * up).length
+        return max(radial - self.NECK_RADIUS, 0.0) + max(-up, 0.0)
+
+    def region(self, face):
+        """Region of a face and how deep it lies under the nearest hem (metres, 0 if exposed)."""
+        bone = self.bone(face)
+        c = face.calc_center_median()
+        if bone == "head":
+            return SKIN, 0.0
+        if bone == "neck_01" or bone.startswith(("spine_", "clavicle_")) or bone == "pelvis":
+            covered = self.outside_neckline(c)
+            if covered <= 0.0:
+                return SKIN, 0.0
+            if c.z > self.waist + BELT_HALF:
+                return JERSEY, covered
+            return (BELT if c.z > self.waist - BELT_HALF else PANTS), 1.0
+        if bone.startswith("upperarm_"):
+            t = self.along(bone, c)
+            length = (self.rig.data.bones[bone].head_local - self.plane(bone, 1.0)[0]).length
+            return (JERSEY, (SLEEVE_HEM - t) * length) if t < SLEEVE_HEM else (SKIN, 0.0)
+        if bone.startswith("lowerarm_"):
+            return SKIN, 0.0
+        if bone.startswith("thigh_"):
+            return PANTS, 1.0
+        if bone.startswith("calf_"):
+            t = self.along(bone, c)
+            length = (self.rig.data.bones[bone].head_local - self.plane(bone, 1.0)[0]).length
+            return (PANTS, (PANTS_HEM - t) * length) if t < PANTS_HEM else (SOCKS, 0.0)
+        if bone.startswith(("foot_", "ball_")):
+            return SHOES, 1.0
+        return HANDS, 0.0
+
+
+def cut(bm, anatomy, bones, plane_co, plane_no):
+    """Splits the faces of the given bones along a plane so a hem can follow a straight line."""
+    faces = [f for f in bm.faces if anatomy.bone(f) in bones]
+    geom = set(faces)
+    for f in faces:
+        geom.update(f.edges)
+        geom.update(f.verts)
+    bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-5, plane_co=plane_co, plane_no=plane_no)
+
+
+def prepare_body(body, rig):
+    """Removes MakeHuman's helper geometry, cuts hem lines and labels every face with its
+    region. Returns the foot vertices per side for the shoes."""
     for modifier in list(body.modifiers):
         if modifier.type == 'MASK':
             body.modifiers.remove(modifier)
-
-    # Material slots must exist before faces are given indices into them.
-    body.data.materials.clear()
-    for name, rgb in MATERIALS:
-        body.data.materials.append(make_material(name, rgb))
-
-    bone_of_group = {g.index: g.name for g in body.vertex_groups if g.name in rig.data.bones}
-    body_group = body.vertex_groups["body"].index
-    waist_z = rig.data.bones["spine_01"].head_local.z + 0.035
-
     bm = bmesh.new()
     bm.from_mesh(body.data)
     deform = bm.verts.layers.deform.verify()
-    helpers = [v for v in bm.verts if v[deform].get(body_group, 0.0) < 0.5]
-    bmesh.ops.delete(bm, geom=helpers, context='VERTS')
-    bm.normal_update()
+    body_group = body.vertex_groups["body"].index
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v[deform].get(body_group, 0.0) < 0.5], context='VERTS')
 
-    # The rig's origin is at the pelvis while the mesh stands on the ground, so vertex
-    # positions are converted to the rig's space before being compared with bones.
-    bpy.context.view_layer.update()
-    to_rig = rig.matrix_world.inverted() @ body.matrix_world
-    print("make_player: rig origin at height %.3f m" % rig.matrix_world.translation.z)
-    region = {}
-    for v in bm.verts:
-        best, best_w = "head", 0.0
-        for group, weight in v[deform].items():
-            if group in bone_of_group and weight > best_w:
-                best, best_w = bone_of_group[group], weight
-        region[v.index] = region_of(best, to_rig @ v.co, rig, waist_z)
-    for v in bm.verts:
-        v.co += v.normal * PUFF.get(region[v.index], 0.0)
+    anatomy = Anatomy(body, rig, bm)
+    torso = {"pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r"}
+    for z in (anatomy.waist + BELT_HALF, anatomy.waist - BELT_HALF):
+        cut(bm, anatomy, torso, Vector((0.0, 0.0, z)), Vector((0.0, 0.0, 1.0)))
+    for side in ("l", "r"):
+        cut(bm, anatomy, {"upperarm_" + side}, *anatomy.plane("upperarm_" + side, SLEEVE_HEM))
+        cut(bm, anatomy, {"calf_" + side}, *anatomy.plane("calf_" + side, PANTS_HEM))
+
+    bm.faces.ensure_lookup_table()
+    region = bm.faces.layers.int.new("region")
+    depth = bm.faces.layers.float.new("depth")
+    feet = {"l": [], "r": []}
     for face in bm.faces:
-        votes = {}
-        for v in face.verts:
-            votes[region[v.index]] = votes.get(region[v.index], 0) + 1
-        face.material_index = SLOT[max(votes, key=votes.get)]
         face.smooth = True
-
-    head = [v.co.copy() for v in bm.verts if any(bone_of_group.get(g) == "head" and w > 0.6 for g, w in v[deform].items())]
-    counts = {}
-    for face in bm.faces:
-        counts[face.material_index] = counts.get(face.material_index, 0) + 1
-    print("make_player: faces per material", {MATERIALS[i][0]: n for i, n in sorted(counts.items())})
+        face[region], face[depth] = anatomy.region(face)
+        if face[region] == SHOES:
+            feet["l" if face.calc_center_median().x > 0.0 else "r"].extend(v.co.copy() for v in face.verts)
+    head = [v.co.copy() for v in bm.verts
+            if any(anatomy.bone_of_group.get(g) == "head" and w > 0.6 for g, w in v[deform].items())]
     bm.to_mesh(body.data)
     bm.free()
-    return head
+    return feet, head
+
+
+def make_garment(body, name, regions, lift, flare, slots):
+    """Copies the faces of some regions into a new mesh, lifts it off the skin, smooths away
+    the anatomy underneath and unwraps it front/back."""
+    obj = body.copy()
+    obj.data = body.data.copy()
+    obj.name = obj.data.name = name
+    bpy.context.scene.collection.objects.link(obj)
+
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    region = bm.faces.layers.int["region"]
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[region] not in regions], context='FACES')
+    bm.normal_update()
+    hem = {v for e in bm.edges if e.is_boundary for v in e.verts}
+    for v in bm.verts:
+        v.co += v.normal * (lift + (flare if v in hem else 0.0))
+    inner = [v for v in bm.verts if v not in hem]
+    for _ in range(4):
+        bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.normal_update()
+
+    # Front/back planar UVs: u runs across the body, v from the bottom to the top of the
+    # garment. The front fills the left half of the texture and the back the right half,
+    # mirrored so that lettering reads correctly from behind.
+    xs = [v.co.x for v in bm.verts]
+    zs = [v.co.z for v in bm.verts]
+    x0, x1, z0, z1 = min(xs), max(xs), min(zs), max(zs)
+    uv = bm.loops.layers.uv.verify()
+    for face in bm.faces:
+        front = face.normal.y < 0.0
+        for loop in face.loops:
+            across = (loop.vert.co.x - x0) / (x1 - x0)
+            u = 0.5 * across if front else 0.5 + 0.5 * (1.0 - across)
+            loop[uv].uv = (u, (loop.vert.co.z - z0) / (z1 - z0))
+        face.material_index = slots.index(face[region])
+    # Slots first, then the mesh: clearing materials afterwards would reset the indices.
+    obj.data.materials.clear()
+    for slot in slots:
+        obj.data.materials.append(material({JERSEY: "Jersey", PANTS: "Pants", BELT: "Belt"}[slot]))
+    bm.to_mesh(obj.data)
+    bm.free()
+    print("make_player: %s %d faces, x %.2f..%.2f m, z %.2f..%.2f m" % (name, len(obj.data.polygons), x0, x1, z0, z1))
+    return obj
+
+
+def make_shell(body, rig, name, keep, lift, mat_name):
+    """Padding worn over the uniform (chest protector, shin guards): the chosen faces of the
+    body, pushed well out and smoothed. keep(face, anatomy, region) picks the faces."""
+    obj = body.copy()
+    obj.data = body.data.copy()
+    obj.name = obj.data.name = name
+    bpy.context.scene.collection.objects.link(obj)
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.normal_update()
+    anatomy = Anatomy(obj, rig, bm)
+    region = bm.faces.layers.int["region"]
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if not keep(f, anatomy, f[region])], context='FACES')
+    bm.normal_update()
+    edge = {v for e in bm.edges if e.is_boundary for v in e.verts}
+    for v in bm.verts:
+        v.co += v.normal * (lift * (0.55 if v in edge else 1.0))
+    for _ in range(3):
+        bmesh.ops.smooth_vert(bm, verts=[v for v in bm.verts if v not in edge], factor=0.5,
+                              use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    for face in bm.faces:
+        face.material_index = 0
+    obj.data.materials.clear()
+    obj.data.materials.append(material(mat_name))
+    bm.to_mesh(obj.data)
+    bm.free()
+    return obj
+
+
+TORSO = {"spine_01", "spine_02", "spine_03", "clavicle_l", "clavicle_r"}
+
+
+def is_chest(face, anatomy, region):
+    c = face.calc_center_median()
+    return (region == JERSEY and anatomy.bone(face) in TORSO and face.normal.y < -0.2
+            and c.z > anatomy.waist + 0.05 and anatomy.outside_neckline(c) > 0.035)
+
+
+def is_shin(face, anatomy, region):
+    bone = anatomy.bone(face)
+    if face.normal.y > -0.15:
+        return False
+    c = face.calc_center_median()
+    if bone.startswith("calf_"):
+        return anatomy.along(bone, c) < 0.93
+    return bone.startswith("thigh_") and anatomy.along(bone, c) > 0.84
+
+
+def make_collar(rig):
+    """A band round the base of the neck that finishes the jersey's neckline."""
+    neck = rig.data.bones["neck_01"]
+    axis = (rig.data.bones["head"].head_local - neck.head_local).normalized()
+    centre = neck.head_local + axis * 0.012
+    side = axis.cross(Vector((0.0, 1.0, 0.0))).normalized()
+    front = side.cross(axis).normalized()
+    bm = bmesh.new()
+    inner, outer = [], []
+    segments = 28
+    for i in range(segments):
+        a = 2.0 * math.pi * i / segments
+        around = side * math.cos(a) + front * math.sin(a)
+        inner.append(bm.verts.new(centre + around * (Anatomy.NECK_RADIUS - 0.012) + axis * 0.016))
+        outer.append(bm.verts.new(centre + around * (Anatomy.NECK_RADIUS + 0.02) - axis * 0.01))
+    for i in range(segments):
+        n = (i + 1) % segments
+        bm.faces.new((inner[i], inner[n], outer[n], outer[i]))
+    return skinned_object("Collar", bm, rig, lambda co: "spine_03", "Collar")
+
+
+def make_mask(head_points, rig):
+    """Catcher's and umpire's mask: a cage of bars in front of the face under a padded brow."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    rx, ry = half_w + 0.03, half_d + 0.05
+    brow, chin = top - height * 0.36, top - height * 1.0
+    bm = bmesh.new()
+
+    def at(angle_deg, z):
+        a = math.radians(angle_deg)
+        return Vector((centre.x + rx * math.sin(a), centre.y - ry * math.cos(a), z))
+
+    def strip(points, thickness, direction):
+        for p, q in zip(points, points[1:]):
+            bm.faces.new((bm.verts.new(p - direction * thickness), bm.verts.new(q - direction * thickness),
+                          bm.verts.new(q + direction * thickness), bm.verts.new(p + direction * thickness)))
+
+    up = Vector((0.0, 0.0, 1.0))
+    arc = [-68.0 + 136.0 * i / 16 for i in range(17)]
+    for row in range(6):
+        z = brow + (chin - brow) * row / 5
+        strip([at(a, z) for a in arc], 0.014 if row == 0 or row == 5 else 0.0045, up)
+    for angle in (-44.0, -22.0, 0.0, 22.0, 44.0):
+        columns = [at(angle - 0.9, brow + (chin - brow) * i / 6) for i in range(7)]
+        across = (at(angle + 0.9, brow) - at(angle - 0.9, brow)).normalized()
+        strip(columns, 0.0045, across)
+    return skinned_object("Mask", bm, rig, lambda co: "head", "Bars")
+
+
+def strip_body(body):
+    """Removes skin that is well under clothing or inside the shoes and sets body materials."""
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    region = bm.faces.layers.int["region"]
+    depth = bm.faces.layers.float["depth"]
+    hidden = [f for f in bm.faces if f[region] == SHOES or (f[region] in (JERSEY, BELT, PANTS) and f[depth] > TUCK)]
+    bmesh.ops.delete(bm, geom=hidden, context='FACES')
+    for face in bm.faces:
+        face.material_index = {HANDS: 1, SOCKS: 2}.get(face[region], 0)
+    # Keep the textured skin if there is one; the hands get their own copy so the game can
+    # swap them for batting gloves.
+    textured = body.data.materials[0] if len(body.data.materials) > 0 else None
+    if textured is not None and textured.name not in COLOURS:
+        skin = textured
+        skin.name = "Skin"
+        hands = skin.copy()
+        hands.name = "Hands"
+    else:
+        skin, hands = material("Skin"), material("Hands")
+    body.data.materials.clear()
+    for mat in (skin, hands, material("Socks")):
+        body.data.materials.append(mat)
+    bm.to_mesh(body.data)
+    bm.free()
+
+
+def skinned_object(name, bm, rig, weights, mat_name):
+    """Wraps a bmesh as an object deformed by the rig. weights(vertex position) -> bone name."""
+    for face in bm.faces:
+        face.smooth = True
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    mesh.materials.append(material(mat_name))
+    by_bone = {}
+    for v in mesh.vertices:
+        by_bone.setdefault(weights(v.co), []).append(v.index)
+    for bone, indices in by_bone.items():
+        obj.vertex_groups.new(name=bone).add(indices, 1.0, 'REPLACE')
+    obj.parent = rig
+    obj.modifiers.new("Armature", 'ARMATURE').object = rig
+    return obj
+
+
+def make_shoes(feet, rig):
+    """A convex shell around each foot hides the toes and reads as a shoe."""
+    bm = bmesh.new()
+    for side in ("l", "r"):
+        verts = [bm.verts.new(co) for co in feet[side]]
+        hull = bmesh.ops.convex_hull(bm, input=verts)
+        unused = {g for g in hull.get("geom_unused", []) + hull.get("geom_interior", []) if isinstance(g, bmesh.types.BMVert)}
+        bmesh.ops.delete(bm, geom=list(unused), context='VERTS')
+    bm.normal_update()
+    for v in bm.verts:
+        v.co += v.normal * 0.005
+        v.co.z = max(v.co.z, 0.0)
+
+    def weights(co):
+        side = "l" if co.x > 0.0 else "r"
+        toes = rig.data.bones["ball_" + side].head_local
+        return ("ball_" if co.y < toes.y else "foot_") + side
+    return skinned_object("Shoes", bm, rig, weights, "Shoes")
 
 
 def head_box(head_points):
@@ -212,21 +499,6 @@ def brim(bm, centre, rx, ry, z, reach, spread_deg):
         bm.faces.new((inner[i], inner[i + 1], outer[i + 1], outer[i]))
 
 
-def finish_headgear(bm, name, rig):
-    for face in bm.faces:
-        face.smooth = True
-    mesh = bpy.data.meshes.new(name)
-    bm.to_mesh(mesh)
-    bm.free()
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.scene.collection.objects.link(obj)
-    mesh.materials.append(bpy.data.materials[name])
-    obj.vertex_groups.new(name="head").add(list(range(len(mesh.vertices))), 1.0, 'REPLACE')
-    obj.parent = rig
-    obj.modifiers.new("Armature", 'ARMATURE').object = rig
-    return obj
-
-
 def make_cap(head_points, rig):
     """Fitted cap: a dome over the skull and a brim over the eyes."""
     centre, half_w, half_d, top, height = head_box(head_points)
@@ -235,12 +507,12 @@ def make_cap(head_points, rig):
     bm = bmesh.new()
     dome(bm, centre, rx, ry, rz, 0.22)
     brim(bm, centre, rx, ry, centre.z + rz * math.cos(math.pi * 0.5 + 0.12), 0.075, 70.0)
-    return finish_headgear(bm, "Cap", rig)
+    return skinned_object("Cap", bm, rig, lambda co: "head", "Cap")
 
 
 def make_helmet(head_points, rig):
-    """Batting helmet: a larger shell that comes down over the ears and the back of the head,
-    open at the face, with a short brim."""
+    """Batting helmet: a larger shell over the ears and the back of the head, open at the
+    face, with a short brim."""
     centre, half_w, half_d, top, height = head_box(head_points)
     rx, ry, rz = half_w + 0.024, half_d + 0.026, height * 0.46
     centre.z = top - rz + 0.022
@@ -248,7 +520,7 @@ def make_helmet(head_points, rig):
     bm = bmesh.new()
     dome(bm, centre, rx, ry, rz, 0.62, face_open=brow)
     brim(bm, centre, rx, ry, brow, 0.055, 62.0)
-    return finish_headgear(bm, "Helmet", rig)
+    return skinned_object("Helmet", bm, rig, lambda co: "head", "Helmet")
 
 
 def render_preview(path, target_z):
@@ -258,6 +530,7 @@ def render_preview(path, target_z):
     scene.cycles.use_denoising = False
     scene.render.resolution_x, scene.render.resolution_y = 900, 760
     world = bpy.data.worlds.new("Preview")
+    world.use_nodes = True
     world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.62, 0.66, 0.72, 1.0)
     world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.9
     scene.world = world
@@ -286,31 +559,42 @@ def main():
     body = HumanService.create_human(mask_helpers=True, detailed_helpers=False, extra_vertex_groups=True,
                                      feet_on_ground=False, scale=0.1, macro_detail_dict=macro)
     rig = HumanService.add_builtin_rig(body, "game_engine", import_weights=True)
+    face_parts = add_skin_and_face(body)
     TargetService.bake_targets(body)
     stand_on_ground(body, rig)
 
-    head_points = dress(body, rig)
-    for name, rgb in HEADGEAR:
-        make_material(name, rgb)
-    headgear = [make_cap(head_points, rig), make_helmet(head_points, rig)]
+    feet, head_points = prepare_body(body, rig)
+    jersey = make_garment(body, "Jersey", (JERSEY,), 0.018, 0.012, [JERSEY])
+    pants = make_garment(body, "Pants", (PANTS, BELT), 0.012, 0.010, [PANTS, BELT])
+    # Catcher's gear is built from the body before the covered skin is removed.
+    gear = [make_shell(body, rig, "ChestProtector", is_chest, 0.045, "Gear"),
+            make_shell(body, rig, "ShinGuards", is_shin, 0.032, "Gear")]
+    strip_body(body)
+    optional = [*gear, make_mask(head_points, rig), make_helmet(head_points, rig)]
+    parts = [body, jersey, pants, make_collar(rig), make_shoes(feet, rig), *face_parts,
+             make_cap(head_points, rig), *optional]
+
     for old, new in BONE_NAMES.items():
         if old in rig.data.bones:
             rig.data.bones[old].name = new
-    body.name = body.data.name = "Player"
+    body.name = body.data.name = "Body"
     rig.name = rig.data.name = "PlayerRig"
 
     height = max(v.co.z for v in body.data.vertices)
-    print("make_player: height %.3f m, %d vertices, %d faces, %d bones" % (
-        height, len(body.data.vertices), len(body.data.polygons), len(rig.data.bones)))
+    print("make_player: height %.3f m, %d bones, faces: %s" % (
+        height, len(rig.data.bones), {p.name: len(p.data.polygons) for p in parts}))
 
     for obj in bpy.data.objects:
-        obj.select_set(obj in (body, rig, *headgear))
+        obj.select_set(obj in (rig, *parts))
     bpy.context.view_layer.objects.active = rig
     bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB', use_selection=True, export_apply=False,
                               export_yup=True, export_skins=True, export_animations=False, export_morph=False)
     print("make_player: wrote", OUT_GLB)
     if PREVIEW:
-        headgear[1].hide_render = True
+        for obj in optional[:-1]:
+            obj.hide_render = False
+        parts[-1].hide_render = False
+        parts[parts.index(optional[0]) - 1].hide_render = True
         render_preview(PREVIEW, height * 0.5)
         print("make_player: preview", PREVIEW)
 

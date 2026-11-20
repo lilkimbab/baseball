@@ -86,3 +86,9 @@ static func catcher() -> PuppetPose:
 static func fielder_ready() -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.84, 0.0), 0.0, 0.0, 22.0, a.call(0.24, 0.72, 0.3), a.call(-0.24, 0.72, 0.3), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.0))
+
+
+## Plate umpire: bent forward with hands on knees, looking over the catcher.
+static func umpire() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.8, 0.0), 0.0, 0.0, 30.0, a.call(0.2, 0.56, 0.24), a.call(-0.2, 0.56, 0.24), a.call(0.26, 0.08, 0.0), a.call(-0.26, 0.08, 0.0))

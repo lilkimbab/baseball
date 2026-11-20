@@ -78,17 +78,55 @@ func test_team_colours_are_applied_to_the_uniform() -> void:
 	var puppet := SkinnedPuppet.new()
 	puppet.set_colors(Color(0.2, 0.3, 0.8), Color(0.9, 0.9, 0.9), Color(0.8, 0.1, 0.1))
 	add_child_autofree(puppet)
-	var seen := {}
+	assert_eq(puppet.uniform.jersey, Color(0.2, 0.3, 0.8))
+	var plain := {}
+	var textured := {}
 	for mesh: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in mesh.mesh.get_surface_count():
 			var material := mesh.get_surface_override_material(surface) as StandardMaterial3D
-			if material != null:
-				seen[mesh.mesh.surface_get_material(surface).resource_name] = material.albedo_color
-	assert_eq(seen["Jersey"], Color(0.2, 0.3, 0.8))
-	assert_eq(seen["Cap"], Color(0.8, 0.1, 0.1))
-	assert_eq(seen["Helmet"], Color(0.8, 0.1, 0.1))
-	assert_eq(seen["Socks"], Color(0.8, 0.1, 0.1))
-	assert_true(seen.has("Skin") and seen.has("Pants") and seen.has("Shoes") and seen.has("Belt"))
+			if material == null:
+				continue
+			var source := mesh.mesh.surface_get_material(surface).resource_name
+			plain[source] = material.albedo_color
+			textured[source] = material.albedo_texture != null
+	assert_eq(plain["Cap"], Color(0.8, 0.1, 0.1))
+	assert_eq(plain["Helmet"], Color(0.8, 0.1, 0.1))
+	assert_eq(plain["Socks"], Color(0.8, 0.1, 0.1))
+	assert_true(textured["Jersey"] and textured["Pants"], "cloth is painted into a texture")
+	assert_true(plain.has("Shoes") and plain.has("Belt"))
+
+
+func test_model_has_separate_clothes_shoes_and_a_face() -> void:
+	var puppet := _model()
+	for part: String in ["Body", "Jersey", "Pants", "Shoes", "Cap", "Helmet", "Eyes", "Eyebrows"]:
+		assert_not_null(puppet.find_child(part, true, false), "missing %s" % part)
+
+
+func test_catchers_gear_is_only_shown_when_worn() -> void:
+	var puppet := _model()
+	puppet.apply(PuppetClips.catcher())
+	for piece: String in ["Mask", "ChestProtector", "ShinGuards"]:
+		assert_false((puppet.find_child(piece, true, false) as MeshInstance3D).visible, "%s hidden by default" % piece)
+	puppet.gear = [&"Mask", &"ChestProtector", &"ShinGuards"]
+	puppet.apply(PuppetClips.catcher())
+	for piece: String in ["Mask", "ChestProtector", "ShinGuards"]:
+		assert_true((puppet.find_child(piece, true, false) as MeshInstance3D).visible, "%s shown on the catcher" % piece)
+	assert_not_null(puppet.find_child("Collar", true, false), "the jersey has a collar band")
+
+
+func test_batting_gloves_cover_the_hands() -> void:
+	var puppet := _model()
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	var hands := -1
+	for surface: int in body.mesh.get_surface_count():
+		if body.mesh.surface_get_material(surface).resource_name == "Hands":
+			hands = surface
+	assert_gt(hands, -1, "the hands are their own surface")
+	assert_null(body.get_surface_override_material(hands), "bare hands keep the skin")
+	puppet.gloves = true
+	puppet.repaint()
+	var glove := body.get_surface_override_material(hands) as StandardMaterial3D
+	assert_lt(glove.albedo_color.v, 0.2, "gloves are dark")
 
 
 func test_headgear_switches_between_cap_and_helmet() -> void:
@@ -134,12 +172,14 @@ func test_head_turns_toward_what_the_player_is_watching() -> void:
 	assert_gt(facing.x, 0.5, "and to the right")
 
 
-func test_name_and_number_are_on_the_back() -> void:
+func test_name_number_and_team_word_are_painted_on_the_jersey() -> void:
 	var puppet := _model()
+	puppet.uniform.wordmark = "Harbor"
 	puppet.set_back_lettering(18, "서강민")
-	var texts: Array[String] = []
-	for label: Label3D in puppet.find_children("*", "Label3D", true, false):
-		texts.append(label.text)
-		var behind := puppet.global_transform.affine_inverse() * label.global_position
-		assert_gt(behind.z, 0.08, "lettering sits behind the spine (the puppet faces -Z)")
-	assert_true(texts.has("18") and texts.has("서강민"))
+	var jersey := puppet.find_child("Jersey", true, false) as MeshInstance3D
+	var art := jersey.get_node("Art").get_child(0) as UniformArt
+	assert_eq(art.style.number, 18)
+	assert_eq(art.style.player_name, "서강민")
+	assert_eq(art.style.wordmark, "Harbor")
+	var viewport := jersey.get_node("Art") as SubViewport
+	assert_almost_eq(float(viewport.size.x) / viewport.size.y, 2.0 * art.half_size.x / art.half_size.y, 0.05, "texture matches the garment so letters are not stretched")

@@ -14,6 +14,7 @@ const LIMBS: Array[Array] = [
 	[&"RightUpperLeg", &"RightLowerLeg"], [&"RightLowerLeg", &"RightFoot"],
 ]
 
+const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"ChestProtector", &"ShinGuards"]
 const FINGERS: Array[String] = ["Index", "Middle", "Ring", "Little"]
 ## Curl in degrees for [finger base, middle, tip, thumb] per grip.
 const CURL := {
@@ -22,17 +23,16 @@ const CURL := {
 	Grip.BALL: [38.0, 44.0, 28.0, 30.0],
 	Grip.GLOVE: [26.0, 30.0, 20.0, 16.0],
 }
-## Distance from the spine to the surface of the jersey's back, and heights of the lettering.
-const BACK_DEPTH := 0.142
-const NUMBER_HEIGHT := 1.245
-const NAME_HEIGHT := 1.385
+## Team look and lettering. Change it and call repaint().
+var uniform := UniformStyle.new()
+## Batting gloves instead of bare hands.
+var gloves := false
 
 var _skeleton: Skeleton3D
 var _mesh: MeshInstance3D
 var _cap: MeshInstance3D
 var _helmet: MeshInstance3D
-var _number_label: Label3D
-var _name_label: Label3D
+var _model: Node3D
 ## Axis (skeleton space, at rest) each finger bone curls about, by bone index.
 var _curl_axis: Dictionary[int, Vector3] = {}
 ## Skeleton space -> puppet space, and back.
@@ -57,8 +57,9 @@ func _ready() -> void:
 	# glTF characters face +Z; the puppet's space faces -Z.
 	model.rotation.y = PI
 	add_child(model)
+	_model = model
 	_skeleton = model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
-	_mesh = model.find_child("Player", true, false) as MeshInstance3D
+	_mesh = model.find_child("Body", true, false) as MeshInstance3D
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
 	var node: Node3D = _skeleton
@@ -70,27 +71,40 @@ func _ready() -> void:
 	_measure_fingers()
 	_paint()
 	_build_props()
-	_build_lettering()
 	apply(PuppetClips.fielder_ready())
 
 
 func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> void:
 	super.set_colors(jersey_color, pants_color, cap_color)
+	uniform.jersey = jersey_color
+	uniform.pants = pants_color
+	uniform.cap = cap_color
+	uniform.socks = cap_color
+	uniform.trim = cap_color
+	repaint()
+
+
+## Applies the current uniform style, lettering and gloves to the model.
+func repaint() -> void:
 	if _mesh != null:
 		_paint()
 
 
 func set_back_lettering(number: int, player_name: String, ink: Color = Color.BLACK) -> void:
-	_number_label.text = str(number)
-	_name_label.text = player_name
-	_number_label.modulate = ink
-	_name_label.modulate = ink
+	uniform.number = number
+	uniform.player_name = player_name
+	uniform.ink = ink
+	repaint()
 
 
 func apply(pose: PuppetPose) -> void:
 	solve(pose)
 	_cap.visible = headgear != &"helmet"
 	_helmet.visible = headgear == &"helmet"
+	for piece: StringName in OPTIONAL_GEAR:
+		var node := _model.find_child(piece, true, false) as MeshInstance3D
+		if node != null:
+			node.visible = gear.has(piece)
 	var basis_for: Dictionary[int, Basis] = {}
 	var curl := _finger_curls()
 
@@ -241,36 +255,6 @@ func _measure_fingers() -> void:
 			_curl_axis[_bone[thumb[i]]] = along.cross((toward - along * toward.dot(along)).normalized() + palm * 0.6).normalized()
 
 
-## Name and number on the back of the jersey, carried by the upper spine.
-func _build_lettering() -> void:
-	var attachment := BoneAttachment3D.new()
-	attachment.bone_name = "UpperChest"
-	_skeleton.add_child(attachment)
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Pretendard", "Noto Sans KR", "Noto Sans CJK KR", "Malgun Gothic", "NanumGothic"])
-	font.font_weight = 800
-	var bone_rest := _rest[_bone[&"UpperChest"]]
-	_number_label = _back_label(attachment, font, bone_rest, NUMBER_HEIGHT, 150, 0.00135)
-	_name_label = _back_label(attachment, font, bone_rest, NAME_HEIGHT, 64, 0.00115)
-
-
-func _back_label(parent: Node3D, font: Font, bone_rest: Transform3D, height: float, font_size: int, pixel_size: float) -> Label3D:
-	var label := Label3D.new()
-	label.font = font
-	label.font_size = font_size
-	label.pixel_size = pixel_size
-	label.outline_size = 0
-	label.shaded = false
-	label.double_sided = false
-	label.alpha_cut = Label3D.ALPHA_CUT_DISCARD
-	label.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	# The model faces +Z in skeleton space, so the back is -Z; turn the text to face that way.
-	var on_back := Transform3D(Basis(Vector3.UP, PI), Vector3(0.0, height, bone_rest.origin.z - BACK_DEPTH))
-	label.transform = bone_rest.affine_inverse() * on_back
-	parent.add_child(label)
-	return label
-
-
 ## Sets a bone's target orientation: its rest orientation carried along by a rotation of the
 ## body given in puppet space.
 func _turn(basis_for: Dictionary[int, Basis], bone: StringName, body_rotation: Basis) -> void:
@@ -319,30 +303,90 @@ static func _grain() -> NoiseTexture2D:
 
 
 func _paint() -> void:
-	var colours := {
-		"Skin": skin, "Jersey": jersey, "Pants": pants, "Socks": cap, "Cap": cap, "Helmet": cap,
+	var plain := {
+		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap, "Collar": uniform.trim,
+		"Gear": uniform.cap.darkened(0.25), "Bars": Color(0.09, 0.09, 0.1),
 		"Shoes": Color(0.06, 0.06, 0.07), "Belt": Color(0.05, 0.05, 0.06),
 	}
-	for part: MeshInstance3D in [_mesh, _cap, _helmet] as Array[MeshInstance3D]:
+	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in part.mesh.get_surface_count():
 			var source := part.mesh.surface_get_material(surface).resource_name
-			var material := StandardMaterial3D.new()
-			material.albedo_color = colours.get(source, Color.WHITE)
-			material.roughness = {"Skin": 0.5, "Helmet": 0.22, "Shoes": 0.45, "Belt": 0.4}.get(source, 0.85)
-			if source == "Helmet":
-				material.clearcoat_enabled = true
-				material.clearcoat = 0.6
-			else:
-				# Fine surface grain so cloth and skin catch the light unevenly instead of
-				# reading as flat paint. Projected in object space, so it needs no UVs.
-				material.normal_enabled = true
-				material.normal_texture = _grain()
-				material.normal_scale = 0.18 if source == "Skin" else 0.5
-				material.uv1_triplanar = true
-				material.uv1_scale = Vector3.ONE * (22.0 if source == "Skin" else 13.0)
-				material.rim_enabled = true
-				material.rim = 0.18
-				material.rim_tint = 0.6
-			if source == "Cap" or source == "Helmet":
-				material.cull_mode = BaseMaterial3D.CULL_DISABLED
-			part.set_surface_override_material(surface, material)
+			if source == "Jersey" or source == "Pants":
+				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
+			elif source == "Hands":
+				part.set_surface_override_material(surface, _glove_material() if gloves else null)
+			elif plain.has(source):
+				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
+
+
+func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = colour
+	material.roughness = {"Helmet": 0.2, "Shoes": 0.45, "Belt": 0.4, "Gear": 0.6, "Bars": 0.35}.get(source, 0.85)
+	if source != "Shoes" and source != "Socks":
+		material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if source == "Bars":
+		material.metallic = 0.7
+	if source == "Helmet":
+		material.clearcoat_enabled = true
+		material.clearcoat = 0.7
+	else:
+		material.normal_enabled = true
+		material.normal_texture = _grain()
+		material.normal_scale = 0.5
+		material.uv1_triplanar = true
+		material.uv1_scale = Vector3.ONE * 13.0
+	return material
+
+
+func _glove_material() -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.07, 0.07, 0.08)
+	material.roughness = 0.55
+	material.normal_enabled = true
+	material.normal_texture = _grain()
+	material.normal_scale = 0.6
+	material.uv1_triplanar = true
+	material.uv1_scale = Vector3.ONE * 30.0
+	return material
+
+
+## Cloth material whose colour comes from a texture painted for this player: the texture is
+## drawn once in an off-screen viewport sized to the garment so lettering is not stretched.
+func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMaterial3D:
+	var bounds := part.mesh.get_aabb().size
+	var half_size := Vector2(bounds.x, bounds.y)
+	var pixels_per_metre := 1000.0 if is_jersey else 520.0
+	var old := part.get_node_or_null("Art")
+	if old != null:
+		old.free()
+	var viewport := SubViewport.new()
+	viewport.name = "Art"
+	viewport.size = Vector2i(roundi(half_size.x * pixels_per_metre) * 2, roundi(half_size.y * pixels_per_metre))
+	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	viewport.disable_3d = true
+	var art := UniformArt.new()
+	art.garment = UniformArt.Garment.JERSEY if is_jersey else UniformArt.Garment.PANTS
+	art.style = uniform
+	art.half_size = half_size
+	art.font = _lettering_font()
+	art.size = Vector2(viewport.size)
+	viewport.add_child(art)
+	part.add_child(viewport)
+
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = viewport.get_texture()
+	material.roughness = 0.88
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return material
+
+
+static var _font: SystemFont
+
+
+static func _lettering_font() -> Font:
+	if _font == null:
+		_font = SystemFont.new()
+		_font.font_names = PackedStringArray(["Pretendard", "Noto Sans KR", "Noto Sans CJK KR", "Malgun Gothic", "NanumGothic"])
+		_font.font_weight = 900
+	return _font
