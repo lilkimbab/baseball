@@ -25,7 +25,26 @@ var game: GameState
 var resolver: PhysicalResolver
 var scorer: Scorer
 var manager: AiManager
-var match_hud: MatchHud
+var scorebug: Scorebug
+var bottom_bar: BottomBar
+var pitch_track: PitchTrack
+## The small second view (docs/13 S6-5).
+var pip_viewport: SubViewport
+var pip_camera: Camera3D
+var pip_rect: TextureRect
+
+
+## A pitch of this plate appearance, for the pitch track.
+class TrackedPitch:
+	extends RefCounted
+	var x := 0.0
+	var z := 0.0
+	var family: StringName = &"fastball"
+
+## This plate appearance's pitches, and each pitcher's pitches by cell (0..8, 9 = outside).
+var pa_pitches: Array[TrackedPitch] = []
+var pitcher_cells: Dictionary[String, PackedInt32Array] = {}
+var _clear_track := false
 var menu: SubstitutionPanel
 ## One line per event, for the play-by-play panel.
 var log := PackedStringArray()
@@ -64,9 +83,21 @@ func _ready() -> void:
 	_half_key = _half_name()
 	_dress_for_half()
 	var layer := hud.get_parent()
-	match_hud = MatchHud.new()
-	match_hud.scene = self
-	layer.add_child(match_hud)
+	scorebug = Scorebug.new()
+	scorebug.scene = self
+	layer.add_child(scorebug)
+	bottom_bar = BottomBar.new()
+	bottom_bar.scene = self
+	layer.add_child(bottom_bar)
+	pitch_track = PitchTrack.new()
+	pitch_track.scene = self
+	layer.add_child(pitch_track)
+	_build_pip(layer)
+	# The duel's own count and help line give way to the scoreboard and the bottom bar.
+	var duel_hud := hud as DuelHud
+	duel_hud.show_count = false
+	duel_hud.show_help = false
+	duel_hud.bottom_reserved = BottomBar.HEIGHT + 20.0
 	menu = SubstitutionPanel.new()
 	menu.scene = self
 	layer.add_child(menu)
@@ -145,6 +176,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		bunt()
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_F:
 		toggle_menu()
+	if key != null and key.keycode == KEY_TAB and not key.echo:
+		bottom_bar.detail = key.pressed
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_C:
+		pitch_track.show_spread = not pitch_track.show_spread
 
 
 ## Opens or closes the manager's menu. It opens only between pitches; the game waits.
@@ -180,6 +215,9 @@ func _new_duel() -> void:
 	if game == null:
 		return
 	_pitch_count += 1
+	if _clear_track:
+		pa_pitches.clear()
+		_clear_track = false
 	var release_point := settings.release_point
 	duel = resolver.new_duel(game)
 	duel.settings.release_point = release_point
@@ -216,6 +254,7 @@ func _finish_on_contact() -> bool:
 func _finish_pitch() -> void:
 	if swing_motion != null:
 		swing_motion.relax()
+	_track_pitch()
 	resolver.last_play = null
 	var events := resolver.after_pitch(game, duel)
 	var play := resolver.last_play
@@ -306,6 +345,8 @@ func _apply(e: GameEvent) -> void:
 	var out := GameFlow.apply(game, e)
 	scorer.record(game, e, out)
 	manager.note_change(game, e)
+	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
+		_clear_track = true
 	var text := _describe(e, out, batter)
 	if text != "":
 		last_text = text
@@ -535,10 +576,91 @@ func refresh(delta: float) -> void:
 		_show_play(_play_time)
 		_move_camera_play(delta)
 		hud.queue_redraw()
-		match_hud.queue_redraw()
+		_redraw_overlays()
 		return
 	super.refresh(delta)
-	match_hud.queue_redraw()
+	_redraw_overlays()
+
+
+func _redraw_overlays() -> void:
+	scorebug.queue_redraw()
+	bottom_bar.queue_redraw()
+	pitch_track.queue_redraw()
+	_update_pip()
+
+
+## Notes where the pitch crossed the plate, for the pitch track.
+func _track_pitch() -> void:
+	if duel.pitch == null:
+		return
+	var t := TrackedPitch.new()
+	t.x = duel.pitch.plate_pos.x
+	t.z = duel.pitch.plate_pos.z
+	t.family = duel.decision.type.family
+	pa_pitches.append(t)
+	var id := game.pitcher_id()
+	if not pitcher_cells.has(id):
+		var fresh := PackedInt32Array()
+		fresh.resize(10)
+		pitcher_cells[id] = fresh
+	var cell := AiPitcher.cell_of(duel.zone, Vector3(t.x, Field.PLATE_FRONT_Y, t.z))
+	var cells := pitcher_cells[id]
+	cells[cell if cell >= 0 else 9] += 1
+	pitcher_cells[id] = cells
+
+
+# --- Picture in picture (docs/13 S6-5) ---
+
+
+const PIP_SIZE := Vector2(384.0, 216.0)
+var _pip_frame := 0
+
+
+func _build_pip(layer: Node) -> void:
+	pip_viewport = SubViewport.new()
+	pip_viewport.size = Vector2i(400, 225)
+	pip_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(pip_viewport)
+	pip_camera = Camera3D.new()
+	pip_camera.fov = 24.0
+	pip_camera.far = 400.0
+	pip_viewport.add_child(pip_camera)
+	pip_camera.current = true
+	pip_rect = TextureRect.new()
+	pip_rect.texture = pip_viewport.get_texture()
+	pip_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pip_rect.stretch_mode = TextureRect.STRETCH_SCALE
+	pip_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(pip_rect)
+
+
+## While a pitch is being set up and thrown: the lead runner taking his lead, or with the
+## bases empty the pitcher from the side.
+func _update_pip() -> void:
+	var showing := _play_time < 0.0 and not game.over and (state == State.PRE_PITCH or state == State.WINDUP or state == State.LIVE)
+	pip_rect.visible = showing
+	# Drawn every other frame: half the cost, and a small view does not need more.
+	_pip_frame += 1
+	pip_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE if showing and _pip_frame % 2 == 0 else SubViewport.UPDATE_DISABLED
+	if not showing:
+		return
+	var k := UiTheme.scale_for(get_viewport().get_visible_rect().size.y)
+	var screen := get_viewport().get_visible_rect().size
+	pip_rect.size = PIP_SIZE * k
+	pip_rect.position = Vector2(screen.x - (PIP_SIZE.x + 16.0) * k, 16.0 * k)
+	var from := Vector3(-15.0, 13.0, 2.2)
+	var look := Vector3(0.0, Field.RUBBER_Y, 1.3)
+	for base: int in [3, 2, 1]:
+		if game.base_empty(base):
+			continue
+		var bag := PlaySim.base_xy(base)
+		var lead := bag + (PlaySim.base_xy(base + 1) - bag).normalized() * resolver.motion.leads[base - 1]
+		look = Vector3(lead.x, lead.y, 1.0)
+		# From foul ground behind the runner's base, a little up.
+		var out := Vector2(bag.x, bag.y).normalized() * 12.0 + Vector2(signf(bag.x) * 4.0, -3.0)
+		from = Vector3(bag.x + out.x, bag.y + out.y, 3.0)
+		break
+	pip_camera.look_at_from_position(Field.to_world(from), Field.to_world(look))
 
 
 func _show_play(t: float) -> void:
