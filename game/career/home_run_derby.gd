@@ -25,6 +25,8 @@ func _ready() -> void:
 		limit = int(cs.rules.all_star.get("derby_outs", 10))
 		speed = float(cs.rules.all_star.get("derby_speed", 112.0))
 	super._ready()
+	# Balls and strikes mean nothing here; the outs and home runs are on the help line.
+	(hud as DuelHud).show_count = false
 
 
 func set_mode(_new_mode: StringName) -> void:
