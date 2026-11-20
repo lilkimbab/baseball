@@ -31,6 +31,8 @@ static func load_pack(path: String) -> Array[Team]:
 		for id: Variant in ids:
 			if players.has(str(id)):
 				t.players.append(players[str(id)])
+		if entry.has("registered"):
+			t.registered = PackedStringArray(entry["registered"] as Array)
 		teams.append(t)
 	return teams
 
@@ -43,12 +45,15 @@ static func save_pack(path: String, pack_id: String, pack_name: String, season: 
 		for p: Player in t.players:
 			ids.append(p.id)
 			player_list.append(player_to(p))
-		team_list.append({
+		var entry := {
 			"id": t.id, "name": t.name, "short": t.short_name, "stadium": t.stadium,
 			"colors": {"primary": "#" + t.primary.to_html(false), "secondary": "#" + t.secondary.to_html(false), "accent": "#" + t.accent.to_html(false)},
 			"manager": {"steal": snappedf(t.steal_style, 0.01), "bunt": snappedf(t.bunt_style, 0.01)},
 			"players": ids,
-		})
+		}
+		if not t.registered.is_empty():
+			entry["registered"] = Array(t.registered)
+		team_list.append(entry)
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return FileAccess.get_open_error()
@@ -77,6 +82,7 @@ static func player_from(entry: Dictionary) -> Player:
 	p.throws = StringName(str(entry.get("throws", "R")))
 	p.height_cm = entry.get("height_cm", 183.0)
 	p.weight_kg = entry.get("weight_kg", 88.0)
+	p.origin = StringName(str(entry.get("origin", "")))
 	var positions: Dictionary = entry.get("positions", {})
 	for code: String in positions:
 		p.positions[code] = float(positions[code])
@@ -133,6 +139,8 @@ static func player_to(p: Player) -> Dictionary:
 		"fielding": {"range": _r(p.fielding.range), "hands": _r(p.fielding.hands), "arm": _r(p.fielding.arm), "accuracy": _r(p.fielding.accuracy)},
 		"forms": p.forms.duplicate(),
 	}
+	if p.origin != &"":
+		d["origin"] = String(p.origin)
 	if p.pitching != null:
 		var arsenal: Array = []
 		for a: ArsenalPitch in p.pitching.arsenal:
@@ -162,6 +170,10 @@ static func load_names(path: String = NAMES_PATH) -> NameTable:
 		t.city_names.append(str(c.get("name", "")))
 		t.city_codes.append(str(c.get("code", "")))
 	t.nicknames = PackedStringArray(root.get("nicknames", []) as Array)
+	t.foreign_first = PackedStringArray(root.get("foreign_first", []) as Array)
+	t.foreign_last = PackedStringArray(root.get("foreign_last", []) as Array)
+	t.asia_first = PackedStringArray(root.get("asia_first", []) as Array)
+	t.asia_last = PackedStringArray(root.get("asia_last", []) as Array)
 	var colors: Array = root.get("colors", [])
 	for row: Array in colors:
 		var palette := PackedColorArray()

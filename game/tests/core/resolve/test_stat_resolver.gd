@@ -174,7 +174,22 @@ func test_the_same_seed_makes_the_same_league_and_every_club_is_legal() -> void:
 		assert_eq(a[i].players[0].name, b[i].players[0].name)
 	var ai := F.manager()
 	for t: Team in a:
-		assert_eq(t.players.size(), 28)
+		assert_eq(t.players.size(), LeagueGenerator.ROSTER.size() + LeagueGenerator.FARM.size())
+		# KBO: 29 on the first team, among them three foreign players and one Asia-quota player.
+		assert_eq(t.registered.size(), RuleSet.kbo_2026().registered_roster)
+		assert_eq(t.second_team().size(), LeagueGenerator.FARM.size())
+		var foreign := 0
+		var asia := 0
+		var foreign_starters := 0
+		for p: Player in t.first_team():
+			if p.origin == &"foreign":
+				foreign += 1
+				if p.role() == &"SP":
+					foreign_starters += 1
+			elif p.origin == &"asia":
+				asia += 1
+		assert_eq([foreign, asia, foreign_starters], [3, 1, 2], t.name)
+		assert_eq(t.rotation().size(), 5, "the rotation is the first team's five starters")
 		var numbers: Dictionary[int, bool] = {}
 		for p: Player in t.players:
 			assert_false(numbers.has(p.number), "%s: numbers are unique" % t.name)
@@ -184,6 +199,8 @@ func test_the_same_seed_makes_the_same_league_and_every_club_is_legal() -> void:
 					assert_false(Position.needs_right_hand(Position.from_code(code)), "left-handed %s at %s" % [p.name, code])
 		var lineup := ai.make_lineup(t, RuleSet.kbo_2026(), t.rotation()[0].id)
 		assert_eq(lineup.validate(true), PackedStringArray(), t.name)
+		for id: String in lineup.players:
+			assert_true(t.is_registered(id), "only first-team players dress")
 
 
 func test_a_small_batch_lands_near_the_league_targets() -> void:
@@ -209,14 +226,16 @@ func test_a_roster_pack_reads_back_the_same() -> void:
 	var back := RosterIO.load_pack(path)
 	assert_eq(back.size(), 2)
 	assert_eq(back[0].name, teams[0].name)
-	assert_eq(back[0].players.size(), 28)
-	for i: int in 28:
+	assert_eq(back[0].players.size(), teams[0].players.size())
+	assert_eq(back[0].registered, teams[0].registered)
+	for i: int in teams[0].players.size():
 		var a := teams[0].players[i]
 		var b := back[0].players[i]
 		assert_eq(b.id, a.id)
 		assert_eq(b.name, a.name)
 		assert_eq(b.bats, a.bats)
 		assert_eq(b.throws, a.throws)
+		assert_eq(b.origin, a.origin)
 		assert_eq(b.positions.keys(), a.positions.keys())
 		assert_almost_eq(b.batting.eye, roundf(a.batting.eye), 0.001)
 		assert_eq(b.is_pitcher(), a.is_pitcher())

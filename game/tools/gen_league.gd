@@ -1,5 +1,6 @@
 extends SceneTree
-## Makes the fictional league's roster pack: 3 divisions of 10 clubs, 28 players each.
+## Makes the fictional league's roster pack: 3 divisions of 10 clubs, 29 players on each first
+## team (three foreign players and an Asia-quota player among them) and 11 on the second.
 ##
 ##   godot --headless --path game --script res://tools/gen_league.gd -- --seed 2026
 ##

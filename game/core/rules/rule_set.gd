@@ -24,6 +24,9 @@ var batter_timeouts := 2
 ## Players dressed for a game and registered for the club.
 var active_roster := 28
 var registered_roster := 29
+## Foreign players a club may register, and Asia-quota players besides them (KBO 2026).
+var foreign_players := 3
+var asia_quota := 1
 
 
 static func kbo_2026() -> RuleSet:

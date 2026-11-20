@@ -30,18 +30,22 @@ func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], 
 
 
 ## Builds a team for one game: the best fielder at each position, the best remaining hitter
-## as designated hitter, and a batting order by the usual roles.
-func make_lineup(team: Team, rules: RuleSet, starter_id: String) -> TeamInGame:
+## as designated hitter, and a batting order by the usual roles. Players in `rest` start on
+## the bench (a day off, a slump) unless nobody else can play the position.
+func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionary[String, bool] = {}) -> TeamInGame:
 	var t := TeamInGame.new()
 	t.team_id = team.id
 	t.name = team.name
 	t.short_name = team.short_name
 	t.steal_style = team.steal_style
 	t.bunt_style = team.bunt_style
-	for p: Player in team.players:
+	var squad := team.first_team()
+	for p: Player in squad:
 		t.players[p.id] = p
+	if team.player(starter_id) != null:
+		t.players[starter_id] = team.player(starter_id)
 	var hitters: Array[Player] = []
-	for p: Player in team.players:
+	for p: Player in squad:
 		if not p.is_pitcher():
 			hitters.append(p)
 	var chosen: Dictionary[Position.Kind, Player] = {}
@@ -56,8 +60,8 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String) -> TeamInGame:
 				continue
 			if Position.needs_right_hand(kind) and p.throws == &"L":
 				continue
-			var v := overall.batter(p, kind) * (0.6 + 0.4 * p.aptitude(kind))
-			if v > best_value:
+			var v := overall.batter(p, kind) * (0.6 + 0.4 * p.aptitude(kind)) - (1000.0 if rest.has(p.id) else 0.0)
+			if v > best_value or best == null:
 				best_value = v
 				best = p
 		if best != null:
@@ -67,8 +71,9 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String) -> TeamInGame:
 		var best_dh: Player = null
 		var best_value := -1.0
 		for p: Player in hitters:
-			if not used.has(p.id) and overall.batter(p, Position.Kind.DH) > best_value:
-				best_value = overall.batter(p, Position.Kind.DH)
+			var v := overall.batter(p, Position.Kind.DH) - (1000.0 if rest.has(p.id) else 0.0)
+			if not used.has(p.id) and (v > best_value or best_dh == null):
+				best_value = v
 				best_dh = p
 		if best_dh != null:
 			chosen[Position.Kind.DH] = best_dh
@@ -79,7 +84,7 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String) -> TeamInGame:
 	for kind: Position.Kind in _batting_order(chosen):
 		t.lineup.append(LineupSlot.make(chosen[kind].id, kind))
 	t.pitcher_id = starter_id
-	for p: Player in team.players:
+	for p: Player in squad:
 		if used.has(p.id) or p.id == starter_id:
 			continue
 		if p.is_pitcher():

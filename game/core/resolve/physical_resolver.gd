@@ -29,6 +29,8 @@ var manager: AiManager
 var rng: Rng
 ## Who decides for the away team and the home team.
 var controllers: Array[Controller] = []
+## Each side's manager orders (Tactics): none unless a player gives them.
+var tactics: Array[Tactics] = [Tactics.new(), Tactics.new()]
 
 ## The last pitch and play, for the scene and the checks.
 var last_duel: PitchDuel
@@ -46,6 +48,10 @@ var _third_fielders := "2"
 ## Steals planned for this plate appearance: base -> the pitch (0, 1, 2...) he goes on.
 var _steal_plan: Dictionary[int, int] = {}
 var _pitch_in_pa := 0
+## A double steal is planned for this pitch (runners on first and second).
+var _double_steal := false
+## Orders already acted on in this plate appearance (offence, defence).
+var _acted: Array[Tactics.Order] = [Tactics.Order.NONE, Tactics.Order.NONE]
 
 
 func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], ai: AiManager, random: Rng,
@@ -60,6 +66,8 @@ func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], 
 	motion = MotionIO.load_default()
 	alignment = MotionIO.alignment()
 	controllers = [AiController.new(ai, pitch_catalog, random), AiController.new(ai, pitch_catalog, random)]
+	for t: int in 2:
+		(controllers[t] as AiController).tactics = tactics[t]
 
 
 ## The greybox park until stadiums come in (S13): 100 m lines, 116 m alleys, 122 m centre.
@@ -77,7 +85,7 @@ func next_event(state: GameState) -> GameEvent:
 	duel.throw_pitch(tire(state, controllers[state.fielding()].choose_pitch(state, duel)))
 	if _bunting and controllers[state.batting()] is AiController:
 		AiBatter.bunt(duel, rng)
-	else:
+	elif not batter_takes(state):
 		controllers[state.batting()].react(state, duel)
 	while duel.phase == PitchDuel.Phase.FLIGHT:
 		duel.tick(DT)
@@ -116,15 +124,65 @@ func before_pitch(state: GameState) -> GameEvent:
 		var pickoff := _pickoff(state)
 		if pickoff != null:
 			return pickoff
-		if manager.wants_intentional_walk(state):
-			_close_plate_appearance()
-			return GameEvent.plate_appearance(PaResult.Kind.INTENTIONAL_WALK, GameFlow.forced_moves(state), 0 if state.rules.auto_intentional_walk else 4)
-		_bunting = controllers[state.batting()].wants_bunt(state)
-		_plan_steals(state)
+		var defence := tactics[state.fielding()].order
+		if defence == Tactics.Order.NONE and manager.wants_intentional_walk(state):
+			return _intentional_walk(state)
+		var offence := tactics[state.batting()].order
+		_bunting = offence == Tactics.Order.NONE and controllers[state.batting()].wants_bunt(state)
+		if offence == Tactics.Order.NONE or offence == Tactics.Order.SWING_AWAY or offence == Tactics.Order.TAKE:
+			_plan_steals(state)
+	var ordered := _follow_orders(state)
+	if ordered != null:
+		return ordered
 	if _bunting and state.strikes == 2:
 		# Two strikes: a foul bunt would be strike three, so he swings away.
 		_bunting = false
 	return _steal(state)
+
+
+func _intentional_walk(state: GameState) -> GameEvent:
+	_close_plate_appearance()
+	return GameEvent.plate_appearance(PaResult.Kind.INTENTIONAL_WALK, GameFlow.forced_moves(state), 0 if state.rules.auto_intentional_walk else 4)
+
+
+## Acts on orders given since the last pitch: an intentional walk at once, a bunt or squeeze
+## for the rest of the plate appearance, a steal or double steal on this pitch.
+func _follow_orders(state: GameState) -> GameEvent:
+	var defence := tactics[state.fielding()]
+	if defence.order != _acted[1]:
+		_acted[1] = defence.order
+		if defence.order == Tactics.Order.INTENTIONAL_WALK:
+			defence.order = Tactics.Order.NONE
+			return _intentional_walk(state)
+	var offence := tactics[state.batting()]
+	if offence.order == _acted[0]:
+		return null
+	_acted[0] = offence.order
+	match offence.order:
+		Tactics.Order.BUNT, Tactics.Order.SQUEEZE:
+			_bunting = state.strikes < 2
+		Tactics.Order.SWING_AWAY, Tactics.Order.TAKE:
+			_bunting = false
+		Tactics.Order.STEAL:
+			_bunting = false
+			_steal_plan.clear()
+			var base := Tactics.lead_stealer(state)
+			if base > 0:
+				_steal_plan[base] = _pitch_in_pa
+			offence.order = Tactics.Order.NONE
+			_acted[0] = Tactics.Order.NONE
+		Tactics.Order.DOUBLE_STEAL:
+			_bunting = false
+			_steal_plan.clear()
+			_double_steal = Tactics.can_give(Tactics.Order.DOUBLE_STEAL, state)
+			offence.order = Tactics.Order.NONE
+			_acted[0] = Tactics.Order.NONE
+	return null
+
+
+## The batter has been told to take: he lets pitches go until he has a strike.
+func batter_takes(state: GameState) -> bool:
+	return tactics[state.batting()].order == Tactics.Order.TAKE and state.strikes == 0
 
 
 ## The batter is squared to bunt in this plate appearance.
@@ -136,6 +194,11 @@ func _close_plate_appearance() -> void:
 	_pa_key = ""
 	_bunting = false
 	_steal_plan.clear()
+	_double_steal = false
+	# Orders are for one plate appearance.
+	for t: Tactics in tactics:
+		t.order = Tactics.Order.NONE
+	_acted = [Tactics.Order.NONE, Tactics.Order.NONE]
 	_pitch_in_pa = 0
 	_third_strike = PaResult.Kind.STRIKEOUT
 	_third_fielders = "2"
@@ -179,6 +242,10 @@ func _can_steal(state: GameState, base: int) -> bool:
 
 
 func _steal(state: GameState) -> GameEvent:
+	if _double_steal:
+		_double_steal = false
+		if Tactics.can_give(Tactics.Order.DOUBLE_STEAL, state):
+			return double_steal(state, steal_margin(state, 2) + rng.next_normal() * STEAL_SPREAD, rng.chance(motion.bad_throw * 2.0 * exp(-(_catcher(state).fielding.accuracy - 50.0) / 40.0)))
 	for base: int in [2, 1]:
 		if not _steal_plan.has(base) or _steal_plan[base] > _pitch_in_pa:
 			continue
@@ -208,6 +275,28 @@ static func stolen_on_wild_throw(state: GameState, base: int) -> GameEvent:
 			moves.append(RunnerMove.make(ahead, mini(ahead + 1, 4), RunnerMove.OutKind.NONE, true))
 	var e := GameEvent.running(GameEvent.Kind.STEAL, moves)
 	e.fielders = "E2"
+	return e
+
+
+## Runners on first and second go together. The catcher throws to third: the lead runner is
+## safe if he beats the throw (`margin` > 0), the trailing runner takes second either way. A
+## throw that gets away scores the lead runner and puts the other on third, on the error.
+static func double_steal(state: GameState, margin: float, wild: bool) -> GameEvent:
+	var moves: Array[RunnerMove] = []
+	var e: GameEvent
+	if wild:
+		moves.append(RunnerMove.make(2, 4, RunnerMove.OutKind.NONE, true))
+		moves.append(RunnerMove.make(1, 3, RunnerMove.OutKind.NONE, true))
+		e = GameEvent.running(GameEvent.Kind.STEAL, moves)
+		e.fielders = "E2"
+		return e
+	if margin > 0.0:
+		moves.append(RunnerMove.make(2, 3))
+	else:
+		moves.append(RunnerMove.out_at_base(2, 3, RunnerMove.OutKind.TAG))
+	moves.append(RunnerMove.make(1, 2))
+	e = GameEvent.running(GameEvent.Kind.STEAL, moves)
+	e.fielders = "" if margin > 0.0 else "2-5"
 	return e
 
 
@@ -350,8 +439,14 @@ func after_pitch(state: GameState, duel: PitchDuel) -> Array[GameEvent]:
 
 ## The ball in play, fielded and run out.
 func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false) -> PlayResult:
-	var positions := alignment.positions(state, fence, duel.settings.bats_left, bunt)
+	var orders := tactics[state.fielding()]
+	var positions := alignment.positions(state, fence, duel.settings.bats_left, bunt, orders)
 	var ctx := PlayContext.from_state(state, duel.path, field, positions, motion, bunt)
+	if orders.defence != Tactics.Defence.AUTO:
+		ctx.infield_in = orders.defence == Tactics.Defence.INFIELD_IN and not state.base_empty(3)
+	var offence := tactics[state.batting()]
+	ctx.running_shift = offence.running_shift()
+	ctx.squeeze = bunt and offence.order == Tactics.Order.SQUEEZE
 	return PlaySim.run(ctx, rng)
 
 

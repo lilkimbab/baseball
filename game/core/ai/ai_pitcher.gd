@@ -82,7 +82,7 @@ static func options_for(pitcher: Player, catalog: Dictionary[StringName, PitchTy
 ## The pitch for this count. `weak` lists the batter's weak cells (0..8, row by row from the
 ## top, first column on the third-base side).
 static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes: int, bats_left: bool,
-		weak: PackedInt32Array, memory: Memory, rng: Rng) -> PitchDecision:
+		weak: PackedInt32Array, memory: Memory, rng: Rng, zone_factor: float = 1.0, zone_bonus: float = 0.0) -> PitchDecision:
 	var weights := PackedFloat64Array()
 	var behind := balls >= 2 and balls > strikes
 	var ahead := strikes == 2 and balls <= 1
@@ -94,7 +94,7 @@ static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes
 			w *= AHEAD_BREAKING
 		weights.append(w)
 	var pick := options[rng.pick_weighted(weights)]
-	var in_zone := rng.chance(ZONE_INTENT[mini(balls, 3)][mini(strikes, 2)])
+	var in_zone := rng.chance(clampf(ZONE_INTENT[mini(balls, 3)][mini(strikes, 2)] * zone_factor + zone_bonus, 0.0, 0.97))
 	var target := _zone_target(zone, weak, balls, rng) if in_zone else _chase_target(zone, pick.type.family, bats_left, rng)
 	var cell := cell_of(zone, target)
 	if memory != null and memory.would_repeat_twice(pick.type.id, cell):

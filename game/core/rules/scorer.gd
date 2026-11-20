@@ -52,13 +52,20 @@ func record(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		GameEvent.Kind.PLATE_APPEARANCE:
 			_plate_appearance(event, out, batting, fielding)
 		GameEvent.Kind.STEAL:
-			# The first move is the runner who stole; others moved up on a wild throw.
+			# The first move is the runner who stole; others moved up on a wild throw (on the
+			# error) or with him on a double steal. On a double steal they steal too, unless a
+			# runner is thrown out (OBR 9.07(e)).
 			if not event.moves.is_empty() and out.runner_ids[0] != "" and out.applied[0] == 1:
 				var id := out.runner_ids[0]
 				if event.moves[0].is_out():
 					book.bat(id).caught_stealing += 1
 				elif event.moves[0].to > event.moves[0].from:
 					book.bat(id).stolen_bases += 1
+				for i: int in range(1, event.moves.size()):
+					var m := event.moves[i]
+					if m.on_error or event.moves[0].is_out() or m.is_out() or out.runner_ids[i] == "" or out.applied[i] != 1:
+						continue
+					book.bat(out.runner_ids[i]).stolen_bases += 1
 		GameEvent.Kind.WILD_PITCH:
 			book.pitch(out.pitcher_id).wild_pitches += 1
 

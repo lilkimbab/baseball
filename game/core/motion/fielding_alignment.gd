@@ -36,9 +36,10 @@ static func variants_for(state: GameState, expect_bunt: bool) -> Array[String]:
 	return on
 
 
-## Positions on the field (x, y) for the coming pitch.
-func positions(state: GameState, fence: FenceProfile, bats_left: bool, expect_bunt: bool = false) -> Dictionary[Position.Kind, Vector2]:
-	var on := variants_for(state, expect_bunt)
+## Positions on the field (x, y) for the coming pitch. `orders` replaces the usual
+## positioning with the manager's (Tactics.defence).
+func positions(state: GameState, fence: FenceProfile, bats_left: bool, expect_bunt: bool = false, orders: Tactics = null) -> Dictionary[Position.Kind, Vector2]:
+	var on := orders.variants(state, expect_bunt) if orders != null else variants_for(state, expect_bunt)
 	var out: Dictionary[Position.Kind, Vector2] = {}
 	for code: String in spots:
 		var kind := Position.from_code(code)

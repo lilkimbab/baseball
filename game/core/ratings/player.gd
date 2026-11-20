@@ -20,6 +20,9 @@ var fielding := FieldingRatings.new()
 var pitching: PitchingRatings
 ## Form ids for motion: "batting", "pitching".
 var forms: Dictionary[String, String] = {}
+## &"" for a local player, &"foreign" for one of the club's foreign players, &"asia" for its
+## Asia-quota player (docs/13 S7).
+var origin: StringName = &""
 
 
 func is_pitcher() -> bool:
@@ -82,3 +85,62 @@ func batting_side(pitcher_throws: StringName) -> StringName:
 	if bats == &"S":
 		return &"L" if pitcher_throws == &"R" else &"R"
 	return bats
+
+
+func is_foreign() -> bool:
+	return origin != &""
+
+
+## A copy for one game with his ratings scaled by `factor` (1 as he is; 0.94 for a bad day,
+## 1.06 for a good one, docs/02 section 5.4). Pitch speeds drop or rise far less than the
+## ratings: a tired arm loses a km/h or two, not 6%.
+func with_form(factor: float) -> Player:
+	var p := Player.new()
+	p.id = id
+	p.name = name
+	p.number = number
+	p.born = born
+	p.bats = bats
+	p.throws = throws
+	p.height_cm = height_cm
+	p.weight_kg = weight_kg
+	p.positions = positions.duplicate()
+	p.forms = forms.duplicate()
+	p.origin = origin
+	var s := func(v: float) -> float: return clampf(v * factor, 1.0, 99.0)
+	var b := BattingRatings.new()
+	b.contact_r = s.call(batting.contact_r)
+	b.contact_l = s.call(batting.contact_l)
+	b.power_r = s.call(batting.power_r)
+	b.power_l = s.call(batting.power_l)
+	b.eye = s.call(batting.eye)
+	b.speed = s.call(batting.speed)
+	b.baserunning = s.call(batting.baserunning)
+	b.bunt = s.call(batting.bunt)
+	b.clutch = batting.clutch
+	p.batting = b
+	var f := FieldingRatings.new()
+	f.range = s.call(fielding.range)
+	f.hands = s.call(fielding.hands)
+	f.arm = s.call(fielding.arm)
+	f.accuracy = s.call(fielding.accuracy)
+	p.fielding = f
+	if pitching != null:
+		var r := PitchingRatings.new()
+		r.stamina = pitching.stamina
+		r.control = s.call(pitching.control)
+		r.composure = pitching.composure
+		r.hold = pitching.hold
+		r.fielding = s.call(pitching.fielding)
+		var kmh := (factor - 1.0) * 25.0
+		for a: ArsenalPitch in pitching.arsenal:
+			var c := ArsenalPitch.new()
+			c.type = a.type
+			c.velo_avg = a.velo_avg + kmh
+			c.velo_max = a.velo_max + kmh
+			c.movement = s.call(a.movement)
+			c.command = s.call(a.command)
+			c.usage = a.usage
+			r.arsenal.append(c)
+		p.pitching = r
+	return p
