@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+assets-src/
+*.local
+.tools/
+.godot/
+build/
+content-local/
+*.import.tmp
+reference/

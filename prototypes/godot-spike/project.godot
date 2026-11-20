@@ -1,0 +1,8 @@
+config_version=5
+
+[application]
+config/name="spike"
+
+[physics]
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=120

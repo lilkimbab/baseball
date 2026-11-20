@@ -1,0 +1,18 @@
+{
+  "godotTools.editorPath.godot4": "${workspaceFolder}/.tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64",
+  "godotTools.lsp.headless": true,
+  "files.exclude": {
+    "**/.godot": true,
+    "**/*.uid": true
+  },
+  "search.exclude": {
+    "**/addons/gut": true,
+    "**/.godot": true,
+    ".tools": true,
+    "reference": true
+  },
+  "[gdscript]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  }
+}
