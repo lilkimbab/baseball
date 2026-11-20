@@ -128,6 +128,10 @@ func set_mode(new_mode: StringName) -> void:
 		_snap_camera()
 
 
+func help_keys() -> String:
+	return "Space 번트   F 작전·교체   F3 관전   Esc 종료"
+
+
 func selected_type() -> PitchType:
 	if _arsenal.is_empty():
 		return super.selected_type()
@@ -602,5 +606,13 @@ func _show_ball() -> void:
 	super._show_ball()
 
 
+## The batting camera stands behind the batter's back shoulder: mirrored for a left-handed
+## batter, as a broadcast does.
 func _camera_preset() -> Array:
-	return PITCH_CAMERA if human_pitches() else BAT_CAMERA
+	if human_pitches():
+		return PITCH_CAMERA
+	if settings.bats_left:
+		var from: Vector3 = BAT_CAMERA[0]
+		var to: Vector3 = BAT_CAMERA[1]
+		return [Vector3(-from.x, from.y, from.z), Vector3(-to.x, to.y, to.z), BAT_CAMERA[2]]
+	return BAT_CAMERA
