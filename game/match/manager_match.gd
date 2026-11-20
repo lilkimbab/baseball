@@ -68,6 +68,11 @@ func _ready() -> void:
 	orders.scene = self
 	layer.add_child(orders)
 	set_auto_changes(true)
+	if league_game != null:
+		# Leaving a season game goes back to the league; the game stays to be played.
+		for c: Dictionary in pause_menu.quit_requested.get_connections():
+			pause_menu.quit_requested.disconnect(c["callable"])
+		pause_menu.quit_requested.connect(leave_unplayed)
 
 
 func _read_arguments() -> void:
@@ -128,6 +133,11 @@ func _record_result() -> void:
 	_recorded = true
 	LeagueSession.season.record(league_game, game, scorer.book)
 	LeagueSession.pending = null
+
+
+func leave_unplayed() -> void:
+	LeagueSession.pending = null
+	get_tree().change_scene_to_file(LeagueSession.SCREEN)
 
 
 func back_to_league() -> void:
