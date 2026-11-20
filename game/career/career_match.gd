@@ -27,6 +27,15 @@ var _best_count := Vector2i.ZERO
 var _runners_before: Array[bool] = [false, false, false]
 var _scene_leverage := 0.0
 var _card := PackedStringArray()
+## His pitches thrown in this game, by type.
+var pitches_seen: Dictionary[StringName, int] = {}
+
+
+func _finish_pitch() -> void:
+	if game.pitcher_id() == me and duel != null and duel.decision != null:
+		var id := duel.decision.type.id
+		pitches_seen[id] = int(pitches_seen.get(id, 0)) + 1
+	super._finish_pitch()
 
 
 func card_lines() -> PackedStringArray:
@@ -236,7 +245,7 @@ func _record_result() -> void:
 	if _recorded or game == null or not game.over or CareerSession.career_season == null:
 		return
 	_recorded = true
-	report = CareerSession.career_season.finish(game, scorer.book, chances, errors, scene_gp, clutch_wins)
+	report = CareerSession.career_season.finish(game, scorer.book, chances, errors, scene_gp, clutch_wins, pitches_seen)
 	CareerSession.last_report = report
 
 

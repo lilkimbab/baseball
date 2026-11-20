@@ -39,6 +39,7 @@ class Report:
 	var called_up := false
 	var sent_down := false
 	var line := ""
+	var evolved := PackedStringArray()
 
 
 var season: Season
@@ -179,7 +180,7 @@ func fielding_credit(e: GameEvent) -> Vector2i:
 
 ## The game is over: into the books (the season's, or the second team's), growth points for
 ## his lines and his game goal, popularity, and a call-up or a trip down.
-func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_gp: Dictionary[String, float] = {}, clutch: int = 0) -> Report:
+func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_gp: Dictionary[String, float] = {}, clutch: int = 0, pitches_seen: Dictionary[StringName, int] = {}) -> Report:
 	var report := Report.new()
 	report.played = true
 	report.first_team = career.first_team
@@ -208,6 +209,11 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	report.gp = gp
 	career.popularity += (1.0 if career.first_team else 0.3) * (1.0 + clutch + (1.0 if report.goal_met else 0.0))
 	report.line = _line_text(bat, pitch)
+	if pitch != null:
+		PitchEvolution.note_game(career, pitch.pitches, pitches_seen)
+	report.evolved = PitchEvolution.check(career, rules, season.catalog)
+	for change: String in report.evolved:
+		log.append("%d일: 구종 진화 %s" % [season.day + 1, change])
 	if not career.first_team and ready_for_call_up():
 		call_up()
 		report.called_up = career.first_team

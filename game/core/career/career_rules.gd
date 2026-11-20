@@ -15,6 +15,15 @@ class PlayerType:
 	var velocity := 144.0
 
 
+class Evolution:
+	var from: StringName = &""
+	var to: StringName = &""
+	var uses := 0
+	## "velocity" (km/h of his fastball) or a rating of the pitch: "movement", "command".
+	var rating := ""
+	var at_least := 0.0
+
+
 class Body:
 	var id := ""
 	var name := ""
@@ -45,6 +54,10 @@ var type_discount := 0.2
 var ratings: Dictionary[String, PackedStringArray] = {}
 ## Type id or pitching position → [what, how many].
 var game_goals: Dictionary[String, Array] = {}
+var evolutions: Array[Evolution] = []
+var new_pitch_gp := 150.0
+var max_pitches := 6
+var learnable: Array[StringName] = []
 
 
 func field_of(rating: String) -> String:

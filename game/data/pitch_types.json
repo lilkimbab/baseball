@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it.",
+  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it. Types marked evolved are reached only by the career mode's pitch evolution (docs/02 section 6.3): a four-seam with more spin and ride, a slider thrown harder, a curve with more spin, a changeup with more fade (A: typical Statcast values for such pitches).",
   "types": [
     { "id": "four_seam", "label": "포심 패스트볼", "family": "fastball", "speed_kmh": 145, "spin_rpm": 2300, "efficiency": 0.9, "tilt_deg": -12 },
     { "id": "two_seam", "label": "투심 패스트볼", "family": "fastball", "speed_kmh": 142, "spin_rpm": 2150, "efficiency": 0.88, "tilt_deg": -50 },
@@ -9,6 +9,10 @@
     { "id": "sweeper", "label": "스위퍼", "family": "breaking", "speed_kmh": 128, "spin_rpm": 2600, "efficiency": 0.6, "tilt_deg": 85 },
     { "id": "curve", "label": "커브", "family": "breaking", "speed_kmh": 120, "spin_rpm": 2500, "efficiency": 0.75, "tilt_deg": 160 },
     { "id": "changeup", "label": "체인지업", "family": "offspeed", "speed_kmh": 130, "spin_rpm": 1750, "efficiency": 0.88, "tilt_deg": -60 },
-    { "id": "splitter", "label": "스플리터", "family": "offspeed", "speed_kmh": 132, "spin_rpm": 1300, "efficiency": 0.35, "tilt_deg": -40 }
+    { "id": "splitter", "label": "스플리터", "family": "offspeed", "speed_kmh": 132, "spin_rpm": 1300, "efficiency": 0.35, "tilt_deg": -40 },
+    { "id": "rising_fastball", "label": "라이징 패스트볼", "family": "fastball", "speed_kmh": 147, "spin_rpm": 2550, "efficiency": 0.97, "tilt_deg": -8, "evolved": true },
+    { "id": "hard_slider", "label": "고속 슬라이더", "family": "breaking", "speed_kmh": 138, "spin_rpm": 2450, "efficiency": 0.3, "tilt_deg": 70, "evolved": true },
+    { "id": "power_curve", "label": "파워 커브", "family": "breaking", "speed_kmh": 127, "spin_rpm": 2750, "efficiency": 0.78, "tilt_deg": 165, "evolved": true },
+    { "id": "circle_change", "label": "서클 체인지업", "family": "offspeed", "speed_kmh": 128, "spin_rpm": 1800, "efficiency": 0.9, "tilt_deg": -72, "evolved": true }
   ]
 }

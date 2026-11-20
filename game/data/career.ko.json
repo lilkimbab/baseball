@@ -45,6 +45,14 @@
     "fielding": ["range", "hands", "arm", "accuracy"],
     "pitching": ["control", "stamina", "velocity", "movement", "command"]
   },
+  "evolutions": [
+    {"from": "four_seam", "to": "rising_fastball", "uses": 400, "rating": "velocity", "at_least": 149},
+    {"from": "slider", "to": "hard_slider", "uses": 250, "rating": "velocity", "at_least": 147},
+    {"from": "slider", "to": "sweeper", "uses": 250, "rating": "movement", "at_least": 58},
+    {"from": "curve", "to": "power_curve", "uses": 250, "rating": "velocity", "at_least": 145},
+    {"from": "changeup", "to": "circle_change", "uses": 250, "rating": "movement", "at_least": 55}
+  ],
+  "new_pitch": {"gp": 150, "max": 6, "learnable": ["two_seam", "cutter", "slider", "curve", "changeup", "splitter", "sweeper"]},
   "game_goals": {
     "contact": ["hits", 2], "power": ["extra_bases", 1], "speed": ["runs_or_steals", 2], "defence": ["times_on_base", 1], "all_round": ["times_on_base", 2],
     "SP": ["quality_start", 1], "RP": ["scoreless", 1], "CL": ["scoreless", 1]
