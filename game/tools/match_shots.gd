@@ -40,6 +40,12 @@ func _process(_delta: float) -> bool:
 		return true
 	if _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _taken.has("pitch"):
 		_shoot("pitch")
+	# The Tab detail cards, once, a moment before the second pitch.
+	if _taken.has("pitch") and _scene.state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.5 and not _taken.has("detail"):
+		_scene.bottom_bar.detail = true
+		_shoot("detail")
+	elif _taken.has("detail") and _due.is_empty():
+		_scene.bottom_bar.detail = false
 	# A left-handed batter (mirrored model) and a left-handed pitcher, once each.
 	if _scene.state == DuelScene.State.WINDUP and _scene.settings.bats_left and not _taken.has("lefty_batter"):
 		_shoot("lefty_batter")
