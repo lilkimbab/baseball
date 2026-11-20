@@ -275,7 +275,12 @@ func toggle_menu(from_pause: bool = false) -> void:
 
 func set_auto_changes(on: bool) -> void:
 	auto_changes = on
-	manager.manual_team = -1 if on or human_team < 0 else human_team
+	manager.manual_team = -1 if on or own_team() < 0 else own_team()
+
+
+## The player's club (0 away, 1 home), or −1 when he only watches.
+func own_team() -> int:
+	return human_team
 
 
 ## A substitution the player chose in the menu.

@@ -44,7 +44,7 @@ func _rebuild() -> void:
 	_button("투구 시간: %s" % ("켜짐" if scene.pitch_clock_on else "꺼짐"), func() -> void:
 		scene.pitch_clock_on = not scene.pitch_clock_on
 		_rebuild())
-	if scene.human_team >= 0:
+	if scene.own_team() >= 0:
 		_button("우리 팀 교체: %s" % ("컴퓨터가 함께" if scene.auto_changes else "직접만"), func() -> void:
 			scene.set_auto_changes(not scene.auto_changes)
 			_rebuild())
