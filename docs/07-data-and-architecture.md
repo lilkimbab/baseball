@@ -39,7 +39,8 @@ baseball/
     tools/                     # 헤드리스 명령 도구 (sim_batch, calibrate, screenshot)
     addons/gut/                # 테스트 프레임워크
   tools/                       # 엔진 밖 도구
-    blender/                   # 모델·애니메이션 변환 스크립트
+    blender/                   # 선수 모델 생성 스크립트
+    mocap/                     # 모션캡처 자료 → 관절 위치 클립 (Python)
     roster/                    # 기록 수집과 로스터 팩 생성 (Python)
   assets-src/                  # 에셋 원본 (.blend). git 제외
   content-local/               # 로컬 콘텐츠 팩. git 제외
@@ -261,6 +262,8 @@ baseball/
 ./dev perf        # Windows에서 프레임 시간 측정
 ./dev shot-win [파일] [씬]   # Windows GPU로 화면 캡처
 ./dev model       # 선수 모델 재생성 (Blender 5.3 + MPFB, tools/blender/make_player.py)
+./dev mocap       # 모션캡처 자료(OBP)를 받아 투구·스윙 클립으로 변환 → content-local/animations/
+                  # 동작 점검: res://tools/motion_shots.gd(시각별 촬영), motion_report.gd(튀는 뼈 찾기)
                   # 목표 장면 촬영: Godot으로 res://tools/closeup_shot.gd 실행 (Windows GPU 권장)
 ```
 

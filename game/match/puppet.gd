@@ -89,8 +89,45 @@ func set_back_lettering(_number: int, _player_name: String, _ink: Color = Color.
 
 func apply(pose: PuppetPose) -> void:
 	solve(pose)
-	_place_limb(&"Torso", pose.hips - spine_dir * 0.05, joints[&"Chest"] + spine_dir * 0.05)
-	_place(&"Hips", pose.hips)
+	_show(pose.bat_dir)
+
+
+## Poses the figure from recorded joint positions (a JointClip frame, in the puppet's space).
+## hands_offset moves both hands, for a swing that has to reach a pitch off the recorded path.
+## The mannequin shows the recorded joints as they are; the player model fits them to itself.
+func apply_joints(frame: Dictionary[StringName, Vector3], _source: JointClip, hands_offset: Vector3 = Vector3.ZERO) -> void:
+	for side: String in JointClip.SIDES:
+		for part: String in ["UpperArm", "LowerArm", "Hand", "UpperLeg", "LowerLeg", "Foot"]:
+			joints[StringName(side + part)] = frame[StringName(side + part)]
+		joints[StringName(side + "Hand")] += hands_offset
+	var hips := frame[&"LeftUpperLeg"].lerp(frame[&"RightUpperLeg"], 0.5)
+	var across_hips := frame[&"RightUpperLeg"] - frame[&"LeftUpperLeg"]
+	var across_chest := frame[&"RightUpperArm"] - frame[&"LeftUpperArm"]
+	hip_basis = Basis(Vector3.UP, atan2(-across_hips.z, across_hips.x))
+	chest_basis = Basis(Vector3.UP, atan2(-across_chest.z, across_chest.x))
+	spine_dir = (frame[&"ThoraxTop"] - hips).normalized()
+	joints[&"Hips"] = hips
+	joints[&"Chest"] = frame[&"ThoraxTop"]
+	joints[&"Head"] = frame[&"ThoraxTop"] + spine_dir * (0.1 + HEAD_RADIUS)
+	_show(bat_direction(frame))
+
+
+## Forgets anything carried over from earlier recorded frames. The mannequin keeps nothing.
+func reset_motion() -> void:
+	pass
+
+
+## Direction of the bat in a recorded frame, or zero if the recording has no bat.
+static func bat_direction(frame: Dictionary[StringName, Vector3]) -> Vector3:
+	if not frame.has(&"BatSweetSpot") or not frame.has(&"BatGrip"):
+		return Vector3.ZERO
+	return (frame[&"BatSweetSpot"] - frame[&"BatGrip"]).normalized()
+
+
+func _show(bat_direction_now: Vector3) -> void:
+	var hips := joints[&"Hips"]
+	_place_limb(&"Torso", hips - spine_dir * 0.05, joints[&"Chest"] + spine_dir * 0.05)
+	_place(&"Hips", hips)
 	_place(&"Head", joints[&"Head"])
 	_place(&"Cap", joints[&"Head"] + spine_dir * 0.035 + chest_basis * Vector3.FORWARD * 0.012)
 	for side: String in ["Left", "Right"]:
@@ -101,7 +138,7 @@ func apply(pose: PuppetPose) -> void:
 		_place_limb(StringName(side + "LowerLeg"), joints[StringName(side + "LowerLeg")], joints[StringName(side + "Foot")])
 		var foot := _parts[StringName(side + "Foot")]
 		foot.transform = Transform3D(hip_basis, joints[StringName(side + "Foot")] + hip_basis * Vector3.FORWARD * 0.07 - Vector3.UP * 0.045)
-	_place_props(pose)
+	_place_props(bat_direction_now)
 
 
 ## Works out every joint position for a pose with two-bone IK and stores them in `joints`.
@@ -136,21 +173,31 @@ func solve(pose: PuppetPose) -> void:
 		joints[StringName(name + "Foot")] = ankle
 
 
-## Places the bat along the pose's bat direction from the hands, and the glove on the left hand.
-func _place_props(pose: PuppetPose) -> void:
+## How far along the bat from the knob the hands' midpoint and the sweet spot are (m).
+const BAT_GRIP_FROM_KNOB := 0.09
+const BAT_SWEET_FROM_KNOB := 0.68
+
+## Where the bat is held and which way it points, in the puppet's space, from the last pose.
+var bat_grip := Vector3.ZERO
+var bat_dir := Vector3.ZERO
+
+
+## Places the bat along its direction from the hands, and the glove on the left hand.
+func _place_props(direction: Vector3) -> void:
 	var bat := _parts[&"Bat"]
-	bat.visible = show_bat and pose.bat_dir.length() > 0.1
+	bat.visible = show_bat and direction.length() > 0.1
+	bat_dir = direction
+	bat_grip = joints[&"LeftHand"].lerp(joints[&"RightHand"], 0.5)
 	if bat.visible:
-		var grip: Vector3 = joints[&"LeftHand"].lerp(joints[&"RightHand"], 0.5)
-		_place_limb(&"Bat", grip - pose.bat_dir * 0.08, grip + pose.bat_dir * (PuppetClips.BAT_LENGTH - 0.08))
+		_place_limb(&"Bat", bat_grip - direction * BAT_GRIP_FROM_KNOB, bat_grip + direction * (PuppetClips.BAT_LENGTH - BAT_GRIP_FROM_KNOB))
 	var glove := _parts[&"Glove"]
 	glove.visible = show_glove and not bat.visible
 	glove.position = joints[&"LeftHand"]
 
 
-## Position of the bat's barrel (the sweet spot) in world space, or the right hand if no bat.
-func barrel_world() -> Vector3:
-	return global_transform * joints.get(&"RightHand", Vector3.ZERO)
+## The sweet spot of the bat's barrel in the puppet's space, from the last pose.
+func sweet_spot() -> Vector3:
+	return bat_grip + bat_dir * (BAT_SWEET_FROM_KNOB - BAT_GRIP_FROM_KNOB)
 
 
 static func _reach(root: Vector3, target: Vector3, max_length: float) -> Vector3:

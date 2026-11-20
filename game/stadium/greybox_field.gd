@@ -87,11 +87,7 @@ func _build_ground() -> void:
 
 
 func _build_infield() -> void:
-	var mound := CylinderMesh.new()
-	mound.top_radius = 1.2
-	mound.bottom_radius = Field.MOUND_RADIUS
-	mound.height = Field.MOUND_HEIGHT
-	_add(mound, DIRT, Vector3(0.0, Field.MOUND_CENTER_Y, Field.MOUND_HEIGHT * 0.5)).material_override = _surface
+	_build_mound()
 	var rubber := BoxMesh.new()
 	rubber.size = Vector3(0.61, 0.03, 0.15)
 	_add(rubber, CHALK, Vector3(0.0, Field.RUBBER_Y + 0.075, Field.MOUND_HEIGHT + 0.015))
@@ -104,6 +100,45 @@ func _build_infield() -> void:
 	var plate := BoxMesh.new()
 	plate.size = Vector3(Field.PLATE_WIDTH, 0.02, Field.PLATE_FRONT_Y)
 	_add(plate, CHALK, Vector3(0.0, Field.PLATE_FRONT_Y * 0.5, 0.01))
+
+
+## The mound as a surface over Field.ground_height(), so its slope is the one pitchers stride
+## down: rings around the centre of its circle.
+func _build_mound() -> void:
+	const RINGS := 26
+	const SPOKES := 72
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	tool.set_smooth_group(0)
+	tool.add_vertex(Field.to_world(Vector3(0.0, Field.MOUND_CENTER_Y, Field.ground_height(0.0, Field.MOUND_CENTER_Y))))
+	for ring: int in range(1, RINGS + 1):
+		var radius := Field.MOUND_RADIUS * ring / RINGS
+		for spoke: int in SPOKES:
+			var angle := TAU * spoke / SPOKES
+			var x := sin(angle) * radius
+			var y := Field.MOUND_CENTER_Y + cos(angle) * radius
+			# The rim dips just under the field so there is no seam where the two meet.
+			var z := Field.ground_height(x, y) if ring < RINGS else -0.01
+			tool.add_vertex(Field.to_world(Vector3(x, y, z)))
+	for spoke: int in SPOKES:
+		var next := (spoke + 1) % SPOKES
+		tool.add_index(0)
+		tool.add_index(1 + next)
+		tool.add_index(1 + spoke)
+		for ring: int in range(1, RINGS):
+			var inner := 1 + (ring - 1) * SPOKES
+			var outer := 1 + ring * SPOKES
+			tool.add_index(inner + spoke)
+			tool.add_index(inner + next)
+			tool.add_index(outer + spoke)
+			tool.add_index(inner + next)
+			tool.add_index(outer + next)
+			tool.add_index(outer + spoke)
+	tool.generate_normals()
+	var mound := MeshInstance3D.new()
+	mound.mesh = tool.commit()
+	mound.material_override = _surface
+	add_child(mound)
 
 
 func _build_foul_lines() -> void:

@@ -2,9 +2,10 @@ class_name SkinnedPuppet
 extends Puppet
 ## The same poses as Puppet, shown on the skinned player model instead of capsules.
 ##
-## Puppet.solve() gives joint positions; this turns them into bone rotations: the spine is
-## bent between the pelvis and chest frames, each limb bone is aimed at the next joint, and
-## feet and head keep their rest orientation turned to the body's heading.
+## Key poses (apply) give hand and foot targets: Puppet.solve() works out joint positions and
+## this turns them into bone rotations. Recorded motion (apply_joints) gives the joints of a
+## real player; the trunk takes the recorded orientations and the limbs are fitted to this
+## model's proportions with two-bone IK.
 
 const MODEL := "res://assets/characters/player_base.glb"
 const LIMBS: Array[Array] = [
@@ -23,10 +24,17 @@ const CURL := {
 	Grip.BALL: [38.0, 44.0, 28.0, 30.0],
 	Grip.GLOVE: [26.0, 30.0, 20.0, 16.0],
 }
+## Recorded trunk axes lean forward of the true ones (the markers sit on the front of the
+## body), so the pelvis and ribcage are tipped back by this much, in radians.
+const PELVIS_UPRIGHT := 0.0
+const CHEST_UPRIGHT := 0.0
+
 ## Team look and lettering. Change it and call repaint().
 var uniform := UniformStyle.new()
 ## Batting gloves instead of bare hands.
 var gloves := false
+## Standing height in metres; the model is scaled to it. Set before adding to the scene.
+var height := 1.83
 
 var _skeleton: Skeleton3D
 var _mesh: MeshInstance3D
@@ -46,6 +54,19 @@ var _parent: PackedInt32Array = PackedInt32Array()
 var _aim_rest: Dictionary[StringName, Vector3] = {}
 ## Pelvis bone origin relative to the midpoint of the hip joints, at rest.
 var _hips_offset := Vector3.ZERO
+## Height of the ankle joint above the ground when standing, in the puppet's space.
+var _ankle_height := 0.07
+## Rest axis (skeleton space) each limb bone's elbow or knee bends about.
+var _hinge_rest: Dictionary[StringName, Vector3] = {}
+## Rest direction of each hand from the wrist to the knuckles, across the palm from the little
+## finger to the index finger, and of each foot toward the toes along the ground.
+var _hand_rest: Dictionary[String, Vector3] = {}
+var _grip_rest: Dictionary[String, Vector3] = {}
+var _toe_rest: Dictionary[String, Vector3] = {}
+## Hinge axis and direction of each upper limb bone in the last recorded frame shown. A
+## straight limb does not say how it is twisted, so the twist carries over from when it bent.
+var _hinge_last: Dictionary[StringName, Vector3] = {}
+var _dir_last: Dictionary[StringName, Vector3] = {}
 
 
 static func available() -> bool:
@@ -60,6 +81,7 @@ func _ready() -> void:
 	_model = model
 	_skeleton = model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	_mesh = model.find_child("Body", true, false) as MeshInstance3D
+	model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
 	var node: Node3D = _skeleton
@@ -99,12 +121,8 @@ func set_back_lettering(number: int, player_name: String, ink: Color = Color.BLA
 
 func apply(pose: PuppetPose) -> void:
 	solve(pose)
-	_cap.visible = headgear != &"helmet"
-	_helmet.visible = headgear == &"helmet"
-	for piece: StringName in OPTIONAL_GEAR:
-		var node := _model.find_child(piece, true, false) as MeshInstance3D
-		if node != null:
-			node.visible = gear.has(piece)
+	_show_gear()
+	_hinge_last.clear()
 	var basis_for: Dictionary[int, Basis] = {}
 	var curl := _finger_curls()
 
@@ -112,20 +130,15 @@ func apply(pose: PuppetPose) -> void:
 	var hip_right := hip_basis * Vector3.RIGHT
 	var pelvis := Basis(hip_right, -pose.lean * 0.3) * hip_basis
 	var chest := Basis(hip_right, -pose.lean) * chest_basis
-	var pelvis_q := pelvis.get_rotation_quaternion()
-	var chest_q := chest.get_rotation_quaternion()
-	_turn(basis_for, &"Hips", pelvis)
-	_turn(basis_for, &"Spine", Basis(pelvis_q.slerp(chest_q, 0.34)))
-	_turn(basis_for, &"Chest", Basis(pelvis_q.slerp(chest_q, 0.67)))
-	_turn(basis_for, &"UpperChest", chest)
-	_turn(basis_for, &"Neck", Basis(pelvis_q.slerp(chest_q, 0.6)))
+	_turn_spine(basis_for, pelvis, chest)
+	_turn(basis_for, &"Neck", Basis(pelvis.get_rotation_quaternion().slerp(chest.get_rotation_quaternion(), 0.6)))
 	_turn(basis_for, &"Head", chest_basis)
 	_turn(basis_for, &"LeftFoot", hip_basis)
 	_turn(basis_for, &"RightFoot", hip_basis)
 
 	# First pass: bend the spine, then read where the model's own shoulders and hips ended
 	# up and solve the arms and legs again from there, so hands and feet land on target.
-	var globals := _walk(basis_for, curl, pose)
+	var globals := _walk(basis_for, curl, pose.hips)
 	if has_look_target:
 		_aim_head(basis_for, _to_puppet * globals[_bone[&"Head"]].origin)
 	var elbow_out := chest_basis * Vector3.RIGHT
@@ -153,25 +166,256 @@ func apply(pose: PuppetPose) -> void:
 		var index := _bone[from]
 		basis_for[index] = Basis(Quaternion(_aim_rest[from], want.normalized())) * _rest[index].basis
 
-	# Second pass: final bone poses.
-	globals = _walk(basis_for, curl, pose)
+	_pose_bones(_walk(basis_for, curl, pose.hips))
+	_place_props(pose.bat_dir)
+
+
+## Poses the model from recorded joint positions. The recording is of someone with other
+## proportions, so it is fitted: the pelvis path is scaled by leg length, the trunk takes the
+## recorded orientations, and feet and hands are placed with two-bone IK from the model's own
+## hips and shoulders, bending toward the recorded knees and elbows. Feet therefore stay where
+## the recorded feet stood, and two hands on a bat stay together.
+func apply_joints(frame: Dictionary[StringName, Vector3], source: JointClip, hands_offset: Vector3 = Vector3.ZERO) -> void:
+	_show_gear()
+	var basis_for: Dictionary[int, Basis] = {}
+	var curl := _finger_curls()
+
+	var hip_mid := frame[&"LeftUpperLeg"].lerp(frame[&"RightUpperLeg"], 0.5)
+	var top := frame[&"ThoraxTop"]
+	var bottom := frame[&"ThoraxBottom"]
+	var across_chest := frame[&"RightUpperArm"] - frame[&"LeftUpperArm"]
+	if frame.has(&"ThoraxRight"):
+		across_chest = frame[&"ThoraxRight"] - top
+	var pelvis := _body_frame(frame[&"RightUpperLeg"] - frame[&"LeftUpperLeg"], bottom - hip_mid, PELVIS_UPRIGHT)
+	var chest := _body_frame(across_chest, top - bottom, CHEST_UPRIGHT)
+	hip_basis = pelvis
+	chest_basis = chest
+	spine_dir = chest.y
+	_turn_spine(basis_for, pelvis, chest)
+	_turn(basis_for, &"Neck", chest)
+	_turn(basis_for, &"Head", chest)
+
+	var leg_scale := (upper_leg + lower_leg) / source.leg_length
+	var arm_scale := (upper_arm + lower_arm) / source.arm_length
+	var hips := _fit(hip_mid, source, leg_scale)
+	joints[&"Hips"] = hips
+
+	# First pass places the trunk; arms and legs are then solved from where the model's own
+	# shoulders and hips are. Hands are placed relative to the middle of the shoulders, so the
+	# distance between them is the recorded one.
+	var globals := _walk(basis_for, curl, hips)
+	_face_target(basis_for, _to_puppet * globals[_bone[&"Head"]].origin, chest)
+	var recorded_mid := frame[&"LeftUpperArm"].lerp(frame[&"RightUpperArm"], 0.5)
+	var model_mid := _to_puppet * globals[_bone[&"LeftUpperArm"]].origin.lerp(globals[_bone[&"RightUpperArm"]].origin, 0.5)
+	for side: String in JointClip.SIDES:
+		var shoulder := _to_puppet * globals[_bone[StringName(side + "UpperArm")]].origin
+		var wrist := model_mid + (frame[StringName(side + "Hand")] - recorded_mid) * arm_scale + hands_offset
+		_fit_limb(frame, side, ["UpperArm", "LowerArm", "Hand"], shoulder, wrist, upper_arm, lower_arm)
+		var hip := _to_puppet * globals[_bone[StringName(side + "UpperLeg")]].origin
+		var ankle := _fit(frame[StringName(side + "Foot")], source, leg_scale)
+		_fit_limb(frame, side, ["UpperLeg", "LowerLeg", "Foot"], hip, ankle, upper_leg, lower_leg)
+
+	var bat := bat_direction(frame)
+	var pelvis_turn := basis_for[_bone[&"Hips"]] * _rest[_bone[&"Hips"]].basis.inverse()
+	var chest_turn := basis_for[_bone[&"UpperChest"]] * _rest[_bone[&"UpperChest"]].basis.inverse()
+	for side: String in JointClip.SIDES:
+		_orient_limb(basis_for, StringName(side + "UpperArm"), StringName(side + "LowerArm"), StringName(side + "Hand"), chest_turn, false)
+		_orient_limb(basis_for, StringName(side + "UpperLeg"), StringName(side + "LowerLeg"), StringName(side + "Foot"), pelvis_turn, true)
+		_orient_hand(basis_for, side, frame, bat)
+		_orient_foot(basis_for, side, joints[StringName(side + "Foot")].y - _ankle_height)
+
+	_pose_bones(_walk(basis_for, curl, hips))
+	_place_props(bat)
+
+
+## Forgets the limb twists carried over from earlier recorded frames. Call when the figure
+## is about to show an unrelated motion.
+func reset_motion() -> void:
+	_hinge_last.clear()
+	_dir_last.clear()
+
+
+func _show_gear() -> void:
+	_cap.visible = headgear != &"helmet"
+	_helmet.visible = headgear == &"helmet"
+	for piece: StringName in OPTIONAL_GEAR:
+		var node := _model.find_child(piece, true, false) as MeshInstance3D
+		if node != null:
+			node.visible = gear.has(piece)
+
+
+## Sets the bones from pelvis to upper chest, spreading the turn and lean between the two
+## frames along the spine.
+func _turn_spine(basis_for: Dictionary[int, Basis], pelvis: Basis, chest: Basis) -> void:
+	var pelvis_q := pelvis.get_rotation_quaternion()
+	var chest_q := chest.get_rotation_quaternion()
+	_turn(basis_for, &"Hips", pelvis)
+	_turn(basis_for, &"Spine", Basis(pelvis_q.slerp(chest_q, 0.34)))
+	_turn(basis_for, &"Chest", Basis(pelvis_q.slerp(chest_q, 0.67)))
+	_turn(basis_for, &"UpperChest", chest)
+
+
+## Writes bone poses to the skeleton from global transforms, and records where the model's
+## hands really are so the ball and bat sit in them.
+func _pose_bones(globals: Array[Transform3D]) -> void:
 	for i: int in _rest.size():
 		var parent_global := Transform3D.IDENTITY if _parent[i] < 0 else globals[_parent[i]]
 		var local := parent_global.affine_inverse() * globals[i]
 		_skeleton.set_bone_pose_position(i, local.origin)
 		_skeleton.set_bone_pose_rotation(i, local.basis.get_rotation_quaternion())
-
-	# Report where the model's hands really are, so the ball and bat sit in them.
-	for side: String in ["Left", "Right"]:
+	for side: String in JointClip.SIDES:
 		var hand := StringName(side + "Hand")
 		var middle: int = _bone.get(StringName(side + "MiddleProximal"), _bone[hand])
 		joints[hand] = _to_puppet * globals[_bone[hand]].origin.lerp(globals[middle].origin, 0.7)
-	_place_props(pose)
+
+
+## A recorded point moved to where it belongs for this model: scaled about the origin on the
+## ground, with the standing ankle height of the recording mapped to the model's.
+func _fit(point: Vector3, source: JointClip, scale_by: float) -> Vector3:
+	return Vector3(point.x * scale_by, (point.y - source.ankle_height) * scale_by + _ankle_height, point.z * scale_by)
+
+
+## Works out the joints of one arm or leg: from the model's own shoulder or hip to a target
+## for the wrist or ankle, bending toward the recorded elbow or knee.
+##
+## A nearly straight limb is a bad case for IK: a few millimetres in the target swing the bend
+## by many degrees, and recordings are not that exact. So when the target is near full stretch
+## and the recorded limb is nearly straight too, the bend is taken from the recording, and the
+## end lands where that bend puts it, which is within a centimetre or so of the target.
+func _fit_limb(frame: Dictionary[StringName, Vector3], side: String, parts: Array[String], root: Vector3, target: Vector3, l1: float, l2: float) -> void:
+	var names: Array[StringName] = [StringName(side + parts[0]), StringName(side + parts[1]), StringName(side + parts[2])]
+	var upper := frame[names[1]] - frame[names[0]]
+	var lower := frame[names[2]] - frame[names[1]]
+	var reach := l1 + l2
+	var to := target - root
+	var distance := maxf(to.length(), 1e-4)
+	# Cosine of the recorded bend: 1 is a straight limb.
+	var straightness := upper.normalized().dot(lower.normalized())
+	var same_bend := sqrt(maxf(l1 * l1 + l2 * l2 + 2.0 * l1 * l2 * straightness, 0.0))
+	var weight := smoothstep(0.9, 0.985, distance / reach) * smoothstep(0.82, 0.95, straightness)
+	var tip := root + to / distance * lerpf(minf(distance, reach * 0.9995), same_bend, weight)
+	joints[names[0]] = root
+	joints[names[1]] = _two_bone(root, tip, l1, l2, upper)
+	joints[names[2]] = tip
+
+
+## Orientation of the pelvis or ribcage from its side-to-side and upward directions, tipped
+## back by `upright` radians.
+static func _body_frame(right: Vector3, up: Vector3, upright: float) -> Basis:
+	var x := right.normalized()
+	var z := x.cross(up)
+	if z.length() < 1e-5:
+		return Basis.IDENTITY
+	z = z.normalized()
+	return Basis(x, upright) * Basis(x, z.cross(x), z)
+
+
+## Rotation taking a rest direction and a rest axis square to it onto a direction and axis.
+static func _align(dir: Vector3, axis: Vector3, rest_dir: Vector3, rest_axis: Vector3) -> Basis:
+	return Basis(dir, axis, dir.cross(axis)) * Basis(rest_dir, rest_axis, rest_dir.cross(rest_axis)).inverse()
+
+
+static func _square_to(v: Vector3, dir: Vector3) -> Vector3:
+	return (v - dir * v.dot(dir)).normalized()
+
+
+## Orients the two bones of an arm or leg whose joints are in `joints`. Both bones point along
+## the limb and share the hinge axis of the elbow or knee, so the joint bends like a hinge and
+## the twist of the upper bone comes from the plane the limb lies in. When the limb is nearly
+## straight that plane is not defined and the twist carries over from the last frame.
+func _orient_limb(basis_for: Dictionary[int, Basis], upper: StringName, lower: StringName, tip: StringName, parent_turn: Basis, is_leg: bool) -> void:
+	var to_skeleton := _to_skeleton.basis
+	var d1 := (to_skeleton * (joints[lower] - joints[upper])).normalized()
+	var d2 := (to_skeleton * (joints[tip] - joints[lower])).normalized()
+	var bend := d1.cross(d2)
+	var hinge := parent_turn * _hinge_rest[upper]
+	if _hinge_last.has(upper):
+		hinge = Quaternion(_dir_last[upper], d1) * _hinge_last[upper]
+	hinge = _square_to(hinge, d1)
+	var weight := smoothstep(0.1, 0.35, bend.length())
+	if weight > 0.0:
+		# Turn the carried-over axis about the bone toward the one the bend shows.
+		var shown := bend.normalized()
+		var angle := hinge.signed_angle_to(shown, d1)
+		# A knee does not bend backward: a leg that seems to is straight, and tells nothing.
+		if is_leg and absf(angle) > PI * 0.5:
+			angle = 0.0
+		hinge = _square_to(hinge.rotated(d1, angle * weight), d1)
+	_hinge_last[upper] = hinge
+	_dir_last[upper] = d1
+	basis_for[_bone[upper]] = _align(d1, hinge, _aim_rest[upper], _hinge_rest[upper]) * _rest[_bone[upper]].basis
+	basis_for[_bone[lower]] = _align(d2, _square_to(hinge, d2), _aim_rest[lower], _hinge_rest[lower]) * _rest[_bone[lower]].basis
+
+
+## Points a hand the way the recorded hand points. A hand on the bat is turned so that the
+## handle lies across the palm, from the little finger toward the index finger.
+func _orient_hand(basis_for: Dictionary[int, Basis], side: String, frame: Dictionary[StringName, Vector3], bat: Vector3) -> void:
+	var lower := _bone[StringName(side + "LowerArm")]
+	var hand := _bone[StringName(side + "Hand")]
+	var forearm_turn := basis_for[lower] * _rest[lower].basis.inverse()
+	var straight := forearm_turn * _hand_rest[side]
+	var want := straight
+	var tip := StringName(side + "HandTip")
+	if frame.has(tip):
+		var recorded := _to_skeleton.basis * (frame[tip] - frame[StringName(side + "Hand")])
+		if recorded.length() > 1e-4:
+			# A wrist bends about 70 degrees at most; recordings are noisy at speed.
+			var turn := Quaternion(straight, recorded.normalized())
+			var limit := deg_to_rad(65.0)
+			if turn.get_angle() > limit:
+				turn = Quaternion.IDENTITY.slerp(turn, limit / turn.get_angle())
+			want = turn * straight
+	var grip: Grip = left_grip if side == "Left" else right_grip
+	if grip == Grip.BAT and bat.length() > 0.5:
+		var along := (_to_skeleton.basis * bat).normalized()
+		var across := want - along * want.dot(along)
+		if across.length() > 0.05:
+			var rest_across := _square_to(_hand_rest[side], _grip_rest[side])
+			basis_for[hand] = _align(along, across.normalized(), _grip_rest[side], rest_across) * _rest[hand].basis
+			return
+	basis_for[hand] = Basis(Quaternion(straight, want)) * forearm_turn * _rest[hand].basis
+
+
+## A foot near the ground lies flat, pointing where the knee points; a lifted foot follows
+## the shin.
+func _orient_foot(basis_for: Dictionary[int, Basis], side: String, lift: float) -> void:
+	var lower := _bone[StringName(side + "LowerLeg")]
+	var foot := _bone[StringName(side + "Foot")]
+	var shin_turn := basis_for[lower] * _rest[lower].basis.inverse()
+	var follow := shin_turn * _rest[foot].basis
+	var toes := _to_puppet.basis * (shin_turn * _toe_rest[side])
+	var level := Vector2(toes.x, toes.z)
+	var steep := 1.0 - smoothstep(0.15, 0.7, level.length() / toes.length())
+	if steep >= 1.0:
+		basis_for[foot] = follow
+		return
+	var flat := _to_skeleton.basis * Basis(Vector3.UP, atan2(-level.x, -level.y)) * _to_puppet.basis * _rest[foot].basis
+	# The more the heel is lifted, or the more the shin is laid over, the less the foot is flat.
+	var weight := maxf(smoothstep(0.03, 0.12, lift), steep)
+	basis_for[foot] = Basis(flat.get_rotation_quaternion().slerp(follow.get_rotation_quaternion(), weight))
+
+
+## Turns the head toward look_target, keeping it fairly level however the trunk is tilted,
+## within what a neck can do. The neck takes half of the turn.
+func _face_target(basis_for: Dictionary[int, Basis], head_at: Vector3, chest: Basis) -> void:
+	if not has_look_target or look_target.distance_to(head_at) < 0.05:
+		return
+	var z := (head_at - look_target).normalized()
+	var x := Vector3.UP.lerp(chest.y, 0.35).cross(z)
+	if x.length() < 1e-3:
+		return
+	x = x.normalized()
+	var turn := (chest.inverse() * Basis(x, z.cross(x), z)).get_rotation_quaternion()
+	var limit := deg_to_rad(75.0)
+	if turn.get_angle() > limit:
+		turn = Quaternion.IDENTITY.slerp(turn, limit / turn.get_angle())
+	_turn(basis_for, &"Head", chest * Basis(turn))
+	_turn(basis_for, &"Neck", chest * Basis(Quaternion.IDENTITY.slerp(turn, 0.5)))
 
 
 ## Global transform of every bone (skeleton space) for the given target orientations,
 ## walking parent-first. Bones without a target keep their rest pose relative to the parent.
-func _walk(basis_for: Dictionary[int, Basis], curl: Dictionary[int, Basis], pose: PuppetPose) -> Array[Transform3D]:
+func _walk(basis_for: Dictionary[int, Basis], curl: Dictionary[int, Basis], hips_at: Vector3) -> Array[Transform3D]:
 	var globals: Array[Transform3D] = []
 	globals.resize(_rest.size())
 	var hips := _bone[&"Hips"]
@@ -184,7 +428,7 @@ func _walk(basis_for: Dictionary[int, Basis], curl: Dictionary[int, Basis], pose
 			# A curl is given in rest space; carry it along with however the parent has moved.
 			g.basis = parent_global.basis * _rest[_parent[i]].basis.inverse() * curl[i] * _rest[i].basis
 		if i == hips:
-			g.origin = _to_skeleton * pose.hips + g.basis * (_rest[i].basis.inverse() * _hips_offset)
+			g.origin = _to_skeleton * hips_at + g.basis * (_rest[i].basis.inverse() * _hips_offset)
 		globals[i] = g
 	return globals
 
@@ -277,16 +521,38 @@ func _measure() -> void:
 		var to: StringName = pair[1]
 		_aim_rest[from] = (_origin(to) - _origin(from)).normalized()
 
-	upper_arm = _origin(&"LeftUpperArm").distance_to(_origin(&"LeftLowerArm"))
-	lower_arm = _origin(&"LeftLowerArm").distance_to(_origin(&"LeftHand"))
-	upper_leg = _origin(&"LeftUpperLeg").distance_to(_origin(&"LeftLowerLeg"))
-	lower_leg = _origin(&"LeftLowerLeg").distance_to(_origin(&"LeftFoot"))
-	shoulder_half = absf(_origin(&"LeftUpperArm").x - _origin(&"RightUpperArm").x) * 0.5
-	hip_half = absf(_origin(&"LeftUpperLeg").x - _origin(&"RightUpperLeg").x) * 0.5
+	# Lengths are measured on the skeleton and used in the puppet's space, where the model
+	# has been scaled to the player's height.
+	var size := _to_puppet.basis.get_scale().x
+	upper_arm = _origin(&"LeftUpperArm").distance_to(_origin(&"LeftLowerArm")) * size
+	lower_arm = _origin(&"LeftLowerArm").distance_to(_origin(&"LeftHand")) * size
+	upper_leg = _origin(&"LeftUpperLeg").distance_to(_origin(&"LeftLowerLeg")) * size
+	lower_leg = _origin(&"LeftLowerLeg").distance_to(_origin(&"LeftFoot")) * size
+	shoulder_half = absf(_origin(&"LeftUpperArm").x - _origin(&"RightUpperArm").x) * 0.5 * size
+	hip_half = absf(_origin(&"LeftUpperLeg").x - _origin(&"RightUpperLeg").x) * 0.5 * size
 	var hip_mid := _origin(&"LeftUpperLeg").lerp(_origin(&"RightUpperLeg"), 0.5)
 	var shoulder_mid := _origin(&"LeftUpperArm").lerp(_origin(&"RightUpperArm"), 0.5)
-	spine = shoulder_mid.distance_to(hip_mid) + shoulder_drop
+	spine = shoulder_mid.distance_to(hip_mid) * size + shoulder_drop
 	_hips_offset = _origin(&"Hips") - hip_mid
+	_ankle_height = (_to_puppet * _origin(&"LeftFoot")).y
+
+	# The model rests with elbows and knees slightly bent, which shows the axis each bends about.
+	for side: String in JointClip.SIDES:
+		for limb: Array in [["UpperArm", "LowerArm", "Hand"], ["UpperLeg", "LowerLeg", "Foot"]]:
+			var upper := StringName(side + str(limb[0]))
+			var lower := StringName(side + str(limb[1]))
+			var d1 := _aim_rest[upper]
+			var d2 := _aim_rest[lower]
+			var axis := d1.cross(d2)
+			if axis.length() < 0.05:
+				axis = Vector3.RIGHT if limb[0] == "UpperLeg" else d1.cross(Vector3.BACK)
+			_hinge_rest[upper] = _square_to(axis, d1)
+			_hinge_rest[lower] = _square_to(axis, d2)
+		var wrist := _origin(StringName(side + "Hand"))
+		_hand_rest[side] = (_origin(StringName(side + "MiddleProximal")) - wrist).normalized()
+		_grip_rest[side] = (_origin(StringName(side + "IndexProximal")) - _origin(StringName(side + "LittleProximal"))).normalized()
+		var toes := _origin(StringName(side + "Toes")) - _origin(StringName(side + "Foot"))
+		_toe_rest[side] = Vector3(toes.x, 0.0, toes.z).normalized()
 
 
 func _origin(bone: StringName) -> Vector3:

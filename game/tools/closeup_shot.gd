@@ -6,6 +6,8 @@ extends SceneTree
 ##   godot --path game --script res://tools/closeup_shot.gd -- --out build/closeup.png
 ##
 ## Options: --out <file>  --swing <seconds after contact, default 0.2>
+## With a recorded swing in the local content pack the batter is shown in that swing;
+## otherwise in the hand-made follow-through pose.
 
 var _scene: DuelScene
 var _camera: Camera3D
@@ -46,11 +48,15 @@ func _compose() -> void:
 	batter.look_at_world(Field.to_world(Vector3(25.0, 60.0, 22.0)))
 	# Follow-through: hands finish high by the front shoulder with the bat across the back,
 	# eyes following the ball.
-	var finish := PuppetClips.swing(_swing_time, 0.11, 0.85)
-	finish.r_hand = PuppetPose.at(-0.14, 1.6, -0.1)
-	finish.l_hand = PuppetPose.at(-0.19, 1.55, -0.08)
-	finish.bat_dir = PuppetPose.at(0.9, 0.08, -0.42).normalized()
-	batter.apply(finish)
+	var motion := _scene.swing_motion
+	if motion != null:
+		batter.apply_joints(motion.clip.sample(motion.contact + _swing_time), motion.clip)
+	else:
+		var finish := PuppetClips.swing(_swing_time, 0.11, 0.85)
+		finish.r_hand = PuppetPose.at(-0.14, 1.6, -0.1)
+		finish.l_hand = PuppetPose.at(-0.19, 1.55, -0.08)
+		finish.bat_dir = PuppetPose.at(0.9, 0.08, -0.42).normalized()
+		batter.apply(finish)
 	_scene.catcher.look_at_world(Field.to_world(Vector3(10.0, 40.0, 8.0)))
 	_scene.catcher.apply(PuppetClips.catcher())
 	_scene.umpire.look_at_world(Field.to_world(Vector3(10.0, 40.0, 8.0)))
@@ -65,5 +71,7 @@ func _compose() -> void:
 	blur.dof_blur_amount = 0.11
 	_camera.attributes = blur
 	_scene.add_child(_camera)
-	_camera.look_at_from_position(Field.to_world(Vector3(-0.55, 2.7, 1.5)), Field.to_world(Vector3(-0.85, 0.05, 1.38)))
+	# In front of the batter on the pitcher's side, wherever in the box he stands.
+	var stands := Field.to_field(batter.global_position)
+	_camera.look_at_from_position(Field.to_world(stands + Vector3(0.5, 2.45, 1.5)), Field.to_world(stands + Vector3(0.2, -0.2, 1.38)))
 	_camera.make_current()
