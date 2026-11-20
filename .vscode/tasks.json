@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "test", "type": "shell", "command": "./dev test", "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "check scripts", "type": "shell", "command": "./dev check", "group": "build", "problemMatcher": [] },
+    { "label": "play (Windows)", "type": "shell", "command": "./dev play", "group": { "kind": "build", "isDefault": true }, "problemMatcher": [] },
+    { "label": "editor (Windows)", "type": "shell", "command": "./dev editor", "problemMatcher": [] },
+    { "label": "screenshot (WSL)", "type": "shell", "command": "./dev shot", "problemMatcher": [] },
+    { "label": "perf (Windows)", "type": "shell", "command": "./dev perf", "problemMatcher": [] }
+  ]
+}

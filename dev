@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Developer commands for the baseball project. Run "./dev help".
+#
+# Linux Godot (headless tests, checks, software-rendered screenshots) runs inside WSL.
+# Windows Godot (real GPU: playing, the editor, performance) is started through WSL interop
+# and opens the project over its \\wsl.localhost path.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GAME="$ROOT/game"
+GODOT="${GODOT:-$ROOT/.tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64}"
+GODOT_WIN="${GODOT_WIN:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64.exe}"
+GODOT_WIN_CONSOLE="${GODOT_WIN_CONSOLE:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64_console.exe}"
+
+win_game_path() { wslpath -w "$GAME"; }
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  import)
+    # Rebuild the import cache and the global class list. Needed after adding files.
+    "$GODOT" --headless --path "$GAME" --import
+    ;;
+  check)
+    # Parse every project script (addons excluded). Untyped declarations are errors.
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    failed=0
+    while IFS= read -r file; do
+      res="res://${file#"$GAME"/}"
+      if ! out="$("$GODOT" --headless --path "$GAME" --check-only --script "$res" 2>&1)"; then
+        failed=1
+        echo "FAIL $res"
+        echo "$out" | grep -E "ERROR|at:" || true
+      fi
+    done < <(find "$GAME" -name '*.gd' -not -path '*/addons/*' -not -path '*/.godot/*' | sort)
+    [ "$failed" -eq 0 ] && echo "check: all scripts parse"
+    exit "$failed"
+    ;;
+  test)
+    # Headless test run. Extra arguments go to GUT, e.g. ./dev test -gtest=res://tests/core/test_field.gd
+    "$GODOT" --headless --path "$GAME" -s addons/gut/gut_cmdln.gd "$@"
+    ;;
+  shot)
+    # ./dev shot [out.png] [res://scene.tscn]   Software-rendered capture inside WSL.
+    out="${1:-$ROOT/build/shot.png}"
+    scene="${2:-res://boot/boot.tscn}"
+    mkdir -p "$(dirname "$out")"
+    "$GODOT" --path "$GAME" --rendering-method mobile --rendering-driver vulkan --resolution 1280x720 \
+      --script res://tools/screenshot.gd -- --scene "$scene" --out "$out"
+    ;;
+  play)
+    # Run the game on Windows with the real GPU.
+    "$GODOT_WIN" --path "$(win_game_path)" "$@"
+    ;;
+  editor)
+    # Open the project in the Godot editor on Windows.
+    "$GODOT_WIN" --editor --path "$(win_game_path)" "$@" >/dev/null 2>&1 &
+    echo "editor: started on Windows for $(win_game_path)"
+    ;;
+  perf)
+    # ./dev perf [--scene res://x.tscn] [--seconds 5]   Frame-rate probe on Windows, vsync off.
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --disable-vsync --resolution 1920x1080 \
+      --script res://tools/perf_probe.gd -- "$@"
+    ;;
+  shot-win)
+    # ./dev shot-win [out.png] [res://scene.tscn]   GPU-rendered capture on Windows.
+    out="${1:-$ROOT/build/shot-win.png}"
+    scene="${2:-res://boot/boot.tscn}"
+    mkdir -p "$(dirname "$out")"
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution 1920x1080 \
+      --script res://tools/screenshot.gd -- --scene "$scene" --out "$(wslpath -w "$out")"
+    ;;
+  help|*)
+    cat <<'EOF'
+Usage: ./dev <command>
+
+  import      rebuild Godot's import cache and class list
+  check       parse every script; fails on errors and untyped declarations
+  test        run the headless test suite (GUT)
+  shot        save a software-rendered screenshot inside WSL   [out.png] [scene]
+  play        run the game on Windows (GPU)
+  editor      open the Godot editor on Windows
+  perf        measure frame rate on Windows                    [--scene ..] [--seconds ..]
+  shot-win    save a GPU-rendered screenshot on Windows        [out.png] [scene]
+EOF
+    ;;
+esac
