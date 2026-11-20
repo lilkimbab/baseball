@@ -52,13 +52,12 @@ func record(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		GameEvent.Kind.PLATE_APPEARANCE:
 			_plate_appearance(event, out, batting, fielding)
 		GameEvent.Kind.STEAL:
-			for i: int in event.moves.size():
-				var id := out.runner_ids[i]
-				if id == "" or out.applied[i] == 0:
-					continue
-				if event.moves[i].is_out():
+			# The first move is the runner who stole; others moved up on a wild throw.
+			if not event.moves.is_empty() and out.runner_ids[0] != "" and out.applied[0] == 1:
+				var id := out.runner_ids[0]
+				if event.moves[0].is_out():
 					book.bat(id).caught_stealing += 1
-				elif event.moves[i].to > event.moves[i].from:
+				elif event.moves[0].to > event.moves[0].from:
 					book.bat(id).stolen_bases += 1
 		GameEvent.Kind.WILD_PITCH:
 			book.pitch(out.pitcher_id).wild_pitches += 1

@@ -178,10 +178,10 @@ func _draw_banner() -> void:
 
 
 func _draw_help() -> void:
-	var line := "F1 타격   F2 투구   F3 관전   Esc 종료"
+	var line := scene.help_keys()
 	if scene.human_bats():
 		line = "왼쪽 클릭 컨택 스윙   오른쪽 클릭 파워 스윙   V 조준 %s      %s" % ["끄기" if scene.aim_enabled else "켜기", line]
 	elif scene.human_pitches():
-		line = "1~5 구종   마우스 코스   누르고 있기 → 떼기 → 고리가 맞을 때 클릭      " + line
+		line = "1~%d 구종   마우스 코스   누르고 있기 → 떼기 → 고리가 맞을 때 클릭      %s" % [scene.pitch_ids.size(), line]
 	draw_rect(Rect2(Vector2(0.0, size.y - 34.0), Vector2(size.x, 34.0)), PANEL)
 	_text(Vector2(16.0, size.y - 11.0), line, 15, Color(1, 1, 1, 0.85))

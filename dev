@@ -45,7 +45,7 @@ case "$cmd" in
     ;;
   shot)
     # ./dev shot [out.png] [res://scene.tscn]   Software-rendered capture inside WSL.
-    out="${1:-$ROOT/build/shot.png}"
+    out="$(realpath -m "${1:-$ROOT/build/shot.png}")"
     scene="${2:-res://match/duel.tscn}"
     mkdir -p "$(dirname "$out")"
     "$GODOT" --path "$GAME" --rendering-method mobile --rendering-driver vulkan --resolution 1280x720 \
@@ -163,7 +163,7 @@ case "$cmd" in
     # on Windows (GPU): the player bats at a few pitches, then throws a few. Godot writes every
     # frame at a steady 60 a second, so the video is smooth however fast the PC renders.
     out="$ROOT/build/demo/dugout-demo.mp4"
-    if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then out="$1"; shift; fi
+    if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then out="$(realpath -m "$1")"; shift; fi
     mkdir -p "$(dirname "$out")"
     raw="${out%.mp4}.avi"
     "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution "${RES:-1280x720}" \
@@ -185,7 +185,7 @@ case "$cmd" in
     ;;
   shot-win)
     # ./dev shot-win [out.png] [res://scene.tscn]   GPU-rendered capture on Windows.
-    out="${1:-$ROOT/build/shot-win.png}"
+    out="$(realpath -m "${1:-$ROOT/build/shot-win.png}")"
     scene="${2:-res://match/duel.tscn}"
     mkdir -p "$(dirname "$out")"
     "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution 1920x1080 \

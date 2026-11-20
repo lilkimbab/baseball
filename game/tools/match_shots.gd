@@ -40,6 +40,13 @@ func _process(_delta: float) -> bool:
 		return true
 	if _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _taken.has("pitch"):
 		_shoot("pitch")
+	# A left-handed batter (mirrored model) and a left-handed pitcher, once each.
+	if _scene.state == DuelScene.State.WINDUP and _scene.settings.bats_left and not _taken.has("lefty_batter"):
+		_shoot("lefty_batter")
+	if _scene.state == DuelScene.State.WINDUP and _scene.settings.throws_left and not _taken.has("lefty_pitcher"):
+		_shoot("lefty_pitcher")
+	if _frames % 600 == 0:
+		print("match_shots: fps %.0f" % Engine.get_frames_per_second())
 	var playing := _scene._play_time >= 0.0 and _scene._play != null and not _scene._play.foul
 	if playing:
 		for at: float in [0.5, 1.5, 3.0, 5.0]:

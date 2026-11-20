@@ -272,3 +272,21 @@ func test_every_runner_scores_is_put_out_or_is_left_on_base() -> void:
 			if left != sim.scorer.book.left_on_base[t]:
 				bad.append("game %d team %d: %d left by count, %d in the box" % [g, t, left, sim.scorer.book.left_on_base[t]])
 	assert_eq(bad, PackedStringArray())
+
+
+func test_a_wild_throw_on_a_steal_moves_the_runner_ahead_too() -> void:
+	var s := F.game()
+	F.put_runners(s, [1, 3])
+	var first := s.runner_on(1).player_id
+	var third := s.runner_on(3).player_id
+	var e := PhysicalResolver.stolen_on_wild_throw(s, 1)
+	var scorer := Scorer.new()
+	scorer.start(s)
+	var out := GameFlow.apply(s, e)
+	scorer.record(s, e, out)
+	assert_eq(scorer.book.bat(first).stolen_bases, 1, "the steal is his")
+	assert_eq(scorer.book.bat(third).stolen_bases, 0, "the runner from third moved up on the error")
+	assert_eq(s.runner_on(3).player_id, first, "the runner from first ends on third")
+	assert_eq(s.score[s.batting()], 1, "the runner from third came home on the error")
+	assert_ne(third, first)
+	assert_true(s.base_empty(1) and s.base_empty(2))

@@ -189,17 +189,26 @@ func _steal(state: GameState) -> GameEvent:
 		var actual := margin + rng.next_normal() * STEAL_SPREAD
 		var catcher := _catcher(state)
 		if rng.chance(motion.bad_throw * 2.0 * exp(-(catcher.fielding.accuracy - 50.0) / 40.0)):
-			# The throw gets away: on to the next base on the error.
-			var through := RunnerMove.make(base, base + 2, RunnerMove.OutKind.NONE, true)
-			var e := GameEvent.running(GameEvent.Kind.STEAL, [through] as Array[RunnerMove])
-			e.fielders = "E2"
-			return e
+			return stolen_on_wild_throw(state, base)
 		var safe := actual > 0.0
 		var m := RunnerMove.make(base, base + 1) if safe else RunnerMove.out_at_base(base, base + 1, RunnerMove.OutKind.TAG)
 		var steal := GameEvent.running(GameEvent.Kind.STEAL, [m] as Array[RunnerMove])
 		steal.fielders = "" if safe else ("2-6" if base == 1 else "2-5")
 		return steal
 	return null
+
+
+## The catcher's throw on a steal gets away into the outfield: the runner goes on a base
+## past the one he stole, and a runner ahead moves up too (both on the error).
+static func stolen_on_wild_throw(state: GameState, base: int) -> GameEvent:
+	# The stealer first (the scorer credits the steal to the first move).
+	var moves: Array[RunnerMove] = [RunnerMove.make(base, mini(base + 2, 4), RunnerMove.OutKind.NONE, true)]
+	for ahead: int in [3, 2]:
+		if ahead > base and not state.base_empty(ahead):
+			moves.append(RunnerMove.make(ahead, mini(ahead + 1, 4), RunnerMove.OutKind.NONE, true))
+	var e := GameEvent.running(GameEvent.Kind.STEAL, moves)
+	e.fielders = "E2"
+	return e
 
 
 ## Seconds by which the runner on `base` would beat the throw to the next base (negative: he

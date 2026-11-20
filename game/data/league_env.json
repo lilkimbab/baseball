@@ -69,7 +69,7 @@
     "steal_success": 0.74,
     "pickoff": 0.0045,
     "wild_pitch": 0.021,
-    "passed_ball": 0.0028
+    "passed_ball": 0.0037
   },
   "pitches_per_pa": {"basis": "A", "K": 4.8, "BB": 5.6, "HBP": 3.2, "in_play": 3.3},
   "manager": {

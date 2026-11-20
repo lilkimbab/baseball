@@ -264,6 +264,7 @@ func test_events_survive_a_round_trip_through_a_dictionary() -> void:
 		GameEvent.substitution(1, GameEvent.Change.DEFENSE, "a", "b", Position.Kind.SS),
 		GameEvent.running(GameEvent.Kind.STEAL, [F.move(1, 2)] as Array[RunnerMove]),
 		F.pa(PaResult.Kind.REACHED_ON_ERROR, [F.move(2, 4, NONE, true), F.move(0, 1)] as Array[RunnerMove]),
+		F.pa(PaResult.Kind.SINGLE, [F.move(3, 4), RunnerMove.out_at_base(0, 2, TAG)] as Array[RunnerMove]),
 	]
 	events[0].fielders = "6-4-3"
 	events[0].direction = 6
@@ -279,7 +280,7 @@ func test_events_survive_a_round_trip_through_a_dictionary() -> void:
 		assert_eq(back.direction, e.direction)
 		assert_eq(back.moves.size(), e.moves.size())
 		for i: int in e.moves.size():
-			assert_eq([back.moves[i].from, back.moves[i].to, back.moves[i].out_kind, back.moves[i].on_error], [e.moves[i].from, e.moves[i].to, e.moves[i].out_kind, e.moves[i].on_error])
+			assert_eq([back.moves[i].from, back.moves[i].to, back.moves[i].out_kind, back.moves[i].on_error, back.moves[i].out_at], [e.moves[i].from, e.moves[i].to, e.moves[i].out_kind, e.moves[i].on_error, e.moves[i].out_at])
 
 
 func test_a_replayed_game_ends_the_same() -> void:
