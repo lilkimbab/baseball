@@ -1,0 +1,72 @@
+{
+  "note": "Club management (docs/02 section 5, docs/13 S7-9). Grades and costs, the first-team cost cap per division (top division first), condition, scouting, training, points, traits and team colours. Numbers marked A in the docs are assumptions to tune by play.",
+  "grades": [
+    {"grade": "S", "min": 85, "cost": 7},
+    {"grade": "A", "min": 75, "cost": 5},
+    {"grade": "B", "min": 65, "cost": 3},
+    {"grade": "C", "min": 55, "cost": 2},
+    {"grade": "D", "min": 0, "cost": 1}
+  ],
+  "cost_caps": [90, 75, 60],
+  "condition": {
+    "levels": ["최악", "나쁨", "보통", "좋음", "최상"],
+    "effect": [-0.06, -0.03, 0.0, 0.03, 0.06],
+    "change": 0.35,
+    "toward_normal": 0.65,
+    "streak_games": 8,
+    "streak_drop": 0.06
+  },
+  "scouting": {
+    "candidates": 5,
+    "talent_by_division": [55, 50, 45],
+    "spread": 8.0,
+    "level_bonus": 2.5,
+    "max_level": 3,
+    "second_team_size": 34
+  },
+  "training": {
+    "per_day": 3,
+    "gain": 0.3,
+    "age_rates": [[22, 1.0], [26, 0.7], [30, 0.4], [99, 0.15]],
+    "headroom": [[22, 16.0], [26, 10.0], [30, 5.0], [99, 2.0]],
+    "focus": {
+      "batting": ["contact", "power", "eye"],
+      "running": ["speed", "baserunning"],
+      "fielding": ["range", "hands", "arm"],
+      "stuff": ["movement", "velocity"],
+      "control": ["control", "command"],
+      "breaking": ["movement"]
+    }
+  },
+  "points": {"win": 30, "tie": 15, "loss": 10, "postseason_win": 60, "release": 5, "scout_report": 60},
+  "trait_tiers": [1.0, 1.75, 2.5],
+  "traits": [
+    {"id": "precision", "name": "정교함", "kind": "batter", "effect": {"contact": 2.0}, "note": "컨택 상승, 삼진 감소"},
+    {"id": "slugger", "name": "장타", "kind": "batter", "effect": {"power": 2.0}, "note": "파워 상승"},
+    {"id": "table_setter", "name": "테이블세터", "kind": "batter", "effect": {"baserunning": 3.0, "eye": 1.0}, "note": "출루와 주루 상승"},
+    {"id": "speedster", "name": "준족", "kind": "batter", "effect": {"speed": 2.5, "baserunning": 1.0}, "note": "주력·도루 상승"},
+    {"id": "utility", "name": "만능", "kind": "batter", "effect": {"range": 1.0, "hands": 1.0, "arm": 1.0}, "note": "모든 수비 위치에서 수비 상승(적성 자체는 그대로)"},
+    {"id": "iron_glove", "name": "철벽", "kind": "batter", "effect": {"range": 2.0, "hands": 2.0}, "note": "수비 범위·포구 상승"},
+    {"id": "balanced_batter", "name": "균형", "kind": "batter", "effect": {"contact": 0.8, "power": 0.8, "eye": 0.8, "speed": 0.8, "range": 0.8, "hands": 0.8}, "note": "전 능력치 소폭 상승"},
+    {"id": "clutch", "name": "해결사", "kind": "batter", "effect": {"clutch": 6.0}, "note": "득점권 타격 상승(클러치 능력치는 득점권에서만 쓰인다)"},
+    {"id": "strikeout", "name": "탈삼진", "kind": "pitcher", "effect": {"movement": 1.5, "command": 0.5}, "note": "구위 상승(2스트라이크 조건은 아직 없음)"},
+    {"id": "grounder", "name": "땅볼 유도", "kind": "pitcher", "effect": {"movement": 1.0, "control": 0.5}, "note": "무브먼트 상승(낮은 코스 조건은 아직 없음)"},
+    {"id": "fly_ball", "name": "뜬공 유도", "kind": "pitcher", "effect": {"velocity": 0.8, "movement": 0.5}, "note": "구속 상승(높은 코스 조건은 아직 없음)"},
+    {"id": "pinpoint", "name": "정밀 제구", "kind": "pitcher", "effect": {"control": 2.0, "command": 2.0}, "note": "제구 상승"},
+    {"id": "closer", "name": "뒷문", "kind": "pitcher", "effect": {"composure": 6.0}, "note": "위기·접전 능력 상승(평정 능력치는 득점권에서 쓰인다)"},
+    {"id": "workhorse", "name": "이닝 소화", "kind": "pitcher", "effect": {"stamina": 6.0}, "note": "체력 상승"},
+    {"id": "balanced_pitcher", "name": "균형", "kind": "pitcher", "effect": {"control": 0.8, "movement": 0.8, "command": 0.8, "stamina": 1.5}, "note": "전 능력치 소폭 상승"},
+    {"id": "escape", "name": "위기 탈출", "kind": "pitcher", "effect": {"composure": 4.0, "control": 0.8}, "note": "득점권 제구·구위 상승"}
+  ],
+  "team_colors": [
+    {"id": "speed", "name": "발야구", "need": {"kind": "batter", "rating": "speed", "at_least": 70, "count": 6}, "bonus": {"speed": 2.0, "baserunning": 2.5}, "to": "batter"},
+    {"id": "power", "name": "대포 군단", "need": {"kind": "batter", "rating": "power", "at_least": 75, "count": 4}, "bonus": {"power": 2.5}, "to": "batter"},
+    {"id": "defence", "name": "그물망 수비", "need": {"kind": "batter", "rating": "range", "at_least": 70, "count": 6}, "bonus": {"range": 2.5, "hands": 2.0}, "to": "batter"},
+    {"id": "rotation", "name": "선발 왕국", "need": {"kind": "starter", "grade_at_least": "B", "count": 4}, "bonus": {"stamina": 5.0}, "to": "starter"},
+    {"id": "bullpen", "name": "철벽 불펜", "need": {"kind": "reliever", "grade_at_least": "B", "count": 5}, "bonus": {"control": 2.5}, "to": "reliever"},
+    {"id": "franchise", "name": "프랜차이즈", "need": {"kind": "homegrown", "steps": [10, 15, 20]}, "bonus": {"all": 1.0}, "to": "all"},
+    {"id": "development", "name": "육성 구단", "need": {"kind": "developed", "count": 8}, "bonus": {"training": 0.3}, "to": "club"}
+  ],
+  "team_color_limit": 2,
+  "team_color_cap": 5.0
+}
