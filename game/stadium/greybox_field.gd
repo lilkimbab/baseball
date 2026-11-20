@@ -160,7 +160,7 @@ func _build_bowl() -> void:
 	wall.generate_normals()
 	stands.generate_normals()
 
-	var wall_material := _material(Color(0.09, 0.3, 0.23), 0.8)
+	var wall_material := _material(Color(0.12, 0.36, 0.5), 0.8)
 	wall_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var wall_node := MeshInstance3D.new()
 	wall_node.mesh = wall.commit()

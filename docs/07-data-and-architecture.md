@@ -261,6 +261,7 @@ baseball/
 ./dev perf        # Windows에서 프레임 시간 측정
 ./dev shot-win [파일] [씬]   # Windows GPU로 화면 캡처
 ./dev model       # 선수 모델 재생성 (Blender 5.3 + MPFB, tools/blender/make_player.py)
+                  # 목표 장면 촬영: Godot으로 res://tools/closeup_shot.gd 실행 (Windows GPU 권장)
 ```
 
 헤드리스 도구 스크립트는 `--` 뒤의 인자를 `OS.get_cmdline_user_args()`로 읽는다(`tools/cmd_args.gd`).

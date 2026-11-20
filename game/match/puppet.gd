@@ -31,6 +31,8 @@ var left_grip: Grip = Grip.RELAXED
 var right_grip: Grip = Grip.RELAXED
 ## &"cap" or &"helmet".
 var headgear: StringName = &"cap"
+## Extra equipment worn over the uniform: any of &"Mask", &"ChestProtector", &"ShinGuards".
+var gear: Array[StringName] = []
 ## Point the head should face, in the puppet's space. Used when has_look_target is true.
 var look_target := Vector3.ZERO
 var has_look_target := false
