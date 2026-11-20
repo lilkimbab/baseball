@@ -4,10 +4,9 @@ extends Node3D
 ## and an outfield wall. Replaced by the stadium generator (docs/06, stage S13); until then it
 ## gives cameras, physics and UI something correctly sized to work against.
 
-## Fence distance (m) at the foul poles and in dead centre; the wall between is a smooth blend.
-@export var fence_corner := 100.0
-@export var fence_center := 122.0
-@export var fence_height := 2.6
+## Outfield fence. The same profile builds the collision model (AnalyticField), so what is
+## drawn and what the ball hits always agree.
+var fence := FenceProfile.symmetric(100.0, 116.0, 122.0, 2.6)
 
 const GRASS := Color(0.16, 0.42, 0.17)
 const INFIELD_GRASS := Color(0.2, 0.5, 0.2)
@@ -82,26 +81,29 @@ func _build_infield() -> void:
 
 
 func _build_foul_lines() -> void:
-	var length := fence_corner
+	var length := fence.distance_at(45.0)
 	var line := BoxMesh.new()
 	line.size = Vector3(0.1, 0.01, length)
 	var mid := length * 0.5 / sqrt(2.0)
 	_add(line, CHALK, Vector3(mid, mid, 0.035), -PI / 4.0)
 	_add(line, CHALK, Vector3(-mid, mid, 0.035), PI / 4.0)
+	var pole := CylinderMesh.new()
+	pole.top_radius = 0.08
+	pole.bottom_radius = 0.08
+	pole.height = 12.0
+	var corner := length / sqrt(2.0)
+	_add(pole, Color(0.95, 0.85, 0.1), Vector3(corner, corner, 6.0))
+	_add(pole, Color(0.95, 0.85, 0.1), Vector3(-corner, corner, 6.0))
 
 
 func _build_wall() -> void:
-	const SEGMENTS := 45
-	var step := deg_to_rad(90.0 / SEGMENTS)
+	const SEGMENTS := 60
+	var step_deg := 90.0 / SEGMENTS
 	for i: int in SEGMENTS:
-		var a := deg_to_rad(-45.0) + step * (float(i) + 0.5)
-		var d := fence_distance(a)
+		var az_deg := -45.0 + step_deg * (float(i) + 0.5)
+		var a := deg_to_rad(az_deg)
+		var d := fence.distance_at(az_deg)
+		var h := fence.height_at(az_deg)
 		var seg := BoxMesh.new()
-		seg.size = Vector3(d * step * 1.08, fence_height, 0.4)
-		_add(seg, WALL, Vector3(d * sin(a), d * cos(a), fence_height * 0.5), -a)
-
-
-## Fence distance from home (m) at a given azimuth (radians, 0 = centre field).
-func fence_distance(azimuth: float) -> float:
-	var t := cos(azimuth * 2.0)
-	return lerpf(fence_corner, fence_center, t)
+		seg.size = Vector3(d * deg_to_rad(step_deg) * 1.1, h, 0.4)
+		_add(seg, WALL, Vector3((d + 0.2) * sin(a), (d + 0.2) * cos(a), h * 0.5), -a)
