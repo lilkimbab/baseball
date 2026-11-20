@@ -25,6 +25,8 @@ const PITCH_CAMERA := [Vector3(-3.9, 54.6, 4.0), Vector3(0.3, 0.0, 0.8), 6.5]
 @export var seed_value := 20261120
 ## Show the pitcher and batter as the skinned player model when it has been built.
 @export var use_models := true
+## Play recorded deliveries and swings when the local content pack has them (see MotionLibrary).
+@export var use_motion := true
 
 var cfg: PhysicsConfig
 var catalog: Dictionary[StringName, PitchType]
@@ -60,6 +62,10 @@ var umpire: Puppet
 var ball_actor: BallActor
 var hud: DuelHud
 
+## Recorded motion for the delivery and the swing; null = key poses.
+var pitch_motion: PitchMotion
+var swing_motion: SwingMotion
+
 var _rng: Rng
 var _ai_rng: Rng
 var _pitch_count := 0
@@ -68,6 +74,12 @@ var _swing_clock := -1.0
 var _swing_lead := 0.11
 var _swing_height := 0.8
 var _follow_target := Vector3.ZERO
+var _load_started := false
+var _swing_shown := false
+## The barrel's sweet spot at contact in the recorded swing, in the batter's space, and how
+## far the hands have to move from the recording for this swing to go where it is aimed.
+var _recorded_contact := Vector3.ZERO
+var _reach := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -81,6 +93,8 @@ func _ready() -> void:
 	field_model = park.collision
 	_build_environment()
 	_build_players()
+	if use_motion:
+		set_motion(MotionLibrary.find(&"pitch"), MotionLibrary.find(&"swing"))
 	ball_actor = BallActor.new()
 	add_child(ball_actor)
 	ball_actor.visible = false
@@ -108,6 +122,41 @@ func set_mode(new_mode: StringName) -> void:
 	strikes = 0
 	_enter(State.PRE_PITCH)
 	_snap_camera()
+
+
+## Uses recorded clips for the delivery and the swing. Null keeps the key poses for that one.
+func set_motion(pitch_clip: JointClip, swing_clip: JointClip) -> void:
+	pitch_motion = PitchMotion.new(pitch_clip) if pitch_clip != null else null
+	swing_motion = SwingMotion.new(swing_clip) if swing_clip != null else null
+	settings.release_point = DuelSettings.new().release_point
+	var on_rubber := Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT)
+	if pitch_motion != null:
+		# The recording's origin is under the pivot foot, which stands against the front of the
+		# rubber. The ball leaves from where this pitcher's hand is at the moment of release.
+		on_rubber.y -= 0.06
+		pitcher.position = Field.to_world(on_rubber)
+		pitcher.reset_motion()
+		pitcher.apply_joints(pitch_motion.frame(pitch_motion.release_time), pitch_clip)
+		var hand: StringName = &"LeftHand" if pitch_clip.side == &"L" else &"RightHand"
+		settings.release_point = Field.to_field(pitcher.global_transform * pitcher.joints[hand])
+		pitcher.reset_motion()
+	else:
+		pitcher.position = Field.to_world(on_rubber)
+	var in_box := Vector3(-1.05, 0.25, 0.0)
+	if swing_motion != null:
+		# Stand the batter where the recorded swing meets the ball over the middle of the
+		# plate and on the plane contact is judged at, as far as the box allows.
+		batter.reset_motion()
+		batter.apply_joints(swing_clip.sample(swing_motion.contact), swing_clip)
+		_recorded_contact = batter.sweet_spot()
+		batter.reset_motion()
+		in_box.x = clampf(_recorded_contact.z, -1.25, -0.75)
+		in_box.y = clampf(SwingModel.CONTACT_PLANE_Y + _recorded_contact.x, -0.3, 0.6)
+	batter.position = Field.to_world(in_box)
+
+
+func release_time() -> float:
+	return pitch_motion.release_time if pitch_motion != null else PuppetClips.PITCH_RELEASE
 
 
 ## Number of pitches started since the scene loaded.
@@ -197,6 +246,8 @@ func step(delta: float) -> void:
 		_pitch_clock += delta
 	if _swing_clock >= 0.0:
 		_swing_clock += delta
+	if swing_motion != null:
+		swing_motion.advance(delta)
 
 	match state:
 		State.PRE_PITCH:
@@ -211,11 +262,18 @@ func step(delta: float) -> void:
 				accuracy = 0.0
 				_begin_windup()
 		State.WINDUP:
-			if _pitch_clock >= PuppetClips.PITCH_RELEASE:
+			# The batter starts his stride while the pitcher is still in his delivery.
+			if swing_motion != null and not _load_started and _pitch_clock >= release_time() - swing_motion.load_lead():
+				_load_started = true
+				swing_motion.begin_load()
+			if _pitch_clock >= release_time():
 				_release()
 		State.LIVE:
 			for i: int in roundi(delta / TICK):
 				duel.tick(TICK)
+			# A swing the AI scheduled at release starts when its time comes.
+			if duel.swing != null and not _swing_shown and duel.time >= duel.swing.contact_time - SwingModel.swing_time(duel.swing.kind):
+				_begin_swing_pose()
 			var following := duel.phase == PitchDuel.Phase.IN_PLAY and state_time > MAX_FOLLOW_TIME
 			if duel.is_over() or following:
 				_finish_pitch()
@@ -249,6 +307,8 @@ func _new_duel() -> void:
 	duel = PitchDuel.new(cfg, field_model, settings, _rng.fork(100 + _pitch_count))
 	_pitch_clock = -1.0
 	_swing_clock = -1.0
+	_load_started = false
+	_swing_shown = false
 
 
 func _begin_windup() -> void:
@@ -270,9 +330,23 @@ func _release() -> void:
 
 
 func _begin_swing_pose() -> void:
+	_swing_shown = true
 	_swing_lead = SwingModel.swing_time(duel.swing.kind)
 	_swing_height = duel.ideal_contact_pos.z
 	_swing_clock = 0.0
+	if swing_motion == null:
+		return
+	swing_motion.begin_swing(maxf(duel.swing.contact_time - duel.time, 0.02))
+	# The recorded swing goes through one spot. Move the hands so that this one goes where
+	# the batter aims, or where the pitch crosses if he is not aiming. Along the pitch's path
+	# the swing meets the ball where the recording does.
+	var at := duel.ideal_contact_pos
+	if duel.swing.has_aim:
+		at.x = duel.swing.aim.x
+		at.z = duel.swing.aim.y
+	_reach = batter.to_local(Field.to_world(at)) - _recorded_contact
+	_reach.x = 0.0
+	_reach = _reach.limit_length(0.45)
 
 
 func _finish_pitch() -> void:
@@ -298,6 +372,8 @@ func _finish_pitch() -> void:
 		balls = 0
 		strikes = 0
 	banner_time = 2.4
+	if swing_motion != null:
+		swing_motion.relax()
 	_enter(State.RESULT)
 
 
@@ -330,8 +406,13 @@ func _pose_players() -> void:
 	pitcher.look_at_world(Field.to_world(Vector3(0.0, 0.3, 0.9)))
 	var watching := duel.ball.pos if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT else settings.release()
 	batter.look_at_world(Field.to_world(watching))
-	pitcher.apply(PuppetClips.pitch(maxf(_pitch_clock, 0.0)))
-	if _swing_clock >= 0.0:
+	if pitch_motion != null:
+		pitcher.apply_joints(pitch_motion.frame(_pitch_clock), pitch_motion.clip)
+	else:
+		pitcher.apply(PuppetClips.pitch(maxf(_pitch_clock, 0.0)))
+	if swing_motion != null:
+		batter.apply_joints(swing_motion.frame(), swing_motion.clip, _reach * swing_motion.reach_weight())
+	elif _swing_clock >= 0.0:
 		batter.apply(PuppetClips.swing(_swing_clock - _swing_lead, _swing_lead, _swing_height))
 	else:
 		batter.apply(PuppetClips.stance())
@@ -370,8 +451,11 @@ func _move_camera(delta: float) -> void:
 		camera.position = camera.position.lerp(want, clampf(delta * 3.0, 0.0, 1.0))
 		camera.fov = lerpf(camera.fov, 40.0, clampf(delta * 3.0, 0.0, 1.0))
 		camera.look_at(Field.to_world(_follow_target))
-		catcher.visible = true
-		umpire.visible = true
+		# The batting camera sits where the catcher and umpire are, so they stay hidden
+		# until the camera has pulled away from there.
+		var away: bool = human_pitches() or camera.position.distance_to(Field.to_world(BAT_CAMERA[0])) > 6.0
+		catcher.visible = away
+		umpire.visible = away
 		return
 	_follow_target = Vector3(0.0, 10.0, 1.0)
 	_snap_camera()
