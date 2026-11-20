@@ -9,6 +9,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GAME="$ROOT/game"
 GODOT="${GODOT:-$ROOT/.tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64}"
+BLENDER="${BLENDER:-$ROOT/.tools/blender-5.3.0/blender}"
 GODOT_WIN="${GODOT_WIN:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64.exe}"
 GODOT_WIN_CONSOLE="${GODOT_WIN_CONSOLE:-$ROOT/.tools/godot-4.7.2-win/Godot_v4.7.2-stable_win64_console.exe}"
 
@@ -49,6 +50,16 @@ case "$cmd" in
     "$GODOT" --path "$GAME" --rendering-method mobile --rendering-driver vulkan --resolution 1280x720 \
       --script res://tools/screenshot.gd -- --scene "$scene" --out "$out"
     ;;
+  model)
+    # Rebuild the player model with Blender + MPFB and import it into the game.
+    # Blender keeps its settings and the MPFB add-on under .tools/blender-user.
+    export BLENDER_USER_RESOURCES="$ROOT/.tools/blender-user"
+    mkdir -p "$ROOT/build"
+    "$BLENDER" -b --python "$ROOT/tools/blender/make_player.py" -- \
+      "$GAME/assets/characters/player_base.glb" "$ROOT/build/player_preview.png" 2>&1 | grep -E "make_player|Error|Traceback"
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    echo "model: rebuilt game/assets/characters/player_base.glb (preview: build/player_preview.png)"
+    ;;
   play)
     # Run the game on Windows with the real GPU.
     "$GODOT_WIN" --path "$(win_game_path)" "$@"
@@ -79,6 +90,7 @@ Usage: ./dev <command>
   check       parse every script; fails on errors and untyped declarations
   test        run the headless test suite (GUT)
   shot        save a software-rendered screenshot inside WSL   [out.png] [scene]
+  model       rebuild the player model (Blender + MPFB) and import it
   play        run the game on Windows (GPU)
   editor      open the Godot editor on Windows
   perf        measure frame rate on Windows                    [--scene ..] [--seconds ..]

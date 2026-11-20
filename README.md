@@ -2,7 +2,7 @@
 
 Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경기에 **결정적인 순간만 직접 뛰어드는 감독 + 액션 하이브리드**와, **선수 한 명으로 뛰는 커리어 모드**가 핵심이다.
 
-- **상태**: [구현 파이프라인](docs/08-roadmap.md) 20단계 중 S3(투타 대결)까지 완료. `./dev play`로 타격·투구를 해 볼 수 있다. 다음은 S3b(선수 모델 시험).
+- **상태**: [구현 파이프라인](docs/08-roadmap.md) 20단계 중 S3b(선수 모델 시험)까지 완료. `./dev play`로 타격·투구를 해 볼 수 있다. 다음은 S4(규칙과 통계 해석기).
 - **엔진**: Godot 4.7.2 (GDScript, Jolt 물리). 씬·스크립트·데이터가 전부 텍스트 파일이라 VSCode에서 작성하고 헤드리스로 테스트한다.
 - **참고작**: 넥슨·2K스포츠의 온라인 야구 게임 「프로야구2K」(2013) / 「프로야구2K14」(2014, 서비스 종료). 조사 내용은 [docs/01-reference-research.md](docs/01-reference-research.md).
 
@@ -99,10 +99,11 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 ./dev play      # Windows에서 게임 실행 (GPU)
 ./dev editor    # Windows에서 Godot 에디터 열기
 ./dev shot      # WSL에서 화면 캡처 → build/shot.png
+./dev model     # 선수 모델 재생성 (Blender + MPFB)
 ./dev help      # 전체 명령
 ```
 
-Godot 실행 파일은 `.tools/`에 있다(Linux용은 테스트·검사, Windows용은 플레이·에디터). 게임 프로젝트는 [game/](game/)이다.
+Godot 실행 파일은 `.tools/`에 있다(Linux용은 테스트·검사, Windows용은 플레이·에디터). Blender와 MPFB도 `.tools/`에 있다. `.tools/`는 git에서 제외되므로 다른 PC에서는 다시 내려받아야 한다. 게임 프로젝트는 [game/](game/)이다.
 
 ## 검증 프로토타입
 

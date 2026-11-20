@@ -94,11 +94,11 @@ func test_puppet_reaches_its_targets_and_keeps_limb_lengths() -> void:
 	var shoulder := puppet.joints[&"RightUpperArm"]
 	var elbow := puppet.joints[&"RightLowerArm"]
 	var hand := puppet.joints[&"RightHand"]
-	assert_almost_eq(shoulder.distance_to(elbow), Puppet.UPPER_ARM, 0.002)
-	assert_almost_eq(elbow.distance_to(hand), Puppet.LOWER_ARM, 0.002)
+	assert_almost_eq(shoulder.distance_to(elbow), puppet.upper_arm, 0.002)
+	assert_almost_eq(elbow.distance_to(hand), puppet.lower_arm, 0.002)
 	assert_almost_eq(hand.distance_to(PuppetClips.stance().r_hand), 0.0, 0.01, "hand is on its target")
 	var hip := puppet.joints[&"LeftUpperLeg"]
 	var knee := puppet.joints[&"LeftLowerLeg"]
 	var ankle := puppet.joints[&"LeftFoot"]
-	assert_almost_eq(hip.distance_to(knee), Puppet.UPPER_LEG, 0.002)
-	assert_almost_eq(knee.distance_to(ankle), Puppet.LOWER_LEG, 0.002)
+	assert_almost_eq(hip.distance_to(knee), puppet.upper_leg, 0.002)
+	assert_almost_eq(knee.distance_to(ankle), puppet.lower_leg, 0.002)

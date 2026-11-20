@@ -22,6 +22,8 @@ const PITCH_CAMERA := [Vector3(-0.8, 33.0, 2.7), Vector3(0.15, 0.0, 1.1), 7.5]
 ## &"bat" = player bats, &"pitch" = player pitches, &"watch" = AI against AI.
 @export var mode: StringName = &"bat"
 @export var seed_value := 20261120
+## Show the pitcher and batter as the skinned player model when it has been built.
+@export var use_models := true
 
 var cfg: PhysicsConfig
 var catalog: Dictionary[StringName, PitchType]
@@ -388,8 +390,9 @@ func _build_environment() -> void:
 func _build_players() -> void:
 	var home := Color(0.93, 0.93, 0.95)
 	var away := Color(0.16, 0.24, 0.5)
-	pitcher = _add_puppet(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), PI, home, Color(0.1, 0.15, 0.35))
-	batter = _add_puppet(Vector3(-1.05, 0.25, 0.0), -PI / 2.0, away, Color(0.75, 0.12, 0.12))
+	# Stage S3b: the pitcher and the batter use the player model; everyone else is still a mannequin.
+	pitcher = _add_puppet(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), PI, home, Color(0.1, 0.15, 0.35), use_models)
+	batter = _add_puppet(Vector3(-1.05, 0.25, 0.0), -PI / 2.0, away, Color(0.75, 0.12, 0.12), use_models)
 	batter.show_bat = true
 	catcher = _add_puppet(Vector3(0.0, -1.15, 0.0), 0.0, home, Color(0.1, 0.15, 0.35))
 	catcher.apply(PuppetClips.catcher())
@@ -402,8 +405,8 @@ func _build_players() -> void:
 		_add_puppet(spot, -facing + PI + PI, home, Color(0.1, 0.15, 0.35)).apply(PuppetClips.fielder_ready())
 
 
-func _add_puppet(field_pos: Vector3, yaw: float, jersey: Color, cap: Color) -> Puppet:
-	var puppet := Puppet.new()
+func _add_puppet(field_pos: Vector3, yaw: float, jersey: Color, cap: Color, skinned: bool = false) -> Puppet:
+	var puppet: Puppet = SkinnedPuppet.new() if skinned and SkinnedPuppet.available() else Puppet.new()
 	puppet.set_colors(jersey, Color(0.84, 0.84, 0.86), cap)
 	puppet.position = Field.to_world(field_pos)
 	puppet.rotation.y = yaw
