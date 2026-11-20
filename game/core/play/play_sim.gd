@@ -648,7 +648,9 @@ func _play_on(r: PlayRunner, thrower: PlayFielder, from: Vector2, held: float, r
 			return false
 		_chain.append(str(b.receiver.number()))
 	_hold(b.receiver, b.time, base_xy(base))
-	if margin + rng.next_normal() * m.bang_bang_sd > 0.0:
+	var judged := margin + rng.next_normal() * m.bang_bang_sd
+	out.calls.append(PlayCall.make(maxf(need, runner_at), base, judged > 0.0, absf(judged)))
+	if judged > 0.0:
 		r.put_out(base, RunnerMove.OutKind.FORCE if forced else RunnerMove.OutKind.TAG, need)
 		_outs += 1
 		# The force is off for the runners behind him once the batter is out.

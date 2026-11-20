@@ -1,5 +1,5 @@
 class_name SubstitutionPanel
-extends PanelContainer
+extends CenteredPanel
 ## The manager's menu (docs/13 S5-11, docs/05 2.5): opening it stops the game. Pitching
 ## change and defensive changes while the player's team is in the field; pinch hitter and
 ## pinch runners while it bats. Only players who can still come in are listed, and a change
@@ -14,15 +14,10 @@ var _defence_slot: Position.Kind = Position.Kind.DH
 
 
 func _ready() -> void:
-	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	custom_minimum_size = Vector2(520, 420)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.08, 0.16, 0.92)
-	style.set_corner_radius_all(6)
-	style.set_content_margin_all(16)
-	add_theme_stylebox_override("panel", style)
+	super._ready()
+	custom_minimum_size = Vector2(620, 560)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(500, 400)
+	scroll.custom_minimum_size = Vector2(600, 540)
 	add_child(scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

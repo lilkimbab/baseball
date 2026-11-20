@@ -174,6 +174,11 @@ func pitches_thrown() -> int:
 	return _pitch_count - 1
 
 
+## Whether the timing call of the last swing is still shown.
+func swing_feedback_visible() -> bool:
+	return true
+
+
 ## The keys for this scene, for the help line.
 func help_keys() -> String:
 	return "F1 타격   F2 투구   F3 관전   Esc 종료"

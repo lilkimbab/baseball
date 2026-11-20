@@ -98,6 +98,9 @@ func _draw_pitch_list() -> void:
 ## player times the accuracy click.
 func _draw_target_gauge() -> void:
 	var state := scene.state
+	if state == DuelScene.State.WINDUP and scene.human_pitches():
+		_draw_pitch_grade()
+		return
 	if state != DuelScene.State.PRE_PITCH and state != DuelScene.State.CHARGE and state != DuelScene.State.ACCURACY:
 		return
 	if not _visible(scene.target):
@@ -115,6 +118,17 @@ func _draw_target_gauge() -> void:
 		var sweet := lerpf(base * 3.2, base * 0.3, DuelScene.ACCURACY_SWEET)
 		draw_arc(centre, sweet, 0.0, TAU, 48, Color(GREEN, 0.9), 5.0, true)
 		draw_arc(centre, sweep, 0.0, TAU, 48, INK, 3.0, true)
+
+
+## How well the accuracy click landed, inside the ring while the pitcher winds up.
+func _draw_pitch_grade() -> void:
+	if not _visible(scene.target):
+		return
+	var centre := _screen(scene.target)
+	var grade := "완벽" if scene.accuracy >= 0.85 else ("좋음" if scene.accuracy >= 0.6 else ("보통" if scene.accuracy >= 0.3 else "빗나감"))
+	var color := GOLD if scene.accuracy >= 0.85 else (GREEN if scene.accuracy >= 0.6 else (INK if scene.accuracy >= 0.3 else RED))
+	draw_arc(centre, 30.0, 0.0, TAU, 40, Color(color, 0.8), 3.0, true)
+	_text(centre + Vector2(-80.0, 8.0), grade, 22, color, HORIZONTAL_ALIGNMENT_CENTER, 160.0)
 
 
 func _draw_aim() -> void:
@@ -145,6 +159,8 @@ func _draw_pitch_readout() -> void:
 func _draw_swing_feedback() -> void:
 	var duel := scene.duel
 	if duel.swing == null or not duel.swing.resolved:
+		return
+	if not scene.swing_feedback_visible():
 		return
 	var label: String = JUDGMENT_TEXT.get(duel.swing.judgment, "")
 	var color := INK

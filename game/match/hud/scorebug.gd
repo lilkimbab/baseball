@@ -40,6 +40,11 @@ func _draw() -> void:
 	text(Vector2(mid + 14.0, box.position.y + 64.0), "투구 %d" % pitches, 17, UiTheme.DIM)
 	_draw_bases(Vector2(mid + 112.0, box.position.y + 40.0), g)
 	_draw_count(Vector2(mid + 150.0, box.position.y + 18.0), g)
+	if scene.pitch_clock >= 0.0:
+		var clock := Rect2(Vector2(view.x * 0.5 - 60.0, box.end.y + 6.0), Vector2(120.0, 38.0))
+		panel(clock)
+		var urgent := scene.pitch_clock <= 5.0
+		text(clock.position + Vector2(0.0, 28.0), "⏱ %d" % ceili(scene.pitch_clock), 24, UiTheme.RED if urgent else UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, clock.size.x, 700)
 
 
 func _draw_bases(centre: Vector2, g: GameState) -> void:

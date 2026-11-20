@@ -7,6 +7,10 @@ extends RefCounted
 var env: LeagueEnv
 var catalog: Dictionary[StringName, PitchType]
 var overall: Overall
+## A team whose manager is the player (0 away, 1 home, -1 none): the computer makes only the
+## changes the rules force on it (a pinch hitter taking the field), not its pitching changes
+## or pinch hitters.
+var manual_team := -1
 
 ## Bullpen roles per team, decided when the game starts: closer first, then set-up men.
 var _closer: Array[String] = ["", ""]
@@ -137,9 +141,12 @@ func next_change(state: GameState) -> GameEvent:
 	var fix := _fill_positions(state, defence)
 	if fix != null:
 		return fix
-	var pitching := _pitching_change(state, defence)
-	if pitching != null:
-		return pitching
+	if defence != manual_team:
+		var pitching := _pitching_change(state, defence)
+		if pitching != null:
+			return pitching
+	if state.batting() == manual_team:
+		return null
 	return _offensive_change(state, state.batting())
 
 
