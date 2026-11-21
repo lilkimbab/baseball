@@ -256,3 +256,43 @@ func test_the_player_s_throw_or_running_call_is_taken_when_the_fielder_has_the_b
 	assert_true(scene.game.over)
 	for t: int in 2:
 		assert_eq(scene.scorer.book.team_batting(t).runs, scene.game.score[t])
+
+
+func test_the_player_steals_second_by_letting_go_as_the_pitcher_moves() -> void:
+	# docs/05 2.4: hold Shift, let go with the pitcher's first move.
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 0
+	scene.innings = 3
+	scene.seed_value = 16
+	scene.use_motion = false
+	add_child_autofree(scene)
+	while scene.state != DuelScene.State.PRE_PITCH:
+		scene.step(DT)
+	var team := scene.game.batting_team()
+	var runner_id := team.lineup[8].player_id
+	scene.game.bases[0] = BaseRunner.make(runner_id, scene.game.pitcher_id())
+	assert_eq(scene.steal_base(), 1)
+	assert_true(scene.steal_key(true))
+	while scene._pitch_clock < 0.05:
+		scene.step(DT)
+	assert_true(scene.steal_key(false))
+	assert_almost_eq(scene.steal_jump(), MatchScene.BEST_JUMP, 0.01, "a good jump")
+	assert_eq(scene.resolver.human_steal, 1)
+	var outs := scene.game.outs
+	var ticks := 0
+	while scene.state != DuelScene.State.RESULT and ticks < 6000:
+		scene.step(DT)
+		ticks += 1
+	if scene._play != null and not scene._running:
+		pass_test("the pitch was put in play; the runner's start went into it")
+		return
+	if not scene._running:
+		# The throw got away: he is on third, and it is only reported.
+		assert_not_null(scene.game.runner_on(3), "a wild throw takes him to third")
+		return
+	assert_true(scene._running, "the catcher's throw is shown")
+	gut.p("steal play shown")
+	while scene._play_time >= 0.0:
+		scene.step(DT)
+	var on_second: bool = scene.game.runner_on(2) != null and scene.game.runner_on(2).player_id == runner_id
+	assert_true(on_second or scene.game.outs == outs + 1 or scene.game.top == false, "safe at second or out")

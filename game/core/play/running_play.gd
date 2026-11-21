@@ -25,18 +25,20 @@ const RELEASE_AT := Vector3(0.0, Field.RUBBER_Y - 1.6, 1.8)
 ## A steal of the base after `base` by `runner_id`. `margin` is by how much the runner was
 ## expected to beat the throw (s, PhysicalResolver.steal_margin); `safe` is how it came out.
 ## `cover_from` is where the fielder who takes the throw stood.
-static func steal(base: int, runner_id: String, safe: bool, margin: float, cover: Position.Kind, cover_from: Vector2, motion: MotionModel) -> PlayResult:
+## `with_pitch` false starts at the catch, for a pitch already shown (the player's steal).
+static func steal(base: int, runner_id: String, safe: bool, margin: float, cover: Position.Kind, cover_from: Vector2, motion: MotionModel, with_pitch: bool = true) -> PlayResult:
 	var play := PlayResult.new()
 	var tl := play.timeline
 	var bag := PlaySim.base_xy(base + 1)
 	var target := Vector3(bag.x, bag.y, 1.2)
 	# The pitch.
-	var caught := STEAL_LEAD_IN + PITCH_FLIGHT
-	tl.add("ball", 0.0, RELEASE_AT)
-	tl.add("ball", STEAL_LEAD_IN, RELEASE_AT)
-	tl.add("ball", caught, CATCH_AT)
-	tl.add_throw(STEAL_LEAD_IN, RELEASE_AT, caught, CATCH_AT)
-	_stay(tl, "F:P", Vector2(0.0, Field.RUBBER_Y), caught)
+	var caught := STEAL_LEAD_IN + PITCH_FLIGHT if with_pitch else 0.0
+	tl.add("ball", 0.0, RELEASE_AT if with_pitch else CATCH_AT)
+	if with_pitch:
+		tl.add("ball", STEAL_LEAD_IN, RELEASE_AT)
+		tl.add("ball", caught, CATCH_AT)
+		tl.add_throw(STEAL_LEAD_IN, RELEASE_AT, caught, CATCH_AT)
+	_stay(tl, "F:P", Vector2(0.0, Field.RUBBER_Y), maxf(caught, 0.1))
 	# The catcher's throw to the bag.
 	var release := caught + motion.transfer_for(Position.Kind.C, 50.0)
 	var from := Vector3(CATCHER_AT.x, CATCHER_AT.y + 0.4, 1.8)
@@ -47,8 +49,9 @@ static func steal(base: int, runner_id: String, safe: bool, margin: float, cover
 	tl.add_throw(release, from, arrive, target)
 	# The cover man breaks for the bag as the runner goes and is there before the ball.
 	var key := "F:%s" % Position.code(cover)
-	tl.add(key, STEAL_LEAD_IN, Vector3(cover_from.x, cover_from.y, 0.0))
-	tl.add(key, maxf(arrive - 0.25, STEAL_LEAD_IN + 0.3), Vector3(bag.x, bag.y, 0.0))
+	var breaks := STEAL_LEAD_IN if with_pitch else 0.0
+	tl.add(key, breaks, Vector3(cover_from.x, cover_from.y, 0.0))
+	tl.add(key, maxf(arrive - 0.25, breaks + 0.3), Vector3(bag.x, bag.y, 0.0))
 	# The runner, from his lead, at full stride, to the bag.
 	var shown := maxf(absf(margin), MIN_MARGIN) * (1.0 if safe else -1.0)
 	var need := arrive + motion.tag
@@ -101,8 +104,14 @@ static func _runner(tl: PlayTimeline, id: String, from: int, lead: float, to: in
 	var start := PlaySim.base_xy(from)
 	var bag := PlaySim.base_xy(to)
 	var spot := start + (bag - start).normalized() * lead
-	var leave := maxf(reach - spot.distance_to(bag) / RUNNER_SPEED, 0.1)
+	var leave := reach - spot.distance_to(bag) / RUNNER_SPEED
 	var key := "R:%s" % id
+	if leave < 0.1:
+		# Already on his way when the play opens.
+		var on := bag + (spot - bag).normalized() * minf(spot.distance_to(bag), reach * RUNNER_SPEED)
+		tl.add(key, 0.0, Vector3(on.x, on.y, 0.0))
+		tl.add(key, reach, Vector3(bag.x, bag.y, 0.0))
+		return
 	tl.add(key, 0.0, Vector3(spot.x, spot.y, 0.0))
 	tl.add(key, leave, Vector3(spot.x, spot.y, 0.0))
 	tl.add(key, reach, Vector3(bag.x, bag.y, 0.0))

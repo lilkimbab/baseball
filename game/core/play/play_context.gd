@@ -27,6 +27,9 @@ var squeeze := false
 var throw_to := 0
 var throw_power := 1.0
 var throw_wild := 1.0
+## The base a runner is stealing from on this pitch (the player's steal): he broke with the
+## pitcher's first move. 0 for none.
+var stealing := 0
 
 
 ## A context for the batter now up in `state`, with the fielders at `positions`.

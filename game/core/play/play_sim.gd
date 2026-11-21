@@ -143,7 +143,7 @@ func _setup(context: PlayContext, random: Rng) -> void:
 		r.start = MotionModel.lerp_rating(m.runner_read, r.baserunning) - ROLLING_START
 		if _outs == 2:
 			r.start = -m.two_out_jump
-		if context.running_with_pitch and r.forced:
+		if (context.running_with_pitch and r.forced) or context.stealing == base:
 			r.gap += 6.0
 			r.start = 0.0
 		elif context.squeeze and base == 3:
