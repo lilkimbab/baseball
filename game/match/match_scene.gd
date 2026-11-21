@@ -371,6 +371,7 @@ func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 	model.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, kind))
 	model.set_hair(1 + absi(hash(p.id)) % 4, hair_color_of(p))
 	model.helmet_flaps = &"both" if p.bats == &"S" else &"left"
+	model.set_face(p.id)
 
 
 ## The club's letter on the cap and helmet (fictional clubs: the first letter of the name).
