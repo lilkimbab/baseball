@@ -34,6 +34,14 @@ const POLE_HEIGHT := 16.0
 const SCREEN_SIZE := Vector2(28.0, 12.0)
 const AD_LENGTH := 7.0
 const AD_SLOTS := 8
+## One person a seat this wide (m); the cheering sections run from CHEER_FROM to CHEER_TO
+## degrees round from centre field, their first CHEER_ROWS rows.
+const SEAT_PITCH := 0.5
+const CHEER_FROM := 70.0
+const CHEER_TO := 115.0
+const CHEER_ROWS := 22
+## Seats this far round (degrees from centre field) or more are behind home.
+const BEHIND_HOME_FROM := 140.0
 
 var def: StadiumDef
 var fence: FenceProfile
@@ -46,6 +54,13 @@ var _lamp: StandardMaterial3D
 ## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
 ## the game on it, docs/13 S13-6).
 var scoreboard: SubViewport
+## Every seat, as the stands are laid out (for the crowd, docs/13 S14): where it is (world),
+## its azimuth, row, tier (0 lower, 1 upper) and zone (Crowd.Zone).
+var seat_pos := PackedVector3Array()
+var seat_az := PackedFloat32Array()
+var seat_row := PackedInt32Array()
+var seat_tier := PackedByteArray()
+var seat_zone := PackedByteArray()
 ## Ad boards along the wall behind home and the upper tier's front, made as the stands are.
 var _ads: SurfaceTool
 var _ads_along := 0.0
@@ -592,6 +607,8 @@ func _build_stands() -> void:
 					_quad(seats, _rim(az0, r0, h0), _rim(az1, r0, h0), _rim(az1, r0, h0 + rise), _rim(az0, r0, h0 + rise))
 					seats.set_color(c * 0.9)
 					_quad(seats, _rim(az0, r0, h0 + rise), _rim(az1, r0, h0 + rise), _rim(az1, r0 + ROW_DEPTH, h0 + rise), _rim(az0, r0 + ROW_DEPTH, h0 + rise))
+					if not aisle:
+						_add_seats(az0, STEP, r0 + ROW_DEPTH * 0.55, h0 + rise, row, tier, fair)
 				out += n * ROW_DEPTH
 				height += n * rise
 			# The back wall, up to the roof where there is one, which it holds up.
@@ -854,3 +871,47 @@ func _build_scoreboard() -> void:
 		leg.size = Vector3(1.2, bottom, 1.2)
 		var across := Vector3(cos(deg_to_rad(az)), -sin(deg_to_rad(az)), 0.0) * (SCREEN_SIZE.x * 0.35 * side)
 		_add(leg, Color(0.2, 0.21, 0.23), at_az(az, r + 0.7) + across + Vector3(0.0, 0.0, bottom * 0.5))
+
+
+# --- Seats for the crowd ---
+
+
+## The seats along one row over an azimuth step, SEAT_PITCH apart.
+func _add_seats(az0: float, step: float, outward: float, height: float, row: int, tier: int, fair: bool) -> void:
+	var mid := az0 + step * 0.5
+	var arc := deg_to_rad(step) * (collision.boundary_distance(mid) + 0.25 + outward)
+	var n := int(arc / SEAT_PITCH)
+	for k: int in n:
+		var az := az0 + step * (k + 0.5) / n
+		seat_pos.append(_rim(az, outward, height))
+		seat_az.append(az)
+		seat_row.append(row)
+		seat_tier.append(tier)
+		seat_zone.append(_zone_of(az, tier, row, fair))
+
+
+## Which part of the crowd a seat is in (Crowd.Zone): the first-base side's cheering section
+## is the home club's, the third-base side's the visitors'.
+static func _zone_of(az: float, tier: int, row: int, fair: bool) -> int:
+	if tier > 0:
+		return Crowd.Zone.UPPER
+	if fair:
+		return Crowd.Zone.OUTFIELD
+	if absf(az) >= BEHIND_HOME_FROM:
+		return Crowd.Zone.BEHIND_HOME
+	var cheering := absf(az) >= CHEER_FROM and absf(az) <= CHEER_TO and row < CHEER_ROWS
+	if az > 0.0:
+		return Crowd.Zone.HOME_CHEER if cheering else Crowd.Zone.FIRST
+	return Crowd.Zone.AWAY_CHEER if cheering else Crowd.Zone.THIRD
+
+
+## The azimuths (absolute) the dugouts span.
+func dugout_span() -> Vector2:
+	return Vector2(absf(_line_az(DUGOUT_FROM, 1.0)), absf(_line_az(DUGOUT_TO, 1.0)))
+
+
+## Where a cheering section's stage stands: at the front of its first row (side 1 first base,
+## −1 third), or INF when the park has no seats there.
+func stage_spot(side: float) -> Vector3:
+	var az := (CHEER_FROM + CHEER_TO) * 0.5 * side
+	return _rim(az, 0.9, LOWER_LIP + 0.6)

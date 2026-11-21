@@ -238,6 +238,14 @@ func summary_pitch() -> void:
 		_end_play()
 
 
+## Postseason games sell out.
+func crowd_fill() -> float:
+	var s := LeagueSession.season
+	if s != null and league_game != null and s.postseason_of(league_game) != null:
+		return 1.0
+	return super.crowd_fill()
+
+
 func shows_running_plays() -> bool:
 	return live()
 
