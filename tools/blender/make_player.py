@@ -37,7 +37,22 @@ MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.9, "weight": 0.65, "height": 0.6
 SHAPE = {
     "measure-upperarm-length-incr": 0.25, "measure-lowerarm-length-incr": 0.25,
     "head-scale-vert-incr": 0.4, "head-scale-horiz-incr": 0.4, "head-scale-depth-incr": 0.4,
+    # A man's face (docs/13 S11-6): a wider, firmer jaw and chin, cheekbones, a brow ridge,
+    # a thicker neck. Without these the default face reads as a woman's at close range.
+    "chin-width-incr": 0.3, "chin-bones-incr": 0.35, "l-cheek-bones-incr": 0.25, "r-cheek-bones-incr": 0.25,
+    "eyebrows-trans-forward": 0.35, "forehead-nubian-incr": 0.2, "measure-neck-circ-incr": 0.45, "head-square": 0.25,
 }
+# Faces that differ from player to player: shape keys the game sets per player (morph
+# targets in the model). Each name is one key; pairs give both directions.
+FACE_KEYS = [
+    "head-oval", "head-round", "head-square", "head-triangular",
+    "chin-width-incr", "chin-width-decr", "chin-prominent-incr", "chin-prominent-decr",
+    "nose-scale-horiz-incr", "nose-scale-horiz-decr", "nose-scale-vert-incr", "nose-hump-incr",
+    "mouth-scale-horiz-incr", "mouth-scale-horiz-decr",
+    "l-cheek-bones-incr", "r-cheek-bones-incr",
+]
+# (No eye keys: the eyes, brows and lashes are separate meshes fitted to the default face and
+# would not follow them.)
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
 # Builds (docs/13 S11-1): MPFB weight and muscle for a lean, standard, solid and heavy player
 # of the same height. Weight rises with muscle first (athletes), then with mass. The trunk's
@@ -289,6 +304,8 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of):
     obj.data = body.data.copy()
     obj.name = obj.data.name = name
     bpy.context.scene.collection.objects.link(obj)
+    # Clothes do not need the face keys.
+    obj.shape_key_clear()
 
     bm = bmesh.new()
     bm.from_mesh(obj.data)
@@ -349,6 +366,7 @@ def make_shell(body, rig, name, keep, lift, mat_name):
     obj.data = body.data.copy()
     obj.name = obj.data.name = name
     bpy.context.scene.collection.objects.link(obj)
+    obj.shape_key_clear()
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bm.normal_update()
@@ -700,6 +718,9 @@ def main():
     rig = HumanService.add_builtin_rig(body, "game_engine", import_weights=True)
     face_parts = add_skin_and_face(body)
     TargetService.bake_targets(body)
+    # The face keys stay as keys (weight 0) for the game to set per player.
+    for name in FACE_KEYS:
+        TargetService.load_target(body, TargetService.target_full_path(name), weight=0.0, name="face_" + name)
     stand_on_ground(body, rig)
     hair = add_hair(body)
 
@@ -797,7 +818,8 @@ def main():
         obj.select_set(obj in (rig, *parts))
     bpy.context.view_layer.objects.active = rig
     bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB', use_selection=True, export_apply=False,
-                              export_yup=True, export_skins=True, export_animations=False, export_morph=False)
+                              export_yup=True, export_skins=True, export_animations=False, export_morph=True,
+                              export_morph_normal=True)
     print("make_player: wrote", OUT_GLB)
     if PREVIEW:
         # The preview shows a catcher's gear and a batting helmet with its left flap.

@@ -212,7 +212,7 @@ func test_the_model_is_scaled_to_the_players_height() -> void:
 	assert_almost_eq(tall.upper_leg / short.upper_leg, 1.95 / 1.7, 0.01, "legs scale with height")
 	assert_almost_eq(tall.upper_arm / short.upper_arm, 1.95 / 1.7, 0.01, "and arms")
 	var body := tall.find_child("Body", true, false) as MeshInstance3D
-	var top := (tall.global_transform.affine_inverse() * body.global_transform * body.get_aabb()).end.y
+	var top := (tall.global_transform.affine_inverse() * body.global_transform * Vector3(0.0, SkinnedPuppet.mesh_top(body.mesh), 0.0)).y
 	assert_almost_eq(top, 1.95, 0.01, "the top of the head is at the player's height")
 
 
@@ -387,7 +387,7 @@ func test_head_size_and_belt_height_are_in_proportion() -> void:
 	var body := puppet.find_child("Body", true, false) as MeshInstance3D
 	var eyes := puppet.find_child("Eyes", true, false) as MeshInstance3D
 	var pants := puppet.find_child("Pants", true, false) as MeshInstance3D
-	var top := body.get_aabb().end.y
+	var top := SkinnedPuppet.mesh_top(body.mesh)
 	# Eyes sit a little above the middle of the head, so top-to-eyes is about 0.54 of the head
 	# height. A grown man is 7.5 to 8.2 head-heights tall.
 	var eyes_down := (top - eyes.get_aabb().get_center().y) / top
@@ -420,7 +420,7 @@ func _chest_depth(b: StringName) -> float:
 	var scene := (load(SkinnedPuppet.model_for(b)) as PackedScene).instantiate() as Node3D
 	autofree(scene)
 	var body := scene.find_child("Body", true, false) as MeshInstance3D
-	var top := body.get_aabb().end.y
+	var top := SkinnedPuppet.mesh_top(body.mesh)
 	var jersey := scene.find_child("Jersey", true, false) as MeshInstance3D
 	var low := INF
 	var high := -INF
@@ -562,3 +562,24 @@ func test_the_team_letter_sits_on_the_front_of_the_cap() -> void:
 	var front := puppet.to_local(cap_label.global_position)
 	var centre := puppet.to_local(head.global_transform * head.get_aabb().get_center())
 	assert_lt(front.z, centre.z, "the puppet faces -Z: the letter is on the front")
+
+
+# --- S11-6 faces ---
+
+
+func test_every_player_on_a_club_has_his_own_face() -> void:
+	var puppet := _model()
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	assert_gt(body.get_blend_shape_count(), 10, "the face keys came through as blend shapes")
+	var seen: Dictionary[String, bool] = {}
+	for i: int in 28:
+		var weights := puppet.set_face("p%05d" % (i + 1))
+		assert_false(weights.is_empty())
+		var key := ""
+		for k: String in weights:
+			key += "%s=%.3f;" % [k, weights[k]]
+			assert_between(weights[k], 0.0, 0.61, "moderate, so brows and eyes stay in place")
+		assert_false(seen.has(key), "28 different faces")
+		seen[key] = true
+	# The same player always gets the same face.
+	assert_eq(puppet.set_face("p00007"), puppet.set_face("p00007"))

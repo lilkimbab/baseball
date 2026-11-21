@@ -111,6 +111,23 @@ static func available() -> bool:
 	return ResourceLoader.exists(MODEL)
 
 
+static var _tops: Dictionary[int, float] = {}
+
+
+## The top of the head in the model at rest: the highest point of the body mesh itself. Its
+## bounds would do, but they also take in how far the face keys can move it.
+static func mesh_top(mesh: Mesh) -> float:
+	var key := mesh.get_instance_id()
+	if not _tops.has(key):
+		var top := -INF
+		for surface: int in mesh.get_surface_count():
+			var verts: PackedVector3Array = mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+			for v: Vector3 in verts:
+				top = maxf(top, v.y)
+		_tops[key] = top if top > -INF else mesh.get_aabb().end.y
+	return _tops[key]
+
+
 ## The model file for a build (the standard one if that build has not been made).
 static func model_for(b: StringName) -> String:
 	var path := "res://assets/characters/player_%s.glb" % b
@@ -159,7 +176,7 @@ func set_body(height_m: float, b: StringName) -> void:
 		_paint()
 	elif not is_equal_approx(height_m, height):
 		height = height_m
-		_model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
+		_model.scale = Vector3.ONE * (height / mesh_top(_mesh.mesh))
 		_recompute_frames()
 		_measure()
 
@@ -190,7 +207,7 @@ func _load_model() -> void:
 	_model = model
 	_skeleton = model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	_mesh = model.find_child("Body", true, false) as MeshInstance3D
-	model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
+	model.scale = Vector3.ONE * (height / mesh_top(_mesh.mesh))
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
 	_flaps.clear()
@@ -909,6 +926,44 @@ func _hair_material(original: Material) -> Material:
 	m.roughness = 0.55
 	m.alpha_scissor_threshold = 0.4
 	return m
+
+
+## Which face keys, how far (docs/13 S11-6): a head shape, chin, nose, mouth and cheekbones
+## each picked from the player's id, moderate amounts so the brows and eyes (fitted to the
+## default face) stay in place. Returns the weights set, by key.
+const FACE_GROUPS: Array[Array] = [
+	[["face_head-oval", "face_head-round", "face_head-square", "face_head-triangular"], 0.5],
+	[["face_chin-width-incr", "face_chin-width-decr"], 0.6],
+	[["face_chin-prominent-incr", "face_chin-prominent-decr"], 0.5],
+	[["face_nose-scale-horiz-incr", "face_nose-scale-horiz-decr"], 0.6],
+	[["face_nose-scale-vert-incr"], 0.5],
+	[["face_nose-hump-incr"], 0.5],
+	[["face_mouth-scale-horiz-incr", "face_mouth-scale-horiz-decr"], 0.5],
+]
+
+
+func set_face(seed_text: String) -> Dictionary[String, float]:
+	var out: Dictionary[String, float] = {}
+	if _mesh == null or _mesh.mesh == null:
+		return out
+	for i: int in _mesh.get_blend_shape_count():
+		_mesh.set_blend_shape_value(i, 0.0)
+	var rng := Rng.new(hash(seed_text + ":face"))
+	for group: Array in FACE_GROUPS:
+		var keys: Array = group[0]
+		var key: String = keys[rng.next_int(keys.size())]
+		var amount := float(group[1]) * rng.next_float()
+		var index := _mesh.find_blend_shape_by_name(StringName(key))
+		if index >= 0:
+			_mesh.set_blend_shape_value(index, amount)
+			out[key] = amount
+	var cheeks := 0.4 * rng.next_float()
+	for key: String in ["face_l-cheek-bones-incr", "face_r-cheek-bones-incr"]:
+		var index := _mesh.find_blend_shape_by_name(StringName(key))
+		if index >= 0:
+			_mesh.set_blend_shape_value(index, cheeks)
+			out[key] = cheeks
+	return out
 
 
 ## A player's hair: style 1 to 4 and colour.
