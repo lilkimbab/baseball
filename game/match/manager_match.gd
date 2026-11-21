@@ -81,7 +81,10 @@ func _ready() -> void:
 
 
 func _read_arguments() -> void:
+	var quick := QuickMatchScreen.pending
 	super._read_arguments()
+	if quick:
+		interventions_left = Settings.interventions
 	if human_team >= 0:
 		my_team = human_team
 	human_team = -1

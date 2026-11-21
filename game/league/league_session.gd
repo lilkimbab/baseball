@@ -10,6 +10,8 @@ const MATCH := "res://match/manager_match.tscn"
 static var season: Season
 ## The player's game handed to the match screen, until its result is recorded.
 static var pending: ScheduledGame
+## The save slot this season goes to (one per club).
+static var slot := ""
 
 
 ## A new season with the roster pack's thirty clubs in three divisions (top first). The player
@@ -19,6 +21,7 @@ static func start(team_id: String, games: int, seed_value: int, teams: Array[Tea
 	season = Season.create(clubs, 10, games, seed_value, RuleSet.kbo_2026(), LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), LeagueEnvIO.load_overall(), ClubIO.load_default())
 	season.season_year = year
 	season.manage(team_id)
+	slot = "league_%s" % team_id
 	if carry != null:
 		season.club = carry
 		season.clubs[team_id] = carry
@@ -35,3 +38,10 @@ static func next_season(seed_value: int) -> Season:
 		for id: String in ids:
 			order.append(old.teams[id])
 	return start(old.my_team, old.games_per_team, seed_value, order, old.season_year + 1, old.club)
+
+
+## Saves the season to its slot (after every day and game, docs/07 section 7).
+static func autosave() -> void:
+	if season == null or slot == "":
+		return
+	SaveIO.save_league(slot, season, Time.get_unix_time_from_system())

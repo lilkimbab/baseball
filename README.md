@@ -2,7 +2,7 @@
 
 Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경기에 **결정적인 순간만 직접 뛰어드는 감독 + 액션 하이브리드**와, **선수 한 명으로 뛰는 커리어 모드**가 핵심이다.
 
-- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S6(경기 화면)까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료, S7(감독 리그)·S8(커리어) 완료. `./dev play`로 3이닝 경기를 한다(자기 팀의 타격과 투구, 수비·주루는 자동, 점수 표시·하단 바·투구 기록·화면 속 화면·경기 뒤 화면). 감독 지휘 경기(상황판, 작전, 개입 3회)는 `./dev play res://match/manager_match.tscn`. `./dev sim season`은 144경기 시즌(일정·순위·투수 휴식)을 돌린다. 할 일은 [구현 명세](docs/13-implementation-spec.md)에 순서대로 있다.
+- **상태**: [구현 파이프라인](docs/08-roadmap.md)의 S6(경기 화면)까지와 화면 품질 작업(Q1, Q2, Q3 1차) 완료, S7(감독 리그)·S8(커리어)·S9(허브·메뉴·저장) 완료. `./dev play`는 제목 화면부터 시작한다. `./dev play`로 3이닝 경기를 한다(자기 팀의 타격과 투구, 수비·주루는 자동, 점수 표시·하단 바·투구 기록·화면 속 화면·경기 뒤 화면). 감독 지휘 경기(상황판, 작전, 개입 3회)는 `./dev play res://match/manager_match.tscn`. `./dev sim season`은 144경기 시즌(일정·순위·투수 휴식)을 돌린다. 할 일은 [구현 명세](docs/13-implementation-spec.md)에 순서대로 있다.
 - **엔진**: Godot 4.7.2 (GDScript, Jolt 물리). 씬·스크립트·데이터가 전부 텍스트 파일이라 VSCode에서 작성하고 헤드리스로 테스트한다.
 - **참고작**: 넥슨·2K스포츠의 온라인 야구 게임 「프로야구2K」(2013) / 「프로야구2K14」(2014, 서비스 종료). 조사 내용은 [docs/01-reference-research.md](docs/01-reference-research.md).
 
@@ -98,7 +98,8 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 ```bash
 ./dev test      # 헤드리스 테스트
 ./dev check     # 스크립트 문법·타입 검사
-./dev play      # Windows에서 경기 실행 (GPU). 3이닝 홈팀. 옵션: -- --innings 9 --team away|home|watch
+./dev play      # Windows에서 실행 (GPU). 제목 → 허브(빠른 경기·감독 리그·커리어·훈련장·불러오기·설정)
+                #   경기 장면 바로: ./dev play res://match/match.tscn -- --innings 9 --team away|home|watch
                 #   타격: 왼쪽 클릭 컨택, 오른쪽 클릭 강타, Space 번트 / 투구: 1~5 구종, 누르고 떼고 다시 눌러 힘·정확도
                 #   Esc 일시정지(투구 시간·자동 교체 설정), F 작전·교체, Tab 상세, C 코스 분포, F3 관전
                 #   타격 연습 장면: ./dev play res://match/duel.tscn

@@ -57,6 +57,8 @@ func _start_game() -> void:
 	innings = game.rules.innings
 	my_team = cs.my_side(game)
 	me = cs.career.player.id
+	Settings.ensure_loaded()
+	pitch_all = Settings.pitch_all
 	game_goal = GameGoal.for_player(cs.career, cs.rules)
 	interventions_left = 0
 	_chosen_team = my_team

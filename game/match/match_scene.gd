@@ -34,6 +34,8 @@ var post_game: PostGame
 ## The pitch clock (KBO 2026: 18 s with the bases empty, 23 s with runners) runs only while
 ## the player chooses his pitch; seconds left, negative when not running.
 var pitch_clock_on := true
+## Started from the quick game menu: leaving goes back to the hub.
+var from_menu := false
 var pitch_clock := -1.0
 ## The computer also makes the player's team's pitching changes and pinch hits.
 var auto_changes := true
@@ -119,7 +121,7 @@ func _ready() -> void:
 	pause_menu.scene = self
 	layer.add_child(pause_menu)
 	pause_menu.wants_substitutions.connect(func() -> void: toggle_menu(true))
-	pause_menu.quit_requested.connect(func() -> void: get_tree().quit())
+	pause_menu.quit_requested.connect(leave)
 	commentary = CommentaryIO.load_default()
 	_build_pip(layer)
 	# The duel's own count and help line give way to the scoreboard and the bottom bar.
@@ -138,6 +140,17 @@ func _ready() -> void:
 
 ## Command-line choices: -- --innings 3|6|9 --team home|away|watch --seed n
 func _read_arguments() -> void:
+	Settings.ensure_loaded()
+	pitch_clock_on = Settings.pitch_clock
+	auto_changes = Settings.auto_changes
+	if QuickMatchScreen.pending:
+		QuickMatchScreen.pending = false
+		from_menu = true
+		innings = Settings.innings
+		human_team = QuickMatchScreen.side_index()
+		away_index = QuickMatchScreen.away_index
+		home_index = QuickMatchScreen.home_index
+		return
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
 	if args.has("innings"):
 		innings = int(str(args["innings"]))
@@ -247,9 +260,11 @@ func _unhandled_input(event: InputEvent) -> void:
 func _menu_key(code: Key) -> void:
 	if game.over:
 		if code == KEY_ENTER:
+			if from_menu:
+				QuickMatchScreen.pending = true
 			get_tree().reload_current_scene()
 		else:
-			get_tree().quit()
+			leave()
 		return
 	if code != KEY_ESCAPE:
 		return
@@ -278,6 +293,14 @@ func toggle_menu(from_pause: bool = false) -> void:
 func set_auto_changes(on: bool) -> void:
 	auto_changes = on
 	manager.manual_team = -1 if on or own_team() < 0 else own_team()
+
+
+## Out of the game: back to the hub when there is one to go back to, else the program ends.
+func leave() -> void:
+	if from_menu or ResourceLoader.exists(Screen.HUB) and get_tree().current_scene == self and OS.get_cmdline_user_args().is_empty():
+		get_tree().change_scene_to_file(Screen.HUB)
+	else:
+		get_tree().quit()
 
 
 ## What the screen after the game says the keys do.

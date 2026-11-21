@@ -181,7 +181,7 @@ func swing_feedback_visible() -> bool:
 
 ## The keys for this scene, for the help line.
 func help_keys() -> String:
-	return "F1 타격   F2 투구   F3 관전   Esc 종료"
+	return "F1 타격   F2 투구   F3 관전   Esc 나가기"
 
 
 func human_pitches() -> bool:
@@ -209,7 +209,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_V:
 				aim_enabled = not aim_enabled
 			KEY_ESCAPE:
-				get_tree().quit()
+				# The practice field goes back to the hub; run on its own, it ends the program.
+				if OS.get_cmdline_user_args().is_empty() and ResourceLoader.exists("res://ui/hub_screen.tscn"):
+					get_tree().change_scene_to_file("res://ui/hub_screen.tscn")
+				else:
+					get_tree().quit()
 		if human_pitches() and state == State.PRE_PITCH:
 			var index := key.keycode - KEY_1
 			if index >= 0 and index < pitch_ids.size():

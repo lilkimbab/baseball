@@ -133,8 +133,9 @@ func _footer(rect: Rect2, g: GameState) -> void:
 	panel(rect, UiTheme.PANEL_DARK)
 	var home := scene.win_chance
 	var mine := home if scene.my_team == 1 else 1.0 - home
-	text(rect.position + Vector2(20.0, 40.0), "승리 확률  %s %d%%" % [g.teams[scene.my_team].short_name, roundi(mine * 100.0)], 20, UiTheme.INK)
-	bar(Rect2(rect.position + Vector2(250.0, 28.0), Vector2(160.0, 12.0)), mine, UiTheme.BLUE)
+	if Settings.win_chance:
+		text(rect.position + Vector2(20.0, 40.0), "승리 확률  %s %d%%" % [g.teams[scene.my_team].short_name, roundi(mine * 100.0)], 20, UiTheme.INK)
+		bar(Rect2(rect.position + Vector2(250.0, 28.0), Vector2(160.0, 12.0)), mine, UiTheme.BLUE)
 	var key := scene.leverage >= WinExpectancy.HIGH
 	text(rect.position + Vector2(440.0, 40.0), "레버리지 %.1f%s" % [scene.leverage, "  승부처" if key else ""], 20, UiTheme.RED if key else UiTheme.DIM)
 	text(rect.position + Vector2(660.0, 40.0), scene.board_note(), 20, UiTheme.GOLD)

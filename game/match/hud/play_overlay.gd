@@ -51,7 +51,7 @@ func _base_markers() -> void:
 
 ## A ring where a ball in the air will first come down, until it does.
 func _landing_spot(t: float) -> void:
-	if not scene.landing_known or t > scene.landing_time:
+	if not Settings.landing_spot or not scene.landing_known or t > scene.landing_time:
 		return
 	var at := scene.landing_point
 	if not _in_front(at):

@@ -13,6 +13,7 @@ static var season: Season
 static var career_season: CareerSeason
 ## What the last game earned, for the hub.
 static var last_report: CareerSeason.Report
+static var slot := ""
 
 
 ## A new career: the player joins `team_id`'s second team in a new season of the fictional
@@ -24,3 +25,10 @@ static func start(c: CareerPlayer, team_id: String, games: int, seed_value: int)
 	career = c
 	career_season = CareerSeason.start(season, c, CareerIO.load_default())
 	last_report = null
+	slot = "career_%s" % c.player.id
+
+
+static func autosave() -> void:
+	if career_season == null or slot == "":
+		return
+	SaveIO.save_career(slot, career_season, Time.get_unix_time_from_system())

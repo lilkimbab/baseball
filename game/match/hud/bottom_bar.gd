@@ -34,7 +34,7 @@ func _draw() -> void:
 	var keys := Rect2(Vector2(CARD + 28.0, top + HEIGHT - 34.0), Vector2(view.x - 2.0 * CARD - 56.0, 34.0))
 	panel(keys)
 	text(keys.position + Vector2(0.0, 23.0), scene.help_keys() + "   Tab 상세", 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, keys.size.x)
-	if scene.last_text != "":
+	if scene.last_text != "" and Settings.commentary:
 		var line := Rect2(Vector2(CARD + 28.0, top), Vector2(view.x - 2.0 * CARD - 56.0, 48.0))
 		panel(line)
 		text(line.position + Vector2(0.0, 32.0), scene.last_text, 20, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, line.size.x)
