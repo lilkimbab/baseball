@@ -620,6 +620,42 @@ def trim_hair(hair, head_points):
     return left
 
 
+def make_helmet_flap(head_points, rig, side):
+    """The ear flap of a batting helmet (docs/13 S11-5): a curved plate from the helmet's rim
+    down over one ear to the jaw, with the ear hole as a dark ring. Batters wear it on the ear
+    toward the pitcher (a right-handed batter on the left); switch hitters on both."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    rx, ry, rz = half_w + 0.024, half_d + 0.026, height * 0.46
+    cz = top - rz + 0.022
+    sign = 1.0 if side == "Left" else -1.0
+    bm = bmesh.new()
+    rows = []
+    # From the helmet's lower edge on that side down to about the jaw, round the ear.
+    for i in range(6):
+        z = cz - rz * math.sin(0.62) + 0.004 - i * 0.016
+        row = []
+        for j in range(7):
+            a = math.radians(-40.0 + 80.0 * j / 6.0)
+            width = 1.0 - 0.25 * (i / 5.0) ** 2
+            x = centre.x + sign * (rx + 0.002) * math.cos(a * 0.55) * (0.98 + 0.02 * i)
+            y = centre.y + ry * math.sin(a) * 0.62 * width
+            row.append(bm.verts.new(Vector((x, y, z))))
+        rows.append(row)
+    for i in range(5):
+        for j in range(6):
+            quad = (rows[i][j], rows[i][j + 1], rows[i + 1][j + 1], rows[i + 1][j])
+            bm.faces.new(quad if side == "Left" else tuple(reversed(quad)))
+    return skinned_object("HelmetFlap" + side, bm, rig, lambda co: "head", "Helmet")
+
+
+def make_cap_button(head_points, rig):
+    """The button on top of the cap."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    bm = bmesh.new()
+    dome(bm, Vector((centre.x, centre.y, top + 0.012)), 0.009, 0.009, 0.006, 0.0)
+    return skinned_object("CapButton", bm, rig, lambda co: "head", "Cap")
+
+
 def render_preview(path, target_z):
     scene = bpy.context.scene
     scene.render.engine = 'CYCLES'
@@ -742,9 +778,10 @@ def main():
             make_shell(body, rig, "ShinGuards", is_shin, 0.032, "Gear")]
     strip_body(body)
     trim_hair(hair, head_points)
-    optional = [*gear, make_mask(head_points, rig), make_helmet(head_points, rig)]
+    optional = [*gear, make_mask(head_points, rig), make_helmet_flap(head_points, rig, "Left"),
+                make_helmet_flap(head_points, rig, "Right"), make_helmet(head_points, rig)]
     parts = [body, jersey, pants, make_collar(rig), make_shoes(feet, rig), *face_parts, *hair,
-             make_cap(head_points, rig), *optional]
+             make_cap(head_points, rig), make_cap_button(head_points, rig), *optional]
 
     for old, new in BONE_NAMES.items():
         if old in rig.data.bones:
@@ -763,10 +800,12 @@ def main():
                               export_yup=True, export_skins=True, export_animations=False, export_morph=False)
     print("make_player: wrote", OUT_GLB)
     if PREVIEW:
-        for obj in optional[:-1]:
-            obj.hide_render = False
-        parts[-1].hide_render = False
-        parts[parts.index(optional[0]) - 1].hide_render = True
+        # The preview shows a catcher's gear and a batting helmet with its left flap.
+        for obj in optional:
+            obj.hide_render = obj.name == "HelmetFlapRight"
+        for obj in parts:
+            if obj.name in ("Cap", "CapButton"):
+                obj.hide_render = True
         render_preview(PREVIEW, height * 0.5)
         print("make_player: preview", PREVIEW)
 

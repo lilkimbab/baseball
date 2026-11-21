@@ -46,6 +46,14 @@ var height := 1.83
 ## The body build (docs/13 S11-1): &"lean", &"standard", &"solid" or &"heavy", each a model
 ## built by ./dev model.
 var build: StringName = &"standard"
+## The batting helmet's ear flaps: &"left" (on the model's left ear: the ear toward the
+## pitcher for a right-handed batter, and for a left-hander too once the figure is mirrored),
+## or &"both" for a switch hitter (docs/13 S11-5).
+var helmet_flaps: StringName = &"left"
+## The team's letter on the front of the cap and helmet ("" none).
+var logo := ""
+var _flaps: Dictionary[StringName, MeshInstance3D] = {}
+var _logos: Array[Label3D] = []
 ## Which of the model's four short hair styles shows (1 to 4; 0 none), and its colour.
 var hair := 1
 var hair_color := Color(0.07, 0.06, 0.055)
@@ -185,6 +193,12 @@ func _load_model() -> void:
 	model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
+	_flaps.clear()
+	for side: StringName in [&"Left", &"Right"]:
+		var flap := model.find_child("HelmetFlap" + side, true, false) as MeshInstance3D
+		if flap != null:
+			_flaps[side] = flap
+	_logos.clear()
 	_gear_parts.clear()
 	for piece: StringName in OPTIONAL_GEAR:
 		var part := model.find_child(piece, true, false) as MeshInstance3D
@@ -382,6 +396,13 @@ func _place_props(direction: Vector3) -> void:
 func _show_gear() -> void:
 	_cap.visible = headgear != &"helmet"
 	_helmet.visible = headgear == &"helmet"
+	for side: StringName in _flaps:
+		_flaps[side].visible = headgear == &"helmet" and (side == &"Left" or helmet_flaps == &"both")
+	var button := _model.find_child("CapButton", true, false) as MeshInstance3D
+	if button != null:
+		button.visible = _cap.visible
+	for i: int in _logos.size():
+		_logos[i].visible = logo != "" and (_cap.visible if i == 0 else _helmet.visible)
 	for piece: StringName in _gear_parts:
 		_gear_parts[piece].visible = gear.has(piece)
 
@@ -849,6 +870,33 @@ static func _skin_sheen() -> NoiseTexture2D:
 		ramp.set_color(1, Color(0.8, 0.8, 0.8))
 		_sheen.color_ramp = ramp
 	return _sheen
+
+
+## The team letter on the front of the cap and the helmet: a small label riding on the head
+## bone, placed at the front of each in the model's rest pose.
+func set_logo(letter: String, colour: Color) -> void:
+	logo = letter
+	if _logos.is_empty() and letter != "":
+		for gear: MeshInstance3D in [_cap, _helmet]:
+			var box := gear.get_aabb()
+			var front := Vector3(box.get_center().x, box.position.y + box.size.y * (0.62 if gear == _cap else 0.58), box.end.z + 0.002)
+			var attach := BoneAttachment3D.new()
+			attach.bone_name = "Head"
+			_skeleton.add_child(attach)
+			var label := Label3D.new()
+			label.pixel_size = 0.0009
+			label.font = UiTheme.font(700)
+			label.font_size = 64
+			label.outline_size = 0
+			label.double_sided = false
+			var rest := _skeleton.get_bone_global_rest(_bone[&"Head"])
+			label.transform = rest.affine_inverse() * Transform3D(Basis.IDENTITY, front)
+			attach.add_child(label)
+			_logos.append(label)
+	for label: Label3D in _logos:
+		label.text = letter
+		label.modulate = colour
+	_show_gear()
 
 
 ## Hair (docs/13 S11-4): the style's strand texture as a cut-out, tinted to the player's colour.

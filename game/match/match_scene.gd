@@ -370,6 +370,16 @@ func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 		return
 	model.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, kind))
 	model.set_hair(1 + absi(hash(p.id)) % 4, hair_color_of(p))
+	model.helmet_flaps = &"both" if p.bats == &"S" else &"left"
+
+
+## The club's letter on the cap and helmet (fictional clubs: the first letter of the name).
+func _logo(puppet: Puppet, team: int) -> void:
+	var model := puppet as SkinnedPuppet
+	if model == null or _styles.is_empty():
+		return
+	var name := game.teams[team].short_name
+	model.set_logo(name.substr(0, 1) if name != "" else "", _styles[team].trim)
 
 
 ## Hair colour: nearly black for the local players; the foreign players' run from black to
@@ -678,7 +688,11 @@ func _dress_for_half() -> void:
 	_dress(batter, _style_for(game.batting()), b.number if b != null else 0, b.name if b != null else "", true)
 	for kind: Position.Kind in fielders:
 		_set_body(fielders[kind], field_team.player(field_team.fielder_at(kind)), kind)
+		_logo(fielders[kind], game.fielding())
 	_set_body(catcher, field_team.player(field_team.fielder_at(Position.Kind.C)), Position.Kind.C)
+	_logo(catcher, game.fielding())
+	_logo(pitcher, game.fielding())
+	_logo(batter, game.batting())
 	_people_key = ""
 	for r: Puppet in runner_puppets:
 		_dress(r, _style_for(game.batting()), 0, "", true)
