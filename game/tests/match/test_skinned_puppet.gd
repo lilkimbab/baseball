@@ -363,6 +363,13 @@ func test_equipment_is_real_size() -> void:
 	puppet.apply(PuppetClips.catcher())
 	assert_almost_eq(glove.mesh.get_aabb().size.y, 0.33, 0.004, "a catcher's mitt")
 	assert_gt(glove.mesh.get_aabb().size.x, 0.26, "which is rounder than a fielder's glove")
+	puppet.glove_kind = &"outfield"
+	puppet.apply(PuppetClips.fielder_ready())
+	assert_almost_eq(glove.mesh.get_aabb().size.y, 0.324, 0.004, "a 12.75 in outfielder's glove")
+	puppet.glove_kind = &"first_base"
+	puppet.apply(PuppetClips.fielder_ready())
+	assert_almost_eq(glove.mesh.get_aabb().size.y, 0.3175, 0.004, "a 12.5 in first baseman's mitt")
+	assert_lte(glove.mesh.get_aabb().size.x, 0.2032, "no wider than 8 in across the palm")
 
 
 func test_the_ball_is_drawn_at_its_real_size() -> void:
