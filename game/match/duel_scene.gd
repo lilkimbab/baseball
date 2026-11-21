@@ -537,6 +537,10 @@ func _build_environment() -> void:
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.85
+	# Shadows lit by the blue sky alone look cold on skin (docs/13 S11-3): part of the ambient
+	# light is the warm light bounced off the grass, dirt and stands.
+	env.ambient_light_color = Color(0.62, 0.56, 0.48)
+	env.ambient_light_sky_contribution = 0.6
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 0.95
 	# Contact shadows where things meet the ground, a little bloom on bright surfaces, and
@@ -562,7 +566,7 @@ func _build_environment() -> void:
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48.0, -38.0, 0.0)
-	sun.light_color = Color(1.0, 0.96, 0.89)
+	sun.light_color = Color(1.0, 0.94, 0.84)
 	sun.light_energy = 1.35
 	sun.light_angular_distance = 0.6
 	sun.shadow_enabled = true

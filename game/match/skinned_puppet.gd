@@ -765,9 +765,11 @@ func _paint() -> void:
 			if source == "Jersey" or source == "Pants":
 				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
 			elif source == "Hands":
-				part.set_surface_override_material(surface, _glove_material() if gloves else _solid(original, false))
-			elif source == "Skin" or part.name == &"Eyes":
-				part.set_surface_override_material(surface, _solid(original, false))
+				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original))
+			elif source == "Skin":
+				part.set_surface_override_material(surface, _skin(original))
+			elif part.name == &"Eyes":
+				part.set_surface_override_material(surface, _eyes(original))
 			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
 				part.set_surface_override_material(surface, _solid(original, true))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -776,6 +778,84 @@ func _paint() -> void:
 
 
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
+static var _skin_copies: Dictionary[int, StandardMaterial3D] = {}
+static var _pores: NoiseTexture2D
+static var _sheen: NoiseTexture2D
+
+
+## Skin (docs/13 S11-3): light scattering under the surface (warm, soft shading where light
+## turns to shadow), a roughness that varies over the face (some places shine, others are
+## matte), and fine pore detail.
+static func _skin(original: Material) -> Material:
+	var base := _solid(original, false) as StandardMaterial3D
+	if base == null:
+		return original
+	var key := base.get_instance_id()
+	if _skin_copies.has(key):
+		return _skin_copies[key]
+	var m := base.duplicate() as StandardMaterial3D
+	m.subsurf_scatter_enabled = true
+	m.subsurf_scatter_strength = 0.35
+	m.subsurf_scatter_skin_mode = true
+	m.roughness = 0.62
+	m.roughness_texture = _skin_sheen()
+	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	# Pores: far too fine to see as a pattern at playing distance, they only break up the
+	# highlights a little.
+	m.normal_enabled = true
+	m.normal_texture = _skin_pores()
+	m.normal_scale = 0.06
+	m.uv1_triplanar = true
+	m.uv1_scale = Vector3.ONE * 240.0
+	m.metallic_specular = 0.45
+	_skin_copies[key] = m
+	return m
+
+
+static func _skin_pores() -> NoiseTexture2D:
+	if _pores == null:
+		var noise := FastNoiseLite.new()
+		noise.frequency = 0.35
+		noise.fractal_octaves = 2
+		_pores = NoiseTexture2D.new()
+		_pores.width = 256
+		_pores.height = 256
+		_pores.seamless = true
+		_pores.as_normal_map = true
+		_pores.bump_strength = 2.0
+		_pores.noise = noise
+	return _pores
+
+
+## Broad patches from shiny (dark in the texture: low roughness) to matte.
+static func _skin_sheen() -> NoiseTexture2D:
+	if _sheen == null:
+		var noise := FastNoiseLite.new()
+		noise.frequency = 0.02
+		_sheen = NoiseTexture2D.new()
+		_sheen.width = 128
+		_sheen.height = 128
+		_sheen.seamless = true
+		_sheen.noise = noise
+		var ramp := Gradient.new()
+		ramp.set_color(0, Color(0.45, 0.45, 0.45))
+		ramp.set_color(1, Color(0.8, 0.8, 0.8))
+		_sheen.color_ramp = ramp
+	return _sheen
+
+
+## Eyes: a wet, glossy surface, so the sky shows as a highlight on the cornea.
+static func _eyes(original: Material) -> Material:
+	var base := _solid(original, false) as StandardMaterial3D
+	if base == null:
+		return original
+	var m := base.duplicate() as StandardMaterial3D
+	m.roughness = 0.05
+	m.metallic_specular = 0.9
+	m.clearcoat_enabled = true
+	m.clearcoat = 1.0
+	m.clearcoat_roughness = 0.02
+	return m
 
 
 ## The model's own materials arrive marked see-through, which draws skin with speckled edges
