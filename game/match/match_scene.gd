@@ -336,6 +336,7 @@ func bunt() -> void:
 func _new_duel() -> void:
 	if game == null:
 		return
+	_apply_forms()
 	_pitch_count += 1
 	if _clear_track:
 		pa_pitches.clear()
@@ -356,6 +357,33 @@ func _new_duel() -> void:
 	selected_pitch = clampi(selected_pitch, 0, maxi(pitch_ids.size() - 1, 0))
 	target = duel.zone.center()
 	aim_point = duel.zone.center()
+
+
+var _form_key := ""
+
+
+## The pitcher's and the batter's own forms (docs/13 S10-5): recorded deliveries and swings
+## from the local pack, chosen per player (FormCatalog). With runners on, the delivery is from
+## the set position.
+func _apply_forms() -> void:
+	if not use_motion or game.over:
+		return
+	var pitcher := game.fielding_team().player(game.pitcher_id())
+	var batter := game.batting_team().player(game.batter_id())
+	var pf := FormCatalog.pitch_form(pitcher)
+	var sf := FormCatalog.swing_form(batter, pitcher.throws if pitcher != null else &"R")
+	var key := "%s/%s" % [pf, sf]
+	if key != _form_key and (pf != "" or sf != ""):
+		_form_key = key
+		var p_clip := MotionLibrary.find(&"pitch", StringName(pf) if pf != "" else &"default")
+		var s_clip := MotionLibrary.find(&"swing", StringName(sf) if sf != "" else &"default")
+		var high := MotionLibrary.find(&"swing", StringName(sf + "_high")) if sf != "" else null
+		var low := MotionLibrary.find(&"swing", StringName(sf + "_low")) if sf != "" else null
+		set_motion(p_clip, s_clip, high, low)
+		_box = Field.to_field(batter.position)
+		_box.x = -absf(_box.x)
+	if pitch_motion != null:
+		pitch_motion.use_stretch(game.runners_on() > 0)
 
 
 func _ai_pitch_decision() -> PitchDecision:

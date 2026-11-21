@@ -1,0 +1,5 @@
+{
+  "format": 1,
+  "note": "How forms are given out (docs/13 S10-5). The forms themselves come from the local content pack (content-local/forms/, ./dev mocap forms) because they are made from non-commercial motion capture. arm_slot_shares: the share of fictional pitchers given each arm slot (A: overhand 25%, three-quarter 60%, sidearm 12%, underhand 3% — the recordings have no underhand pitcher, so it goes to sidearm).",
+  "arm_slot_shares": {"overhand": 0.25, "three_quarter": 0.60, "sidearm": 0.15}
+}

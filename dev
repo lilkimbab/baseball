@@ -75,6 +75,7 @@ case "$cmd" in
     #   ./dev mocap                      the default pitcher and hitter
     #   ./dev mocap list pitch|swing     the fastest trials on record
     #   ./dev mocap pitch 2916_4 fast    another trial, saved as form "fast"
+    #   ./dev mocap forms                the game's 20 pitching and 20 batting forms
     raw="$ROOT/content-local/raw/obp"
     mkdir -p "$raw"
     for kind in pitching hitting; do
@@ -94,6 +95,14 @@ case "$cmd" in
     convert="$ROOT/tools/mocap/convert_obp.py"
     if [ "${1:-}" = "list" ]; then
       python3 "$convert" list "${2:-pitch}"
+    elif [ "${1:-}" = "forms" ]; then
+      # The twenty pitching and twenty batting forms (docs/13 S10), with catalogues. Each round
+      # checks every clip on the player model and replaces the trials that fail.
+      for round in 1 2 3 4; do
+        python3 "$ROOT/tools/mocap/forms.py" | grep -v "^convert_obp"
+        "$GODOT" --headless --path "$GAME" --script res://tools/motion_report.gd -- --forms --limit 45 2>&1 | grep "clips pass"
+        [ -f "$ROOT/content-local/forms/failing.txt" ] || break
+      done
     elif [ $# -ge 2 ]; then
       python3 "$convert" "$1" "$2" "$ROOT/content-local/animations/$1/${3:-default}.json"
     else
