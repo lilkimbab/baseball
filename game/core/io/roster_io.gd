@@ -126,17 +126,20 @@ static func player_from(entry: Dictionary) -> Player:
 	return p
 
 
-static func player_to(p: Player) -> Dictionary:
+## A player as a pack entry. `exact` keeps ratings to two decimals (save games, where growth
+## adds fractions) instead of whole numbers (roster packs).
+static func player_to(p: Player, exact: bool = false) -> Dictionary:
+	var r := func(value: float) -> Variant: return snappedf(value, 0.01) if exact else _r(value)
 	var d := {
 		"id": p.id, "name": p.name, "number": p.number, "born": p.born,
 		"bats": String(p.bats), "throws": String(p.throws),
 		"height_cm": snappedf(p.height_cm, 0.1), "weight_kg": snappedf(p.weight_kg, 0.1),
 		"positions": p.positions.duplicate(),
 		"batting": {
-			"contact_r": _r(p.batting.contact_r), "contact_l": _r(p.batting.contact_l), "power_r": _r(p.batting.power_r), "power_l": _r(p.batting.power_l),
-			"eye": _r(p.batting.eye), "speed": _r(p.batting.speed), "baserunning": _r(p.batting.baserunning), "bunt": _r(p.batting.bunt), "clutch": _r(p.batting.clutch),
+			"contact_r": r.call(p.batting.contact_r), "contact_l": r.call(p.batting.contact_l), "power_r": r.call(p.batting.power_r), "power_l": r.call(p.batting.power_l),
+			"eye": r.call(p.batting.eye), "speed": r.call(p.batting.speed), "baserunning": r.call(p.batting.baserunning), "bunt": r.call(p.batting.bunt), "clutch": r.call(p.batting.clutch),
 		},
-		"fielding": {"range": _r(p.fielding.range), "hands": _r(p.fielding.hands), "arm": _r(p.fielding.arm), "accuracy": _r(p.fielding.accuracy)},
+		"fielding": {"range": r.call(p.fielding.range), "hands": r.call(p.fielding.hands), "arm": r.call(p.fielding.arm), "accuracy": r.call(p.fielding.accuracy)},
 		"forms": p.forms.duplicate(),
 	}
 	if p.origin != &"":
@@ -144,8 +147,8 @@ static func player_to(p: Player) -> Dictionary:
 	if p.pitching != null:
 		var arsenal: Array = []
 		for a: ArsenalPitch in p.pitching.arsenal:
-			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.1), "velo_max": snappedf(a.velo_max, 0.1), "movement": _r(a.movement), "command": _r(a.command), "usage": snappedf(a.usage, 0.01)})
-		d["pitching"] = {"stamina": _r(p.pitching.stamina), "control": _r(p.pitching.control), "composure": _r(p.pitching.composure), "hold": _r(p.pitching.hold), "fielding": _r(p.pitching.fielding), "arsenal": arsenal}
+			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.01 if exact else 0.1), "velo_max": snappedf(a.velo_max, 0.01 if exact else 0.1), "movement": r.call(a.movement), "command": r.call(a.command), "usage": snappedf(a.usage, 0.001 if exact else 0.01)})
+		d["pitching"] = {"stamina": r.call(p.pitching.stamina), "control": r.call(p.pitching.control), "composure": r.call(p.pitching.composure), "hold": r.call(p.pitching.hold), "fielding": r.call(p.pitching.fielding), "arsenal": arsenal}
 	return d
 
 
