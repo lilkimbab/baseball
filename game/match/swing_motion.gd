@@ -19,6 +19,10 @@ const FINISH_HOLD := 0.35
 const IDLE_RAMP := 0.3
 
 var clip: JointClip
+## The same batter's swings at a high and a low pitch, if there are any (docs/13 S10-3): the
+## swing is blended toward one of them by the height the bat meets the ball.
+var high: JointClip
+var low: JointClip
 var phase: Phase = Phase.IDLE
 var stride := 0.0
 var launch := 0.0
@@ -34,6 +38,9 @@ var _held := 0.0
 var _from: Dictionary[StringName, Vector3] = {}
 var _blend := 1.0
 var _blend_length := 0.1
+## The clip blended toward and how far (0 none, 1 all of it).
+var _other: JointClip
+var _other_weight := 0.0
 
 
 func _init(source: JointClip) -> void:
@@ -43,6 +50,42 @@ func _init(source: JointClip) -> void:
 	stride = clip.event(&"stride", maxf(launch - 0.8, 0.0))
 	finish = clip.event(&"finish", clip.duration)
 	_idle_length = maxf(stride - 0.05, 0.05)
+
+
+## Picks the high or low swing for a ball met at `height` metres: none at the main swing's own
+## contact height, all of the other at its contact height, in proportion between.
+func aim_height(height: float) -> void:
+	_other = null
+	_other_weight = 0.0
+	var own := _contact_height(clip)
+	var other := high if height > own else low
+	if other == null:
+		return
+	var there := _contact_height(other)
+	if absf(there - own) < 0.03:
+		return
+	_other = other
+	_other_weight = clampf((height - own) / (there - own), 0.0, 1.0)
+
+
+static func _contact_height(c: JointClip) -> float:
+	var t := c.event(&"contact", c.duration * 0.8)
+	var pose := c.sample(t)
+	return pose[&"BatSweetSpot"].y if pose.has(&"BatSweetSpot") else 0.8
+
+
+## The other clip's time for a time in the main clip, matching the swing's marked moments.
+func _other_time(t: float) -> float:
+	var a: Array[float] = [0.0, stride, launch, contact, finish, clip.duration]
+	var o := _other
+	var oc := o.event(&"contact", o.duration * 0.8)
+	var ol := o.event(&"launch", oc - 0.13)
+	var b: Array[float] = [0.0, o.event(&"stride", maxf(ol - 0.8, 0.0)), ol, oc, o.event(&"finish", o.duration), o.duration]
+	for i: int in range(1, a.size()):
+		if t <= a[i] or i == a.size() - 1:
+			var span := maxf(a[i] - a[i - 1], 1e-4)
+			return lerpf(b[i - 1], b[i], clampf((t - a[i - 1]) / span, 0.0, 1.0))
+	return t
 
 
 ## How long before the release the load should start, so that the batter reaches the launch
@@ -105,6 +148,8 @@ func advance(delta: float) -> void:
 
 func frame() -> Dictionary[StringName, Vector3]:
 	var pose := clip.sample(_idle_time() if phase == Phase.IDLE else _time)
+	if _other != null and _other_weight > 0.0 and (phase == Phase.SWING or phase == Phase.FINISH):
+		pose = JointClip.blend(pose, _other.sample(_other_time(_time)), _other_weight)
 	if _blend < 1.0:
 		pose = JointClip.blend(_from, pose, smoothstep(0.0, 1.0, _blend))
 	return pose

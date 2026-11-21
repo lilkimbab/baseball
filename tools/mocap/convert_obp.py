@@ -114,7 +114,19 @@ def speeds(track, dt, window):
     return out
 
 
-def convert(kind, trial, out_path, start=None):
+def mirrored_name(name):
+    if name.startswith("Right"):
+        return "Left" + name[5:]
+    if name.startswith("Left"):
+        return "Right" + name[4:]
+    return name
+
+
+def convert(kind, trial, out_path, start=None, mirror_left=True):
+    """A left-handed trial is stored as its mirror image, a right-handed motion ("side": "R",
+    "original_side": "L"): the game shows a left-hander on a mirrored figure, so the motion
+    on screen is the left-hander's own. Figures, bats and grips then only ever deal with one
+    hand."""
     rows = read_trial(kind, trial)
     side = side_of(kind, trial)
     stems = PITCH_JOINTS if kind == "pitch" else SWING_JOINTS
@@ -220,13 +232,30 @@ def convert(kind, trial, out_path, start=None):
             finish += 1
         events["finish"] = finish * dt
 
+    original_side = side
+    if mirror_left and side == "L":
+        order = [names.index(mirrored_name(n)) for n in names]
+        mirrored = []
+        for frame in track:
+            flipped = [(-p[0], p[1], p[2]) for p in frame]
+            mirrored.append([flipped[order[i]] for i in range(len(names))])
+        track = mirrored
+        # ThoraxRight is a point on the right of the ribcage: keep it there.
+        top_i, right_i = names.index("ThoraxTop"), names.index("ThoraxRight")
+        ra, la = names.index("RightUpperArm"), names.index("LeftUpperArm")
+        for frame in track:
+            lateral = sub(frame[right_i], frame[top_i])
+            if dot(lateral, sub(frame[ra], frame[la])) < 0.0:
+                frame[right_i] = sub(frame[top_i], lateral)
+        side = "R"
+
     first = int(round(start / dt))
     track = track[first:]
     events = {name: round(t - first * dt, 4) for name, t in events.items()}
     frames = [[round(v, 4) for p in frame for v in p] for frame in track]
 
     clip = {
-        "format": 1, "kind": kind, "side": side, "fps": round(1.0 / dt, 3),
+        "format": 1, "kind": kind, "side": side, "original_side": original_side, "fps": round(1.0 / dt, 3),
         "duration": round((len(frames) - 1) * dt, 4), "ankle_height": ANKLE_HEIGHT,
         "source": "OBP %s %s" % ("pitching" if kind == "pitch" else "hitting", trial),
         "licence": LICENCE, "events": events, "joints": names, "frames": frames,

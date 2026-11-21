@@ -12,6 +12,17 @@ static func pack_root() -> String:
 	return ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("content-local")
 
 
+## A swing with the same batter's high and low swings attached, when the pack has them.
+static func swing(form: StringName) -> SwingMotion:
+	var main := find(&"swing", form)
+	if main == null:
+		return null
+	var m := SwingMotion.new(main)
+	m.high = find(&"swing", StringName(String(form) + "_high"))
+	m.low = find(&"swing", StringName(String(form) + "_low"))
+	return m
+
+
 ## The clip for a kind of motion (&"pitch", &"swing") and a form, or null if the pack has none.
 static func find(kind: StringName, form: StringName = &"default") -> JointClip:
 	var path := pack_root().path_join("animations/%s/%s.json" % [kind, form])

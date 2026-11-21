@@ -134,9 +134,12 @@ func set_mode(new_mode: StringName) -> void:
 
 
 ## Uses recorded clips for the delivery and the swing. Null keeps the key poses for that one.
-func set_motion(pitch_clip: JointClip, swing_clip: JointClip) -> void:
+func set_motion(pitch_clip: JointClip, swing_clip: JointClip, swing_high: JointClip = null, swing_low: JointClip = null) -> void:
 	pitch_motion = PitchMotion.new(pitch_clip) if pitch_clip != null else null
 	swing_motion = SwingMotion.new(swing_clip) if swing_clip != null else null
+	if swing_motion != null:
+		swing_motion.high = swing_high
+		swing_motion.low = swing_low
 	settings.release_point = DuelSettings.new().release_point
 	var on_rubber := Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT)
 	if pitch_motion != null:
@@ -382,6 +385,8 @@ func _begin_swing_pose() -> void:
 	_swing_shown = true
 	_swing_lead = SwingModel.swing_time(duel.swing.kind)
 	_swing_height = duel.ideal_contact_pos.z
+	if swing_motion != null:
+		swing_motion.aim_height(_swing_height)
 	_swing_clock = 0.0
 	if swing_motion == null:
 		return
