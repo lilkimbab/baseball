@@ -44,6 +44,8 @@ func refresh() -> void:
 	for child: Node in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
+	if is_inside_tree():
+		CareerSession.autosave()
 	var cs := CareerSession.career_season
 	if cs == null:
 		var col := _column(800.0)
@@ -104,6 +106,8 @@ func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
 		_button(col, "시즌 끝까지 빠른 진행", to_end)
 	else:
 		_line(col, "시즌이 끝났다.", UiTheme.GOLD)
+	_button(col, "능력치 보기", func() -> void: PlayerCard.open_for(self, c.player, s))
+	_button(col, "허브로", func() -> void: get_tree().change_scene_to_file(Screen.HUB))
 	var r := CareerSession.last_report
 	if r != null:
 		var earned := PackedStringArray()

@@ -36,6 +36,7 @@ func _ready() -> void:
 	_fit()
 	if LeagueSession.season != null:
 		LeagueSession.season.play_day()
+		LeagueSession.autosave()
 	refresh()
 
 
@@ -51,6 +52,8 @@ func refresh() -> void:
 	for child: Node in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
+	if is_inside_tree() and LeagueSession.season != null:
+		LeagueSession.autosave()
 	if LeagueSession.season == null:
 		_build_setup()
 	else:
@@ -87,6 +90,10 @@ func _build_setup() -> void:
 			_games = n
 			refresh())
 		row.add_child(b)
+	var back := Button.new()
+	back.text = "허브로"
+	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(Screen.HUB))
+	col.add_child(back)
 	var start := Button.new()
 	start.text = "시즌 시작"
 	start.disabled = _choice == ""
@@ -150,6 +157,7 @@ func _build_today(col: VBoxContainer, s: Season) -> void:
 		_button(col, "정규 시즌 끝까지" if s.phase == Season.Phase.REGULAR else "포스트시즌 끝까지", to_phase_end)
 	if message != "":
 		_line(col, message, UiTheme.GOLD)
+	_button(col, "허브로", func() -> void: get_tree().change_scene_to_file(Screen.HUB))
 	_line(col, "최근 경기", UiTheme.DIM)
 	var recent: Array[ScheduledGame] = []
 	for sched: Schedule in s.schedules:
@@ -274,6 +282,7 @@ func _build_roster(col: VBoxContainer, s: Season, team: Team) -> void:
 	var list := _scroll(col, 760.0)
 	for p: Player in team.first_team():
 		var row := _row(list, _player_line(s, p), [44, 170, 30, 40, 60, 90], UiTheme.INK, 16)
+		_card_button(row, p)
 		var focus := s.club.training.get(p.id, "") as String
 		var b := Button.new()
 		b.text = "훈련: " + (_focus_name(focus) if focus != "" else "없음")
@@ -296,6 +305,7 @@ func _build_farm(col: VBoxContainer, s: Season, team: Team) -> void:
 	var list := _scroll(col, 760.0)
 	for p: Player in team.second_team():
 		var row := _row(list, _player_line(s, p), [44, 170, 30, 40, 60, 90], UiTheme.INK, 16)
+		_card_button(row, p)
 		var up := Button.new()
 		up.text = "등록"
 		up.add_theme_font_size_override("font_size", 14)
@@ -335,6 +345,7 @@ func _build_scout(col: VBoxContainer, s: Season, team: Team) -> void:
 		var line := _player_line(s, p)
 		line[4] = "%d세" % (s.season_year - p.born)
 		var row := _row(col, line, [44, 170, 30, 40, 60, 90], UiTheme.INK, 16)
+		_card_button(row, p)
 		var b := Button.new()
 		b.text = "영입"
 		b.disabled = s.club.signed_today
@@ -388,6 +399,15 @@ func equip_best(index: int) -> String:
 	if best == null or not s.club.equip(best, index, s.club_rules):
 		return "장착할 선수가 없다."
 	return "%s에게 %s 장착." % [best.name, def.name]
+
+
+## "보기": the player card over the screen.
+func _card_button(row: HBoxContainer, p: Player) -> void:
+	var b := Button.new()
+	b.text = "보기"
+	b.add_theme_font_size_override("font_size", 14)
+	b.pressed.connect(func() -> void: PlayerCard.open_for(self, p, LeagueSession.season))
+	row.add_child(b)
 
 
 func _focus_name(focus: String) -> String:

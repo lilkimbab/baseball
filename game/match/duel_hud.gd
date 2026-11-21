@@ -176,7 +176,7 @@ func _draw_swing_feedback() -> void:
 		&"miss":
 			color = RED
 	_text(Vector2(0.0, view.y * 0.62), label, 30, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
-	if duel.contact != null and duel.contact.made_contact:
+	if Settings.hit_info and duel.contact != null and duel.contact.made_contact:
 		var info := "타구 속도 %d km/h   발사각 %d°   방향 %d°" % [roundi(duel.contact.exit_speed_kmh()), roundi(duel.contact.launch_deg()), roundi(duel.contact.spray_deg())]
 		var box := Rect2(Vector2(view.x * 0.5 - 260.0, view.y - 110.0 - bottom_reserved), Vector2(520.0, 42.0))
 		draw_rect(box, PANEL)
