@@ -369,6 +369,16 @@ func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 	if model == null or p == null:
 		return
 	model.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, kind))
+	model.set_hair(1 + absi(hash(p.id)) % 4, hair_color_of(p))
+
+
+## Hair colour: nearly black for the local players; the foreign players' run from black to
+## brown to fair (A).
+static func hair_color_of(p: Player) -> Color:
+	if p.origin != &"foreign":
+		return Color(0.06, 0.05, 0.045)
+	var shades: Array[Color] = [Color(0.06, 0.05, 0.045), Color(0.18, 0.11, 0.06), Color(0.32, 0.22, 0.12), Color(0.55, 0.42, 0.24)]
+	return shades[absi(hash(p.id + ":hair")) % shades.size()]
 
 
 ## The pitcher's and the batter's own forms (docs/13 S10-5): recorded deliveries and swings
