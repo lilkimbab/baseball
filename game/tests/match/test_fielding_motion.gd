@@ -334,3 +334,18 @@ func test_a_runner_rounds_the_bases_he_passes() -> void:
 		assert_between(widest, 0.6, 2.0, "swings out before first (attempt %d)" % attempt)
 		break
 	assert_true(found, "some ball went for a double")
+
+
+func test_a_wild_pitch_rolls_to_the_backstop_and_the_runners_move_up() -> void:
+	var play := RunningPlay.loose_ball(["r1", "", "r3"] as Array[String], Vector3(0.3, -0.9, 0.1), 1.0, motion)
+	var tl := play.timeline
+	var ball := tl.position("ball", RunningPlay.LOOSE_ROLL)
+	assert_lt(ball.y, -12.0, "back by the backstop")
+	assert_lt(ball.z, 0.1, "rolling")
+	var catcher := tl.position("F:C", tl.duration)
+	assert_lt(Vector2(catcher.x - ball.x, catcher.y - ball.y).length(), 1.5, "the catcher gets to it")
+	for pair: Array in [["R:r1", 2], ["R:r3", 4]]:
+		var at := tl.position(pair[0], tl.duration)
+		assert_lt(Vector2(at.x, at.y).distance_to(PlaySim.base_xy(pair[1])), 0.01, "%s moved up" % pair[0])
+	assert_false(tl.tracks.has("R:"), "nobody on second")
+	assert_eq(play.calls.size(), 0, "no play on anyone")

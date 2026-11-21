@@ -20,6 +20,9 @@ const MIN_MARGIN := 0.05
 const CATCHER_AT := Vector2(0.0, -1.15)
 const CATCH_AT := Vector3(0.0, -0.9, 0.8)
 const RELEASE_AT := Vector3(0.0, Field.RUBBER_Y - 1.6, 1.8)
+## A loose ball rolls this far behind the plate (m, the backstop) in LOOSE_ROLL s.
+const BACKSTOP := 16.5
+const LOOSE_ROLL := 1.6
 
 
 ## A steal of the base after `base` by `runner_id`. `margin` is by how much the runner was
@@ -91,6 +94,39 @@ static func pickoff(runner_id: String, first_from: Vector2, motion: MotionModel)
 	play.calls.append(PlayCall.make(need, 1, true, 0.1, true))
 	play.fielders = "1-3"
 	tl.duration = need + 0.4
+	return play
+
+
+## A pitch that gets past the catcher (a wild pitch or a passed ball): it rolls to the
+## backstop, the catcher turns and chases it, and each runner moves up a base. `runners` are
+## the ids on first, second and third ("" where empty); `side` (−1 or 1) which way it kicks.
+static func loose_ball(runners: Array[String], from: Vector3, side: float, motion: MotionModel) -> PlayResult:
+	var play := PlayResult.new()
+	var tl := play.timeline
+	var rest := Vector2(side * 5.0, -BACKSTOP + 1.0)
+	tl.add("ball", 0.0, from)
+	tl.add("ball", 0.5, Vector3(lerpf(from.x, rest.x, 0.4), lerpf(from.y, rest.y, 0.4), 0.05))
+	tl.add("ball", LOOSE_ROLL, Vector3(rest.x, rest.y, 0.04))
+	# The catcher turns, goes after it and has it a moment after it stops.
+	var picked := LOOSE_ROLL + 0.9
+	tl.add("F:C", 0.0, Vector3(CATCHER_AT.x, CATCHER_AT.y, 0.0))
+	tl.add("F:C", 0.4, Vector3(CATCHER_AT.x, CATCHER_AT.y, 0.0))
+	tl.add("F:C", picked, Vector3(rest.x, rest.y + 0.8, 0.0))
+	tl.add("ball", picked, Vector3(rest.x, rest.y + 0.6, 0.8))
+	var last := picked
+	for i: int in 3:
+		if runners[i] == "":
+			continue
+		var start := PlaySim.base_xy(i + 1)
+		var bag := PlaySim.base_xy(i + 2)
+		var spot := start + (bag - start).normalized() * motion.leads[i]
+		var reach := 0.6 + spot.distance_to(bag) / RUNNER_SPEED
+		var key := "R:%s" % runners[i]
+		tl.add(key, 0.0, Vector3(spot.x, spot.y, 0.0))
+		tl.add(key, 0.6, Vector3(spot.x, spot.y, 0.0))
+		tl.add(key, reach, Vector3(bag.x, bag.y, 0.0))
+		last = maxf(last, reach)
+	tl.duration = last + 0.3
 	return play
 
 
