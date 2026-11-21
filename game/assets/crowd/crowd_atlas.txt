@@ -1,0 +1,6 @@
+people 13
+poses seated standing cheering clapping
+columns 8
+rows 7
+frame 128 256
+height_m 2.00

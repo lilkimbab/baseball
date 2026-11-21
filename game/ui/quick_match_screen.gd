@@ -29,7 +29,7 @@ func build() -> void:
 		names.append(_clubs[i].short_name)
 	_club_grid("원정", away_index, func(i: int) -> void: away_index = i)
 	_club_grid("홈", home_index, func(i: int) -> void: home_index = i)
-	choices("이닝", ["3", "6", "9"], ["3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
+	choices("이닝", ["1", "3", "6", "9"], ["1이닝(원정이면 치고 던지기 한 번씩)", "3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
 	choices("내 편", ["away", "home", "watch"], ["원정", "홈", "관전"], side, func(v: String) -> void: side = v)
 	choices("방식", ["action", "manager"], ["풀 액션(직접 치고 던진다)", "감독 지휘(작전과 개입)"], style, func(v: String) -> void: style = v)
 	var park_ids: Array = [""]

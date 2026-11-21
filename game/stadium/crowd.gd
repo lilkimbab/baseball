@@ -1,17 +1,24 @@
 class_name Crowd
 extends Node3D
 ## The people in the stands (docs/06 7, docs/13 S14): one in a seat the stadium builder laid
-## out, three levels of detail by where they sit — people of some 600 triangles in the rows
-## behind home and over the dugouts, figures of some 60 in the rest of the lower bowl, flat
-## cut-outs in the outfield and the upper tiers. No bones: the crowd shader moves them, zone
-## by zone. KBO style, the first-base side is the home side's cheering section and the
-## third-base side the visitors', each with its stage at the front, and they stand and cheer
-## while their team bats.
+## out, each a picture of a real-looking person on a card facing the field
+## (assets/crowd/crowd_atlas.png, rendered by tools/blender/make_crowd.py from Microsoft
+## Rocketbox's people, MIT licence), seated, standing, arms up or clapping as the crowd shader
+## picks, zone by zone. Kept in three lots by where they sit (the rows behind home and over
+## the dugouts, the rest of the lower bowl, the outfield and upper tiers) so each lot is drawn
+## only when it is in view. KBO style, the first-base side is the home side's cheering
+## section and the third-base side the visitors', each with its stage at the front, and they
+## stand and cheer while their team bats; their tops are dyed in the club's colour.
 
 enum Zone { BEHIND_HOME, FIRST, THIRD, OUTFIELD, UPPER, HOME_CHEER, AWAY_CHEER, STAGE }
 enum State { SEATED, STANDING, CHEERING, CLAPPING }
 
 const SHADER := "res://stadium/crowd.gdshader"
+const ATLAS := "res://assets/crowd/crowd_atlas.png"
+const MASK := "res://assets/crowd/crowd_mask.png"
+const ATLAS_INFO := "res://assets/crowd/crowd_atlas.txt"
+## A card: the picture covers 2 m of height (crowd_atlas.txt) and half that across.
+const CARD := Vector2(1.0, 2.0)
 ## Ordinary clothes, for anyone not in his club's colours.
 const CASUAL: Array[Color] = [
 	Color(0.95, 0.95, 0.95), Color(0.12, 0.12, 0.13), Color(0.5, 0.52, 0.55), Color(0.15, 0.2, 0.38),
@@ -41,16 +48,13 @@ func _init(stadium: StadiumBuilder = null) -> void:
 
 
 func _ready() -> void:
-	var mesh_material := _material(false)
-	var flat_material := _material(true)
-	var person := _person_mesh()
-	var doll := _doll_mesh()
-	var cutout := QuadMesh.new()
-	cutout.size = Vector2(0.62, 1.24)
-	cutout.center_offset = Vector3(0.0, 0.62, 0.0)
-	var near := _multimesh(person)
-	var mid := _multimesh(doll)
-	var far := _multimesh(cutout)
+	var material := _material()
+	var card := QuadMesh.new()
+	card.size = CARD
+	card.center_offset = Vector3(0.0, CARD.y * 0.5, 0.0)
+	var near := _multimesh(card)
+	var mid := _multimesh(card)
+	var far := _multimesh(card)
 	var rng := Rng.new(seed_value)
 	var near_items: Array = []
 	var mid_items: Array = []
@@ -84,10 +88,10 @@ func _ready() -> void:
 	_fill(mid, mid_items)
 	_fill(far, far_items)
 	counts = Vector3i(near.instance_count, mid.instance_count, far.instance_count)
-	_add_instance(near, mesh_material, "NearCrowd")
-	_add_instance(mid, mesh_material, "MidCrowd")
-	_add_instance(far, flat_material, "FarCrowd")
-	_materials = [mesh_material, flat_material]
+	_add_instance(near, material, "NearCrowd")
+	_add_instance(mid, material, "MidCrowd")
+	_add_instance(far, material, "FarCrowd")
+	_materials = [material]
 	_push()
 
 
@@ -145,11 +149,11 @@ func _fill(mm: MultiMesh, items: Array) -> void:
 		var yaw := atan2(-d.x, -d.z)
 		var size := rng.next_range(0.92, 1.06)
 		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * size), at))
-		var skin := clampf(rng.next_normal() * 0.12 + 0.25, 0.0, 1.0)
 		var shirt := _shirt(zone, rng)
-		mm.set_instance_color(i, Color(shirt.r, shirt.g, shirt.b, skin))
-		var stick := 1.0 if (zone == Zone.HOME_CHEER or zone == Zone.AWAY_CHEER) and rng.chance(0.8) else 0.0
-		mm.set_instance_custom_data(i, Color(float(it[3]), float(zone), stick, rng.next_float() * rng.next_float()))
+		# Only club colours are dyed in; anyone else keeps the clothes he came in.
+		var dyed := 1.0 if shirt in home_colours or shirt in away_colours or zone == Zone.STAGE else 0.0
+		mm.set_instance_color(i, Color(shirt.r, shirt.g, shirt.b, 1.0))
+		mm.set_instance_custom_data(i, Color(float(it[3]), float(zone), dyed, rng.next_float()))
 
 
 static func _multimesh(mesh: Mesh) -> MultiMesh:
@@ -172,13 +176,28 @@ func _add_instance(mm: MultiMesh, material: ShaderMaterial, node_name: String) -
 	add_child(node)
 
 
-func _material(flat: bool) -> ShaderMaterial:
+func _material() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = load(SHADER) as Shader
-	m.set_shader_parameter("cutout", flat)
-	if flat:
-		m.set_shader_parameter("atlas", cutout_atlas())
+	m.set_shader_parameter("atlas", load(ATLAS) as Texture2D)
+	m.set_shader_parameter("mask", load(MASK) as Texture2D)
+	var info := atlas_info()
+	m.set_shader_parameter("people", info.get("people", 13))
+	m.set_shader_parameter("columns", info.get("columns", 8))
+	m.set_shader_parameter("rows", info.get("rows", 7))
 	return m
+
+
+## How the atlas is laid out (crowd_atlas.txt: people, columns, rows).
+static func atlas_info() -> Dictionary:
+	var out := {}
+	if not FileAccess.file_exists(ATLAS_INFO):
+		return out
+	for line: String in FileAccess.get_file_as_string(ATLAS_INFO).split("\n"):
+		var parts := line.split(" ", false)
+		if parts.size() >= 2 and parts[1].is_valid_int():
+			out[parts[0]] = int(parts[1])
+	return out
 
 
 ## A sideways step of `metres` along the front of the stands at `at`.
@@ -226,138 +245,3 @@ func tick(delta: float) -> void:
 func _push() -> void:
 	for m: ShaderMaterial in _materials:
 		m.set_shader_parameter("zone_state", _states)
-
-
-# --- The meshes ---
-
-
-## Seated person, some 600 triangles: legs bent at the seat, hands on the thighs, a cheering
-## stick folded in the right hand (the shader shows it only for those who have one).
-static func _person_mesh() -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for side: float in [-1.0, 1.0]:
-		# Thigh then shin: hip forward to the knee, down to the foot.
-		_limb(tool, Vector3(side * 0.1, 0.45, 0.0), Vector3(side * 0.11, 0.47, -0.42), 0.075, 0.0, 0.0, 0.5)
-		_limb(tool, Vector3(side * 0.11, 0.47, -0.42), Vector3(side * 0.11, 0.04, -0.48), 0.06, 0.0, 0.5, 1.0)
-		# Upper arm down the side, forearm to the hand on the thigh.
-		_limb(tool, Vector3(side * 0.2, 0.92, 0.0), Vector3(side * 0.22, 0.66, -0.06), 0.05, 3.0, 0.0, 0.45)
-		_limb(tool, Vector3(side * 0.22, 0.66, -0.06), Vector3(side * 0.15, 0.55, -0.27), 0.045, 4.0, 0.45, 1.0)
-	_limb(tool, Vector3(0.15, 0.55, -0.27), Vector3(0.15, 0.95, -0.3), 0.02, 5.0, 0.0, 1.0)
-	_limb(tool, Vector3(0.0, 0.43, 0.02), Vector3(0.0, 0.96, 0.0), 0.17, 1.0, 0.0, 1.0)
-	_ball(tool, Vector3(0.0, 1.09, -0.01), 0.105, 2.0, false)
-	_ball(tool, Vector3(0.0, 1.12, 0.0), 0.11, 6.0, true)
-	tool.generate_normals()
-	return tool.commit()
-
-
-## Mid-distance figure, some 60 triangles: boxes for the body, head, legs and arms.
-static func _doll_mesh() -> ArrayMesh:
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_box(tool, Vector3(0.0, 0.7, 0.0), Vector3(0.36, 0.52, 0.22), 1.0, 0.5)
-	_box(tool, Vector3(0.0, 1.08, 0.0), Vector3(0.2, 0.22, 0.2), 2.0, 0.5)
-	_box(tool, Vector3(0.0, 0.42, -0.22), Vector3(0.32, 0.14, 0.44), 0.0, 0.3)
-	_box(tool, Vector3(0.0, 0.22, -0.44), Vector3(0.3, 0.42, 0.12), 0.0, 0.8)
-	for side: float in [-1.0, 1.0]:
-		_box(tool, Vector3(side * 0.22, 0.72, -0.06), Vector3(0.09, 0.4, 0.1), 4.0, 0.6)
-	tool.generate_normals()
-	return tool.commit()
-
-
-static func _limb(tool: SurfaceTool, a: Vector3, b: Vector3, radius: float, part: float, along_a: float, along_b: float) -> void:
-	const SIDES := 8
-	var axis := (b - a).normalized()
-	var u := axis.cross(Vector3.UP if absf(axis.y) < 0.9 else Vector3.RIGHT).normalized()
-	var w := axis.cross(u)
-	for k: int in SIDES:
-		var t0 := TAU * k / SIDES
-		var t1 := TAU * (k + 1) / SIDES
-		var o0 := (u * cos(t0) + w * sin(t0)) * radius
-		var o1 := (u * cos(t1) + w * sin(t1)) * radius
-		var corners: Array[Vector3] = [a + o0, b + o0, b + o1, a + o0, b + o1, a + o1]
-		var alongs: Array[float] = [along_a, along_b, along_b, along_a, along_b, along_a]
-		for i: int in 6:
-			tool.set_uv2(Vector2(part, alongs[i]))
-			tool.add_vertex(corners[i])
-	# Caps.
-	for k: int in SIDES:
-		var t0 := TAU * k / SIDES
-		var t1 := TAU * (k + 1) / SIDES
-		for end: Array in [[a, along_a], [b, along_b]]:
-			var c: Vector3 = end[0]
-			tool.set_uv2(Vector2(part, float(end[1])))
-			tool.add_vertex(c)
-			tool.set_uv2(Vector2(part, float(end[1])))
-			tool.add_vertex(c + (u * cos(t0) + w * sin(t0)) * radius)
-			tool.set_uv2(Vector2(part, float(end[1])))
-			tool.add_vertex(c + (u * cos(t1) + w * sin(t1)) * radius)
-
-
-static func _ball(tool: SurfaceTool, centre: Vector3, radius: float, part: float, top_only: bool) -> void:
-	const RINGS := 6
-	const SEGMENTS := 10
-	var last_ring := RINGS / 2 if top_only else RINGS
-	for r: int in last_ring:
-		var p0 := PI * r / RINGS
-		var p1 := PI * (r + 1) / RINGS
-		for s: int in SEGMENTS:
-			var q0 := TAU * s / SEGMENTS
-			var q1 := TAU * (s + 1) / SEGMENTS
-			var pt := func(p: float, q: float) -> Vector3:
-				return centre + Vector3(sin(p) * cos(q), cos(p), sin(p) * sin(q)) * radius
-			var corners: Array[Vector3] = [pt.call(p0, q0), pt.call(p1, q0), pt.call(p1, q1), pt.call(p0, q0), pt.call(p1, q1), pt.call(p0, q1)]
-			for c: Vector3 in corners:
-				tool.set_uv2(Vector2(part, 0.5))
-				tool.add_vertex(c)
-
-
-static func _box(tool: SurfaceTool, centre: Vector3, size: Vector3, part: float, along: float) -> void:
-	var h := size * 0.5
-	var faces: Array = [
-		[Vector3(-1, -1, 1), Vector3(1, -1, 1), Vector3(1, 1, 1), Vector3(-1, 1, 1)],
-		[Vector3(1, -1, -1), Vector3(-1, -1, -1), Vector3(-1, 1, -1), Vector3(1, 1, -1)],
-		[Vector3(-1, -1, -1), Vector3(-1, -1, 1), Vector3(-1, 1, 1), Vector3(-1, 1, -1)],
-		[Vector3(1, -1, 1), Vector3(1, -1, -1), Vector3(1, 1, -1), Vector3(1, 1, 1)],
-		[Vector3(-1, 1, 1), Vector3(1, 1, 1), Vector3(1, 1, -1), Vector3(-1, 1, -1)],
-	]
-	for f: Array in faces:
-		var q: Array[Vector3] = []
-		for corner: Vector3 in f:
-			q.append(centre + corner * h)
-		for idx: int in [0, 1, 2, 0, 2, 3]:
-			tool.set_uv2(Vector2(part, along))
-			tool.add_vertex(q[idx])
-
-
-## The far crowd's picture: two frames side by side, seated and arms up. Red is the shirt,
-## green the skin, blue the hair; alpha where there is anyone.
-static func cutout_atlas() -> ImageTexture:
-	var image := Image.create(128, 128, true, Image.FORMAT_RGBA8)
-	image.fill(Color(0, 0, 0, 0))
-	for frame: int in 2:
-		var ox := frame * 64
-		for x: int in 64:
-			for y: int in 128:
-				var c := Color(0, 0, 0, 0)
-				var head := Vector2(x - 32, y - 30).length() < 12.0
-				var hair := head and y < 26
-				var torso := x >= 18 and x <= 46 and y >= 44 and y <= 96
-				var legs := x >= 20 and x <= 44 and y > 96 and y <= 124
-				var arms_down := (x >= 11 and x <= 18 or x >= 46 and x <= 53) and y >= 46 and y <= 86
-				var hands_down := (x >= 11 and x <= 18 or x >= 46 and x <= 53) and y > 86 and y <= 92
-				var arms_up := (x >= 9 and x <= 16 or x >= 48 and x <= 55) and y >= 8 and y <= 48
-				var hands_up := (x >= 9 and x <= 16 or x >= 48 and x <= 55) and y >= 1 and y < 8
-				var arm := arms_down if frame == 0 else arms_up
-				var hand := hands_down if frame == 0 else hands_up
-				if hair:
-					c = Color(0, 0, 1, 1)
-				elif head or hand:
-					c = Color(0, 1, 0, 1)
-				elif torso or arm:
-					c = Color(1, 0, 0, 1)
-				elif legs:
-					c = Color(0.25, 0, 0.15, 1)
-				image.set_pixel(ox + x, y, c)
-	image.generate_mipmaps()
-	return ImageTexture.create_from_image(image)

@@ -8,6 +8,9 @@ extends Puppet
 ## model's proportions with two-bone IK.
 
 const MODEL := "res://assets/characters/player_base.glb"
+const SKIN_SHADER := preload("res://match/skin.gdshader")
+## The painted skin's fine relief as a normal map, the same for every build (make_player.py).
+const SKIN_RELIEF := "res://assets/characters/player_skin_relief.png"
 const LIMBS: Array[Array] = [
 	[&"LeftUpperArm", &"LeftLowerArm"], [&"LeftLowerArm", &"LeftHand"],
 	[&"RightUpperArm", &"RightLowerArm"], [&"RightLowerArm", &"RightHand"],
@@ -15,7 +18,11 @@ const LIMBS: Array[Array] = [
 	[&"RightUpperLeg", &"RightLowerLeg"], [&"RightLowerLeg", &"RightFoot"],
 ]
 
-const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"ChestProtector", &"ShinGuards"]
+## Worn only by those who wear them (Puppet.gear): the umpire's mask; the catcher's
+## hockey-style helmet (shell, cage, throat guard), chest protector and shin guards.
+const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards"]
+## A catcher's gear, as one list.
+const CATCHER_GEAR: Array[StringName] = [&"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards"]
 ## Metres beyond which small parts are not drawn (A): the eyes, brows and lashes are a few
 ## pixels at 30 m on a 1080-line screen, the hair and the cap button a few more.
 const FAR_DETAIL := {"face": 30.0, "hair": 45.0, "button": 35.0}
@@ -162,11 +169,11 @@ static func build_for(height_cm: float, weight_kg: float, position: Position.Kin
 			bmi += 0.8
 		Position.Kind.CF, Position.Kind.SS, Position.Kind.B2:
 			bmi -= 0.6
-	if bmi < 24.5:
+	if bmi < 25.0:
 		return &"lean"
-	if bmi < 26.8:
+	if bmi < 27.6:
 		return &"standard"
-	if bmi < 28.8:
+	if bmi < 29.8:
 		return &"solid"
 	return &"heavy"
 
@@ -399,7 +406,7 @@ func ball_spot(hand: StringName) -> Vector3:
 
 func _build_props() -> void:
 	super._build_props()
-	_use_prop(&"Bat", &"bat", Color(0.74, 0.57, 0.36), 0.42, 26.0)
+	_use_prop(&"Bat", &"bat", Color(0.66, 0.5, 0.32), 0.55, 26.0)
 
 
 ## Replaces a stand-in shape with the real piece of equipment, if it has been built.
@@ -449,7 +456,8 @@ func _place_props(direction: Vector3) -> void:
 
 
 func _show_gear() -> void:
-	_cap.visible = headgear != &"helmet"
+	# headgear: &"cap", &"helmet" (batting), or &"none" (the catcher's helmet is gear).
+	_cap.visible = headgear == &"cap"
 	_helmet.visible = headgear == &"helmet"
 	for side: StringName in _flaps:
 		_flaps[side].visible = headgear == &"helmet" and (side == &"Left" or helmet_flaps == &"both")
@@ -835,7 +843,8 @@ func _paint() -> void:
 	var plain := {
 		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap, "Collar": uniform.trim,
 		"Undershirt": uniform.cap.darkened(0.2),
-		"Gear": uniform.cap.darkened(0.25), "Bars": Color(0.09, 0.09, 0.1),
+		"Gear": uniform.cap.darkened(0.25), "Bars": Color(0.05, 0.05, 0.055),
+		"HelmetPads": Color(0.045, 0.045, 0.05), "GearTrim": uniform.cap.darkened(0.35),
 		"Shoes": Color(0.06, 0.06, 0.07), "Belt": Color(0.05, 0.05, 0.06),
 	}
 	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
@@ -845,9 +854,9 @@ func _paint() -> void:
 			if source == "Jersey" or source == "Pants":
 				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
 			elif source == "Hands":
-				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original))
+				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original, build))
 			elif source == "Skin":
-				part.set_surface_override_material(surface, _skin(original))
+				part.set_surface_override_material(surface, _skin(original, build))
 			elif part.name == &"Eyes":
 				part.set_surface_override_material(surface, _eyes(original))
 			elif String(part.name).begins_with("Hair"):
@@ -855,43 +864,41 @@ func _paint() -> void:
 				part.set_surface_override_material(surface, _hair_material(original))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
-				part.set_surface_override_material(surface, _solid(original, true))
+				part.set_surface_override_material(surface, _brow_material(original))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif plain.has(source):
 				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
 
 
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
-static var _skin_copies: Dictionary[int, StandardMaterial3D] = {}
+static var _skin_copies: Dictionary[int, ShaderMaterial] = {}
 static var _pores: NoiseTexture2D
-static var _sheen: NoiseTexture2D
 
 
-## Skin (docs/13 S11-3): light scattering under the surface (warm, soft shading where light
-## turns to shadow), a roughness that varies over the face (some places shine, others are
-## matte), and fine pore detail.
-static func _skin(original: Material) -> Material:
-	var base := _solid(original, false) as StandardMaterial3D
+## Skin (docs/13 S11-3, S14): the painted MakeHuman skin through match/skin.gdshader, with
+## the maps make_player.py bakes for each build — creases shaded (ambient occlusion), where
+## skin shines and where it is matte, where the beard grows — and the painted skin's own fine
+## relief, pores, a second sharp highlight for oil and sweat, light scattering under the
+## surface and a sheen at the edges. Without the maps (an older model) the shader still runs.
+static func _skin(original: Material, for_build: StringName = &"standard") -> Material:
+	var base := original as StandardMaterial3D
 	if base == null:
 		return original
 	var key := base.get_instance_id()
 	if _skin_copies.has(key):
 		return _skin_copies[key]
-	var m := base.duplicate() as StandardMaterial3D
-	m.subsurf_scatter_enabled = true
-	m.subsurf_scatter_strength = 0.35
-	m.subsurf_scatter_skin_mode = true
-	m.roughness = 0.62
-	m.roughness_texture = _skin_sheen()
-	m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
-	# Pores: far too fine to see as a pattern at playing distance, they only break up the
-	# highlights a little.
-	m.normal_enabled = true
-	m.normal_texture = _skin_pores()
-	m.normal_scale = 0.06
-	m.uv1_triplanar = true
-	m.uv1_scale = Vector3.ONE * 240.0
-	m.metallic_specular = 0.45
+	var m := ShaderMaterial.new()
+	m.shader = SKIN_SHADER
+	m.set_shader_parameter(&"albedo_texture", base.albedo_texture)
+	m.set_shader_parameter(&"pore_texture", _skin_pores())
+	var detail := "%s_skin_detail.png" % model_for(for_build).get_basename()
+	if ResourceLoader.exists(detail):
+		m.set_shader_parameter(&"detail_texture", load(detail))
+		m.set_shader_parameter(&"has_detail", true)
+	if ResourceLoader.exists(SKIN_RELIEF):
+		m.set_shader_parameter(&"relief_texture", load(SKIN_RELIEF))
+	else:
+		m.set_shader_parameter(&"relief_strength", 0.0)
 	_skin_copies[key] = m
 	return m
 
@@ -909,23 +916,6 @@ static func _skin_pores() -> NoiseTexture2D:
 		_pores.bump_strength = 2.0
 		_pores.noise = noise
 	return _pores
-
-
-## Broad patches from shiny (dark in the texture: low roughness) to matte.
-static func _skin_sheen() -> NoiseTexture2D:
-	if _sheen == null:
-		var noise := FastNoiseLite.new()
-		noise.frequency = 0.02
-		_sheen = NoiseTexture2D.new()
-		_sheen.width = 128
-		_sheen.height = 128
-		_sheen.seamless = true
-		_sheen.noise = noise
-		var ramp := Gradient.new()
-		ramp.set_color(0, Color(0.45, 0.45, 0.45))
-		ramp.set_color(1, Color(0.8, 0.8, 0.8))
-		_sheen.color_ramp = ramp
-	return _sheen
 
 
 ## The team letter on the front of the cap and the helmet: a small label riding on the head
@@ -1003,7 +993,32 @@ func set_face(seed_text: String) -> Dictionary[String, float]:
 		if index >= 0:
 			_mesh.set_blend_shape_value(index, cheeks)
 			out[key] = cheeks
+	# Complexion: from fair to sun-browned (men who play outdoors all summer), how much beard
+	# shadow, how sweaty.
+	var sun := rng.next_float()
+	_mesh.set_instance_shader_parameter(&"tone", SKIN_FAIR.lerp(SKIN_TANNED, sun))
+	_mesh.set_instance_shader_parameter(&"stubble", 0.15 + 0.6 * rng.next_float())
+	_mesh.set_instance_shader_parameter(&"sweat", 0.2 + 0.35 * rng.next_float())
+	out["tone"] = sun
 	return out
+
+
+## The two ends of the complexions (multipliers on the painted skin, which is pale).
+const SKIN_FAIR := Color(0.97, 0.92, 0.88)
+const SKIN_TANNED := Color(0.83, 0.7, 0.6)
+
+
+## Brows and lashes: cut-outs in the player's hair colour; the brows a little fuller (the
+## painted ones are thin and pale and left the face blank from a few metres away).
+func _brow_material(original: Material) -> Material:
+	var base := _solid(original, true) as StandardMaterial3D
+	if base == null:
+		return original
+	var m := base.duplicate() as StandardMaterial3D
+	m.albedo_color = (hair_color * 3.0).clamp() if hair_color.v < 0.3 else hair_color
+	m.alpha_scissor_threshold = 0.22
+	m.roughness = 0.6
+	return m
 
 
 ## A player's hair: style 1 to 4 and colour.
@@ -1015,17 +1030,19 @@ func set_hair(style: int, colour: Color) -> void:
 	repaint()
 
 
-## Eyes: a wet, glossy surface, so the sky shows as a highlight on the cornea.
+## Eyes: a wet, glossy surface, so the sky shows as a highlight on the cornea; not so strong
+## a reflection that it covers the iris (at full strength the whole eye mirrored the blue sky
+## and dark brown eyes looked blue).
 static func _eyes(original: Material) -> Material:
 	var base := _solid(original, false) as StandardMaterial3D
 	if base == null:
 		return original
 	var m := base.duplicate() as StandardMaterial3D
-	m.roughness = 0.05
-	m.metallic_specular = 0.9
+	m.roughness = 0.08
+	m.metallic_specular = 0.5
 	m.clearcoat_enabled = true
-	m.clearcoat = 1.0
-	m.clearcoat_roughness = 0.02
+	m.clearcoat = 0.35
+	m.clearcoat_roughness = 0.03
 	return m
 
 
@@ -1049,20 +1066,32 @@ static func _solid(original: Material, cutout: bool) -> Material:
 func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
-	material.roughness = {"Helmet": 0.2, "Shoes": 0.45, "Belt": 0.4, "Gear": 0.6, "Bars": 0.35}.get(source, 0.85)
+	material.roughness = {"Helmet": 0.32, "Shoes": 0.45, "Belt": 0.4, "Gear": 0.5, "Bars": 0.45,
+		"HelmetPads": 0.85, "GearTrim": 0.75}.get(source, 0.85)
 	if source != "Shoes" and source != "Socks":
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if source == "Bars":
-		material.metallic = 0.7
+		# Powder-coated steel: dark, a dull metallic sheen.
+		material.metallic = 0.6
 	if source == "Helmet":
+		# A painted shell under a clear coat: the coat carries the sharp reflection (the
+		# stadium, from the park's reflection probe), the paint under it is satin.
 		material.clearcoat_enabled = true
-		material.clearcoat = 0.7
+		material.clearcoat = 0.55
+		material.clearcoat_roughness = 0.08
+		material.normal_enabled = true
+		material.normal_texture = _grain()
+		material.normal_scale = 0.06
+		material.uv1_triplanar = true
+		material.uv1_scale = Vector3.ONE * 6.0
 	else:
 		material.normal_enabled = true
 		material.normal_texture = _grain()
 		material.normal_scale = 0.5
 		material.uv1_triplanar = true
 		material.uv1_scale = Vector3.ONE * 13.0
+		if source == "Socks" or source == "Cap" or source == "Collar" or source == "GearTrim":
+			_make_fabric(material)
 	return material
 
 
@@ -1103,9 +1132,77 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = viewport.get_texture()
-	material.roughness = 0.88
+	_make_fabric(material)
+	# The folds the cloth settled into, baked for this build (tools/blender/make_player.py).
+	var stem := "%s_%s" % [model_for(build).get_basename(), "jersey" if is_jersey else "pants"]
+	if ResourceLoader.exists(stem + "_folds.png"):
+		material.normal_enabled = true
+		material.normal_texture = load(stem + "_folds.png") as Texture2D
+		material.normal_scale = 2.0
+	# The creases are darker inside (baked with the folds): the light does not reach into them.
+	if ResourceLoader.exists(stem + "_shade.png"):
+		material.ao_enabled = true
+		material.ao_texture = load(stem + "_shade.png") as Texture2D
+		material.ao_light_affect = 0.55
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
+
+
+## Woven polyester rather than painted plastic: a fine knit in the surface (a detail normal
+## laid on in the model's own space, so it needs no unwrapping), the soft bright edge cloth
+## has against the light (rim), and little shine.
+static func _make_fabric(material: StandardMaterial3D) -> void:
+	# Polyester knit: a soft sheen at grazing angles, otherwise matte (more sheen than this
+	# and a dark jersey looked like satin).
+	material.roughness = 0.8
+	material.metallic_specular = 0.38
+	material.rim_enabled = true
+	material.rim = 0.22
+	material.rim_tint = 0.7
+	material.detail_enabled = true
+	material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+	material.detail_normal = _knit()
+	material.uv2_triplanar = true
+	material.uv2_scale = Vector3.ONE * 70.0
+	material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+	material.detail_albedo = _white()
+
+
+static var _knit_texture: ImageTexture
+static var _white_texture: ImageTexture
+
+
+## A knit: rows of small interlocking loops, as a normal map (one tile).
+static func _knit() -> ImageTexture:
+	if _knit_texture != null:
+		return _knit_texture
+	const N := 64
+	var height := PackedFloat32Array()
+	height.resize(N * N)
+	for y: int in N:
+		for x: int in N:
+			# Two columns of loops a tile, each loop a rounded bump, offset row by row.
+			var u := fmod(float(x) / N * 4.0 + (0.5 if (y * 8 / N) % 2 == 1 else 0.0), 1.0)
+			var v := fmod(float(y) / N * 8.0, 1.0)
+			height[y * N + x] = sin(u * PI) * sin(v * PI)
+	var image := Image.create(N, N, true, Image.FORMAT_RGB8)
+	for y: int in N:
+		for x: int in N:
+			var dx := height[y * N + (x + 1) % N] - height[y * N + (x + N - 1) % N]
+			var dy := height[((y + 1) % N) * N + x] - height[((y + N - 1) % N) * N + x]
+			var n := Vector3(-dx * 1.2, -dy * 1.2, 1.0).normalized()
+			image.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
+	image.generate_mipmaps(true)
+	_knit_texture = ImageTexture.create_from_image(image)
+	return _knit_texture
+
+
+static func _white() -> ImageTexture:
+	if _white_texture == null:
+		var image := Image.create(4, 4, false, Image.FORMAT_RGB8)
+		image.fill(Color.WHITE)
+		_white_texture = ImageTexture.create_from_image(image)
+	return _white_texture
 
 
 static var _font: SystemFont

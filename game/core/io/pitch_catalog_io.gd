@@ -26,5 +26,7 @@ static func load_file(path: String) -> Dictionary[StringName, PitchType]:
 		t.spin_rpm = entry.get("spin_rpm", 0.0)
 		t.efficiency = entry.get("efficiency", 1.0)
 		t.tilt_deg = entry.get("tilt_deg", 0.0)
+		t.ssw_accel = entry.get("ssw_accel", 0.0)
+		t.ssw_deg = entry.get("ssw_deg", 0.0)
 		out[t.id] = t
 	return out

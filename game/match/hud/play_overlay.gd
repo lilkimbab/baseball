@@ -44,6 +44,9 @@ func _base_markers() -> void:
 		if not _in_front(at):
 			continue
 		var p := _project(at)
+		# Right beside the camera a point projects far off the screen (or to nothing).
+		if not p.is_finite() or not Rect2(-view, view * 3.0).has_point(p):
+			continue
 		var r := 13.0
 		var pts := PackedVector2Array([p + Vector2(0.0, -r), p + Vector2(r, 0.0), p + Vector2(0.0, r), p + Vector2(-r, 0.0)])
 		draw_colored_polygon(pts, Color(UiTheme.GOLD, 0.85))

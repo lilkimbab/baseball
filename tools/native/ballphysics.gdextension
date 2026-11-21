@@ -1,0 +1,11 @@
+; The ball's flight in native code (approved proposal 5): ./dev native builds the libraries
+; from tools/native into game/native/bin/ and copies this file to game/native/ (all outside git). Without it the game runs the same physics in
+; GDScript (core/physics/native_physics.gd).
+[configuration]
+entry_symbol = "ballphysics_init"
+compatibility_minimum = "4.7"
+reloadable = false
+
+[libraries]
+linux.x86_64 = "res://native/bin/libballphysics.linux.template_release.x86_64.so"
+windows.x86_64 = "res://native/bin/libballphysics.windows.template_release.x86_64.dll"

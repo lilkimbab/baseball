@@ -11,6 +11,12 @@ const BLUE := Color(0.45, 0.7, 1.0)
 const ORANGE := Color(1.0, 0.6, 0.25)
 const RED := Color(1.0, 0.35, 0.3)
 
+## The see-through bat: from its knob to the sweet spot, and on past it to the tip (m).
+const BAT_KNOB_TO_SWEET := 0.68
+const BAT_TIP_BEYOND := 0.17
+## Seconds a pitch's trail stays up after it.
+const TRAIL_TIME := 2.0
+
 const JUDGMENT_TEXT := {&"perfect": "완벽", &"good": "좋음", &"early": "빠름", &"late": "늦음", &"miss": "헛스윙"}
 const MODE_TEXT := {&"bat": "타격", &"pitch": "투구", &"watch": "관전"}
 
@@ -29,11 +35,13 @@ func _draw() -> void:
 	_draw_zone()
 	if show_count:
 		_draw_count()
+	_draw_trail()
 	if scene.human_pitches():
+		_draw_preview()
 		_draw_pitch_list()
 		_draw_target_gauge()
 	if scene.human_bats() and scene.aim_enabled:
-		_draw_aim()
+		_draw_bat_cursor()
 	_draw_pitch_readout()
 	_draw_swing_feedback()
 	_draw_banner()
@@ -131,12 +139,101 @@ func _draw_pitch_grade() -> void:
 	_text(centre + Vector2(-80.0, 8.0), grade, 22, color, HORIZONTAL_ALIGNMENT_CENTER, 160.0)
 
 
-func _draw_aim() -> void:
-	if not _visible(scene.aim_point):
+## The batter's aim: a see-through bat lying where the swing will meet the ball, its sweet
+## spot on the pointer. Its barrel reaches across the plate from the batter's side, dipping
+## for a low pitch. The bright ring is the sweet spot (a miss this small is forgiven,
+## SwingModel.FORGIVEN_ERROR); the faint one, beyond which he is fooled.
+func _draw_bat_cursor() -> void:
+	if scene.duel.swing != null or not (scene.state == DuelScene.State.PRE_PITCH or scene.state == DuelScene.State.WINDUP or scene.state == DuelScene.State.LIVE):
 		return
-	var centre := _screen(scene.aim_point)
-	var per_metre := (_screen(scene.aim_point + Vector3(0.1, 0.0, 0.0)) - centre).length() * 10.0
-	draw_arc(centre, maxf(per_metre * 0.07, 10.0), 0.0, TAU, 32, GOLD, 2.5, true)
+	var aim := scene.aim_point
+	if not _visible(aim):
+		return
+	var handle_side := 1.0 if scene.settings.bats_left else -1.0
+	# Knob toward the batter, a little higher than the barrel, more so for a low pitch.
+	var drop := clampf((0.95 - aim.z) * 0.55, -0.12, 0.35) + 0.08
+	var tip := aim + Vector3(-handle_side * BAT_TIP_BEYOND, 0.0, -drop * BAT_TIP_BEYOND / BAT_KNOB_TO_SWEET)
+	var knob := aim + Vector3(handle_side * BAT_KNOB_TO_SWEET, 0.0, drop)
+	var axis := (tip - knob).normalized()
+	var across := Vector3(-axis.z, 0.0, axis.x)
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	const STEPS := 14
+	for i: int in STEPS + 1:
+		var f := float(i) / STEPS
+		var p := knob.lerp(tip, f)
+		# Knob, thin handle, taper, barrel (radius in metres).
+		var r := 0.017 if f < 0.04 else (0.013 if f < 0.4 else lerpf(0.013, 0.033, smoothstep(0.4, 0.72, f)))
+		left.append(_screen(p + across * r))
+		right.append(_screen(p - across * r))
+	right.reverse()
+	var outline := left + right
+	draw_colored_polygon(outline, Color(1.0, 1.0, 1.0, 0.22))
+	outline.append(outline[0])
+	draw_polyline(outline, Color(1.0, 1.0, 1.0, 0.75), 1.5, true)
+	var centre := _screen(aim)
+	var per_metre := (_screen(aim + Vector3(0.1, 0.0, 0.0)) - centre).length() * 10.0
+	draw_arc(centre, maxf(per_metre * SwingModel.FORGIVEN_ERROR, 6.0), 0.0, TAU, 32, Color(GOLD, 0.9), 2.5, true)
+	draw_arc(centre, maxf(per_metre * SwingModel.FOOLED_ERROR, 14.0), 0.0, TAU, 48, Color(1, 1, 1, 0.25), 1.2, true)
+	draw_circle(centre, 3.0, GOLD)
+
+
+## A ball of the path, drawn its size at its distance, at least a few pixels across.
+func _ghost_ball(at: Vector3, alpha: float, colour: Color = Color.WHITE) -> void:
+	if not _visible(at):
+		return
+	var p := _screen(at)
+	var r := maxf((_screen(at + Vector3(0.1, 0.0, 0.0)) - p).length() * 10.0 * 0.0366 * 1.25, 3.5)
+	draw_circle(p, r, Color(colour, alpha))
+	draw_arc(p, r, 0.0, TAU, 16, Color(0.15, 0.15, 0.18, alpha * 0.8), 1.2, true)
+
+
+## Before the pitch: where the chosen pitch will go, a ball every PATH_STEP s, and an arrow
+## from where it would cross without its spin to where it does — the break.
+func _draw_preview() -> void:
+	var path := scene.preview
+	if path.size() < 3:
+		return
+	var points := PackedVector2Array()
+	for p: Vector3 in path:
+		if _visible(p):
+			points.append(_screen(p))
+	if points.size() >= 2:
+		draw_polyline(points, Color(1.0, 0.85, 0.35, 0.35), 2.0, true)
+	for i: int in range(2, path.size()):
+		_ghost_ball(path[i], lerpf(0.25, 0.85, float(i) / path.size()), Color(1.0, 0.95, 0.8))
+	var end := path[path.size() - 1]
+	var from := scene.preview_straight
+	if from.distance_to(end) > 0.05 and _visible(end) and _visible(from):
+		_arrow(_screen(from), _screen(end), GOLD)
+
+
+func _arrow(a: Vector2, b: Vector2, colour: Color) -> void:
+	draw_line(a, b, colour, 3.0, true)
+	var dir := (b - a).normalized()
+	var side := Vector2(-dir.y, dir.x)
+	draw_colored_polygon(PackedVector2Array([b + dir * 4.0, b - dir * 12.0 + side * 7.0, b - dir * 12.0 - side * 7.0]), colour)
+
+
+## After a pitch nobody hit: the path it took, a ball every PATH_STEP s, for a moment.
+func _draw_trail() -> void:
+	var path := scene.trail
+	if path.size() < 3:
+		return
+	var duel := scene.duel
+	if duel.pitch == null:
+		return
+	var hit := duel.contact != null and duel.contact.made_contact
+	var passed := duel.phase != PitchDuel.Phase.FLIGHT or duel.time >= duel.pitch.flight_time
+	if hit or not passed:
+		return
+	var fade := 1.0
+	if scene.state == DuelScene.State.RESULT:
+		fade = 1.0 - smoothstep(TRAIL_TIME - 0.5, TRAIL_TIME, scene.state_time)
+	if fade <= 0.0:
+		return
+	for i: int in range(2, path.size()):
+		_ghost_ball(path[i], fade * lerpf(0.3, 0.9, float(i) / path.size()))
 
 
 ## Speed and pitch type where the ball crossed the plate.

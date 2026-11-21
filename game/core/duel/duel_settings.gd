@@ -25,6 +25,9 @@ var aim_across := 1.0
 ## Random spread of the bat's angle at contact (degrees, one sd): the computer batter's
 ## natural variation. A person's spray comes from his own timing.
 var yaw_spread := 0.0
+## The pitcher's feel for the seam-shifted wake: how much of a pitch type's push his sinker,
+## changeup or splitter gets (PitchType.ssw_accel), from his movement rating.
+var ssw_scale := 1.0
 ## Pitcher's release point for a right-hander; mirrored for a left-hander.
 var release_point := Vector3(-0.55, 16.76, 1.80)
 ## Rules the pitch is called under (the strike zone's size).

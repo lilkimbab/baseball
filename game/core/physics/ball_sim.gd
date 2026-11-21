@@ -16,6 +16,9 @@ var pos := Vector3.ZERO
 var vel := Vector3.ZERO
 ## Angular velocity (rad/s). The Magnus force points along spin x velocity.
 var spin := Vector3.ZERO
+## A pitch's seam-shifted wake (m/s²): a steady push besides drag, lift and gravity, gone once
+## the ball is hit.
+var ssw := Vector3.ZERO
 var rolling := false
 var stopped := false
 ## Off the bat: flies by the batted-ball coefficients, which depend on the launch speed.
@@ -34,6 +37,7 @@ func clone() -> BallSim:
 	copy.pos = pos
 	copy.vel = vel
 	copy.spin = spin
+	copy.ssw = ssw
 	copy.batted = batted
 	copy._batted_cd = _batted_cd
 	copy.rolling = rolling
@@ -45,6 +49,7 @@ func clone() -> BallSim:
 ## Marks the ball as just hit at its present velocity (sets the batted-ball drag).
 func hit() -> void:
 	batted = true
+	ssw = Vector3.ZERO
 	var mph := vel.length() / 0.44704
 	_batted_cd = cfg.bat_cd0 * (1.0 + cfg.bat_cd_per_mph * (100.0 - mph))
 
@@ -85,12 +90,17 @@ func _batted_aero(v: Vector3, w: Vector3, sp: float) -> Vector3:
 
 
 func accel(v: Vector3, w: Vector3) -> Vector3:
-	return aero(v, w) + Vector3(0.0, 0.0, -cfg.gravity)
+	return aero(v, w) + Vector3(0.0, 0.0, -cfg.gravity) + ssw
 
 
 ## One RK4 step of free flight. Updates velocity and spin and returns the proposed new
 ## position; the caller commits it (or tests the swept segment for collisions first).
 func integrate(dt: float) -> Vector3:
+	if NativePhysics.enabled:
+		var out := NativePhysics.integrate(pos, vel, spin, ssw, batted, _batted_cd, dt, cfg.native)
+		vel = out[1]
+		spin = out[2]
+		return out[0]
 	var k1v := accel(vel, spin)
 	var v2 := vel + k1v * (dt * 0.5)
 	var k2v := accel(v2, spin)

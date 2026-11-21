@@ -61,7 +61,9 @@ var accuracy := 0.0
 var decision: PitchDecision
 
 ## Batting input.
-var aim_enabled := false
+## The batter aims his swing with the pointer (the bat-shaped cursor over the zone); off,
+## the swing goes where he reads the pitch.
+var aim_enabled := true
 var aim_point := Vector3.ZERO
 ## Where the pointer is on screen. Tools and tests set this to aim without a mouse; while it
 ## is Vector2.INF the real mouse is used.
@@ -158,9 +160,6 @@ func set_motion(pitch_clip: JointClip, swing_clip: JointClip, swing_high: JointC
 		pitcher.reset_motion()
 		_throwing_hand = &"LeftHand" if pitch_clip.side == &"L" else &"RightHand"
 		pitcher.right_grip = Puppet.Grip.BALL
-		pitcher.apply_joints(pitch_motion.frame(pitch_motion.release_time), pitch_clip)
-		settings.release_point = Field.to_field(pitcher.global_transform * pitcher.ball_spot(_throwing_hand))
-		pitcher.reset_motion()
 	else:
 		pitcher.position = Field.to_world(on_rubber)
 	var in_box := Vector3(-1.05, 0.25, 0.0)
@@ -174,6 +173,21 @@ func set_motion(pitch_clip: JointClip, swing_clip: JointClip, swing_high: JointC
 		in_box.x = clampf(_recorded_contact.z, -1.25, -0.75)
 		in_box.y = clampf(SwingModel.CONTACT_PLANE_Y + _recorded_contact.x, -0.3, 0.6)
 	batter.position = Field.to_world(in_box)
+
+
+## Where the ball leaves the pitcher's hand (field coordinates): the pitcher as he stands on
+## the rubber now, posed at the moment of release. Measured at the release itself, so the
+## ball always leaves from his hand. (Measured once when his delivery was chosen, through the
+## figure as it happened to stand, it came out behind him when he had just fielded a ball and
+## was still turned away, or on the wrong side when the last man drawn threw with the other
+## hand.)
+func pitcher_release_point() -> Vector3:
+	if pitch_motion == null:
+		return settings.release_point
+	pitcher.apply_joints(pitch_motion.frame(release_time()), pitch_motion.clip)
+	var at := Field.to_field(pitcher.global_transform * pitcher.ball_spot(_throwing_hand))
+	# DuelSettings takes a right-hander's release point and mirrors it for a left-hander.
+	return Vector3(-at.x, at.y, at.z) if settings.throws_left else at
 
 
 func release_time() -> float:
@@ -327,6 +341,8 @@ func _process(delta: float) -> void:
 func refresh(delta: float) -> void:
 	_frame_time = delta
 	_update_pointer()
+	_update_preview()
+	_record_trail(delta)
 	_pose_players()
 	_show_ball()
 	_move_camera(delta)
@@ -359,6 +375,7 @@ func _begin_windup() -> void:
 
 
 func _release() -> void:
+	settings.release_point = pitcher_release_point()
 	duel.throw_pitch(decision)
 	if not human_bats():
 		_ai_react()
@@ -442,6 +459,57 @@ func _finish_pitch() -> void:
 	if swing_motion != null:
 		swing_motion.relax()
 	_enter(State.RESULT)
+
+
+# --- The pitch's path: before it is thrown (the player's), and after (everyone's) ---
+
+
+## Where the pitch the player has chosen would go, at even steps from the hand to the plate,
+## and where it would cross the plate without its spin (the start of the break arrow).
+var preview := PackedVector3Array()
+var preview_straight := Vector3.ZERO
+var _preview_key := ""
+## Where the last pitch went, recorded as it flew (drawn after it as a trail of balls).
+var trail := PackedVector3Array()
+var _trail_clock := 0.0
+## Seconds between the balls of a path or a trail.
+const PATH_STEP := 0.045
+
+
+## Works out the path of the pitch the player would throw to the target now (docs/05 2.2):
+## from his release point, his pitch type, its spin, without the miss of execution.
+func _update_preview() -> void:
+	if not human_pitches() or not (state == State.PRE_PITCH or state == State.CHARGE or state == State.ACCURACY):
+		preview.clear()
+		_preview_key = ""
+		return
+	var type := selected_type()
+	if type == null:
+		return
+	var key := "%s|%.2f|%.2f|%s" % [type.id, target.x, target.z, settings.throws_left]
+	if key == _preview_key:
+		return
+	_preview_key = key
+	var flight := PitchModel.throw_type(cfg, type, settings.release(), target, settings.throws_left)
+	preview = PitchModel.path(cfg, flight, PATH_STEP)
+	preview_straight = flight.plate_pos - Vector3(flight.movement.x, 0.0, flight.movement.y)
+
+
+## Keeps the pitch's path as it flies, for the trail drawn after it.
+func _record_trail(delta: float) -> void:
+	if duel == null or duel.pitch == null:
+		return
+	if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT:
+		if trail.is_empty() or duel.time < 0.02:
+			trail.clear()
+			trail.append(duel.pitch.release_pos)
+			_trail_clock = 0.0
+		_trail_clock += delta
+		if _trail_clock >= PATH_STEP and duel.ball.pos.y > Field.PLATE_FRONT_Y - 0.5:
+			_trail_clock = 0.0
+			trail.append(duel.ball.pos)
+	elif state == State.PRE_PITCH or state == State.WINDUP:
+		trail.clear()
 
 
 func _update_pointer() -> void:
@@ -578,8 +646,8 @@ func _build_players() -> void:
 	catcher.left_grip = Puppet.Grip.GLOVE
 	if catcher is SkinnedPuppet:
 		(catcher as SkinnedPuppet).glove_kind = &"mitt"
-	catcher.headgear = &"helmet"
-	catcher.gear = [&"Mask", &"ChestProtector", &"ShinGuards"]
+	catcher.headgear = &"none"
+	catcher.gear = SkinnedPuppet.CATCHER_GEAR.duplicate()
 	_dress(catcher, UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"), 22, "오세현", false)
 	catcher.apply(PuppetClips.catcher())
 	# The plate umpire stands behind the catcher in black and grey.

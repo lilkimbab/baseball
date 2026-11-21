@@ -34,7 +34,8 @@ var left_grip: Grip = Grip.RELAXED
 var right_grip: Grip = Grip.RELAXED
 ## &"cap" or &"helmet".
 var headgear: StringName = &"cap"
-## Extra equipment worn over the uniform: any of &"Mask", &"ChestProtector", &"ShinGuards".
+## Extra equipment worn over the uniform: any of SkinnedPuppet.OPTIONAL_GEAR (the umpire's
+## mask, the catcher's helmet, cage, throat guard, chest protector and shin guards).
 var gear: Array[StringName] = []
 ## Point the head should face, in the puppet's space. Used when has_look_target is true.
 var look_target := Vector3.ZERO

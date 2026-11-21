@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+# Builds the native ball physics (approved proposal 5) against godot-cpp:
+#   ./dev native            (Linux and Windows libraries into game/native/bin)
+import os
+
+env = SConscript(os.path.join(os.environ["GODOT_CPP"], "SConstruct"))
+env.Append(CPPPATH=["src/"])
+# Objects per platform (the Linux and Windows builds would share them otherwise), ending in .o
+# for zig, which picks the input kind by file extension.
+env["SHOBJSUFFIX"] = ".{}.o".format(env["platform"])
+sources = Glob("src/*.cpp")
+out = os.path.join(os.environ["NATIVE_OUT"], "ballphysics{}{}".format(env["suffix"], env["SHLIBSUFFIX"]))
+library = env.SharedLibrary(out, source=sources)
+Default(library)

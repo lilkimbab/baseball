@@ -9,3 +9,7 @@ build/
 content-local/
 *.import.tmp
 /reference/
+
+# Native libraries (and their .gdextension) are put there by ./dev native.
+game/native/
+__pycache__/

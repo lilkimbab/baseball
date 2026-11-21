@@ -65,11 +65,13 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 		actual = PitchModel.apply_execution_error(choice.target, sigma, _rng)
 	var type := choice.type
 	pitch = PitchModel.throw_at(cfg, settings.release(), actual, type.speed_kmh * choice.effort,
-		type.spin_rpm, type.efficiency, type.tilt_deg, settings.throws_left, SwingModel.CONTACT_PLANE_Y, false)
+		type.spin_rpm, type.efficiency, type.tilt_deg, settings.throws_left, SwingModel.CONTACT_PLANE_Y, false,
+		type.ssw_accel * settings.ssw_scale, type.ssw_deg)
 	ball = BallSim.new(cfg)
 	ball.pos = pitch.release_pos
 	ball.vel = pitch.release_vel
 	ball.spin = pitch.spin
+	ball.ssw = pitch.ssw
 	ideal_contact_time = pitch.contact_time
 	ideal_contact_pos = pitch.contact_pos
 	swing = null

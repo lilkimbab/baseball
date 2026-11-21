@@ -48,6 +48,16 @@ var comfortable_slack := 0.25
 var running_catch := Vector2(0.92, 0.45)
 var diving_catch := Vector2(0.50, 0.10)
 var diving_slack := -0.15
+## A ball in the air (the approved proposal 2, after Statcast's Catch Probability): the
+## chance is an S-curve of the time to spare — half the catches at air_half_slack s, the
+## curve as steep as air_width s — rather than straight lines. Statcast's own inputs are
+## the distance he must go and the time he has, harder going back and at the wall; the time
+## to spare already holds the first three (his speed, his reaction, slower going back), and
+## within wall_reach m of the fence a catch is wall_cost s harder at the wall itself.
+var air_half_slack := 0.10
+var air_width := 0.10
+var wall_reach := 3.0
+var wall_cost := 0.25
 var fly_drop := 0.010
 var ground_bobble := 0.040
 var hard_bobble_extra := 0.03
@@ -189,6 +199,11 @@ func fielder_time(from: Vector2, target: Vector2, reach: float, speed_rating: fl
 	if target.length() > from.length() + 2.0:
 		v *= backward
 	return reaction_for(range_rating, kind, in_air) + time_to_cover(d / efficiency_for(range_rating), v)
+
+
+## Chance of a catch in the air with this much time to spare (Statcast-shaped S-curve).
+func air_catch_chance(slack: float) -> float:
+	return 1.0 / (1.0 + exp(-(slack - air_half_slack) / maxf(air_width, 0.01)))
 
 
 ## Chance of holding on to a catch with this much time to spare (negative: he dives).

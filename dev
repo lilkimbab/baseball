@@ -64,6 +64,14 @@ case "$cmd" in
         "$GAME/assets/characters/player_$build.glb" "$ROOT/build/player_preview_$build.png" "$build" 2>&1 | grep -E "make_player: (build|wrote)|Error|Traceback"
     done
     "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    # The skin maps are read with mipmaps (no shimmer at a distance); the relief is a normal map.
+    for f in "$GAME"/assets/characters/player_*_skin_detail.png.import "$GAME"/assets/characters/player_skin_relief.png.import \
+        "$GAME"/assets/characters/player_*_shade.png.import "$GAME"/assets/characters/player_*_folds.png.import; do
+      [ -f "$f" ] && sed -i 's|^mipmaps/generate=false|mipmaps/generate=true|' "$f"
+    done
+    f="$GAME/assets/characters/player_skin_relief.png.import"
+    [ -f "$f" ] && sed -i 's|^compress/mode=0|compress/mode=2|; s|^compress/normal_map=0|compress/normal_map=1|' "$f"
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
     echo "model: rebuilt game/assets/characters/player_{base,lean,solid,heavy}.glb (previews: build/player_preview*.png)"
     ;;
   props)
@@ -114,6 +122,26 @@ case "$cmd" in
       python3 "$convert" pitch 3037_2 "$ROOT/content-local/animations/pitch/default.json"
       python3 "$convert" swing 48_2 "$ROOT/content-local/animations/swing/default.json"
     fi
+    ;;
+  native)
+    # Builds the native ball physics (approved proposal 5, tools/native) for Linux and
+    # Windows into game/native/bin (outside git). Needs the tools under .tools: godot-cpp,
+    # SCons (.tools/pyenv) and zig (as the Windows cross compiler). Without the libraries
+    # the game runs the same physics in GDScript.
+    export GODOT_CPP="$ROOT/.tools/godot-cpp" NATIVE_OUT="$GAME/native/bin"
+    API="$ROOT/.tools/extension_api_4.7.2.json"
+    if [ ! -f "$API" ]; then
+      (cd "$ROOT/.tools" && "$GODOT" --headless --dump-extension-api >/dev/null 2>&1 && mv extension_api.json "$API")
+    fi
+    cd "$ROOT/tools/native"
+    "$ROOT/.tools/pyenv/bin/scons" platform=linux target=template_release custom_api_file="$API" -j8 | grep -E "Linking Shared|error|Error" || true
+    PATH="$ROOT/tools/native/zig-mingw:$PATH" "$ROOT/.tools/pyenv/bin/scons" platform=windows use_mingw=yes use_llvm=yes lto=none target=template_release \
+      custom_api_file="$API" -j8 | grep -E "Linking Shared|error|Error" || true
+    # The extension file goes in only with the libraries (without them Godot would complain
+    # at every start; the game then runs the GDScript physics).
+    cp "$ROOT/tools/native/ballphysics.gdextension" "$GAME/native/ballphysics.gdextension"
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    ls -la "$GAME/native/bin"
     ;;
   sim)
     # Simulated games with the stat resolver (headless).
@@ -216,6 +244,7 @@ Usage: ./dev <command>
   model       rebuild the player model (Blender + MPFB) and import it
   props       rebuild the glove, mitt, bat and ball cover to real sizes (Blender)
   sim         simulate games (stat resolver)                    [--games n] [--seed n] | league
+  native      build the native ball physics (Linux, Windows)
   mocap       fetch and convert recorded deliveries and swings   [list pitch|swing] | [pitch|swing <trial> [form]]
   play        run the game on Windows (GPU)
   editor      open the Godot editor on Windows

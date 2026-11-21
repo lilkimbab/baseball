@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# zig as a MinGW cross compiler for the Windows build of the native ball physics (./dev native).
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-$here/../../../.tools/zig-cache}"
+args=()
+for a in "$@"; do
+  case "$a" in
+    -static-libgcc|-static-libstdc++|-Wl,--no-undefined) ;;
+    -lstdc++) args+=("-lc++") ;;
+    *) args+=("$a") ;;
+  esac
+done
+exec "$here/../../../.tools/zig-x86_64-linux-0.17.1/zig" cc -target x86_64-windows-gnu "${args[@]}"

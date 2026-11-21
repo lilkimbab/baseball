@@ -77,6 +77,20 @@ func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], 
 		(controllers[t] as AiController).tactics = tactics[t]
 
 
+## A pitcher's feel for the seam-shifted wake (DuelSettings.ssw_scale): more with better
+## movement ratings on his pitches, and his own besides (from his id, so the same man is the same every day):
+## two sinkerballers of the same rating do not move the ball alike.
+static func ssw_scale_for(pitcher: Player) -> float:
+	var own := float(absi(hash(pitcher.id + ":seams")) % 1000) / 1000.0
+	var rating := 50.0
+	if pitcher.pitching != null and not pitcher.pitching.arsenal.is_empty():
+		var total := 0.0
+		for a: ArsenalPitch in pitcher.pitching.arsenal:
+			total += a.movement
+		rating = total / pitcher.pitching.arsenal.size()
+	return clampf(lerpf(0.65, 1.35, clampf(rating / 99.0, 0.0, 1.0)) + (own - 0.5) * 0.3, 0.5, 1.5)
+
+
 ## Plays the game in this park: its fence and foul ground for every ball (docs/13 S13).
 func use_park(def: StadiumDef) -> void:
 	fence = def.fence()
@@ -386,6 +400,7 @@ func new_duel(state: GameState) -> PitchDuel:
 		# A tired pitcher loses command.
 		s.command = maxf(pitcher.pitching.control - 12.0 * _tiredness(state), 1.0)
 		s.release_point.z = 1.80 * clampf(pitcher.height_cm / 185.0, 0.9, 1.1)
+		s.ssw_scale = ssw_scale_for(pitcher)
 	s.body_offset = motion.body_offset
 	s.body_radius = motion.body_radius
 	s.body_ankle = motion.body_ankle

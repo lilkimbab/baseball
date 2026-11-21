@@ -296,3 +296,77 @@ func test_the_player_steals_second_by_letting_go_as_the_pitcher_moves() -> void:
 		scene.step(DT)
 	var on_second: bool = scene.game.runner_on(2) != null and scene.game.runner_on(2).player_id == runner_id
 	assert_true(on_second or scene.game.outs == outs + 1 or scene.game.top == false, "safe at second or out")
+
+
+func test_a_one_inning_practice_game_is_one_half_batting_and_one_pitching() -> void:
+	# The player as the visitors: he bats in the top of the first and pitches in the bottom,
+	# and the game ends there, tied or not.
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 0
+	scene.innings = 1
+	scene.seed_value = 18
+	scene.use_motion = false
+	add_child_autofree(scene)
+	var rng := Rng.new(9)
+	var swung: Array[bool] = [false]
+	var batted := false
+	var pitched := false
+	var ticks := 0
+	while not scene.game.over and ticks < 200000:
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+		if scene.state == DuelScene.State.PRE_PITCH and not scene.game.over:
+			batted = batted or scene.human_bats()
+			pitched = pitched or scene.human_pitches()
+	assert_true(scene.game.over, "finished")
+	assert_true(batted, "the player batted")
+	assert_eq(scene.game.inning, 1, "no extra innings")
+	assert_eq(scene.game.line[0].size(), 1)
+	# The bottom half is always played: the home side cannot lead before it.
+	assert_true(pitched, "the player pitched the bottom half")
+
+
+func test_the_ball_leaves_from_the_pitcher_s_hand() -> void:
+	# The release point was measured through the pitcher as he happened to stand when his
+	# delivery was picked: after fielding a ball he was still turned away and the pitch came
+	# from behind him. Now it is his hand at the moment of release, for every pitch.
+	if MotionLibrary.find(&"pitch") == null:
+		pass_test("no recorded deliveries here")
+		return
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = -1
+	scene.innings = 3
+	scene.seed_value = 5
+	add_child_autofree(scene)
+	var checked := 0
+	var ticks := 0
+	while checked < 14 and ticks < 120000 and not scene.game.over:
+		var before := scene.state
+		scene.step(1.0 / 240.0)
+		ticks += 1
+		if not (before == DuelScene.State.WINDUP and scene.state == DuelScene.State.LIVE):
+			continue
+		var start := scene.duel.ball.pos
+		assert_lt(start.y, Field.RUBBER_Y, "pitch %d leaves in front of the rubber" % checked)
+		scene.pitcher.apply_joints(scene.pitch_motion.frame(scene.release_time()), scene.pitch_motion.clip)
+		var hand := Field.to_field(scene.pitcher.global_transform * scene.pitcher.ball_spot(scene._throwing_hand))
+		assert_lt(hand.distance_to(start), 0.2, "pitch %d leaves from his hand" % checked)
+		checked += 1
+	assert_eq(checked, 14)
+
+
+func test_the_catcher_stays_put_while_the_pitcher_aims() -> void:
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 1
+	scene.innings = 3
+	scene.seed_value = 19
+	scene.use_motion = false
+	add_child_autofree(scene)
+	while not scene.human_pitches() or scene.state != DuelScene.State.PRE_PITCH:
+		scene.step(DT)
+	var middle := scene.catcher.position
+	for corner: Vector3 in [Vector3(0.3, Field.PLATE_FRONT_Y, 0.5), Vector3(-0.3, Field.PLATE_FRONT_Y, 1.1)]:
+		scene.pointer_override = scene.camera.unproject_position(Field.to_world(corner))
+		scene.refresh(DT)
+		assert_lt(scene.catcher.position.distance_to(middle), 0.001, "he does not move to the target")

@@ -5,6 +5,17 @@ extends SceneTree
 ##   godot --headless --path game --script res://tools/physics_bench.gd
 
 func _initialize() -> void:
+	if NativePhysics.available():
+		NativePhysics.enabled = false
+		_measure("gdscript")
+		NativePhysics.enabled = true
+		_measure("native")
+	else:
+		_measure("gdscript (native library not built)")
+	quit()
+
+
+func _measure(label: String) -> void:
 	var cfg := PhysicsConfigIO.load_file(PhysicsConfigIO.DEFAULT_PATH)
 	var field := AnalyticField.create(FenceProfile.symmetric(100.0, 116.0, 122.0, 2.6))
 	var catalog := PitchCatalogIO.load_file(PitchCatalogIO.DEFAULT_PATH)
@@ -30,7 +41,6 @@ func _initialize() -> void:
 		ball.spin = Vector3(cos(az), -sin(az), 0.0) * (1800.0 * TAU / 60.0)
 		steps += BallFlight.run(ball, field).points.size()
 	var total_us := float(Time.get_ticks_usec() - started)
-	print("physics_bench: aimed pitch %.2f ms | batted ball %.2f ms each, %.2f us/step (%d steps over %d balls)" % [
-		pitch_ms, total_us / 1000.0 / flights, total_us / steps, steps, flights,
+	print("physics_bench %s: aimed pitch %.2f ms | batted ball %.2f ms each, %.2f us/step (%d steps over %d balls)" % [
+		label, pitch_ms, total_us / 1000.0 / flights, total_us / steps, steps, flights,
 	])
-	quit()

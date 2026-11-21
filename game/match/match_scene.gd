@@ -32,6 +32,32 @@ func _turn(p: Puppet, yaw: float) -> void:
 	p.rotation.y += clampf(gap, -TURN_RATE * _frame_time, TURN_RATE * _frame_time)
 
 
+## Recorded running by motion matching (approved proposal 4): the frame of the CMU runs that
+## best fits where he is going — his speed and where the timeline has him in 0.2 and 0.4 s,
+## in his own heading — played on and blended. False when the local pack has no recordings.
+func _run_matched(p: Puppet, tl: PlayTimeline, key: String, t: float, here: Vector2, step: Vector2) -> bool:
+	var mm := MotionMatcher.shared()
+	if mm == null:
+		return false
+	var pb: MotionMatcher.Playback = _playbacks.get(p)
+	if pb == null or _play_time - float(_playback_used.get(p, -9.0)) > 0.3:
+		pb = MotionMatcher.Playback.new(mm)
+		_playbacks[p] = pb
+	_playback_used[p] = _play_time
+	var heading := Basis(Vector3.UP, p.rotation.y).inverse()
+	var local := func(field: Vector2) -> Vector2:
+		var w := heading * (Field.to_world(Vector3(field.x, field.y, 0.0)) - Field.to_world(Vector3.ZERO))
+		return Vector2(w.x, w.z)
+	var soon := tl.position(key, t + 0.2)
+	var later := tl.position(key, t + 0.4)
+	var vel: Vector2 = local.call(step / 0.1)
+	var p1: Vector2 = local.call(Vector2(soon.x, soon.y) - here)
+	var p2: Vector2 = local.call(Vector2(later.x, later.y) - here)
+	var frame := pb.step(_frame_time, vel, p1, p2)
+	p.apply_joints(frame, mm.clips[pb.clip])
+	return true
+
+
 ## A sprint (m/s): running poses are drawn from a jog at 0 to a sprint at this speed.
 const SPRINT := 8.0
 
@@ -168,6 +194,9 @@ var _board_shown := ""
 ## opens with its own pitch (a computer runner's steal) rather than at the catch.
 var _running := false
 var _running_pitch := false
+## Each puppet's motion-matched running, and when it was last used.
+var _playbacks: Dictionary[Puppet, MotionMatcher.Playback] = {}
+var _playback_used: Dictionary[Puppet, float] = {}
 ## Where each running puppet is in his stride (steps).
 var _strides: Dictionary[Puppet, float] = {}
 ## Where a right-handed batter stands in the box (field coordinates).
@@ -231,6 +260,7 @@ func _ready() -> void:
 ## Command-line choices: -- --innings 3|6|9 --team home|away|watch --seed n
 func _read_arguments() -> void:
 	Settings.ensure_loaded()
+	Settings.apply_rendering(get_tree())
 	pitch_clock_on = Settings.pitch_clock
 	auto_changes = Settings.auto_changes
 	if QuickMatchScreen.pending:
@@ -264,6 +294,10 @@ func _start_game() -> void:
 	var away := _clubs[clampi(away_index, 0, _clubs.size() - 1)]
 	var home := _clubs[clampi(home_index, 0, _clubs.size() - 1)]
 	var rules := RuleSet.kbo_2026() if innings >= 9 else RuleSet.short_game(innings)
+	if innings <= 2:
+		# A practice game (one inning: bat in the top, pitch in the bottom as the visitors)
+		# ends when its innings do, tied or not.
+		rules.extra_inning_limit = innings
 	manager = AiManager.new(env, catalog_all, ovr)
 	game = GameState.new()
 	game.rules = rules
@@ -1369,10 +1403,11 @@ func _show_target() -> void:
 	var aim := decision.target if showing and decision != null else Vector3(0.0, 0.0, 0.75)
 	if human_pitches() and state != State.LIVE and state != State.WINDUP:
 		aim = target
-	if state != State.RESULT:
-		catcher.position = Field.to_world(Vector3(clampf(aim.x * 0.7, -0.45, 0.45), -1.15, 0.0))
+	# He stays where he is and takes the ball where it comes (not giving the target away by
+	# moving to it).
+	catcher.position = Field.to_world(Vector3(0.0, -1.15, 0.0))
 	catcher.frame_time = _frame_time
-	var pose := PuppetClips.catcher(aim.z)
+	var pose := PuppetClips.catcher()
 	if state == State.PRE_PITCH and not human_pitches() and state_time < SIGN_TIME:
 		pose = PuppetClips.catcher_sign()
 	if state == State.RESULT and state_time > CATCHER_SETTLED:
@@ -1700,6 +1735,8 @@ func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 			p.apply(PuppetClips.backpedal(-_stride(p, speed)))
 			return
 		_turn(p, _yaw_toward(Vector2.ZERO, step))
+		if _run_matched(p, tl, key, t, here, step):
+			return
 		p.apply(PuppetClips.run_at(_stride(p, speed), speed / SPRINT))
 	else:
 		var ball := _ball_at(tl, t)

@@ -106,12 +106,15 @@ func test_model_has_separate_clothes_shoes_and_a_face() -> void:
 func test_catchers_gear_is_only_shown_when_worn() -> void:
 	var puppet := _model()
 	puppet.apply(PuppetClips.catcher())
-	for piece: String in ["Mask", "ChestProtector", "ShinGuards"]:
+	for piece: StringName in SkinnedPuppet.OPTIONAL_GEAR:
 		assert_false((puppet.find_child(piece, true, false) as MeshInstance3D).visible, "%s hidden by default" % piece)
-	puppet.gear = [&"Mask", &"ChestProtector", &"ShinGuards"]
+	puppet.headgear = &"none"
+	puppet.gear = SkinnedPuppet.CATCHER_GEAR.duplicate()
 	puppet.apply(PuppetClips.catcher())
-	for piece: String in ["Mask", "ChestProtector", "ShinGuards"]:
+	for piece: StringName in SkinnedPuppet.CATCHER_GEAR:
 		assert_true((puppet.find_child(piece, true, false) as MeshInstance3D).visible, "%s shown on the catcher" % piece)
+	assert_false((puppet.find_child("Cap", true, false) as MeshInstance3D).visible, "no cap under the catcher's helmet")
+	assert_false((puppet.find_child("Mask", true, false) as MeshInstance3D).visible, "the umpire's mask is not the catcher's")
 
 
 func test_batting_gloves_cover_the_hands() -> void:
@@ -122,9 +125,10 @@ func test_batting_gloves_cover_the_hands() -> void:
 		if body.mesh.surface_get_material(surface).resource_name == "Hands":
 			hands = surface
 	assert_gt(hands, -1, "the hands are their own surface")
-	var bare := body.get_surface_override_material(hands) as StandardMaterial3D
-	assert_not_null(bare.albedo_texture, "bare hands keep the skin texture")
-	assert_eq(bare.transparency, BaseMaterial3D.TRANSPARENCY_DISABLED, "and skin is drawn solid")
+	var bare := body.get_surface_override_material(hands) as ShaderMaterial
+	assert_not_null(bare, "bare hands are skin")
+	assert_not_null(bare.get_shader_parameter(&"albedo_texture"), "bare hands keep the skin texture")
+	assert_false(bare.shader.code.contains("blend_add") or bare.shader.code.contains("ALPHA ="), "and skin is drawn solid")
 	puppet.gloves = true
 	puppet.repaint()
 	var glove := body.get_surface_override_material(hands) as StandardMaterial3D
@@ -456,7 +460,7 @@ func test_a_player_gets_the_build_for_his_body_and_position() -> void:
 	assert_eq(SkinnedPuppet.build_for(183.0, 88.0), &"standard")
 	assert_eq(SkinnedPuppet.build_for(183.0, 95.0), &"solid")
 	assert_eq(SkinnedPuppet.build_for(183.0, 105.0), &"heavy")
-	assert_eq(SkinnedPuppet.build_for(183.0, 88.0, Position.Kind.C), &"solid", "a catcher a little thicker")
+	assert_eq(SkinnedPuppet.build_for(183.0, 90.0, Position.Kind.C), &"solid", "a catcher a little thicker")
 	assert_eq(SkinnedPuppet.build_for(183.0, 82.0, Position.Kind.SS), &"lean", "a shortstop a little leaner")
 
 
@@ -477,23 +481,35 @@ func test_a_figure_changes_body_between_players() -> void:
 
 func test_skin_scatters_light_and_eyes_are_glossy() -> void:
 	var puppet := _model()
-	var skin: StandardMaterial3D = null
+	var skin: ShaderMaterial = null
 	var eyes: StandardMaterial3D = null
 	for part: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in part.mesh.get_surface_count():
-			var m := part.get_surface_override_material(surface) as StandardMaterial3D
-			if m == null:
-				continue
+			var m := part.get_surface_override_material(surface)
 			if part.mesh.surface_get_material(surface).resource_name == "Skin":
-				skin = m
+				skin = m as ShaderMaterial
 			if part.name == &"Eyes":
-				eyes = m
+				eyes = m as StandardMaterial3D
 	assert_not_null(skin)
-	assert_true(skin.subsurf_scatter_enabled, "light scatters under the skin")
-	assert_true(skin.subsurf_scatter_skin_mode)
-	assert_not_null(skin.roughness_texture, "some places shine, others are matte")
+	var code := skin.shader.code
+	assert_string_contains(code, "sss_mode_skin", false)
+	assert_string_contains(code, "SSS_STRENGTH", false)
+	assert_string_contains(code, "CLEARCOAT", false)
+	assert_true(skin.get_shader_parameter(&"has_detail"), "baked creases, shine and beard area")
+	assert_not_null(skin.get_shader_parameter(&"relief_texture"), "the painted skin's fine relief")
 	assert_not_null(eyes)
 	assert_lt(eyes.roughness, 0.1, "a wet cornea")
+
+
+func test_complexion_differs_from_player_to_player() -> void:
+	var puppet := _model()
+	var tones := {}
+	for i: int in 12:
+		var weights := puppet.set_face("p%05d" % (i + 1))
+		tones[snappedf(weights["tone"], 0.05)] = true
+	assert_gt(tones.size(), 4, "fair to sun-browned")
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	assert_ne(body.get_instance_shader_parameter(&"tone"), null)
 
 
 func test_shadows_are_not_lit_blue() -> void:
@@ -584,7 +600,8 @@ func test_every_player_on_a_club_has_his_own_face() -> void:
 		var key := ""
 		for k: String in weights:
 			key += "%s=%.3f;" % [k, weights[k]]
-			assert_between(weights[k], 0.0, 0.61, "moderate, so brows and eyes stay in place")
+			if k != "tone":
+				assert_between(weights[k], 0.0, 0.61, "moderate, so brows and eyes stay in place")
 		assert_false(seen.has(key), "28 different faces")
 		seen[key] = true
 	# The same player always gets the same face.

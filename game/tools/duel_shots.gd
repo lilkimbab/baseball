@@ -24,6 +24,7 @@ var _every := 0.0
 var _clock := 0.0
 var _strip := 0
 var _swing_allowed := true
+var _trail_at := -1
 
 
 func _initialize() -> void:
@@ -56,7 +57,17 @@ func _process(delta: float) -> bool:
 	var state := _scene.state
 	var duel := _scene.duel
 
-	# Scripted player input.
+	# Scripted player input. The pointer goes low and away (pitching, with a breaking ball
+	# picked) or low and inside (batting) so the aiming displays can be photographed.
+	if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.2 and _scene.state_time < 0.25:
+		var zone := duel.zone
+		var spot := Vector3(zone.half_width * 0.8, Field.PLATE_FRONT_Y, zone.bottom + 0.1) if _scene.human_pitches() else Vector3(-zone.half_width * 0.6, Field.PLATE_FRONT_Y, zone.bottom + 0.15)
+		_scene.pointer_override = _scene.camera.unproject_position(Field.to_world(spot))
+		for i: int in _scene.pitch_ids.size():
+			if String(_scene.pitch_ids[i]).contains("curve") or String(_scene.pitch_ids[i]).contains("slider"):
+				_scene.selected_pitch = i
+	if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.5 and not _has("aiming"):
+		_shoot("aiming")
 	if _scene.human_pitches():
 		if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.6:
 			_scene.press_pitch_button()
@@ -69,12 +80,15 @@ func _process(delta: float) -> bool:
 			_scene.swing(SwingAttempt.Kind.POWER)
 			_swung = true
 
+	if _frames == _trail_at:
+		_shoot("trail_%d" % _seen)
 	# Captures.
 	if state != _last_state:
 		if state == DuelScene.State.CHARGE or state == DuelScene.State.ACCURACY:
 			pass
 		elif state == DuelScene.State.RESULT:
 			_shoot("result")
+			_trail_at = _frames + 20
 			_seen += 1
 			_swung = false
 			_in_play_shot = false
