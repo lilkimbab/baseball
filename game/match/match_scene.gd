@@ -152,6 +152,9 @@ var _dropped_bat: MeshInstance3D
 const BAT_DROPPED_AT := 0.2
 ## Seconds since the plate umpire called time (negative: he has not).
 var _time_called := -1.0
+var board_screen: ScoreboardScreen
+var _board_clock := 0.0
+var _board_shown := ""
 ## The play being shown is a steal or a pickoff (RunningPlay), not a ball in play; and it
 ## opens with its own pitch (a computer runner's steal) rather than at the catch.
 var _running := false
@@ -185,6 +188,12 @@ func _ready() -> void:
 	play_overlay = PlayOverlay.new()
 	play_overlay.scene = self
 	layer.add_child(play_overlay)
+	# The park's scoreboard shows this game.
+	if park.scoreboard != null:
+		board_screen = ScoreboardScreen.new()
+		board_screen.scene = self
+		board_screen.size = Vector2(park.scoreboard.size)
+		park.scoreboard.add_child(board_screen)
 	post_game = PostGame.new()
 	post_game.scene = self
 	layer.add_child(post_game)
@@ -221,6 +230,8 @@ func _read_arguments() -> void:
 		human_team = QuickMatchScreen.side_index()
 		away_index = QuickMatchScreen.away_index
 		home_index = QuickMatchScreen.home_index
+		stadium_id = QuickMatchScreen.park
+		time_of_day = StringName(QuickMatchScreen.time)
 		return
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
 	if args.has("innings"):
@@ -258,6 +269,24 @@ func _start_game() -> void:
 	_chosen_team = human_team if human_team >= 0 else 1
 	balls = 0
 	strikes = 0
+
+
+## When a season's game is played (docs/13 S13): weekday games at 18:30 under the lights,
+## Saturday's at 17:00, Sunday's at 14:00. The week runs Tuesday to Sunday, Monday off.
+static func time_for(game_day: int) -> StringName:
+	match Schedule.calendar_day(game_day) % 7:
+		4:
+			return &"dusk"
+		5:
+			return &"day"
+	return &"night"
+
+
+## A season's game in the home club's park at its time of day.
+func _play_at_home(home_club: String, game_day: int) -> void:
+	stadium = StadiumIO.load_park(home_park(home_club))
+	resolver.use_park(stadium)
+	time_of_day = time_for(game_day)
 
 
 ## The park a club plays its home games in: each club has one of the parks, always the same.
@@ -1372,6 +1401,15 @@ static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 
 func refresh(delta: float) -> void:
 	_show_target()
+	# The scoreboard redraws when what it shows changes (about once a pitch).
+	_board_clock -= delta
+	if board_screen != null and _board_clock <= 0.0:
+		_board_clock = 0.25
+		var now := board_screen.signature()
+		if now != _board_shown:
+			_board_shown = now
+			board_screen.queue_redraw()
+			park.scoreboard.render_target_update_mode = SubViewport.UPDATE_ONCE
 	if _play_time >= 0.0 and _play != null:
 		_frame_time = delta
 		_show_play(_play_time)

@@ -56,6 +56,9 @@ func _start_game() -> void:
 	manager = sim.manager
 	innings = game.rules.innings
 	my_team = cs.my_side(game)
+	var today := cs.club_game()
+	if today != null:
+		_play_at_home(today.home, today.day)
 	me = cs.career.player.id
 	Settings.ensure_loaded()
 	pitch_all = Settings.pitch_all

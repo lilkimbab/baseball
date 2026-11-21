@@ -8,6 +8,9 @@ static var away_index := 0
 static var home_index := 1
 static var side := "home"
 static var style := "action"
+## The park ("" for the home club's own) and the time of day (docs/13 S13).
+static var park := ""
+static var time := "day"
 ## The game the match screens read when they start from here; cleared when read.
 static var pending := false
 
@@ -29,6 +32,13 @@ func build() -> void:
 	choices("이닝", ["3", "6", "9"], ["3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
 	choices("내 편", ["away", "home", "watch"], ["원정", "홈", "관전"], side, func(v: String) -> void: side = v)
 	choices("방식", ["action", "manager"], ["풀 액션(직접 치고 던진다)", "감독 지휘(작전과 개입)"], style, func(v: String) -> void: style = v)
+	var park_ids: Array = [""]
+	var park_names: Array = ["홈 구장"]
+	for id: String in StadiumIO.ids():
+		park_ids.append(id)
+		park_names.append(StadiumIO.load_park(id).name)
+	choices("구장", park_ids, park_names, park, func(v: String) -> void: park = v)
+	choices("시간", ["day", "dusk", "night"], ["낮 14시", "해 질 녘 17시", "밤 18시 30분"], time, func(v: String) -> void: time = v)
 	var r := row()
 	button("경기 시작", start, r, 300.0)
 	button("허브로", func() -> void: go(HUB), r, 200.0)

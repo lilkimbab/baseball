@@ -110,6 +110,7 @@ func _start_game() -> void:
 	manager = sim.manager
 	innings = game.rules.innings
 	my_team = 0 if g.away == s.my_team else 1
+	_play_at_home(g.home, g.day)
 	if s.postseason_of(g) != null:
 		interventions_left = POSTSEASON_INTERVENTIONS
 	_chosen_team = my_team

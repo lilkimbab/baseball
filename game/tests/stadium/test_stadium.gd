@@ -79,7 +79,7 @@ func test_a_park_is_built_with_all_its_parts() -> void:
 	for id: String in ["grand_park", "galaxy_dome"]:
 		var park := StadiumBuilder.new(StadiumIO.load_park(id))
 		add_child_autofree(park)
-		for part: String in ["Ground", "Fence", "HomeRunLine", "BackstopNet", "BattersEye", "Seats", "StandWalls"]:
+		for part: String in ["Ground", "Fence", "HomeRunLine", "BackstopNet", "BattersEye", "Seats", "StandWalls", "Scoreboard", "Ads"]:
 			assert_not_null(park.find_child(part, false, false), "%s has %s" % [id, part])
 		assert_eq(_named(park, "Dugout"), 2, "%s: a dugout on each side" % id)
 		assert_eq(_named(park, "Mound"), 5, "%s: the field's mound and four in the bullpens" % id)
@@ -91,3 +91,21 @@ func test_a_park_is_built_with_all_its_parts() -> void:
 		var signs := park.find_children("*", "Label3D", false, false)
 		assert_eq(signs.size(), 5)
 		assert_eq((signs[2] as Label3D).text, str(roundi(park.fence.distance_at(0.0))))
+
+
+func test_season_games_are_played_at_their_hour() -> void:
+	# Tuesday to Friday at night, Saturday at 17:00, Sunday at 14:00; Monday off.
+	var times: Array[StringName] = []
+	for game_day: int in 7:
+		times.append(MatchScene.time_for(game_day))
+	assert_eq(times, [&"night", &"night", &"night", &"night", &"dusk", &"day", &"night"] as Array[StringName])
+	assert_true(StadiumIO.ids().has(MatchScene.home_park("SSG")), "every club has one of the parks")
+	assert_eq(MatchScene.home_park("SSG"), MatchScene.home_park("SSG"), "and always the same one")
+
+
+func test_the_ad_boards_are_made_up_sponsors() -> void:
+	var sponsors := AdStrip.load_sponsors()
+	assert_gte(sponsors.size(), 8)
+	for s: Dictionary in sponsors:
+		assert_true(str(s["name"]).length() >= 2)
+		assert_true(Color.html_is_valid(str(s["bg"])) and Color.html_is_valid(str(s["fg"])))
