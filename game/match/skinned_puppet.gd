@@ -422,6 +422,20 @@ func _use_prop(part: StringName, prop: StringName, colour: Color, roughness: flo
 	scene.free()
 
 
+## Where a caught ball's centre sits in each glove, in the hand's frame (make_props.py: the
+## pocket's floor is some 2.5 cm off the palm side, and the ball is 3.7 cm round it).
+const POCKET := {
+	&"glove": Vector3(-0.03, 0.05, 0.062), &"outfield": Vector3(-0.03, 0.055, 0.062),
+	&"first_base": Vector3(-0.005, 0.06, 0.055), &"mitt": Vector3(-0.012, 0.05, 0.052),
+}
+
+
+func glove_pocket() -> Vector3:
+	if not _hand_frame.has("Left"):
+		return super.glove_pocket()
+	return _hand_frame["Left"] * (POCKET.get(glove_kind, POCKET[&"glove"]) as Vector3)
+
+
 func _place_props(direction: Vector3) -> void:
 	super._place_props(direction)
 	var glove := _parts[&"Glove"]

@@ -120,6 +120,12 @@ func apply_joints(frame: Dictionary[StringName, Vector3], _source: JointClip, ha
 	_show(bat_direction(frame))
 
 
+## Where a caught ball sits in the glove, in the puppet's space: the mannequin's glove is a
+## ball on its hand.
+func glove_pocket() -> Vector3:
+	return joints[&"LeftHand"]
+
+
 ## Where a ball held in a hand (&"RightHand" or &"LeftHand") is, in the puppet's space.
 func ball_spot(hand: StringName) -> Vector3:
 	return joints[hand]

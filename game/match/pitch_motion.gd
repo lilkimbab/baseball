@@ -9,6 +9,11 @@ const TAIL := 0.15
 const HOLD := 0.3
 const RECOVER := 0.8
 const STRETCH_LEAD := 0.35
+## Longest step (m) the pitcher takes walking back, and how high the stepping foot comes up.
+const WALK_STEP := 0.55
+const STEP_LIFT := 0.07
+## The part of each step's time a foot is in the air; the rest both feet are down.
+const STEP_SHARE := 0.85
 
 var clip: JointClip
 ## Seconds from the start of the delivery to the release of the ball.
@@ -54,4 +59,37 @@ func frame(clock: float) -> Dictionary[StringName, Vector3]:
 	var back := (clock - clip.duration - TAIL - HOLD) / RECOVER
 	if back <= 0.0:
 		return finish
-	return JointClip.blend(finish, clip.sample(offset), smoothstep(0.0, 1.0, back))
+	return walk_back(finish, clip.sample(offset), minf(back, 1.0))
+
+
+## From the follow-through back to the set position (docs/13 S12-7), `back` from 0 to 1. The
+## body goes back at an even pace while the feet take turns, the farther one first: one stays
+## planted while the other is picked up and put down nearer the rubber, so neither slides.
+static func walk_back(finish: Dictionary[StringName, Vector3], set_frame: Dictionary[StringName, Vector3], back: float) -> Dictionary[StringName, Vector3]:
+	var out := JointClip.blend(finish, set_frame, smoothstep(0.0, 1.0, back))
+	if not finish.has(&"LeftFoot") or not set_frame.has(&"LeftFoot"):
+		return out
+	var away: Dictionary[String, float] = {}
+	for side: String in JointClip.SIDES:
+		var d := set_frame[StringName(side + "Foot")] - finish[StringName(side + "Foot")]
+		away[side] = Vector2(d.x, d.z).length()
+	var first := "Left" if away["Left"] >= away["Right"] else "Right"
+	var steps := clampi(ceili(maxf(away["Left"], away["Right"]) / WALK_STEP) * 2, 2, 6)
+	for side: String in JointClip.SIDES:
+		var turn := 0 if side == first else 1
+		@warning_ignore("integer_division")
+		var own := (steps + 1 - turn) / 2
+		var done := 0.0
+		var lift := 0.0
+		for k: int in range(turn, steps, 2):
+			# Each step ends a little before the next begins: both feet are down between.
+			var u := clampf((back * steps - k) / STEP_SHARE, 0.0, 1.0)
+			done += smoothstep(0.0, 1.0, u) / own
+			lift = maxf(lift, sin(PI * u))
+		var foot := StringName(side + "Foot")
+		var at := finish[foot].lerp(set_frame[foot], minf(done, 1.0)) + Vector3.UP * (STEP_LIFT * lift)
+		var moved := at - out[foot]
+		out[foot] = at
+		var knee := StringName(side + "LowerLeg")
+		out[knee] += moved * 0.5
+	return out
