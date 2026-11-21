@@ -54,12 +54,17 @@ case "$cmd" in
   model)
     # Rebuild the player model with Blender + MPFB and import it into the game.
     # Blender keeps its settings and the MPFB add-on under .tools/blender-user.
+    # The standard build is player_base.glb; lean, solid and heavy builds beside it (S11-1).
     export BLENDER_USER_RESOURCES="$ROOT/.tools/blender-user"
     mkdir -p "$ROOT/build"
     "$BLENDER" -b --python "$ROOT/tools/blender/make_player.py" -- \
-      "$GAME/assets/characters/player_base.glb" "$ROOT/build/player_preview.png" 2>&1 | grep -E "make_player|Error|Traceback"
+      "$GAME/assets/characters/player_base.glb" "$ROOT/build/player_preview.png" standard 2>&1 | grep -E "make_player|Error|Traceback"
+    for build in lean solid heavy; do
+      "$BLENDER" -b --python "$ROOT/tools/blender/make_player.py" -- \
+        "$GAME/assets/characters/player_$build.glb" "$ROOT/build/player_preview_$build.png" "$build" 2>&1 | grep -E "make_player: (build|wrote)|Error|Traceback"
+    done
     "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
-    echo "model: rebuilt game/assets/characters/player_base.glb (preview: build/player_preview.png)"
+    echo "model: rebuilt game/assets/characters/player_{base,lean,solid,heavy}.glb (previews: build/player_preview*.png)"
     ;;
   props)
     # Rebuild the equipment (glove, catcher's mitt, bat, ball cover) to real sizes with Blender.

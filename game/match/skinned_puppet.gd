@@ -40,8 +40,12 @@ const PROPS := {&"glove": "res://assets/props/glove.glb", &"mitt": "res://assets
 var uniform := UniformStyle.new()
 ## Batting gloves instead of bare hands.
 var gloves := false
-## Standing height in metres; the model is scaled to it. Set before adding to the scene.
+## Standing height in metres; the model is scaled to it. Set before adding to the scene, or
+## change it with set_body().
 var height := 1.83
+## The body build (docs/13 S11-1): &"lean", &"standard", &"solid" or &"heavy", each a model
+## built by ./dev model.
+var build: StringName = &"standard"
 ## &"glove" for a fielder's glove, &"mitt" for the catcher's.
 var glove_kind: StringName = &"glove"
 var _glove_shown: StringName = &""
@@ -96,8 +100,79 @@ static func available() -> bool:
 	return ResourceLoader.exists(MODEL)
 
 
+## The model file for a build (the standard one if that build has not been made).
+static func model_for(b: StringName) -> String:
+	var path := "res://assets/characters/player_%s.glb" % b
+	return path if b != &"standard" and ResourceLoader.exists(path) else MODEL
+
+
+## The build for a player of this height, weight and position (A): by body mass index, with
+## catchers and first basemen a little thicker and centre fielders and middle infielders a
+## little leaner, as clubs tend to play them.
+static func build_for(height_cm: float, weight_kg: float, position: Position.Kind = Position.Kind.DH) -> StringName:
+	var m := height_cm / 100.0
+	var bmi := weight_kg / maxf(m * m, 1.0)
+	match position:
+		Position.Kind.C, Position.Kind.B1:
+			bmi += 0.8
+		Position.Kind.CF, Position.Kind.SS, Position.Kind.B2:
+			bmi -= 0.6
+	if bmi < 24.5:
+		return &"lean"
+	if bmi < 26.8:
+		return &"standard"
+	if bmi < 28.8:
+		return &"solid"
+	return &"heavy"
+
+
+## Gives the figure another player's body: his build's model and his height.
+func set_body(height_m: float, b: StringName) -> void:
+	if _model == null:
+		height = height_m
+		build = b
+		return
+	if b != build or model_for(b) != model_for(build):
+		build = b
+		height = height_m
+		var old := _model
+		remove_child(old)
+		old.queue_free()
+		_load_model()
+		_measure()
+		_measure_fingers()
+		_curls_for = -1
+		_hinge_last.clear()
+		_dir_last.clear()
+		_wrist_last.clear()
+		_paint()
+	elif not is_equal_approx(height_m, height):
+		height = height_m
+		_model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
+		_recompute_frames()
+		_measure()
+
+
 func _ready() -> void:
-	var model := (load(MODEL) as PackedScene).instantiate() as Node3D
+	_load_model()
+	_measure()
+	_measure_fingers()
+	_paint()
+	_build_props()
+	apply(PuppetClips.fielder_ready())
+
+
+func _recompute_frames() -> void:
+	_to_puppet = Transform3D.IDENTITY
+	var node: Node3D = _skeleton
+	while node != self:
+		_to_puppet = node.transform * _to_puppet
+		node = node.get_parent() as Node3D
+	_to_skeleton = _to_puppet.affine_inverse()
+
+
+func _load_model() -> void:
+	var model := (load(model_for(build)) as PackedScene).instantiate() as Node3D
 	# glTF characters face +Z; the puppet's space faces -Z.
 	model.rotation.y = PI
 	add_child(model)
@@ -107,20 +182,12 @@ func _ready() -> void:
 	model.scale = Vector3.ONE * (height / _mesh.get_aabb().end.y)
 	_cap = model.find_child("Cap", true, false) as MeshInstance3D
 	_helmet = model.find_child("Helmet", true, false) as MeshInstance3D
+	_gear_parts.clear()
 	for piece: StringName in OPTIONAL_GEAR:
 		var part := model.find_child(piece, true, false) as MeshInstance3D
 		if part != null:
 			_gear_parts[piece] = part
-	var node: Node3D = _skeleton
-	while node != self:
-		_to_puppet = node.transform * _to_puppet
-		node = node.get_parent() as Node3D
-	_to_skeleton = _to_puppet.affine_inverse()
-	_measure()
-	_measure_fingers()
-	_paint()
-	_build_props()
-	apply(PuppetClips.fielder_ready())
+	_recompute_frames()
 
 
 func set_colors(jersey_color: Color, pants_color: Color, cap_color: Color) -> void:

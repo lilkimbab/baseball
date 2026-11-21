@@ -360,18 +360,37 @@ func _new_duel() -> void:
 
 
 var _form_key := ""
+var _people_key := ""
+
+
+## A figure takes the player's height and build (docs/13 S11-1).
+func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
+	var model := puppet as SkinnedPuppet
+	if model == null or p == null:
+		return
+	model.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, kind))
 
 
 ## The pitcher's and the batter's own forms (docs/13 S10-5): recorded deliveries and swings
 ## from the local pack, chosen per player (FormCatalog). With runners on, the delivery is from
 ## the set position.
 func _apply_forms() -> void:
-	if not use_motion or game.over:
+	if game.over:
 		return
-	var pitcher := game.fielding_team().player(game.pitcher_id())
-	var batter := game.batting_team().player(game.batter_id())
-	var pf := FormCatalog.pitch_form(pitcher)
-	var sf := FormCatalog.swing_form(batter, pitcher.throws if pitcher != null else &"R")
+	var pitcher_player := game.fielding_team().player(game.pitcher_id())
+	var batter_player := game.batting_team().player(game.batter_id())
+	var people := "%s/%s" % [game.pitcher_id(), game.batter_id()]
+	if people != _people_key:
+		# A new batter or pitcher: his body, and the batter's name and number on his back.
+		_people_key = people
+		_set_body(pitcher, pitcher_player, Position.Kind.P)
+		_set_body(batter, batter_player, Position.Kind.DH)
+		if batter_player != null and not _styles.is_empty():
+			_dress(batter, _style_for(game.batting()), batter_player.number, batter_player.name, true)
+	if not use_motion:
+		return
+	var pf := FormCatalog.pitch_form(pitcher_player)
+	var sf := FormCatalog.swing_form(batter_player, pitcher_player.throws if pitcher_player != null else &"R")
 	var key := "%s/%s" % [pf, sf]
 	if key != _form_key and (pf != "" or sf != ""):
 		_form_key = key
@@ -647,6 +666,10 @@ func _dress_for_half() -> void:
 	var bat_team := game.batting_team()
 	var b := bat_team.player(game.batter_id())
 	_dress(batter, _style_for(game.batting()), b.number if b != null else 0, b.name if b != null else "", true)
+	for kind: Position.Kind in fielders:
+		_set_body(fielders[kind], field_team.player(field_team.fielder_at(kind)), kind)
+	_set_body(catcher, field_team.player(field_team.fielder_at(Position.Kind.C)), Position.Kind.C)
+	_people_key = ""
 	for r: Puppet in runner_puppets:
 		_dress(r, _style_for(game.batting()), 0, "", true)
 	for c: Puppet in coaches:
