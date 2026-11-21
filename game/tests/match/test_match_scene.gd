@@ -189,3 +189,24 @@ func test_with_manual_changes_the_computer_leaves_the_player_s_pitcher_in() -> v
 	assert_null(scene.manager.next_change(g), "the player's own pitcher stays until he changes him")
 	scene.set_auto_changes(true)
 	assert_not_null(scene.manager.next_change(g), "with the computer's help he is relieved")
+
+
+func test_the_catcher_s_mitt_takes_the_pitch_where_it_arrives() -> void:
+	# docs/13 S12-4, S12-8: the pocket of the mitt is on the ball as it is caught.
+	var scene := _start(13)
+	var checked := 0
+	var ticks := 0
+	while checked < 3 and ticks < 60000:
+		scene.step(DT)
+		scene.refresh(DT)
+		ticks += 1
+		if scene.state != DuelScene.State.RESULT or scene.state_time > 0.02 or scene._play_time >= 0.0:
+			continue
+		if scene.duel.bounced or scene.duel.result not in [PitchDuel.Result.BALL, PitchDuel.Result.CALLED_STRIKE, PitchDuel.Result.SWINGING_STRIKE]:
+			continue
+		var pocket := scene.catcher.global_transform * scene.catcher.glove_pocket()
+		assert_lt(pocket.distance_to(Field.to_world(scene.duel.ball.pos)), 0.05, "pitch %d" % checked)
+		checked += 1
+		while scene.state == DuelScene.State.RESULT:
+			scene.step(DT)
+	assert_eq(checked, 3, "three caught pitches looked at")

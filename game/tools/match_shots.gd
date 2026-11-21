@@ -9,7 +9,8 @@ extends SceneTree
 ##          photograph the screen after it  --menus: the player's side, with the pause menu
 ##          and the pitch clock  --manager: the manager mode (situation board, orders menu,
 ##          a ball in play shown from the summary)  --moves: a close camera on each catch,
-##          throw and slide in the plays (docs/13 S12)
+##          throw and slide in the plays (docs/13 S12)  --running: the same for steals and
+##          pickoffs only, fast-forwarding to them
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -23,6 +24,7 @@ var _to_end := false
 var _menus := false
 var _manager := false
 var _moves := false
+var _running_only := false
 var _close: Camera3D
 var _shot_moves := {}
 
@@ -37,7 +39,8 @@ func _initialize() -> void:
 	_scene = packed.instantiate() as MatchScene
 	_to_end = args.has("to-end")
 	_menus = args.has("menus")
-	_moves = args.has("moves")
+	_moves = args.has("moves") or args.has("running")
+	_running_only = args.has("running")
 	if _moves:
 		Engine.time_scale = 1.0
 		_close = Camera3D.new()
@@ -54,7 +57,7 @@ func _process(_delta: float) -> bool:
 	for name: String in _due:
 		root.get_texture().get_image().save_png("%s_%s.png" % [_prefix, name])
 	_due.clear()
-	if _frames > (200000 if _to_end else 20000):
+	if _frames > (200000 if _to_end or _running_only else 20000):
 		print("match_shots: gave up after %d frames" % _frames)
 		return true
 	if _menus:
@@ -81,6 +84,9 @@ func _process(_delta: float) -> bool:
 	if _frames % 600 == 0:
 		print("match_shots: fps %.0f" % Engine.get_frames_per_second())
 	var playing := _scene._play_time >= 0.0 and _scene._play != null and not _scene._play.foul
+	if _running_only:
+		playing = playing and _scene._running
+		Engine.time_scale = 1.0 if playing else 8.0
 	if _moves:
 		_close_up(playing)
 	elif playing:
@@ -137,6 +143,8 @@ func _close_up(playing: bool) -> void:
 		for m: PlayMoves.Moment in _scene._moves.by_key[key]:
 			var at := m.time + (0.0 if m.kind == PlayMoves.Kind.CATCH else 0.12)
 			var tag := "%d_%s_%s_%.1f" % [_seen, key.replace(":", ""), PlayMoves.Kind.keys()[m.kind], m.time]
+			if m.kind == PlayMoves.Kind.SLIDE:
+				at = m.time + 0.25
 			if t >= at and t < at + 0.2 and not _shot_moves.has(tag):
 				_shot_moves[tag] = true
 				var who := tl.position(key, t)

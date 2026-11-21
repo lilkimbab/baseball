@@ -659,7 +659,7 @@ func _play_on(r: PlayRunner, thrower: PlayFielder, from: Vector2, held: float, r
 	# The call comes as the play is made: a force out when the ball is held on the bag, a tag
 	# or a safe call when the runner gets there.
 	var call_at := need if judged > 0.0 and forced else maxf(need, runner_at)
-	out.calls.append(PlayCall.make(call_at, base, judged > 0.0, absf(judged)))
+	out.calls.append(PlayCall.make(call_at, base, judged > 0.0, absf(judged), not forced))
 	if judged > 0.0:
 		r.put_out(base, RunnerMove.OutKind.FORCE if forced else RunnerMove.OutKind.TAG, need)
 		_outs += 1

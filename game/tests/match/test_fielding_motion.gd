@@ -43,6 +43,7 @@ func test_a_grounder_to_short_is_caught_thrown_and_caught_at_first() -> void:
 	assert_almost_eq(r.calls[0].time, took[0].time, 0.05, "called when the ball is held")
 	var batter := r.timeline.position("R:b", took[0].time)
 	assert_between(Vector2(batter.x, batter.y).length(), 5.0, 27.0, "the batter is on his way")
+	assert_true(_moments(moves, "F:1B", PlayMoves.Kind.TAG).is_empty(), "a force needs no tag")
 	# Nobody slides into first: the batter runs through the bag.
 	for key: String in moves.by_key:
 		assert_true(_moments(moves, key, PlayMoves.Kind.SLIDE).is_empty(), key)
@@ -216,5 +217,66 @@ func test_umpire_signals_rise_and_fall() -> void:
 	var a := PuppetClips.umpire_signal(&"home_run", 0.4)
 	var b := PuppetClips.umpire_signal(&"home_run", 0.6)
 	assert_gt(a.r_hand.distance_to(b.r_hand), 0.02, "the hand circles for a home run")
+	assert_gt(PuppetClips.umpire_signal(&"infield_fly", 0.5).r_hand.y, 2.0, "the arm straight up for an infield fly")
+	var time := PuppetClips.umpire_signal(&"time", 0.5)
+	assert_gt(minf(time.r_hand.y, time.l_hand.y), 1.8, "both hands up for time")
 	var done := PuppetClips.umpire_signal(&"strike", 2.0)
 	assert_almost_eq(done.r_hand.y, stand.r_hand.y, 0.001, "and comes back down")
+
+
+# --- Steals and pickoffs shown as plays ---
+
+
+func test_a_steal_of_second_is_pitched_caught_thrown_and_slid_into() -> void:
+	var cover_from := Vector2(-6.0, 38.0)
+	for safe: bool in [true, false]:
+		var play := RunningPlay.steal(1, "r1", safe, 0.2 if safe else -0.3, Position.Kind.SS, cover_from, motion)
+		var tl := play.timeline
+		var moves := PlayMoves.read(tl, play.calls, false)
+		assert_eq(_moments(moves, "F:P", PlayMoves.Kind.THROW).size(), 1, "the pitch")
+		assert_eq(_moments(moves, "F:P", PlayMoves.Kind.CATCH).size(), 0, "the pitcher does not field his own pitch")
+		var took := _moments(moves, "F:C", PlayMoves.Kind.CATCH)
+		var threw := _moments(moves, "F:C", PlayMoves.Kind.THROW)
+		var tagged := _moments(moves, "F:SS", PlayMoves.Kind.CATCH)
+		assert_eq(took.size(), 1, "the catcher takes the pitch")
+		assert_eq(threw.size(), 1, "and throws")
+		assert_eq(tagged.size(), 1, "the shortstop takes the throw")
+		if took.is_empty() or threw.is_empty() or tagged.is_empty():
+			continue
+		assert_lt(took[0].time, threw[0].time)
+		assert_between(threw[0].time - took[0].time, 0.5, 1.1, "the catcher's transfer")
+		assert_lt(Vector2(tagged[0].at.x, tagged[0].at.y).distance_to(PlaySim.base_xy(2)), 0.1)
+		var tags := _moments(moves, "F:SS", PlayMoves.Kind.TAG)
+		assert_eq(tags.size(), 1, "and puts the tag down")
+		if not tags.is_empty():
+			assert_gt(tags[0].time, tagged[0].time, "after the ball is in his glove")
+			assert_lt(tags[0].at.z, 0.3, "down low, where the runner slides in")
+		var slides := _moments(moves, "R:r1", PlayMoves.Kind.SLIDE)
+		assert_eq(slides.size(), 1, "the runner slides")
+		if not slides.is_empty():
+			assert_false(slides[0].head_first, "feet first into second")
+		assert_eq(play.calls.size(), 1)
+		assert_eq(play.calls[0].base, 2)
+		assert_eq(play.calls[0].out, not safe)
+		# The runner gets to the bag at his time, and no faster than a sprint on the way.
+		var bag := PlaySim.base_xy(2)
+		var reached := tl.position("R:r1", tl.duration)
+		assert_lt(Vector2(reached.x, reached.y).distance_to(bag), 0.01)
+		var last := tl.position("R:r1", 0.0)
+		for i: int in range(1, 41):
+			var now := tl.position("R:r1", tl.duration * i / 40.0)
+			assert_lt(Vector2(now.x - last.x, now.y - last.y).length() / (tl.duration / 40.0), 9.0, "running speed")
+			last = now
+
+
+func test_a_runner_picked_off_dives_back_head_first() -> void:
+	var play := RunningPlay.pickoff("r1", PlaySim.base_xy(1) + Vector2(0.5, 0.5), motion)
+	var moves := PlayMoves.read(play.timeline, play.calls, false)
+	assert_eq(_moments(moves, "F:P", PlayMoves.Kind.THROW).size(), 1, "the pitcher throws over")
+	assert_eq(_moments(moves, "F:1B", PlayMoves.Kind.CATCH).size(), 1, "the first baseman takes it")
+	var slides := _moments(moves, "R:r1", PlayMoves.Kind.SLIDE)
+	assert_eq(slides.size(), 1, "the runner dives back")
+	if not slides.is_empty():
+		assert_true(slides[0].head_first)
+	assert_true(play.calls[0].out)
+	assert_eq(play.calls[0].base, 1)

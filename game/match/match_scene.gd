@@ -12,6 +12,15 @@ const PLAY_TAIL := 0.9
 const TRANSITION := 2.0
 ## Puppet speed (m/s) above which the run cycle plays.
 const RUN_POSE_SPEED := 0.8
+## The catcher gives the sign for this long (s) before he sets up; his mitt goes for the
+## ball over the last CATCHER_REACH_TIME s of its flight; a pitch arriving lower than
+## BLOCK_BELOW (m) is blocked; framing draws a caught pitch at most FRAME_PULL (m) inward.
+const SIGN_TIME := 1.2
+const CATCHER_REACH_TIME := 0.25
+const BLOCK_BELOW := 0.18
+const FRAME_PULL := 0.04
+## After this long (s) into a result the catcher is still, and is left as he is.
+const CATCHER_SETTLED := 0.45
 ## A sprint (m/s): running poses are drawn from a jog at 0 to a sprint at this speed.
 const SPRINT := 8.0
 
@@ -23,6 +32,12 @@ func _stride(p: Puppet, speed: float) -> float:
 	var step := lerpf(1.0, 2.0, clampf(speed / SPRINT, 0.0, 1.0))
 	_strides[p] = _strides.get(p, 0.0) + speed * _frame_time / step
 	return _strides[p]
+
+
+## The umpires hold up the infield fly call this long (s) into the play.
+const INFIELD_FLY_SIGNAL := 1.6
+## The plate umpire calls time for this long (s) when play stops for a substitution.
+const TIME_SIGNAL := 1.6
 
 
 ## Rounds of moving the glove hand by how far its pocket is from the ball.
@@ -119,6 +134,10 @@ var _runners_at_start: Array[String] = ["", "", ""]
 var _batter_at_start := ""
 var _between := 0.0
 var _half_key := ""
+## Seconds since the plate umpire called time (negative: he has not).
+var _time_called := -1.0
+## The play being shown is a steal or a pickoff (RunningPlay), not a ball in play.
+var _running := false
 ## Where each running puppet is in his stride (steps).
 var _strides: Dictionary[Puppet, float] = {}
 ## Where a right-handed batter stands in the box (field coordinates).
@@ -165,7 +184,7 @@ func _ready() -> void:
 	menu = SubstitutionPanel.new()
 	menu.scene = self
 	layer.add_child(menu)
-	_drain()
+	var _showing := _drain()
 	_new_duel()
 	_place_cast()
 	_sync_mode()
@@ -474,6 +493,10 @@ func _finish_on_contact() -> bool:
 	return true
 
 
+func _umpire_busy() -> bool:
+	return _time_called >= 0.0
+
+
 func _finish_pitch() -> void:
 	if swing_motion != null:
 		swing_motion.relax()
@@ -559,6 +582,7 @@ func step(delta: float) -> void:
 
 func _end_play() -> void:
 	_play_time = -1.0
+	_running = false
 	for e: GameEvent in _pending:
 		_apply(e)
 	_pending.clear()
@@ -625,7 +649,8 @@ func _sync_mode() -> void:
 
 
 func _after_result() -> void:
-	_drain()
+	if _drain():
+		return
 	if game.over:
 		return
 	var half := _half_name()
@@ -643,18 +668,60 @@ func _after_result() -> void:
 
 
 ## Everything before the next pitch: the end of a plate appearance on a full count,
-## substitutions, an intentional walk, a pickoff or a steal.
-func _drain() -> void:
+## substitutions, an intentional walk, a pickoff or a steal. True when a steal or a pickoff is
+## being shown as a play: the rest waits until it is over.
+func _drain() -> bool:
 	for i: int in 40:
 		if game.over:
-			return
+			return false
 		var e := resolver.before_pitch(game)
 		if e == null:
-			return
+			return false
+		if _show_running(e):
+			return true
 		_apply(e)
-		if e.kind != GameEvent.Kind.SUBSTITUTION and not game.over:
+		if e.kind == GameEvent.Kind.SUBSTITUTION:
+			_time_called = 0.0
+		elif not game.over:
 			banner = last_text
 			banner_time = 2.2
+	return false
+
+
+## Shows a steal or a pickoff as a play (docs/13 S12) before it counts: the pitch or the
+## pickoff throw, the catcher's throw, the cover man, the slide and the call. A double steal
+## and a throw that gets away are only reported.
+func _show_running(e: GameEvent) -> bool:
+	var play: PlayResult = null
+	if e.kind == GameEvent.Kind.PICKOFF and e.moves.size() == 1 and game.runner_on(1) != null:
+		play = RunningPlay.pickoff(game.runner_on(1).player_id, _stands.get(Position.Kind.B1, PlaySim.base_xy(1)), resolver.motion)
+	elif e.kind == GameEvent.Kind.STEAL and e.moves.size() == 1 and e.fielders != "E2":
+		var m := e.moves[0]
+		if m.from < 1 or m.from > 2 or game.runner_on(m.from) == null:
+			return false
+		var cover := Position.Kind.SS if m.from == 1 else Position.Kind.B3
+		var margin := resolver.steal_margin(game, m.from)
+		play = RunningPlay.steal(m.from, game.runner_on(m.from).player_id, not m.is_out(), margin, cover, _stands.get(cover, PlaySim.base_xy(m.from + 1)), resolver.motion)
+	if play == null:
+		return false
+	# Everyone where they stand for the pitch, the new batter in the box.
+	var hitter := game.batting_team().player(game.batter_id())
+	var pitcher_player := game.fielding_team().player(game.pitcher_id())
+	var throws := pitcher_player.throws if pitcher_player != null else &"R"
+	settings.bats_left = hitter != null and hitter.batting_side(throws) == &"L"
+	settings.throws_left = throws == &"L"
+	_apply_forms()
+	_place_cast()
+	_play = play
+	_moves = PlayMoves.read(play.timeline, play.calls, false)
+	_running = true
+	_play_time = 0.0
+	_pending.clear()
+	_pending.append(e)
+	_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
+	_batter_at_start = ""
+	_enter(State.RESULT)
+	return true
 
 
 func _half_name() -> String:
@@ -857,8 +924,11 @@ func _place_cast() -> void:
 	on_deck.visible = next_up.lineup.size() > 0
 
 
-## The catcher sets up where the pitch is meant to go: his body shifts toward the side and
-## his mitt shows the height, from the moment the sign is given until the ball arrives.
+## The catcher's part in each pitch (docs/13 S12-4). He puts down the sign, then sets up
+## where the pitch is meant to go (his body shifts toward the side and his mitt shows the
+## height). As the ball comes in his mitt goes to where it really arrives, and once it is in he
+## draws it a little toward the zone (framing). A pitch in the dirt he drops to his knees to
+## block.
 func _show_target() -> void:
 	if _play_time >= 0.0 or game.over:
 		return
@@ -866,8 +936,47 @@ func _show_target() -> void:
 	var aim := decision.target if showing and decision != null else Vector3(0.0, 0.0, 0.75)
 	if human_pitches() and state != State.LIVE and state != State.WINDUP:
 		aim = target
-	catcher.position = Field.to_world(Vector3(clampf(aim.x * 0.7, -0.45, 0.45), -1.15, 0.0))
-	catcher.apply(PuppetClips.catcher(aim.z))
+	if state != State.RESULT:
+		catcher.position = Field.to_world(Vector3(clampf(aim.x * 0.7, -0.45, 0.45), -1.15, 0.0))
+	catcher.frame_time = _frame_time
+	var pose := PuppetClips.catcher(aim.z)
+	if state == State.PRE_PITCH and not human_pitches() and state_time < SIGN_TIME:
+		pose = PuppetClips.catcher_sign()
+	if state == State.RESULT and state_time > CATCHER_SETTLED:
+		return
+	var ball := _catcher_ball()
+	if not ball.is_finite():
+		catcher.apply(pose)
+		return
+	if duel.bounced or ball.z < BLOCK_BELOW:
+		pose = PuppetClips.catcher_block()
+	var coming := (duel.ball.pos.y - PitchDuel.CATCH_Y) / maxf(-duel.ball.vel.y, 1.0) if state == State.LIVE else 0.0
+	var reach := 1.0 - smoothstep(0.0, CATCHER_REACH_TIME, coming)
+	catch_at(catcher, pose, catcher.to_local(Field.to_world(ball)), reach)
+
+
+## Where the catcher means to take the pitch, in field coordinates: where it will cross his
+## catching plane while it is on its way, where it is (drawn toward the zone) once he has it,
+## or nowhere (INF) when it was hit or hit the batter.
+func _catcher_ball() -> Vector3:
+	var hit := duel.contact != null and duel.contact.made_contact
+	if hit or duel.result == PitchDuel.Result.HIT_BY_PITCH:
+		return Vector3.INF
+	if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT:
+		var b := duel.ball
+		var left := maxf((b.pos.y - PitchDuel.CATCH_Y) / maxf(-b.vel.y, 1.0), 0.0)
+		var at := b.pos + b.vel * left + Vector3(0.0, 0.0, -4.9 * left * left)
+		at.z = maxf(at.z, 0.05)
+		return at
+	if state == State.RESULT:
+		var held := duel.ball.pos
+		if duel.bounced:
+			return held
+		# Framing: a short pull toward the middle of the zone just after the catch.
+		var middle := Vector3(0.0, held.y, (duel.zone.bottom + duel.zone.top) * 0.5)
+		var pull := (middle - held).limit_length(FRAME_PULL) * smoothstep(0.05, 0.3, state_time)
+		return held + pull
+	return Vector3.INF
 
 
 ## The fielder going after the ball in the current play (DH when none).
@@ -933,6 +1042,11 @@ func refresh(delta: float) -> void:
 	_pose_cast()
 	for u: Puppet in base_umpires:
 		signal_call(u, null)
+	if _time_called >= 0.0:
+		_time_called += delta
+		signal_call(umpire, PuppetClips.umpire_signal(&"time", _time_called) if _time_called < TIME_SIGNAL else null)
+		if _time_called >= TIME_SIGNAL:
+			_time_called = -1.0
 	_redraw_overlays()
 
 
@@ -1065,6 +1179,11 @@ func _umpire_signals(t: float) -> void:
 		calls[base_umpires[0]] = PuppetClips.umpire_signal(&"home_run", t - 1.0)
 	if _play.foul:
 		calls[umpire] = PuppetClips.umpire_signal(&"foul", t)
+	if _play.infield_fly and t < INFIELD_FLY_SIGNAL:
+		# Declared while the ball is up, by all of them.
+		for u: Puppet in base_umpires:
+			calls[u] = PuppetClips.umpire_signal(&"infield_fly", t)
+		calls[umpire] = PuppetClips.umpire_signal(&"infield_fly", t)
 	var everyone: Array[Puppet] = [umpire]
 	everyone.append_array(base_umpires)
 	for u: Puppet in everyone:
@@ -1082,16 +1201,33 @@ func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 	p.frame_time = _frame_time
 	var here := Vector2(now.x, now.y)
 	var m: PlayMoves.Moment = _moves.now(key, t) if _moves != null else null
+	# On a steal the pitcher delivers and the catcher waits in his crouch for the pitch.
+	if _running and key == "F:P" and t < RunningPlay.STEAL_LEAD_IN + 0.4 and _play.calls[0].base != 1:
+		p.rotation.y = PI
+		p.apply(PuppetClips.pitch(t - RunningPlay.STEAL_LEAD_IN + PuppetClips.PITCH_RELEASE))
+		return
+	if _running and key == "F:C" and t < RunningPlay.STEAL_LEAD_IN + RunningPlay.PITCH_FLIGHT:
+		p.rotation.y = 0.0
+		catch_at(p, PuppetClips.catcher(), p.to_local(Field.to_world(_ball_at(tl, t))), smoothstep(-0.3, -0.05, t - RunningPlay.STEAL_LEAD_IN - RunningPlay.PITCH_FLIGHT))
+		return
 	if m != null:
 		match m.kind:
 			PlayMoves.Kind.THROW:
 				p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
 				p.apply(PuppetClips.throw_at(t - m.time))
 				return
+			PlayMoves.Kind.TAG:
+				# Down to the bag with the ball in the glove, where the runner's foot comes.
+				if here.distance_to(Vector2(m.at.x, m.at.y)) > 0.3:
+					p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
+				var dt := t - m.time
+				catch_at(p, PuppetClips.ground_catch(), p.to_local(Field.to_world(m.at)), smoothstep(-0.25, -0.05, dt) * (1.0 - smoothstep(0.2, 0.4, dt)))
+				return
 			PlayMoves.Kind.SLIDE:
 				if here.distance_to(Vector2(m.at.x, m.at.y)) > 0.3:
 					p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
-				p.apply(PuppetClips.slide() if t >= m.time - 0.15 else PuppetClips.run_at(_stride(p, speed), 1.0))
+				var down := PuppetClips.head_first() if m.head_first else PuppetClips.slide()
+				p.apply(down if t >= m.time - (0.3 if m.head_first else 0.15) else PuppetClips.run_at(_stride(p, speed), 1.0))
 				return
 			PlayMoves.Kind.CATCH:
 				# Square to where the ball comes from; it may be off to one side of him.
@@ -1126,8 +1262,13 @@ static func catch(p: Puppet, ball: Vector3, dt: float, legs: PuppetPose = null) 
 		pose.hips_yaw = legs.hips_yaw
 		pose.r_foot = legs.r_foot
 		pose.l_foot = legs.l_foot
+	catch_at(p, pose, local, smoothstep(-0.3, -0.05, dt) * (1.0 - smoothstep(0.1, 0.25, dt)))
+
+
+## Poses p as `pose` with the glove's pocket drawn to `local` (in p's space) by `reach` (0 the
+## pose as it is, 1 the pocket on the point).
+static func catch_at(p: Puppet, pose: PuppetPose, local: Vector3, reach: float) -> void:
 	p.apply(pose)
-	var reach := smoothstep(-0.3, -0.05, dt) * (1.0 - smoothstep(0.1, 0.25, dt))
 	if reach <= 0.0:
 		return
 	var base := pose.blend(pose, 0.0)
@@ -1177,6 +1318,9 @@ func _show_ball() -> void:
 	if _play_time >= 0.0 and _play != null:
 		return
 	super._show_ball()
+	# Once the catcher has it the ball is in his mitt, wherever he takes it.
+	if state == State.RESULT and _catcher_ball().is_finite() and not duel.bounced:
+		ball_actor.show_at(Field.to_field(catcher.global_transform * catcher.glove_pocket()))
 
 
 ## The batting camera stands behind the batter's back shoulder: mirrored for a left-handed
