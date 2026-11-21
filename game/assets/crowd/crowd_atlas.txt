@@ -1,6 +1,6 @@
 people 13
-poses seated standing cheering clapping
+poses seated seated_lean seated_arms clapping standing standing_clap cheering cheer_one
 columns 8
-rows 7
+rows 13
 frame 128 256
 height_m 2.00

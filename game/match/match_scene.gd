@@ -307,7 +307,7 @@ func _start_game() -> void:
 	game.teams = [manager.make_lineup(away, rules, away.next_starter().id), manager.make_lineup(home, rules, home.next_starter().id)]
 	resolver = PhysicalResolver.new(env, catalog_all, manager, Rng.new(seed_value).fork(5))
 	# The home club's park, drawn and played in alike.
-	stadium = StadiumIO.load_park(stadium_id if stadium_id != "" else home_park(home.id))
+	stadium = StadiumIO.load_park(stadium_id) if stadium_id != "" else home_def(home)
 	resolver.use_park(stadium)
 	scorer = Scorer.new()
 	GameFlow.start(game)
@@ -383,10 +383,26 @@ func _crowd_react(delta: float) -> void:
 
 
 ## A season's game in the home club's park at its time of day.
-func _play_at_home(home_club: String, game_day: int) -> void:
-	stadium = StadiumIO.load_park(home_park(home_club))
+func _play_at_home(home_club: String, game_day: int, club: Team = null) -> void:
+	stadium = home_def(club) if club != null else StadiumIO.load_park(home_park(home_club))
 	resolver.use_park(stadium)
 	time_of_day = time_for(game_day)
+
+
+## A club's own park: one of the park models (home_park), standing in a setting of its own —
+## one of the kinds of backdrop, laid out from the club's id — with seats and walls in the
+## club's colours. Seventeen models by thirteen settings: no two clubs have the same home.
+static func home_def(team: Team) -> StadiumDef:
+	var def := StadiumIO.load_park(home_park(team.id))
+	def.place_seed = team.id
+	if def.roof != &"dome":
+		var kinds: Array = Backdrop.KINDS.keys()
+		def.backdrop = kinds[absi(hash(team.id + ":view")) % kinds.size()]
+	var colour := team.primary if team.primary.get_luminance() < 0.6 else team.accent
+	def.seat_color = colour.lerp(Color(0.3, 0.33, 0.4), 0.3)
+	def.wall_color = colour.darkened(0.55)
+	def.name = "%s %s" % [team.short_name, def.name]
+	return def
 
 
 ## The park a club plays its home games in: each club has one of the parks, always the same.

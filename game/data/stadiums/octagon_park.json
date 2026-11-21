@@ -1,0 +1,93 @@
+{
+ "id": "octagon_park",
+ "name": "옥타곤 파크",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 58,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 99.5,
+   "height": 3.2
+  },
+  {
+   "az": -31,
+   "dist": 107,
+   "height": 3.2
+  },
+  {
+   "az": -13,
+   "dist": 122.5,
+   "height": 3.2
+  },
+  {
+   "az": 13,
+   "dist": 122.5,
+   "height": 3.2
+  },
+  {
+   "az": 31,
+   "dist": 107,
+   "height": 3.2
+  },
+  {
+   "az": 45,
+   "dist": 99.5,
+   "height": 3.2
+  }
+ ],
+ "foul_territory": {
+  "backstop": 15.5,
+  "width_at_base": 11.0,
+  "width_at_pole": 2.5
+ },
+ "mow": "checker",
+ "bullpens": "outfield",
+ "outfield_setback": 4.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    26,
+    16
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": -12,
+   "rows": [
+    14
+   ],
+   "rake_deg": [
+    18
+   ],
+   "kind": "berm"
+  },
+  {
+   "from_az": -10,
+   "to_az": 44,
+   "rows": [
+    20
+   ],
+   "rake_deg": [
+    26
+   ]
+  }
+ ],
+ "backdrop": "forest_hills",
+ "wall_color": "#0f2c5c",
+ "seat_color": "#1b4fa0",
+ "capacity": 24000,
+ "towers": [
+  -120,
+  -60,
+  60,
+  120
+ ]
+}

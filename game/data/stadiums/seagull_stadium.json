@@ -1,0 +1,71 @@
+{
+ "id": "seagull_stadium",
+ "name": "갈매기 구장",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 40,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 95.8,
+   "height": 6.0
+  },
+  {
+   "az": -22,
+   "dist": 112,
+   "height": 6.0
+  },
+  {
+   "az": 0,
+   "dist": 121,
+   "height": 6.0
+  },
+  {
+   "az": 22,
+   "dist": 112,
+   "height": 6.0
+  },
+  {
+   "az": 45,
+   "dist": 95.8,
+   "height": 6.0
+  }
+ ],
+ "foul_territory": {
+  "backstop": 18.0,
+  "width_at_base": 14.0,
+  "width_at_pole": 4.0
+ },
+ "mow": "straight",
+ "bullpens": "foul",
+ "outfield_setback": 2.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    26,
+    22
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": false
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    18
+   ],
+   "rake_deg": [
+    26
+   ]
+  }
+ ],
+ "backdrop": "beach",
+ "wall_color": "#12305f",
+ "seat_color": "#1f4fa5",
+ "capacity": 23000
+}

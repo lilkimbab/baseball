@@ -1,0 +1,97 @@
+{
+ "id": "monster_yard",
+ "name": "몬스터 야드",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 45,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 94.5,
+   "height": 11.3
+  },
+  {
+   "az": -30,
+   "dist": 102,
+   "height": 11.3
+  },
+  {
+   "az": -17,
+   "dist": 116,
+   "height": 11.3
+  },
+  {
+   "az": -8,
+   "dist": 128,
+   "height": 5.2
+  },
+  {
+   "az": 5,
+   "dist": 128,
+   "height": 5.2
+  },
+  {
+   "az": 20,
+   "dist": 116,
+   "height": 1.6
+  },
+  {
+   "az": 36,
+   "dist": 113,
+   "height": 1.6
+  },
+  {
+   "az": 45,
+   "dist": 92,
+   "height": 1.0
+  }
+ ],
+ "foul_territory": {
+  "backstop": 14.5,
+  "width_at_base": 9.0,
+  "width_at_pole": 1.5
+ },
+ "mow": "diagonal",
+ "bullpens": "foul",
+ "outfield_setback": 1.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    28,
+    10
+   ],
+   "rake_deg": [
+    22,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": -10,
+   "rows": [
+    5
+   ],
+   "rake_deg": [
+    30
+   ]
+  },
+  {
+   "from_az": -8,
+   "to_az": 44,
+   "rows": [
+    20
+   ],
+   "rake_deg": [
+    24
+   ]
+  }
+ ],
+ "backdrop": "downtown",
+ "wall_color": "#0d3b24",
+ "seat_color": "#0e4d2f",
+ "capacity": 18500,
+ "facade": "brick"
+}

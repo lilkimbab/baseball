@@ -67,7 +67,7 @@ func _ready() -> void:
 	# A bright afternoon: the lobby is the park on a game day.
 	var lighting := ParkLighting.new(def, &"day")
 	_viewport.add_child(lighting)
-	park.set_lights(lighting.lights_on())
+	park.set_lights(lighting.lights_on(), lighting.darkness())
 	var crowd := Crowd.new(park)
 	crowd.fill = 0.75
 	crowd.density = [0.3, 0.6, 1.0][clampi(Settings.quality, 0, 2)]
@@ -101,10 +101,11 @@ static func _park() -> StadiumDef:
 	var ids := StadiumIO.ids()
 	if ids.is_empty():
 		return StadiumDef.standard()
-	var id := ids[0]
 	if LeagueSession.season != null:
-		id = MatchScene.home_park(LeagueSession.season.my_team)
-	return StadiumIO.load_park(id)
+		return MatchScene.home_def(LeagueSession.season.teams[LeagueSession.season.my_team])
+	# No club yet: the first club's own park.
+	var clubs := RosterIO.load_pack(LeagueSession.PACK)
+	return MatchScene.home_def(clubs[0]) if not clubs.is_empty() else StadiumIO.load_park(ids[0])
 
 
 ## Moves the camera to another vantage.

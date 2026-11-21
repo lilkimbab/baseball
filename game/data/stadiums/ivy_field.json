@@ -1,0 +1,78 @@
+{
+ "id": "ivy_field",
+ "name": "아이비 필드",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 35,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 108,
+   "height": 4.6
+  },
+  {
+   "az": -25,
+   "dist": 112,
+   "height": 3.5
+  },
+  {
+   "az": 0,
+   "dist": 122,
+   "height": 3.5
+  },
+  {
+   "az": 25,
+   "dist": 112,
+   "height": 3.5
+  },
+  {
+   "az": 45,
+   "dist": 107.6,
+   "height": 4.6
+  }
+ ],
+ "foul_territory": {
+  "backstop": 16.0,
+  "width_at_base": 9.5,
+  "width_at_pole": 1.5
+ },
+ "mow": "checker",
+ "bullpens": "foul",
+ "outfield_setback": 0.5,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    26,
+    18
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    14
+   ],
+   "rake_deg": [
+    26
+   ]
+  }
+ ],
+ "backdrop": "new_town",
+ "wall_color": "#2e5e2a",
+ "seat_color": "#1f5c3a",
+ "capacity": 20000,
+ "facade": "brick",
+ "towers": [
+  -120,
+  -70,
+  70,
+  120
+ ]
+}

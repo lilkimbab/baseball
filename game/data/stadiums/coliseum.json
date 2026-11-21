@@ -1,0 +1,81 @@
+{
+ "id": "coliseum",
+ "name": "콜로세움",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 55,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 101,
+   "height": 3.0
+  },
+  {
+   "az": -22,
+   "dist": 116,
+   "height": 3.0
+  },
+  {
+   "az": 0,
+   "dist": 122,
+   "height": 3.0
+  },
+  {
+   "az": 22,
+   "dist": 116,
+   "height": 3.0
+  },
+  {
+   "az": 45,
+   "dist": 101,
+   "height": 3.0
+  }
+ ],
+ "foul_territory": {
+  "backstop": 20.0,
+  "width_at_base": 18.0,
+  "width_at_pole": 7.0
+ },
+ "mow": "straight",
+ "bullpens": "foul",
+ "outfield_setback": 7.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    28,
+    22,
+    16
+   ],
+   "rake_deg": [
+    22,
+    30,
+    36
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    22,
+    14
+   ],
+   "rake_deg": [
+    24,
+    34
+   ]
+  }
+ ],
+ "backdrop": "downtown",
+ "wall_color": "#2b2b30",
+ "seat_color": "#7a1f2b",
+ "capacity": 30000,
+ "towers": [
+  -110,
+  -50,
+  50,
+  110
+ ]
+}

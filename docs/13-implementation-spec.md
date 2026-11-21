@@ -788,6 +788,13 @@ S4~S6은 한 작업씩 자세히 적었다. 가장 가깝고, 뒤의 모든 것�
 
 **상태: 완료 (2026-11-21, 밤 작업).** 위 1·2차.
 
+**2차 (2026-11-21 저녁, 사용자: "야구장이 허전하다, 배경·관중이 어설프다, 구장·배경을 10종 이상").**
+- 재질과 하늘은 CC0 실사 자료(`./dev materials`, 출처·라이선스는 `game/assets/materials/LICENSE.txt`). `SurfaceLibrary.dress()`가 위치 기준(트라이플래너)으로 입히므로 메시에 UV가 필요 없다
+- 배경은 `Backdrop`(`stadium/backdrop.gd`)이 `StadiumDef.backdrop`의 종류대로 짓는다. 종류 13: forest_hills, new_town, downtown, harbour, riverside, beach, industrial, mountains, countryside, sports_complex, tower_hill, amusement, sea_bridge (옛 이름 hills/city/sea도 읽는다). 배치는 `place_seed`(구단 ID)에서 나와 같은 종류라도 구단마다 다르다. 건물은 실제 건물 정면 사진을 입힌 상자(`city.gdshader`), 종류는 아파트·오피스·타워·저층·호텔
+- 구장 모형은 `data/stadiums/*.json` 17개. 추가된 정의 항목: `facade`(concrete/brick), `towers`(조명탑 방위), `landmark`(warehouse), 스탠드 구역의 `kind: berm`(잔디 둔덕)
+- 구단의 홈구장 = `MatchScene.home_def(team)`: 모형(해시) × 배경(해시) × 구단 색 좌석·벽
+- 성능: 경기 장면 1080p 82fps(변경 전 83)
+
 ## S14. 관중
 
 설계: [06의 7절](06-3d-art-pipeline.md#7-관중). 순서: 3단계 관중 → 옷 색과 응원석 → 응원 도구 → 흥분도 연동 → 관중 수.

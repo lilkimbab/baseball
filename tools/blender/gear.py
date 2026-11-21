@@ -280,7 +280,9 @@ def _visor(bm, head, brow, pts, thetas, reach=0.05, spread=58.0):
         base = pts[i][-1]
         out = Vector((math.sin(a), -math.cos(a), 0.0))
         length = reach * math.cos(a * 0.9) ** 0.7
-        inner.append(bm.verts.new(base + out * 0.004 + Vector((0.0, 0.0, 0.002))))
+        # The visor starts inside the shell and above its rim (it runs through the shell):
+        # butted against it, slivers between the two let the sun through onto the face.
+        inner.append(bm.verts.new(base - out * 0.02 + Vector((0.0, 0.0, 0.012))))
         outer.append(bm.verts.new(base + out * (0.004 + length) + Vector((0.0, 0.0, -0.016 * length / reach))))
     return [bm.faces.new((inner[k], outer[k], outer[k + 1], inner[k + 1])) for k in range(steps)]
 

@@ -123,6 +123,21 @@ case "$cmd" in
       python3 "$convert" swing 48_2 "$ROOT/content-local/animations/swing/default.json"
     fi
     ;;
+  materials)
+    # Fetches the CC0 surface textures and skies (tools/assets/fetch_materials.sh) and imports
+    # them: tiled surfaces with mipmaps (no shimmer far off), skies with their sun clamped
+    # (the game has its own sun).
+    "$ROOT/tools/assets/fetch_materials.sh"
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    for f in "$GAME"/assets/materials/*.jpg.import; do
+      sed -i 's|^mipmaps/generate=false|mipmaps/generate=true|' "$f"
+    done
+    for f in "$GAME"/assets/sky/*.hdr.import; do
+      sed -i 's|^process/hdr_clamp_exposure=false|process/hdr_clamp_exposure=true|' "$f"
+    done
+    "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
+    echo "materials: $(ls "$GAME"/assets/materials/*.jpg | wc -l) maps, $(ls "$GAME"/assets/sky/*.hdr | wc -l) skies imported"
+    ;;
   native)
     # Builds the native ball physics (approved proposal 5, tools/native) for Linux and
     # Windows into game/native/bin (outside git). Needs the tools under .tools: godot-cpp,
@@ -244,6 +259,7 @@ Usage: ./dev <command>
   model       rebuild the player model (Blender + MPFB) and import it
   props       rebuild the glove, mitt, bat and ball cover to real sizes (Blender)
   sim         simulate games (stat resolver)                    [--games n] [--seed n] | league
+  materials   fetch and import the CC0 surface textures and skies
   native      build the native ball physics (Linux, Windows)
   mocap       fetch and convert recorded deliveries and swings   [list pitch|swing] | [pitch|swing <trial> [form]]
   play        run the game on Windows (GPU)

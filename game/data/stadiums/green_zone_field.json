@@ -1,0 +1,82 @@
+{
+ "id": "green_zone_field",
+ "name": "그린존 필드",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 75,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 95,
+   "height": 2.8
+  },
+  {
+   "az": -22,
+   "dist": 110,
+   "height": 2.8
+  },
+  {
+   "az": 0,
+   "dist": 120,
+   "height": 2.8
+  },
+  {
+   "az": 22,
+   "dist": 110,
+   "height": 2.8
+  },
+  {
+   "az": 45,
+   "dist": 95,
+   "height": 2.8
+  }
+ ],
+ "foul_territory": {
+  "backstop": 18.0,
+  "width_at_base": 14.0,
+  "width_at_pole": 4.0
+ },
+ "mow": "diagonal",
+ "bullpens": "outfield",
+ "outfield_setback": 6.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    24,
+    20
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": -14,
+   "rows": [
+    12
+   ],
+   "rake_deg": [
+    16
+   ],
+   "kind": "berm"
+  },
+  {
+   "from_az": -12,
+   "to_az": 44,
+   "rows": [
+    16
+   ],
+   "rake_deg": [
+    24
+   ]
+  }
+ ],
+ "backdrop": "sports_complex",
+ "wall_color": "#5a1218",
+ "seat_color": "#c8102e",
+ "capacity": 23000
+}

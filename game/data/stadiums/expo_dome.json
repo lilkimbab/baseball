@@ -1,0 +1,75 @@
+{
+ "id": "expo_dome",
+ "name": "엑스포 돔",
+ "surface": "turf",
+ "roof": "dome",
+ "orientation_deg": 70,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 100,
+   "height": 4.2
+  },
+  {
+   "az": -22,
+   "dist": 116,
+   "height": 4.2
+  },
+  {
+   "az": 0,
+   "dist": 122,
+   "height": 4.2
+  },
+  {
+   "az": 22,
+   "dist": 116,
+   "height": 4.2
+  },
+  {
+   "az": 45,
+   "dist": 100,
+   "height": 4.2
+  }
+ ],
+ "foul_territory": {
+  "backstop": 18.5,
+  "width_at_base": 15.0,
+  "width_at_pole": 5.0
+ },
+ "mow": "straight",
+ "bullpens": "outfield",
+ "outfield_setback": 6.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    26,
+    20,
+    12
+   ],
+   "rake_deg": [
+    24,
+    32,
+    36
+   ],
+   "roof": false
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    18,
+    10
+   ],
+   "rake_deg": [
+    24,
+    34
+   ]
+  }
+ ],
+ "backdrop": "none",
+ "wall_color": "#2a2f3a",
+ "seat_color": "#2e7f86",
+ "capacity": 28000
+}

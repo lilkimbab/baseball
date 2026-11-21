@@ -1,0 +1,71 @@
+{
+ "id": "champions_field",
+ "name": "챔피언스 필드",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 64,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 99,
+   "height": 2.4
+  },
+  {
+   "az": -22,
+   "dist": 116,
+   "height": 2.4
+  },
+  {
+   "az": 0,
+   "dist": 121,
+   "height": 2.4
+  },
+  {
+   "az": 22,
+   "dist": 116,
+   "height": 2.4
+  },
+  {
+   "az": 45,
+   "dist": 99,
+   "height": 2.4
+  }
+ ],
+ "foul_territory": {
+  "backstop": 15.5,
+  "width_at_base": 11.0,
+  "width_at_pole": 2.5
+ },
+ "mow": "rings",
+ "bullpens": "outfield",
+ "outfield_setback": 5.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    24,
+    20
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    12
+   ],
+   "rake_deg": [
+    20
+   ]
+  }
+ ],
+ "backdrop": "sports_complex",
+ "wall_color": "#3a3a3a",
+ "seat_color": "#b5372f",
+ "capacity": 22000
+}

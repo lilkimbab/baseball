@@ -188,6 +188,15 @@ S1부터 지금까지 만든 것을 모두 실행했다: 전체 테스트, 문�
    - 로딩(`ui/loading.gd`): 경기 진입·복귀는 양 팀 엠블럼 VS + 팁 + 진행 막대, 메뉴 사이는 사선 와이프
    - 포인트(`ui/profile.gd`): 경기를 마치면 지급(완료 60P, 승리 +90P), 상점에서 커리어 장비(능력치 +1)·특별 훈련(성장 포인트 +10)·구단 자금(구단 포인트 +50) 구매
    - 캡처 `build/menus/v4_*.png`, 테스트 `tests/ui/test_menus.gd`(화면 전부 열기, 상점 구매, 커리어 탭)
+8. 선수 질감 2차 + 야구장 사실감 (진행). 외부 CC0 자료를 본격적으로 씀: ambientCG 재질 20종(잔디·흙·자갈·콘크리트·가죽·플라스틱·금속·벽돌·암석·모래·아스팔트·골함석, 실제 건물 정면 사진 6종), Poly Haven 하늘 3종. `./dev materials`(= `tools/assets/fetch_materials.sh`)로 받고 임포트
+   - 하늘: 그려 넣던 하늘 → 사진 하늘(낮 뭉게구름, 석양, 별 있는 밤). 하늘 속 해가 게임의 해 방향과 맞도록 돌려 놓는다. 안개를 절반 이하로(먼 산이 뿌옇게 묻혔다)
+   - 지면: 잔디·내야 흙·워닝트랙에 실사 스캔의 무늬와 요철(구장 고유의 잔디색·깎은 무늬는 유지)
+   - 구조물: 콘크리트·벽돌 외벽, 골함석 지붕과 지붕 기둥·보, 스위트 유리띠(야간 점등), 좌석 한 칸씩 보이는 의자 그림, 계단, 조명탑(둥근 램프 격자 + 철골), 외야 상단 깃발(바람에 펄럭임)
+   - **배경 13종**(`stadium/backdrop.gd`): 숲 능선, 신도시(아파트 단지를 실제처럼 줄지어), 도심(격자 가로 + 중심으로 갈수록 높아지는 스카이라인), 항구(방파제·등대·갠트리 크레인·컨테이너·화물선), 강변(사장교 + 건너편 도시), 해변(백사장·파라솔·부두·호텔·요트), 공단(공장동·줄무늬 굴뚝·저장 탱크·냉각탑), 고산(암봉과 설산 세 겹), 전원(논밭 조각보·마을·비닐하우스·풍력발전기), 종합운동장(실내체육관·주경기장·주차장), 타워 언덕, 유원지(대관람차), 해상 대교. 야간에는 창·다리·등대·관람차에 불이 켜진다. 캡처 `build/backdrops/`
+   - **구장 모형 17종**(`data/stadiums/`): 기존 4 + 13(대칭형, 팔각 펜스, 비대칭 높은 우측 벽, 11m 좌측 벽, 벽돌 외벽, 3층 스탠드, 잔디 둔덕 외야석, 소형 구장, 외야 창고 건물, 두 번째 돔 등). 구단마다 `MatchScene.home_def`가 모형 × 배경 × 구단 색으로 홈구장을 정한다(같은 조합이 거의 없음을 테스트로 고정). 캡처 `build/parks/`
+   - 관중: 한 사람당 자세 4 → 8장(앉기 넷, 서기 넷), 카드가 보는 쪽으로 돌아서 옆에서 종이처럼 보이지 않음, 좌우 반전·키 차이, 발치 음영. `tools/blender/make_crowd.py` 재렌더
+   - 선수: 바지 재단(허벅지에서 무릎 아래로 곧게 떨어지게. 무릎에서 조여 승마바지처럼 보였다), 허벅지 근육 모프 축소, 줄무늬 바지의 굵은 검은 곡선 해결(다리 둘레 UV), 장비에 실사 가죽·플라스틱·금속 요철, 얼굴에 생기던 흰 점·눈물 자국 같은 선 제거(헬멧 귀덮개 그림자, 그림자 가장자리 디더, 땀 반사)
+   - 못 한 것: MakeHuman 커뮤니티 스킨 팩 3종을 받아 봤으나 동양인 남성 스킨도 노멀 맵도 없어 얼굴 교체는 보류. 얼굴은 S18(실제 사진 기반)에서
 
 **제안 1~6 (승인)**
 - 6 FSR 2 업스케일링 (적용): 설정 "업스케일링" 끄기/품질(77%)/균형(67%)/원본(AA만), 기본 품질. FSR 2의 시간축 AA가 좌석·그물의 반짝임도 줄인다
@@ -201,7 +210,7 @@ S1부터 지금까지 만든 것을 모두 실행했다: 전체 테스트, 문�
 ```bash
 cd /home/parkjune/baseball
 git add -A .gitignore README.md PROGRESS.md dev docs/ game/ tools/ prototypes/physics-check/check.mjs
-git commit -m "Player feedback round: ball from the hand, bat cursor and pitch paths, real-looking crowd; skin, gear and uniform toward 2K14/The Show; approved proposals 1-6 (native ball physics); new menus (lobby, league, career, practice, shop, loading)
+git commit -m "Player feedback round: ball from the hand, bat cursor and pitch paths, real-looking crowd; skin, gear and uniform toward 2K14/The Show; approved proposals 1-6 (native ball physics); new menus (lobby, league, career, practice, shop, loading); 17 park models, 13 backdrops, photographed skies and surfaces
 
 Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
 git push origin overnight-2026-11-21

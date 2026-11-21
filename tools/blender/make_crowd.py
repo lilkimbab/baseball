@@ -24,7 +24,10 @@ OUT = ARGS[1] if len(ARGS) > 1 else "game/assets/crowd"
 FRAME_W = 128
 FRAME_H = 256
 FRAME_HEIGHT_M = 2.0
-POSES = ["seated", "standing", "cheering", "clapping"]
+# Eight ways of sitting and standing a row (one person a row of the atlas): people in a
+# crowd are never all in one attitude. (With four, and "standing" a soldier at attention,
+# the stands looked like ranks of mannequins.)
+POSES = ["seated", "seated_lean", "seated_arms", "clapping", "standing", "standing_clap", "cheering", "cheer_one"]
 COLUMNS = 8
 # Bones whose skin is the top (shirt, jacket): dyed in the club's colour.
 TOP_BONES = ("Spine", "Spine1", "Spine2", "L Clavicle", "R Clavicle", "L UpperArm", "R UpperArm")
@@ -88,6 +91,7 @@ def frame_axes(arm):
 # The next joint along each limb: a bone points from its own joint to this one. (The
 # imported bones' own axes do not run along the limbs: they came from 3ds Max's biped.)
 NEXT = {"Thigh": "Calf", "Calf": "Foot", "Foot": "Toe0", "UpperArm": "Forearm", "Forearm": "Hand"}
+SPINE_NEXT = {"Bip01 Spine": "Bip01 Spine1", "Bip01 Spine1": "Bip01 Spine2", "Bip01 Spine2": "Bip01 Neck", "Bip01 Neck": "Bip01 Head"}
 
 
 def aim(arm, bone, direction):
@@ -95,8 +99,13 @@ def aim(arm, bone, direction):
     children following."""
     bpy.context.view_layer.update()
     pb = arm.pose.bones[bone]
-    side, part = bone.split(" ")[1], bone.split(" ")[-1]
-    child = arm.pose.bones["Bip01 %s %s" % (side, NEXT[part])]
+    if bone in SPINE_NEXT:
+        child = arm.pose.bones.get(SPINE_NEXT[bone])
+        if child is None:
+            return
+    else:
+        side, part = bone.split(" ")[1], bone.split(" ")[-1]
+        child = arm.pose.bones["Bip01 %s %s" % (side, NEXT[part])]
     to_arm = arm.matrix_world.inverted().to_3x3()
     want = (to_arm @ direction).normalized()
     m = pb.matrix.copy()
@@ -112,28 +121,63 @@ def pose(arm, which, up, right, forward):
         pb.matrix_basis = Matrix.Identity(4)
     bpy.context.view_layer.update()
     down = -up
+    seated = which in ("seated", "seated_lean", "seated_arms", "clapping")
+    if which == "seated_lean":
+        # Elbows on the knees: the back comes forward.
+        aim(arm, "Bip01 Spine", up * 0.86 + forward * 0.5)
+    elif which in ("cheering", "cheer_one"):
+        aim(arm, "Bip01 Spine", up + forward * -0.06)
     for side, s in (("L", -1.0), ("R", 1.0)):
         out = right * s
-        if which in ("seated", "clapping"):
-            aim(arm, "Bip01 %s Thigh" % side, forward * 0.97 + down * 0.08 + out * 0.08)
-            aim(arm, "Bip01 %s Calf" % side, down * 0.97 + forward * 0.12)
+        if seated:
+            aim(arm, "Bip01 %s Thigh" % side, forward * 0.97 + down * 0.08 + out * (0.16 if which == "seated_lean" else 0.08))
+            aim(arm, "Bip01 %s Calf" % side, down * 0.97 + forward * (0.02 if which == "seated_lean" else 0.12))
             aim(arm, "Bip01 %s Foot" % side, forward)
+        elif which == "standing":
+            # Weight on one leg, the other eased forward.
+            aim(arm, "Bip01 %s Thigh" % side, down + out * (0.1 if side == "L" else 0.03) + forward * (0.0 if side == "L" else 0.09))
+            aim(arm, "Bip01 %s Calf" % side, down + forward * (0.0 if side == "L" else -0.05))
+            aim(arm, "Bip01 %s Foot" % side, forward + out * 0.25)
         else:
-            aim(arm, "Bip01 %s Thigh" % side, down + out * 0.06)
+            aim(arm, "Bip01 %s Thigh" % side, down + out * 0.08)
             aim(arm, "Bip01 %s Calf" % side, down)
-            aim(arm, "Bip01 %s Foot" % side, forward)
+            aim(arm, "Bip01 %s Foot" % side, forward + out * 0.15)
+        upper, fore = "Bip01 %s UpperArm" % side, "Bip01 %s Forearm" % side
         if which == "cheering":
-            aim(arm, "Bip01 %s UpperArm" % side, up * 0.95 + out * 0.3 + forward * 0.1)
-            aim(arm, "Bip01 %s Forearm" % side, up + out * 0.05)
+            # Arms up and out in a V, elbows bent: a cheer, not a signal.
+            aim(arm, upper, up * 0.7 + out * 0.62 + forward * 0.15)
+            aim(arm, fore, up * 0.95 + out * 0.12 + forward * 0.12)
+        elif which == "cheer_one":
+            if side == "R":
+                aim(arm, upper, up * 0.85 + out * 0.3 + forward * 0.22)
+                aim(arm, fore, up + forward * 0.12)
+            else:
+                aim(arm, upper, down + out * 0.14 + forward * 0.1)
+                aim(arm, fore, forward * 0.6 + down * 0.6 - out * 0.1)
         elif which == "clapping":
-            aim(arm, "Bip01 %s UpperArm" % side, down * 0.6 + forward * 0.7 + out * 0.15)
-            aim(arm, "Bip01 %s Forearm" % side, forward * 0.6 + up * 0.55 - out * 0.45)
+            aim(arm, upper, down * 0.6 + forward * 0.7 + out * 0.15)
+            aim(arm, fore, forward * 0.6 + up * 0.55 - out * 0.45)
+        elif which == "standing_clap":
+            aim(arm, upper, down * 0.75 + forward * 0.5 + out * 0.2)
+            aim(arm, fore, forward * 0.45 + up * 0.68 - out * 0.56)
         elif which == "seated":
-            aim(arm, "Bip01 %s UpperArm" % side, down * 0.9 + forward * 0.3 + out * 0.12)
-            aim(arm, "Bip01 %s Forearm" % side, forward * 0.85 + down * 0.35 - out * 0.1)
+            aim(arm, upper, down * 0.9 + forward * 0.3 + out * 0.12)
+            aim(arm, fore, forward * 0.85 + down * 0.35 - out * 0.1)
+        elif which == "seated_lean":
+            aim(arm, upper, down * 0.55 + forward * 0.8 + out * 0.1)
+            aim(arm, fore, forward * 0.45 + down * 0.3 - out * 0.6)
+        elif which == "seated_arms":
+            # Arms folded across the chest.
+            aim(arm, upper, down * 0.95 + forward * 0.28 + out * 0.1)
+            aim(arm, fore, forward * 0.3 + up * 0.12 - out * 0.95)
         else:
-            aim(arm, "Bip01 %s UpperArm" % side, down + out * 0.18 + forward * 0.05)
-            aim(arm, "Bip01 %s Forearm" % side, down + forward * 0.15)
+            # Standing at ease: one hand up at the waist (a drink, a phone), the other down.
+            if side == "L":
+                aim(arm, upper, down + out * 0.14 + forward * 0.12)
+                aim(arm, fore, forward * 0.85 + down * 0.25 - out * 0.25)
+            else:
+                aim(arm, upper, down + out * 0.16 + forward * 0.02)
+                aim(arm, fore, down + forward * 0.22)
 
 
 def lowest_point(mesh):

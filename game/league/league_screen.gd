@@ -566,7 +566,7 @@ func play_on_screen() -> void:
 	LeagueSession.pending = g
 	var d := s.division_of(s.my_team)
 	go(LeagueSession.MATCH, {"away": s.teams[g.away], "home": s.teams[g.home], "title": "%d부 리그" % (d + 1),
-		"line": "%d년 시즌 %d일차 · %s" % [s.season_year, s.day + 1, StadiumIO.load_park(MatchScene.home_park(g.home)).name]})
+		"line": "%d년 시즌 %d일차 · %s" % [s.season_year, s.day + 1, MatchScene.home_def(s.teams[g.home]).name]})
 
 
 ## Settles today's game at once.

@@ -1,0 +1,71 @@
+{
+ "id": "metro_stadium",
+ "name": "메트로 스타디움",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 60,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 100,
+   "height": 2.6
+  },
+  {
+   "az": -22,
+   "dist": 118,
+   "height": 2.6
+  },
+  {
+   "az": 0,
+   "dist": 125,
+   "height": 2.6
+  },
+  {
+   "az": 22,
+   "dist": 118,
+   "height": 2.6
+  },
+  {
+   "az": 45,
+   "dist": 100,
+   "height": 2.6
+  }
+ ],
+ "foul_territory": {
+  "backstop": 19.5,
+  "width_at_base": 16.0,
+  "width_at_pole": 5.0
+ },
+ "mow": "diagonal",
+ "bullpens": "outfield",
+ "outfield_setback": 5.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    30,
+    26
+   ],
+   "rake_deg": [
+    22,
+    32
+   ],
+   "roof": false
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    26
+   ],
+   "rake_deg": [
+    24
+   ]
+  }
+ ],
+ "backdrop": "new_town",
+ "wall_color": "#16324f",
+ "seat_color": "#1e4f9c",
+ "capacity": 25000
+}

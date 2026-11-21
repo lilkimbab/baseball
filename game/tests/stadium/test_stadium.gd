@@ -5,7 +5,7 @@ extends GutTest
 
 func test_four_parks_load_and_their_physics_matches_their_fence() -> void:
 	var ids := StadiumIO.ids()
-	assert_eq(ids.size(), 4)
+	assert_gte(ids.size(), 14, "park models enough to tell thirty clubs' homes apart")
 	for id: String in ids:
 		var park := StadiumIO.load_park(id)
 		assert_eq(park.id, id)
@@ -86,7 +86,7 @@ func test_a_park_is_built_with_all_its_parts() -> void:
 		if id == "galaxy_dome":
 			assert_not_null(park.find_child("Dome", false, false))
 		else:
-			assert_eq(_named(park, "Lamps"), 6, "six light towers")
+			assert_eq(_named(park, "LampFrame"), 6, "six light towers")
 		# The distance signs say what the fence is.
 		var signs := park.find_children("*", "Label3D", false, false)
 		assert_eq(signs.size(), 5)
@@ -109,3 +109,32 @@ func test_the_ad_boards_are_made_up_sponsors() -> void:
 	for s: Dictionary in sponsors:
 		assert_true(str(s["name"]).length() >= 2)
 		assert_true(Color.html_is_valid(str(s["bg"])) and Color.html_is_valid(str(s["fg"])))
+
+
+func test_every_club_has_a_home_of_its_own() -> void:
+	var clubs := RosterIO.load_pack(LeagueSession.PACK)
+	var seen := {}
+	var settings := {}
+	var models := {}
+	for t: Team in clubs:
+		var def := MatchScene.home_def(t)
+		assert_true(Backdrop.KINDS.has(def.backdrop) or def.backdrop == &"none", "%s: %s" % [t.id, def.backdrop])
+		seen["%s|%s" % [MatchScene.home_park(t.id), def.backdrop]] = true
+		settings[def.backdrop] = true
+		models[MatchScene.home_park(t.id)] = true
+		assert_eq(def.place_seed, t.id, "laid out from the club")
+	assert_gte(Backdrop.KINDS.size(), 10, "kinds of setting")
+	assert_gte(models.size(), 10, "the clubs use many models")
+	assert_gte(settings.size(), 9, "and many settings")
+	assert_gte(seen.size(), clubs.size() - 4, "hardly any two the same")
+
+
+func test_every_setting_builds_round_a_park() -> void:
+	for kind: StringName in Backdrop.KINDS:
+		var def := StadiumIO.load_park("harbor_field")
+		def.backdrop = kind
+		var park := StadiumBuilder.new(def)
+		add_child_autofree(park)
+		assert_not_null(park.backdrop, kind)
+		assert_gt(park.backdrop.get_child_count(), 2, "%s has things in it" % kind)
+		park.set_lights(true, 1.0)

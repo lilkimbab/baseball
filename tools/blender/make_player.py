@@ -54,6 +54,9 @@ SHAPE = {
     "torso-muscle-dorsi-incr": 0.5,
     "torso-muscle-pectoral-incr": 0.3, "measure-waist-circ-decr": 0.35, "measure-hips-circ-decr": 0.4,
     "hip-scale-horiz-decr": 0.25, "stomach-pregnant-decr": 0.4, "buttocks-volume-decr": 0.2,
+    # Thighs: the muscle setting above swells them most of all; taken back so the legs are an
+    # athlete's and not a speed skater's.
+    "l-upperleg-muscle-decr": 0.45, "r-upperleg-muscle-decr": 0.45,
 }
 # Faces that differ from player to player: shape keys the game sets per player (morph
 # targets in the model). Each name is one key; pairs give both directions.
@@ -297,7 +300,9 @@ FACE_LINES = [
     ([(0.05, 0.003), (0.061, 0.007)], 0.0008, 0.35, True),
     ([(0.05, -0.004), (0.06, -0.01)], 0.0008, 0.35, True),
 ]
-LINE_SLOPE = 0.55
+# Off (0): drawn as creases they caught the light as dark streaks down the cheek from some
+# angles, like tear tracks. They need to follow the face's own surface, not a front view.
+LINE_SLOPE = 0.0
 
 
 def face_lines(head_pos, marks):
@@ -571,7 +576,7 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
     detail = np.ones((size, size, 4), dtype=np.float32)
     detail[..., 0] = ao[..., 0] * np.where(emitted[..., 1] > 0.1, emitted[..., 0], 1.0)
     f = relief_size // size
-    detail[..., 0] *= 1.0 - 0.12 * lines.reshape(size, f, size, f).mean(axis=(1, 3))
+    detail[..., 0] *= 1.0 - 0.12 * (LINE_SLOPE > 0.0) * lines.reshape(size, f, size, f).mean(axis=(1, 3))
     detail[..., 1] = emitted[..., 1]
     detail[..., 2] = emitted[..., 2]
     # Stored as 1 - height/2: an image importer fills fully clear pixels with their neighbours' colour.
@@ -1315,13 +1320,16 @@ def main():
         """Baseball trousers: roomy at the seat and thighs, narrowing below the knee to the
         hem, close at the belt, gathered a little over the calf."""
         bone = dominant(v, a)
+        # Cloth hangs from the widest part of the thigh past the knee: it does not follow the
+        # leg in where the knee is narrower (close to the skin there, the trousers bulged at
+        # the thigh and pinched at the knee like riding breeches).
         if bone.startswith("thigh_"):
             t = min(max(a.along(bone, v.co), 0.0), 1.0)
             seat = 0.003 if v.co.y > 0.0 and t < 0.35 else 0.0
-            return 0.022 - 0.006 * t + seat
+            return 0.014 + 0.020 * _smooth(0.5, 1.0, t) + seat
         if bone.startswith("calf_"):
             t = min(max(a.along(bone, v.co) / PANTS_HEM, 0.0), 1.0)
-            return 0.018 - 0.010 * t + 0.003 * math.sin(t * 2.0 * math.pi * 4.0)
+            return 0.034 - 0.020 * _smooth(0.0, 0.35, t) - 0.006 * _smooth(0.35, 1.0, t) + 0.002 * math.sin(t * 2.0 * math.pi * 4.0)
         if abs(v.co.z - a.waist) < BELT_HALF + 0.01:
             return 0.010
         return 0.019 + (0.004 if v.co.y > 0.0 else 0.0)
