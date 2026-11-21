@@ -612,3 +612,25 @@ func test_a_v_neck_shows_the_undershirt_and_no_collar_ring() -> void:
 	centre /= verts.size()
 	assert_between(centre.y / top, 0.76, 0.86, "at the base of the neck")
 	assert_gt(centre.z, 0.0, "in front (the model faces +Z)")
+
+
+# --- S11-9 uniforms ---
+
+
+func test_a_club_wears_white_at_home_and_its_colour_or_gray_away() -> void:
+	var t := Team.new()
+	t.id = "t01"
+	t.name = "라온 레드폭스"
+	t.short_name = "라온"
+	t.primary = Color(0.1, 0.12, 0.35)
+	t.accent = Color(0.9, 0.6, 0.1)
+	var home := UniformStyle.for_team(t, true)
+	var away := UniformStyle.for_team(t, false)
+	assert_gt(home.jersey.get_luminance(), 0.9, "white at home")
+	assert_eq(home.wordmark, "레드폭스", "the nickname across the chest")
+	assert_eq(away.wordmark, "라온", "the city on the road")
+	assert_eq(away.jersey, t.primary, "a dark club colour on the road")
+	assert_eq(home.patch, "라")
+	t.primary = Color(0.3, 0.75, 0.9)
+	var gray := UniformStyle.for_team(t, false)
+	assert_almost_eq(gray.jersey.r, gray.jersey.b, 0.05, "road gray for a bright colour")

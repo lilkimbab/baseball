@@ -674,12 +674,19 @@ func _build_officials() -> void:
 ## Home in white with navy, visitors in black with orange: the fielding side on the field,
 ## the batting side at bat, on the bases and in the coaching boxes.
 func _dress_for_half() -> void:
-	_styles = [
-		UniformStyle.make(Color(0.08, 0.08, 0.09), Color(0.9, 0.9, 0.91), Color(0.95, 0.45, 0.08), Color(0.95, 0.45, 0.08), "Comets"),
-		UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"),
-	]
-	_styles[0].cap = Color(0.07, 0.07, 0.08)
-	_styles[0].pants_pinstripes = true
+	# Each club in its own uniform: the home side in white, the visitors in their road
+	# uniform (docs/13 S11-9). Without the clubs (a test game) the plain pair.
+	var away := _club(0)
+	var home := _club(1)
+	if away != null and home != null:
+		_styles = [UniformStyle.for_team(away, false), UniformStyle.for_team(home, true)]
+	else:
+		_styles = [
+			UniformStyle.make(Color(0.08, 0.08, 0.09), Color(0.9, 0.9, 0.91), Color(0.95, 0.45, 0.08), Color(0.95, 0.45, 0.08), "Comets"),
+			UniformStyle.make(Color(0.94, 0.94, 0.96), Color(0.92, 0.92, 0.94), Color(0.1, 0.15, 0.35), Color(0.1, 0.15, 0.35), "Harbor"),
+		]
+		_styles[0].cap = Color(0.07, 0.07, 0.08)
+		_styles[0].pants_pinstripes = true
 	var field_team := game.fielding_team()
 	for kind: Position.Kind in fielders:
 		var p := field_team.player(field_team.fielder_at(kind))
@@ -709,8 +716,26 @@ func _style_for(team: int) -> UniformStyle:
 	var s := _styles[team]
 	var copy := UniformStyle.make(s.jersey, s.pants, s.trim, s.ink, s.wordmark)
 	copy.cap = s.cap
+	copy.socks = s.socks
+	copy.jersey_pinstripes = s.jersey_pinstripes
 	copy.pants_pinstripes = s.pants_pinstripes
+	copy.pinstripe = s.pinstripe
+	copy.patch = s.patch
+	copy.pants_stripe = s.pants_stripe
 	return copy
+
+
+## The club playing as away (0) or home (1): from the roster pack, the league or the career.
+func _club(side: int) -> Team:
+	var id := game.teams[side].team_id
+	for t: Team in _clubs:
+		if t.id == id:
+			return t
+	if LeagueSession.season != null and LeagueSession.season.teams.has(id):
+		return LeagueSession.season.teams[id]
+	if CareerSession.season != null and CareerSession.season.teams.has(id):
+		return CareerSession.season.teams[id]
+	return null
 
 
 ## Puts everyone where they stand before a pitch.
