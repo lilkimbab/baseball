@@ -35,6 +35,9 @@ var surfaces: Dictionary[StringName, SurfaceParams] = {}
 var aero_k := 0.0
 
 var _fallback_surface := SurfaceParams.new()
+## The flight constants in the order the native physics takes them (NativePhysics), set by
+## finalize().
+var native := PackedFloat64Array()
 
 
 ## A separate copy (for a different day's air, say).
@@ -50,6 +53,8 @@ func duplicate_config() -> PhysicsConfig:
 ## Computes derived values. Call once after the fields are filled.
 func finalize() -> void:
 	aero_k = air_density * PI * ball_radius * ball_radius / (2.0 * ball_mass)
+	native = PackedFloat64Array([aero_k, cd0, cd_per_1000_rpm, ball_radius, cl0, cl1, cl2, gravity, spin_decay_tau,
+		bat_cd_spin, bat_cl_a, bat_cl_b])
 
 
 func surface(surface_name: StringName) -> SurfaceParams:

@@ -19,6 +19,10 @@ static var fullscreen := false
 static var resolution := 2
 ## 0 low, 1 medium, 2 high: shadows and anti-aliasing.
 static var quality := 2
+## Upscaling (AMD FSR 2, built into Godot): 0 off, 1 quality (77% of the pixels drawn),
+## 2 balanced (67%), 3 native (full size, for its anti-aliasing alone). FSR 2's temporal
+## anti-aliasing also calms the shimmer of thin lines far off: seats, nets, chalk.
+static var upscale := 1
 ## Frames a second (0 no limit).
 static var fps_limit := 0
 ## Sound (no sound yet; kept for when it comes).
@@ -53,6 +57,7 @@ static func load_file() -> void:
 	fullscreen = bool(s.get("fullscreen", fullscreen))
 	resolution = clampi(int(s.get("resolution", resolution)), 0, RESOLUTIONS.size() - 1)
 	quality = clampi(int(s.get("quality", quality)), 0, 2)
+	upscale = clampi(int(s.get("upscale", upscale)), 0, 3)
 	fps_limit = int(s.get("fps_limit", fps_limit))
 	volume = float(s.get("volume", volume))
 	landing_spot = bool(s.get("landing_spot", landing_spot))
@@ -65,7 +70,7 @@ static func save_file() -> Error:
 	var d := {
 		"format": 1, "innings": innings, "pitch_clock": pitch_clock, "auto_changes": auto_changes,
 		"interventions": interventions, "pitch_all": pitch_all, "fullscreen": fullscreen,
-		"resolution": resolution, "quality": quality, "fps_limit": fps_limit, "volume": volume,
+		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,
 		"landing_spot": landing_spot, "hit_info": hit_info, "win_chance": win_chance, "commentary": commentary,
 	}
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
@@ -85,6 +90,21 @@ static func apply(tree: SceneTree) -> void:
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 		DisplayServer.window_set_size(RESOLUTIONS[resolution])
+	apply_rendering(tree)
+
+
+## The 3D drawing settings alone (a scene started on its own, without the title screen).
+static func apply_rendering(tree: SceneTree) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	var vp := tree.root
-	vp.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][quality]
+	if upscale > 0:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2
+		vp.scaling_3d_scale = [1.0, 0.77, 0.67, 1.0][upscale]
+		# FSR 2 does its own anti-aliasing.
+		vp.msaa_3d = Viewport.MSAA_DISABLED
+	else:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		vp.scaling_3d_scale = 1.0
+		vp.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X][quality]
 	RenderingServer.directional_shadow_atlas_set_size([1024, 2048, 4096][quality], true)

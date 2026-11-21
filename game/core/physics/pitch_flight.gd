@@ -5,6 +5,8 @@ extends RefCounted
 var release_pos := Vector3.ZERO
 var release_vel := Vector3.ZERO
 var spin := Vector3.ZERO
+## The seam-shifted wake's push through the flight (m/s², PitchModel.ssw_vector).
+var ssw := Vector3.ZERO
 ## Seconds from release to the front edge of the plate.
 var flight_time := 0.0
 ## Ball centre where it crosses the front edge of the plate.

@@ -20,6 +20,10 @@ var _lines := PackedStringArray()
 
 func _initialize() -> void:
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
+	# NATIVE_PHYSICS=0: the GDScript physics even where the native library is built (to time
+	# the difference; the results are the same).
+	if OS.get_environment("NATIVE_PHYSICS") == "0":
+		NativePhysics.enabled = false
 	if args.has("merge"):
 		_merge(str(args["merge"]).split(","), LeagueEnvIO.load_default(str(args.get("env", ""))))
 		return

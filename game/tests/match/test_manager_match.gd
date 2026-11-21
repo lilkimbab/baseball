@@ -52,7 +52,8 @@ func test_a_managed_game_goes_by_in_summary_and_ends() -> void:
 
 
 func test_a_reservation_stops_the_game_and_enter_takes_the_plate_appearance() -> void:
-	var scene := _start(22)
+	# Nine innings, so our side surely gets a runner to second or third.
+	var scene := _start(22, 9)
 	var preset := scene.reservation_presets[0]
 	assert_eq(preset.label, "득점권 기회에 알림")
 	scene.reservations.append(preset)

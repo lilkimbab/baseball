@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# zig's archiver for the Windows build of the native ball physics (./dev native).
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export ZIG_GLOBAL_CACHE_DIR="${ZIG_GLOBAL_CACHE_DIR:-$here/../../../.tools/zig-cache}"
+exec "$here/../../../.tools/zig-x86_64-linux-0.17.1/zig" ar "$@"

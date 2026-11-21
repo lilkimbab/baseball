@@ -21,17 +21,40 @@ static func spin_vector(dir: Vector3, spin_rpm: float, efficiency: float, tilt_d
 	return active - gyro if throws_left else active + gyro
 
 
+## The seam-shifted wake's push for a pitch travelling along `dir`: `accel` m/s² in the
+## direction `deg` (measured like tilt_deg, mirrored for a left-hander).
+static func ssw_vector(dir: Vector3, accel: float, deg: float, throws_left: bool) -> Vector3:
+	if accel == 0.0:
+		return Vector3.ZERO
+	var back := -dir
+	var right := back.cross(Vector3(0.0, 0.0, 1.0)).normalized()
+	var up := right.cross(back).normalized()
+	var a := deg_to_rad(-deg if throws_left else deg)
+	return (up * cos(a) + right * sin(a)) * accel
+
+
 ## Flies a ball from release until it crosses the front edge of the plate, noting on the way
 ## where it crosses the plane at `contact_y` (if that is in front of the plate).
-static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3, spin: Vector3, contact_y: float = -INF) -> PitchFlight:
+static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3, spin: Vector3, contact_y: float = -INF, ssw: Vector3 = Vector3.ZERO) -> PitchFlight:
 	var ball := BallSim.new(cfg)
 	ball.pos = release
 	ball.vel = velocity
 	ball.spin = spin
+	ball.ssw = ssw
 	var out := PitchFlight.new()
 	out.release_pos = release
 	out.release_vel = velocity
 	out.spin = spin
+	out.ssw = ssw
+	if NativePhysics.enabled:
+		var native := NativePhysics.fly_to_plate(release, velocity, spin, ssw, contact_y, Field.PLATE_FRONT_Y, DT, cfg.native)
+		out.plate_pos = native["plate_pos"]
+		out.plate_vel = native["plate_vel"]
+		out.flight_time = native["flight_time"]
+		if native.has("contact_pos"):
+			out.contact_pos = native["contact_pos"]
+			out.contact_time = native["contact_time"]
+		return out
 
 	var t := 0.0
 	while t < 3.0:
@@ -60,14 +83,14 @@ static func fly_to_plate(cfg: PhysicsConfig, release: Vector3, velocity: Vector3
 ## (a point on the plane of the plate's front edge), allowing for gravity, drag and break.
 static func throw_at(cfg: PhysicsConfig, release: Vector3, target: Vector3, speed_kmh: float,
 		spin_rpm: float, efficiency: float, tilt_deg: float, throws_left: bool = false,
-		contact_y: float = -INF, with_movement: bool = true) -> PitchFlight:
+		contact_y: float = -INF, with_movement: bool = true, ssw_accel: float = 0.0, ssw_deg: float = 0.0) -> PitchFlight:
 	var speed := speed_kmh / 3.6
 	var aim := target
 	var flight: PitchFlight = null
 	for i: int in MAX_AIM_ITERATIONS:
 		var dir := (aim - release).normalized()
 		var spin := spin_vector(dir, spin_rpm, efficiency, tilt_deg, throws_left)
-		flight = fly_to_plate(cfg, release, dir * speed, spin, contact_y)
+		flight = fly_to_plate(cfg, release, dir * speed, spin, contact_y, ssw_vector(dir, ssw_accel, ssw_deg, throws_left))
 		var miss := Vector3(target.x - flight.plate_pos.x, 0.0, target.z - flight.plate_pos.z)
 		if miss.length() < AIM_TOLERANCE:
 			break
@@ -78,9 +101,32 @@ static func throw_at(cfg: PhysicsConfig, release: Vector3, target: Vector3, spee
 	return flight
 
 
+## Points along a pitch's flight from the hand to the front of the plate, `step` seconds
+## apart, the last one where it crosses the plate (for drawing the path it will take).
+static func path(cfg: PhysicsConfig, flight: PitchFlight, step: float = 0.04) -> PackedVector3Array:
+	var ball := BallSim.new(cfg)
+	ball.pos = flight.release_pos
+	ball.vel = flight.release_vel
+	ball.spin = flight.spin
+	ball.ssw = flight.ssw
+	var out := PackedVector3Array([ball.pos])
+	var t := 0.0
+	var next := step
+	while t < flight.flight_time:
+		ball.pos = ball.integrate(DT)
+		t += DT
+		if t >= next:
+			out.append(ball.pos)
+			next += step
+	out.append(flight.plate_pos)
+	return out
+
+
 ## Throws a catalogue pitch with its reference speed and spin.
-static func throw_type(cfg: PhysicsConfig, type: PitchType, release: Vector3, target: Vector3, throws_left: bool = false) -> PitchFlight:
-	return throw_at(cfg, release, target, type.speed_kmh, type.spin_rpm, type.efficiency, type.tilt_deg, throws_left)
+## ssw_scale: the pitcher's feel for the seam-shifted wake (1 the pitch type's own).
+static func throw_type(cfg: PhysicsConfig, type: PitchType, release: Vector3, target: Vector3, throws_left: bool = false, ssw_scale: float = 1.0) -> PitchFlight:
+	return throw_at(cfg, release, target, type.speed_kmh, type.spin_rpm, type.efficiency, type.tilt_deg, throws_left,
+		-INF, true, type.ssw_accel * ssw_scale, type.ssw_deg)
 
 
 ## Where the pitcher actually aims after execution error: `target` moved by a random miss in

@@ -58,6 +58,7 @@ func _ready() -> void:
 	var world := WorldEnvironment.new()
 	world.environment = environment
 	add_child(world)
+	add_child(_reflections())
 	var dir := sun_direction()
 	if not indoor() and dir.z > 0.0:
 		sun = _light(dir, _sun_colour(), 1.35 if time == &"day" else 1.0, true)
@@ -76,6 +77,24 @@ func _ready() -> void:
 				lamp.shadow_opacity = 0.45
 			lamps.append(lamp)
 			i += 1
+
+
+## What glossy things reflect (helmets, eyes, wet skin, the bat): the park itself, captured
+## once from beside home plate at head height, over the whole field. Without it they mirror
+## only the sky, which is what made the helmets look like plastic toys.
+func _reflections() -> ReflectionProbe:
+	var probe := ReflectionProbe.new()
+	probe.name = "ParkReflections"
+	probe.update_mode = ReflectionProbe.UPDATE_ONCE
+	probe.size = Vector3(260.0, 60.0, 260.0)
+	# The box covers the field; the capture point is at the plate, 1.6 m up.
+	probe.position = Field.to_world(Vector3(0.0, 60.0, 20.0))
+	probe.origin_offset = Field.to_world(Vector3(0.0, -60.0, 1.6 - 20.0)) - Field.to_world(Vector3.ZERO)
+	probe.max_distance = 300.0
+	probe.intensity = 1.0
+	probe.enable_shadows = true
+	probe.ambient_mode = ReflectionProbe.AMBIENT_DISABLED
+	return probe
 
 
 func _sun_colour() -> Color:
@@ -107,7 +126,9 @@ func _environment() -> Environment:
 			sky_material.ground_horizon_color = Color(0.5, 0.56, 0.6)
 			sky_material.ground_bottom_color = Color(0.2, 0.22, 0.24)
 			sky_material.energy_multiplier = 0.8
-			env.ambient_light_energy = 0.85
+			# Less fill than before: the sunlit side and the shadow side of a face or a fold
+			# differ the way they do in a broadcast picture.
+			env.ambient_light_energy = 0.72
 			env.ambient_light_color = Color(0.62, 0.56, 0.48)
 			env.fog_light_color = Color(0.68, 0.76, 0.86)
 		&"dusk":
@@ -146,11 +167,17 @@ func _environment() -> Environment:
 	# Shadows lit by the blue sky alone look cold on skin (docs/13 S11-3): part of the ambient
 	# light is the warm light bounced off the grass, dirt and stands.
 	env.ambient_light_sky_contribution = 0.6
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.95 if time == &"day" or indoor() else 1.05
+	# AgX keeps skin and bright colours from going orange and flat the way ACES does, and
+	# the picture is not pushed (the reference is muted, not saturated).
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = 1.12 if time == &"day" or indoor() else 1.3
 	env.ssao_enabled = true
 	env.ssao_radius = 1.2
-	env.ssao_intensity = 1.6
+	env.ssao_intensity = 2.0
+	# Fine contact shade (under the cap brim, in the folds, between the arm and the body), a
+	# little of it in sunlight too.
+	env.ssao_detail = 1.2
+	env.ssao_light_affect = 0.12
 	env.glow_enabled = true
 	env.glow_intensity = 0.35 if time == &"day" else 0.55
 	env.glow_bloom = 0.04
@@ -159,6 +186,8 @@ func _environment() -> Environment:
 	env.fog_sun_scatter = 0.15
 	env.fog_sky_affect = 0.2
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.06
-	env.adjustment_saturation = 1.08
+	# A little more contrast and a little less colour: the reference pictures are muted and
+	# deep, not bright.
+	env.adjustment_contrast = 1.1
+	env.adjustment_saturation = 0.9
 	return env

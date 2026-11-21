@@ -36,7 +36,9 @@
     "comfortable_slack_s": 0.25,
     "running_from": 0.92, "running_to": 0.45,
     "diving_from": 0.50, "diving_to": 0.10,
-    "diving_slack_s": -0.15
+    "diving_slack_s": -0.15,
+    "air_basis": "Proposal 2 (approved 2026-11-21): Statcast Catch Probability shape (distance and opportunity time, harder going back and at the wall; star bands 0-25%, 30-50%, 55-75%, 80-90%, 95%). S-curve of the time to spare; half catches at air_half_s, tuned with ./dev sim --physical to keep the league's hits on fly balls",
+    "air_half_s": 0.10, "air_width_s": 0.10, "wall_m": 3.0, "wall_s": 0.25
   },
   "errors": {
     "basis": "A, tuned with the error target (0.673 per team per game)",

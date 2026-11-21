@@ -127,19 +127,18 @@ func test_with_a_recorded_delivery_the_ball_leaves_at_the_clips_release() -> voi
 
 
 func test_the_ball_starts_from_the_pitchers_hand() -> void:
+	# The release point is the hand at the moment of release, measured then (not when the
+	# delivery was chosen, through the figure as it happened to stand).
 	var scene := _start_with_motion(&"watch")
-	var default_point := DuelSettings.new().release_point
-	assert_gt(scene.settings.release_point.distance_to(default_point), 0.05, "the release point comes from the motion")
-	scene.pitcher.right_grip = Puppet.Grip.BALL
-	scene.pitcher.reset_motion()
-	scene.pitcher.apply_joints(scene.pitch_motion.frame(scene.release_time()), scene.pitch_motion.clip)
-	var hand := Field.to_field(scene.pitcher.global_transform * scene.pitcher.ball_spot(&"RightHand"))
-	assert_almost_eq(scene.settings.release_point, hand, Vector3.ONE * 0.01)
-	assert_between(scene.settings.release_point.y, Field.RUBBER_Y - 2.5, Field.RUBBER_Y - 0.5, "in front of the rubber")
-	assert_gt(scene.settings.release_point.z, Field.MOUND_HEIGHT + 1.0)
 	_advance(scene, roundi((DuelScene.AI_PITCH_DELAY + 1.0) * 120.0) + 4)
 	assert_eq(scene.state, DuelScene.State.LIVE)
-	assert_almost_eq(scene.duel.pitch.release_pos, scene.settings.release_point, Vector3.ONE * 1e-4)
+	var start := scene.duel.pitch.release_pos
+	scene.pitcher.apply_joints(scene.pitch_motion.frame(scene.release_time()), scene.pitch_motion.clip)
+	var hand := Field.to_field(scene.pitcher.global_transform * scene.pitcher.ball_spot(&"RightHand"))
+	assert_almost_eq(start, hand, Vector3.ONE * 0.01)
+	assert_between(start.y, Field.RUBBER_Y - 2.5, Field.RUBBER_Y - 0.5, "in front of the rubber")
+	assert_gt(start.z, Field.MOUND_HEIGHT + 1.0)
+	assert_gt(start.distance_to(DuelSettings.new().release_point), 0.05, "the recorded delivery's, not the default")
 
 
 func test_watch_mode_keeps_cycling_with_recorded_motion() -> void:
@@ -264,3 +263,50 @@ func test_the_pitching_camera_shows_batter_and_pitcher_at_reference_sizes() -> v
 	# batter nearly as tall (tools/reference/pitch_view.json).
 	assert_between(pitcher, 0.40, 0.52, "pitcher's share of the picture height")
 	assert_between(pitcher / batter, 1.2, 1.4, "pitcher against batter")
+
+
+# --- Aiming displays (the player's requests: a bat cursor, the pitch's path, a still catcher) ---
+
+
+func test_the_path_of_a_pitch_runs_from_the_hand_to_the_plate() -> void:
+	var cfg := PhysicsConfigIO.load_default()
+	var curve: PitchType = PitchCatalogIO.load_default()[&"curve"]
+	var release := Vector3(-0.55, 16.76, 1.8)
+	var target := Vector3(0.1, Field.PLATE_FRONT_Y, 0.6)
+	var flight := PitchModel.throw_type(cfg, curve, release, target)
+	var path := PitchModel.path(cfg, flight, 0.045)
+	assert_gt(path.size(), 10, "a ball every 0.045 s over half a second and more")
+	assert_lt(path[0].distance_to(release), 0.001)
+	assert_lt(path[path.size() - 1].distance_to(flight.plate_pos), 0.001)
+	for i: int in range(1, path.size()):
+		assert_lt(path[i].y, path[i - 1].y, "always coming in")
+	# A curve drops: its highest point is above both ends of a straight line between them.
+	var top := 0.0
+	for p: Vector3 in path:
+		top = maxf(top, p.z)
+	assert_gt(top, release.z, "it rises out of the hand before it breaks down")
+	assert_lt(flight.movement.y, -0.1, "and breaks down")
+
+
+func test_the_player_sees_his_pitch_s_path_before_he_throws() -> void:
+	var scene := _start(&"pitch")
+	for i: int in 30:
+		scene.step(DT)
+		scene.refresh(DT)
+	assert_eq(scene.state, DuelScene.State.PRE_PITCH)
+	assert_gt(scene.preview.size(), 10, "the path is drawn while he aims")
+	assert_lt(scene.preview[scene.preview.size() - 1].distance_to(scene.target), 0.03, "and ends at his target")
+	var first := scene.preview.duplicate()
+	scene.target += Vector3(0.2, 0.0, -0.2)
+	scene.pointer_override = scene.camera.unproject_position(Field.to_world(scene.target))
+	scene.refresh(DT)
+	assert_ne(scene.preview[scene.preview.size() - 1], first[first.size() - 1], "it follows the target")
+
+
+func test_the_batter_aims_with_the_pointer_by_default() -> void:
+	var scene := _start(&"bat")
+	assert_true(scene.aim_enabled, "the bat cursor is on")
+	var spot := Vector3(-0.15, Field.PLATE_FRONT_Y, 0.6)
+	scene.pointer_override = scene.camera.unproject_position(Field.to_world(spot))
+	scene.refresh(DT)
+	assert_lt(Vector2(scene.aim_point.x, scene.aim_point.z).distance_to(Vector2(spot.x, spot.z)), 0.02, "the cursor is where the pointer is")

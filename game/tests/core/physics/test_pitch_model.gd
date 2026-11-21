@@ -1,17 +1,19 @@
 extends PhysicsTest
 ## Pitch flight (docs/04 section 5.3). Expected values are the engine-independent reference
-## calculation in prototypes/physics-check.
+## calculation in prototypes/physics-check (with the seam-shifted wake of the sinker, changeup
+## and splitter since the approved proposal 1, 2026-11-21: the totals were kept, the spin's
+## share lowered).
 
 ## id -> [flight time s, plate speed km/h, horizontal movement cm, vertical movement cm]
 const EXPECTED := {
 	&"four_seam": [0.428, 131.2, -9.4, 45.5],
-	&"two_seam": [0.437, 128.6, -34.3, 28.5],
+	&"two_seam": [0.437, 128.7, -34.3, 28.5],
 	&"cutter": [0.450, 124.9, 15.9, 30.2],
 	&"slider": [0.471, 119.5, 29.0, 6.5],
 	&"sweeper": [0.486, 115.9, 44.2, 3.4],
 	&"curve": [0.519, 108.8, 19.7, -47.1],
-	&"changeup": [0.477, 118.2, -36.0, 20.4],
-	&"splitter": [0.469, 120.3, -9.5, 12.9],
+	&"changeup": [0.477, 118.3, -35.9, 20.5],
+	&"splitter": [0.469, 120.4, -8.4, 13.2],
 }
 
 var catalog: Dictionary[StringName, PitchType]
@@ -101,3 +103,22 @@ func test_better_command_means_a_smaller_miss() -> void:
 	assert_almost_eq(PitchModel.command_sigma(0.0), 0.26, 0.001)
 	assert_almost_eq(PitchModel.command_sigma(100.0), 0.09, 0.001)
 	assert_gt(PitchModel.command_sigma(40.0), PitchModel.command_sigma(80.0))
+
+
+func test_the_seam_shifted_wake_adds_what_spin_does_not_explain() -> void:
+	# Two pitchers, the same changeup: the one with more feel for the seams gets more run and
+	# sink from the same spin.
+	var change := catalog[&"changeup"]
+	var little := PitchModel.throw_type(cfg, change, RELEASE, PLATE_TARGET, false, 0.6)
+	var plenty := PitchModel.throw_type(cfg, change, RELEASE, PLATE_TARGET, false, 1.4)
+	assert_lt(plenty.movement.x, little.movement.x - 0.04, "more run to the arm side (cm)")
+	assert_lt(plenty.movement.y, little.movement.y - 0.01, "and more sink")
+	# Without it the spin alone moves the ball less than the measured totals.
+	var none := PitchModel.throw_type(cfg, change, RELEASE, PLATE_TARGET, false, 0.0)
+	assert_gt(none.movement.x, -0.30, "the spin alone runs it less than the total")
+	# A four-seamer has none, whatever the pitcher.
+	var four := catalog[&"four_seam"]
+	assert_almost_eq(PitchModel.throw_type(cfg, four, RELEASE, PLATE_TARGET, false, 1.5).movement.x, PitchModel.throw_type(cfg, four, RELEASE, PLATE_TARGET, false, 0.5).movement.x, 1e-6)
+	# A left-hander's runs the other way.
+	var lefty := PitchModel.throw_type(cfg, change, Vector3(-RELEASE.x, RELEASE.y, RELEASE.z), PLATE_TARGET, true, 1.0)
+	assert_gt(lefty.movement.x, 0.25)

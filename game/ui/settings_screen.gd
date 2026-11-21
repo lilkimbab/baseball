@@ -22,6 +22,7 @@ func build() -> void:
 		res_names.append("%d×%d" % [Settings.RESOLUTIONS[i].x, Settings.RESOLUTIONS[i].y])
 	choices("해상도", res_ids, res_names, str(Settings.resolution), func(v: String) -> void: _change(func() -> void: Settings.resolution = int(v)))
 	choices("품질", ["0", "1", "2"], ["낮음", "보통", "높음"], str(Settings.quality), func(v: String) -> void: _change(func() -> void: Settings.quality = int(v)))
+	choices("업스케일링 (FSR 2)", ["0", "1", "2", "3"], ["끄기", "품질", "균형", "원본 크기(AA만)"], str(Settings.upscale), func(v: String) -> void: _change(func() -> void: Settings.upscale = int(v)))
 	choices("프레임 제한", ["30", "60", "0"], ["30", "60", "없음"], str(Settings.fps_limit), func(v: String) -> void: _change(func() -> void: Settings.fps_limit = int(v)))
 	line("소리 (소리는 아직 없다. S15)", UiTheme.GOLD, 22)
 	choices("전체 볼륨", ["0.0", "0.4", "0.8", "1.0"], ["끔", "작게", "보통", "크게"], str(Settings.volume), func(v: String) -> void: _change(func() -> void: Settings.volume = float(v)))

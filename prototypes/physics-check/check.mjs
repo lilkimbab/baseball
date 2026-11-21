@@ -36,7 +36,9 @@ function aeroAccel(v, w) {
   return add(drag, mag);
 }
 
-function accel(v, w) { return add(aeroAccel(v, w), v3(0, 0, -G)); }
+// Seam-shifted wake (Smith & Smith 2021): a push the spin does not explain, set per pitch.
+let SSW = v3(0, 0, 0);
+function accel(v, w) { return add(add(aeroAccel(v, w), v3(0, 0, -G)), SSW); }
 
 // RK4 reference integrator (free flight only)
 function fly(p0, v0, w0, stop, dt = 1 / 1000) {
@@ -60,7 +62,7 @@ function fly(p0, v0, w0, stop, dt = 1 / 1000) {
 // ---------- 1. Pitches ----------
 const REL = v3(-0.55, 16.76, 1.80);          // RHP release point
 const PLATE_FRONT = 0.432;
-function pitch(name, speedKmh, spinRpm, eff, tiltDeg) {
+function pitch(name, speedKmh, spinRpm, eff, tiltDeg, sswAccel = 0, sswDeg = 0) {
   // tiltDeg: direction of Magnus force in catcher's view, 0 = straight up, +90 = toward +x (1B side)
   const target = v3(0, PLATE_FRONT, 0.75);
   // aim solver: shoot, measure miss, correct (3 iterations)
@@ -78,9 +80,12 @@ function pitch(name, speedKmh, spinRpm, eff, tiltDeg) {
     const wAct = mul(norm(cross(dir, f)), rpm(spinRpm) * eff);
     const wGyro = mul(dir, rpm(spinRpm) * Math.sqrt(Math.max(0, 1 - eff * eff)));
     w0 = add(wAct, wGyro);
+    const s = (sswDeg * Math.PI) / 180;
+    SSW = mul(add(mul(upPerp, Math.cos(s)), mul(right, Math.sin(s))), sswAccel);
     res = fly(REL, v0, w0, (p) => p.y <= PLATE_FRONT);
     aim = add(aim, sub(target, v3(res.p.x, PLATE_FRONT, res.p.z)));
   }
+  SSW = v3(0, 0, 0);
   const noSpin = fly(REL, v0, v3(0, 0, 0), (p) => p.y <= PLATE_FRONT);
   // drag-only reference with same Cd (so the difference is Magnus only)
   const savedCl2 = CL2;
@@ -93,13 +98,13 @@ function pitch(name, speedKmh, spinRpm, eff, tiltDeg) {
 }
 console.log('== 1. Pitch flight (RHP, release 16.76 m, RK4) ==');
 pitch('4-seam', 145, 2300, 0.90, -12);
-pitch('2-seam', 142, 2150, 0.88, -50);
+pitch('2-seam', 142, 2150, 0.794, -39.9, 0.9, -115);
 pitch('cutter', 138, 2350, 0.50, 25);
 pitch('slider', 132, 2400, 0.35, 75);
 pitch('sweeper', 128, 2600, 0.60, 85);
 pitch('curve', 120, 2500, 0.75, 160);
-pitch('changeup', 130, 1750, 0.88, -60);
-pitch('splitter', 132, 1300, 0.35, -40);
+pitch('changeup', 130, 1750, 0.699, -46.7, 1.0, -110);
+pitch('splitter', 132, 1300, 0.49, -17.7, 0.8, -160);
 
 // ---------- 2. Batted ball carry ----------
 console.log('\n== 2. Batted ball carry (RK4, from z=1.0 m) ==');

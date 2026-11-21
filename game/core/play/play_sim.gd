@@ -191,7 +191,7 @@ func _play() -> void:
 			touch = air.t
 			dropped_by = air.f
 			failed[air.f.kind] = 0.8
-		elif rng.chance(m.catch_chance(air.slack)):
+		elif rng.chance(m.air_catch_chance(air.slack - _wall_cost(air.at))):
 			_caught(air)
 			return
 		else:
@@ -292,9 +292,23 @@ func _air_catch() -> Chance:
 		if best == null or c.slack > best.slack:
 			best = c
 	# An outfielder dives only when he has a fair chance: a miss lets the ball roll.
-	if best.slack < 0.0 and Position.OUTFIELD.has(best.f.kind) and m.catch_chance(best.slack) < 0.25:
+	if best.slack < 0.0 and Position.OUTFIELD.has(best.f.kind) and m.air_catch_chance(best.slack - _wall_cost(best.at)) < 0.25:
 		return null
 	return best
+
+
+## How much harder a catch is this close to the fence (seconds off the time to spare): none
+## more than wall_reach m off it, wall_cost at the wall.
+func _wall_cost(at: Vector3) -> float:
+	if ctx.field == null:
+		return 0.0
+	var az := rad_to_deg(atan2(at.x, at.y))
+	if absf(az) > 45.0:
+		return 0.0
+	var off := ctx.field.boundary_distance(az) - Vector2(at.x, at.y).length()
+	if off >= m.wall_reach:
+		return 0.0
+	return m.wall_cost * (1.0 - maxf(off, 0.0) / m.wall_reach)
 
 
 static func _priority(kind: Position.Kind) -> int:
