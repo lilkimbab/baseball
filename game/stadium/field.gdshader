@@ -14,7 +14,12 @@ uniform vec3 grass_light : source_color = vec3(0.19, 0.43, 0.14);
 uniform vec3 grass_dark : source_color = vec3(0.14, 0.36, 0.11);
 uniform vec3 dirt : source_color = vec3(0.56, 0.38, 0.24);
 uniform vec3 chalk : source_color = vec3(0.94, 0.94, 0.90);
-uniform vec3 apron : source_color = vec3(0.30, 0.31, 0.33);
+uniform vec3 apron : source_color = vec3(0.10, 0.27, 0.10);
+// Mowing pattern (StadiumDef.Mow): 0 diagonal stripes, 1 checkerboard, 2 rings round home,
+// 3 straight stripes. Turf (1) is artificial grass: dirt only in cut-outs round the plate,
+// the mound and the bases.
+uniform int mow = 0;
+uniform float turf = 0.0;
 
 varying vec3 wpos;
 
@@ -45,6 +50,14 @@ void fragment() {
 	float side = smoothstep(-aa, aa, f.y - abs(f.x) + 3.0);
 	float diamond = 1.0 - smoothstep(18.4 - aa, 18.4 + aa, abs(f.x) + abs(f.y - 19.397));
 	float skin = arc * side * (1.0 - diamond);
+	if (turf > 0.5) {
+		// Turf: cut-outs round the bases only.
+		float cut = 0.0;
+		cut = max(cut, 1.0 - smoothstep(2.6 - aa, 2.6 + aa, length(f - vec2(19.16, 19.16))));
+		cut = max(cut, 1.0 - smoothstep(2.6 - aa, 2.6 + aa, length(f - vec2(0.0, 38.795))));
+		cut = max(cut, 1.0 - smoothstep(2.6 - aa, 2.6 + aa, length(f - vec2(-19.16, 19.16))));
+		skin = cut;
+	}
 	float track = fair * smoothstep(fence - track_width - aa, fence - track_width + aa, r);
 	float dirt_mask = clamp(max(max(home, mound), max(skin, track)), 0.0, 1.0);
 	float beyond = fair * smoothstep(fence - aa, fence + aa, r);
@@ -54,8 +67,20 @@ void fragment() {
 	vec2 g = vec2(f.x + f.y, f.y - f.x) * 0.7071;
 	float soft = clamp(aa * 0.25, 0.04, 0.5);
 	float stripe_out = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(g.x / 11.0) - 0.5) * 2.0);
+	if (mow == 1) {
+		float u = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(g.x / 9.0) - 0.5) * 2.0);
+		float v = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(g.y / 9.0) - 0.5) * 2.0);
+		stripe_out = abs(u - v);
+	} else if (mow == 2) {
+		stripe_out = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(r / 8.0) - 0.5) * 2.0);
+	} else if (mow == 3) {
+		stripe_out = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(f.x / 7.0) - 0.5) * 2.0);
+	}
 	float stripe_in = smoothstep(0.5 - soft, 0.5 + soft, abs(fract(f.y / 5.0) - 0.5) * 2.0);
 	float stripe = mix(stripe_out, stripe_in, diamond);
+	if (turf > 0.5) {
+		stripe = mix(0.5, stripe, 0.35);
+	}
 	float patches = texture(grain, f * 0.03).r;
 	float blades = texture(grain, f * 0.85).r;
 	vec3 grass = mix(grass_dark, grass_light, stripe) * (0.84 + 0.26 * patches) * (0.88 + 0.24 * blades);
@@ -78,7 +103,24 @@ void fragment() {
 	float behind = step(f.y, -0.699) * step(-2.438, f.y);
 	float catcher = band(abs(f.x) - 0.546 + half_line, half_line, aa) * behind;
 	catcher = max(catcher, band(f.y + 2.438 - half_line, half_line, aa) * step(abs(f.x), 0.546));
-	colour = mix(colour, chalk * (0.9 + 0.1 * grit), clamp(max(max(foul_line, boxes), catcher), 0.0, 1.0) * 0.9);
+	// Along and away from the lines: s down the line from home, d out into foul ground.
+	float s = (abs(f.x) + f.y) * 0.7071;
+	float d = (abs(f.x) - f.y) * 0.7071;
+	// Coaches' boxes: 20 by 10 ft, 15 ft out from the line, the far end level with the bag.
+	vec2 cq = abs(vec2(s - (27.432 - 3.048), d - (4.572 + 1.524))) - vec2(3.048, 1.524);
+	float coach_edge = length(max(cq, vec2(0.0))) + min(max(cq.x, cq.y), 0.0);
+	float coaches = band(coach_edge + half_line, half_line, aa);
+	// The first-base running lane: 3 ft wide outside the line over the last 45 ft, its outer
+	// line and the mark where it starts.
+	float lane_side = step(0.0, f.x);
+	float lane = band(d - 0.914 + half_line, half_line, aa) * step(13.716, s) * step(s, 27.432) * lane_side;
+	lane = max(lane, band(s - 13.716, half_line, aa) * step(0.0, d) * step(d, 0.914) * lane_side);
+	// On-deck circles: 5 ft across, 37 ft either side of the line home to second.
+	float deck_r = length(vec2(abs(f.x) - 11.28, f.y + 3.96));
+	float on_deck = 1.0 - smoothstep(0.762 - aa, 0.762 + aa, deck_r);
+	colour = mix(colour, soil * 0.8, on_deck * 0.85);
+	float deck_ring = band(deck_r - 0.762 + half_line, half_line, aa);
+	colour = mix(colour, chalk * (0.9 + 0.1 * grit), clamp(max(max(max(foul_line, boxes), catcher), max(max(coaches, lane), deck_ring)), 0.0, 1.0) * 0.9);
 	colour = mix(colour, apron, beyond);
 
 	ALBEDO = colour;

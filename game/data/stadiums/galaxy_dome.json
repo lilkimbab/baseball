@@ -1,0 +1,71 @@
+{
+  "id": "galaxy_dome",
+  "name": "은하 돔",
+  "surface": "turf",
+  "roof": "dome",
+  "orientation_deg": 70,
+  "fence": [
+    {
+      "az": -45,
+      "dist": 99.0,
+      "height": 4.0
+    },
+    {
+      "az": -22,
+      "dist": 115.0,
+      "height": 4.0
+    },
+    {
+      "az": 0,
+      "dist": 122.0,
+      "height": 4.0
+    },
+    {
+      "az": 22,
+      "dist": 115.0,
+      "height": 4.0
+    },
+    {
+      "az": 45,
+      "dist": 99.0,
+      "height": 4.0
+    }
+  ],
+  "foul_territory": {
+    "backstop": 17.5,
+    "width_at_base": 13.0,
+    "width_at_pole": 4.0
+  },
+  "mow": "straight",
+  "bullpens": "outfield",
+  "outfield_setback": 6.0,
+  "stands": [
+    {
+      "from_az": 46,
+      "to_az": -46,
+      "rows": [
+        28,
+        22
+      ],
+      "rake_deg": [
+        24,
+        34
+      ],
+      "roof": false
+    },
+    {
+      "from_az": -44,
+      "to_az": 44,
+      "rows": [
+        20
+      ],
+      "rake_deg": [
+        24
+      ]
+    }
+  ],
+  "backdrop": "none",
+  "wall_color": "#1d2a52",
+  "seat_color": "#3a3f8f",
+  "capacity": 24000
+}

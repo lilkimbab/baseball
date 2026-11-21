@@ -827,7 +827,7 @@ static var _shared_grain: NoiseTexture2D
 
 static func _grain() -> NoiseTexture2D:
 	if _shared_grain == null:
-		_shared_grain = GreyboxField.grain_texture(true)
+		_shared_grain = StadiumBuilder.grain_texture(true)
 	return _shared_grain
 
 

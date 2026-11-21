@@ -77,7 +77,13 @@ func _init(league: LeagueEnv, pitch_catalog: Dictionary[StringName, PitchType], 
 		(controllers[t] as AiController).tactics = tactics[t]
 
 
-## The greybox park until stadiums come in (S13): 100 m lines, 116 m alleys, 122 m centre.
+## Plays the game in this park: its fence and foul ground for every ball (docs/13 S13).
+func use_park(def: StadiumDef) -> void:
+	fence = def.fence()
+	field = def.analytic()
+
+
+## The practice park: 100 m lines, 116 m alleys, 122 m centre (StadiumDef.standard).
 static func default_fence() -> FenceProfile:
 	return FenceProfile.symmetric(100.0, 116.0, 122.0, 2.6)
 

@@ -35,6 +35,12 @@ const PITCH_CAMERA := [Vector3(-7.2, 79.2, 4.6), Vector3(0.17, 3.37, 0.9), 3.6]
 var cfg: PhysicsConfig
 var catalog: Dictionary[StringName, PitchType]
 var field_model: AnalyticField
+## The ballpark (docs/13 S13): the practice park unless a full game picks the home club's.
+var stadium: StadiumDef
+var park: StadiumBuilder
+## Day, dusk or night (docs/13 S13-7); a dome has its own light.
+var time_of_day: StringName = &"day"
+var lighting: ParkLighting
 var settings := DuelSettings.new()
 var duel: PitchDuel
 
@@ -99,7 +105,7 @@ func _ready() -> void:
 	_rng = Rng.new(seed_value)
 	_ai_rng = _rng.fork(1)
 
-	var park := GreyboxField.new()
+	park = StadiumBuilder.new(stadium if stadium != null else StadiumDef.standard())
 	add_child(park)
 	field_model = park.collision
 	_build_environment()
@@ -545,58 +551,9 @@ func _move_camera(delta: float) -> void:
 
 
 func _build_environment() -> void:
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = Color(0.16, 0.34, 0.68)
-	sky_material.sky_horizon_color = Color(0.62, 0.74, 0.88)
-	sky_material.ground_horizon_color = Color(0.5, 0.56, 0.6)
-	sky_material.ground_bottom_color = Color(0.2, 0.22, 0.24)
-	sky_material.sun_angle_max = 25.0
-	sky_material.energy_multiplier = 0.8
-	var sky := Sky.new()
-	sky.sky_material = sky_material
-
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.85
-	# Shadows lit by the blue sky alone look cold on skin (docs/13 S11-3): part of the ambient
-	# light is the warm light bounced off the grass, dirt and stands.
-	env.ambient_light_color = Color(0.62, 0.56, 0.48)
-	env.ambient_light_sky_contribution = 0.6
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.95
-	# Contact shadows where things meet the ground, a little bloom on bright surfaces, and
-	# haze that lightens the far outfield. The forward renderer draws all of these; the
-	# lighter renderers used for captures inside WSL skip what they cannot do.
-	env.ssao_enabled = true
-	env.ssao_radius = 1.2
-	env.ssao_intensity = 1.6
-	env.glow_enabled = true
-	env.glow_intensity = 0.35
-	env.glow_bloom = 0.04
-	env.fog_enabled = true
-	env.fog_light_color = Color(0.68, 0.76, 0.86)
-	env.fog_density = 0.0009
-	env.fog_sun_scatter = 0.15
-	env.fog_sky_affect = 0.2
-	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.06
-	env.adjustment_saturation = 1.08
-	var world_env := WorldEnvironment.new()
-	world_env.environment = env
-	add_child(world_env)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-48.0, -38.0, 0.0)
-	sun.light_color = Color(1.0, 0.94, 0.84)
-	sun.light_energy = 1.35
-	sun.light_angular_distance = 0.6
-	sun.shadow_enabled = true
-	sun.shadow_blur = 1.4
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = 140.0
-	add_child(sun)
+	lighting = ParkLighting.new(park.def, time_of_day)
+	add_child(lighting)
+	park.set_lights(lighting.lights_on())
 
 
 func _build_players() -> void:
