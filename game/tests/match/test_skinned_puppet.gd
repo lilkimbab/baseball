@@ -634,3 +634,15 @@ func test_a_club_wears_white_at_home_and_its_colour_or_gray_away() -> void:
 	t.primary = Color(0.3, 0.75, 0.9)
 	var gray := UniformStyle.for_team(t, false)
 	assert_almost_eq(gray.jersey.r, gray.jersey.b, 0.05, "road gray for a bright colour")
+
+
+# --- S11-10 detail by distance ---
+
+
+func test_small_parts_are_not_drawn_from_far_away() -> void:
+	var puppet := _model()
+	for part: String in ["Eyes", "Eyebrows", "Eyelashes", "Hair1", "CapButton"]:
+		var mesh := puppet.find_child(part, true, false) as MeshInstance3D
+		assert_gt(mesh.visibility_range_end, 20.0, "%s drawn up close" % part)
+		assert_lt(mesh.visibility_range_end, 60.0, "%s not from the outfield" % part)
+	assert_eq((puppet.find_child("Body", true, false) as MeshInstance3D).visibility_range_end, 0.0, "the body always")

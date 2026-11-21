@@ -16,6 +16,19 @@ const LIMBS: Array[Array] = [
 ]
 
 const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"ChestProtector", &"ShinGuards"]
+## Metres beyond which small parts are not drawn (A): the eyes, brows and lashes are a few
+## pixels at 30 m on a 1080-line screen, the hair and the cap button a few more.
+const FAR_DETAIL := {"face": 30.0, "hair": 45.0, "button": 35.0}
+
+
+static func _detail_kind(part: String) -> String:
+	if part == "Eyes" or part == "Eyebrows" or part == "Eyelashes":
+		return "face"
+	if part.begins_with("Hair"):
+		return "hair"
+	if part == "CapButton":
+		return "button"
+	return ""
 const FINGERS: Array[String] = ["Index", "Middle", "Ring", "Little"]
 ## Curl in degrees for [finger base, middle, tip, thumb] per grip.
 const CURL := {
@@ -220,6 +233,13 @@ func _load_model() -> void:
 		if flap != null:
 			_flaps[side] = flap
 	_logos.clear()
+	# Detail too small to see from afar stops being drawn there (docs/13 S11-10); the body and
+	# clothes drop to simpler meshes with distance by themselves (the import makes their LODs).
+	for part: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var far: float = FAR_DETAIL.get(_detail_kind(String(part.name)), 0.0)
+		if far > 0.0:
+			part.visibility_range_end = far
+			part.visibility_range_end_margin = 2.0
 	_gear_parts.clear()
 	for piece: StringName in OPTIONAL_GEAR:
 		var part := model.find_child(piece, true, false) as MeshInstance3D
@@ -911,6 +931,7 @@ func set_logo(letter: String, colour: Color) -> void:
 			label.font_size = 64
 			label.outline_size = 0
 			label.double_sided = false
+			label.visibility_range_end = 40.0
 			var rest := _skeleton.get_bone_global_rest(_bone[&"Head"])
 			label.transform = rest.affine_inverse() * Transform3D(Basis.IDENTITY, front)
 			attach.add_child(label)
