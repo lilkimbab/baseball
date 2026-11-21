@@ -597,6 +597,8 @@ func _ground_ball_running(f: PlayFielder, at: Vector2, held: float, release: flo
 ## The runner to play on: the run at the plate when it matters, else the lead forced runner
 ## if he is sure to be out, else the batter at first. With two out, the surest out.
 func _choose_target(f: PlayFielder, at: Vector2, held: float, release: float) -> PlayRunner:
+	if ctx.throw_to > 0:
+		return _going_to(ctx.throw_to)
 	if _outs == 2:
 		var best: PlayRunner = null
 		var best_margin := -INF
@@ -620,6 +622,15 @@ func _choose_target(f: PlayFielder, at: Vector2, held: float, release: float) ->
 			return r
 	if _margin(_batter, f, at, held, release) > -0.3:
 		return _batter
+	return null
+
+
+## The runner heading for `base` (the batter for first), or null when nobody is: the player
+## threw where there was no play.
+func _going_to(base: int) -> PlayRunner:
+	for r: PlayRunner in _runners:
+		if not r.is_out() and r.to == base and r.to > r.from:
+			return r
 	return null
 
 
@@ -648,7 +659,7 @@ func _play_on(r: PlayRunner, thrower: PlayFielder, from: Vector2, held: float, r
 	var margin := runner_at - need
 	_throw_frames(thrower, from, release, b)
 	if not b.by_self:
-		var wild := m.bad_throw * _accuracy_factor(thrower) * (m.rushed_throw if absf(margin) < 0.3 else 1.0)
+		var wild := m.bad_throw * _accuracy_factor(thrower) * (m.rushed_throw if absf(margin) < 0.3 else 1.0) * ctx.throw_wild
 		if rng.chance(wild):
 			r.time = runner_at
 			_error(thrower, true)
@@ -748,7 +759,10 @@ func _outfield_play(g: Chance, after_drop: bool) -> void:
 		if margin > target_margin:
 			target = r
 			target_margin = margin
-	if target != null and target_margin > -0.25:
+	var chosen := ctx.throw_to > 0
+	if chosen:
+		target = _going_to(ctx.throw_to)
+	if target != null and (chosen or target_margin > -0.25):
 		var thrown_at := _ball_at(f, at, held, release, target.to).time
 		_play_on(target, f, at, held, release)
 		# The runners behind take another base on the throw.
@@ -881,7 +895,7 @@ func _ball_at(thrower: PlayFielder, from: Vector2, held: float, release: float, 
 
 
 func _throw_time(thrower: PlayFielder, d: float) -> float:
-	var t := m.throw_time(d, m.throw_speed(thrower.kind, thrower.arm))
+	var t := m.throw_time(d, m.throw_speed(thrower.kind, thrower.arm) * ctx.throw_power)
 	if d > m.relay_beyond:
 		# Through the cut-off man.
 		t += 0.2

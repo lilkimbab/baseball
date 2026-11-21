@@ -10,7 +10,8 @@ extends SceneTree
 ##          and the pitch clock  --manager: the manager mode (situation board, orders menu,
 ##          a ball in play shown from the summary)  --moves: a close camera on each catch,
 ##          throw and slide in the plays (docs/13 S12)  --running: the same for steals and
-##          pickoffs only, fast-forwarding to them
+##          pickoffs only, fast-forwarding to them  --fielding: the player's team in the
+##          field (pitches scripted), the throw gauge held during a ball in play
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -25,6 +26,8 @@ var _menus := false
 var _manager := false
 var _moves := false
 var _running_only := false
+var _fielding := false
+var _rng := Rng.new(5)
 var _close: Camera3D
 var _shot_moves := {}
 
@@ -46,7 +49,8 @@ func _initialize() -> void:
 		_close = Camera3D.new()
 		_close.fov = 38.0
 		root.add_child.call_deferred(_close)
-	_scene.human_team = 1 if _menus else -1
+	_fielding = args.has("fielding")
+	_scene.human_team = 1 if _menus or _fielding else -1
 	_scene.innings = 3
 	_scene.seed_value = int(str(args.get("seed", "20261121")))
 	root.add_child(_scene)
@@ -62,6 +66,8 @@ func _process(_delta: float) -> bool:
 		return true
 	if _menus:
 		return _menu_shots()
+	if _fielding:
+		return _fielding_shots()
 	if _manager:
 		return _manager_shots()
 	if _to_end:
@@ -154,6 +160,38 @@ func _close_up(playing: bool) -> void:
 				_close.make_current()
 				_shoot(tag)
 				return
+
+
+## Pitches for the player; in the first ball in play holds → (first base), photographs the
+## gauge, lets go in the green, and photographs the throw.
+func _fielding_shots() -> bool:
+	if _scene.human_pitches():
+		match _scene.state:
+			DuelScene.State.PRE_PITCH:
+				if _scene.state_time > 0.3:
+					_scene.target = _scene.duel.zone.point(_rng.next_range(-0.1, 1.1), _rng.next_range(-0.1, 1.1))
+					_scene.press_pitch_button()
+			DuelScene.State.CHARGE:
+				if _scene.power > 0.8:
+					_scene.release_pitch_button()
+			DuelScene.State.ACCURACY:
+				if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.03:
+					_scene.press_pitch_button()
+	if _scene.choice_open() and _scene._controls_fielding():
+		if _scene.charge() < 0.0 and not _taken.has("gauge"):
+			_scene.choice_key(KEY_RIGHT, true)
+		elif _scene.charge() > 0.55 and not _taken.has("gauge"):
+			_shoot("gauge")
+		elif _scene.charge() > 0.85 and _taken.has("gauge"):
+			_scene.choice_key(KEY_RIGHT, false)
+	if _taken.has("gauge") and not _taken.has("throw") and not _scene.choice_open() and _scene._play_time > 0.0:
+		for m: PlayMoves.Moment in _scene._moves.by_key.values().reduce(func(acc: Array, a: Array) -> Array: return acc + a, []):
+			if m.kind == PlayMoves.Kind.THROW and _scene._play_time > m.time + 0.3:
+				_shoot("throw")
+				break
+	if _taken.has("throw") and _scene._play_time < 0.0 and not _taken.has("after"):
+		_shoot("after")
+	return _taken.has("after") and _due.is_empty()
 
 
 func _shoot(tag: String) -> void:
