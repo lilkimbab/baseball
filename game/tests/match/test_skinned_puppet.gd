@@ -522,3 +522,43 @@ func test_four_hair_styles_one_shown_and_none_under_the_cap() -> void:
 	var cap_bottom := cap.get_aabb().position.y
 	for h: MeshInstance3D in styles:
 		assert_lte(h.get_aabb().end.y, cap_bottom + 0.01, "%s stays below the cap" % h.name)
+
+
+# --- S11-5 helmet and cap ---
+
+
+func test_the_helmet_flap_is_on_the_pitcher_side_and_both_for_a_switch_hitter() -> void:
+	var puppet := _model()
+	puppet.headgear = &"helmet"
+	puppet.apply(PuppetClips.fielder_ready())
+	var left := puppet.find_child("HelmetFlapLeft", true, false) as MeshInstance3D
+	var right := puppet.find_child("HelmetFlapRight", true, false) as MeshInstance3D
+	assert_not_null(left)
+	assert_not_null(right)
+	assert_true(left.visible, "a right-handed batter covers his left ear")
+	assert_false(right.visible)
+	# The left flap is on the model's left (+X in the model, which faces +Z).
+	assert_gt(left.get_aabb().get_center().x, 0.0)
+	assert_lt(right.get_aabb().get_center().x, 0.0)
+	puppet.helmet_flaps = &"both"
+	puppet.apply(PuppetClips.fielder_ready())
+	assert_true(left.visible and right.visible, "a switch hitter covers both")
+	puppet.headgear = &"cap"
+	puppet.apply(PuppetClips.fielder_ready())
+	assert_false(left.visible or right.visible, "no flaps on a cap")
+	assert_true((puppet.find_child("CapButton", true, false) as MeshInstance3D).visible)
+
+
+func test_the_team_letter_sits_on_the_front_of_the_cap() -> void:
+	var puppet := _model()
+	puppet.set_logo("해", Color.ORANGE)
+	var labels := puppet.find_children("*", "Label3D", true, false)
+	assert_eq(labels.size(), 2, "cap and helmet")
+	var cap_label := labels[0] as Label3D
+	assert_eq(cap_label.text, "해")
+	assert_true(cap_label.visible)
+	# In front of the face: closer to the camera side than the head's centre.
+	var head := puppet.find_child("Cap", true, false) as MeshInstance3D
+	var front := puppet.to_local(cap_label.global_position)
+	var centre := puppet.to_local(head.global_transform * head.get_aabb().get_center())
+	assert_lt(front.z, centre.z, "the puppet faces -Z: the letter is on the front")
