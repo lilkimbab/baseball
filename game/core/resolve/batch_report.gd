@@ -27,7 +27,7 @@ var tally: PitchTally
 var _rows := PackedStringArray()
 
 
-static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, physical: bool = false) -> BatchReport:
+static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, physical: bool = false, park: StadiumDef = null) -> BatchReport:
 	var r := BatchReport.new()
 	if physical:
 		r.tally = PitchTally.new()
@@ -37,6 +37,8 @@ static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: League
 		var sim := GameSim.create(away, home, rules, env, catalog, ovr, rng.fork(g), null, null, physical)
 		if physical:
 			(sim.resolver as PhysicalResolver).tally = r.tally
+			if park != null:
+				(sim.resolver as PhysicalResolver).use_park(park)
 		var counter := EventCounter.new()
 		var guard := 0
 		while not sim.state.over and guard < GameSim.MAX_EVENTS:

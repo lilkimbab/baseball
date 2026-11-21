@@ -13,6 +13,8 @@ func _start(seed_value: int, innings: int = 3) -> ManagerMatch:
 	scene.innings = innings
 	scene.seed_value = seed_value
 	scene.use_motion = false
+	# The park the pace was measured in (a small park's extra hits make longer innings).
+	scene.stadium_id = "standard"
 	add_child_autofree(scene)
 	return scene
 

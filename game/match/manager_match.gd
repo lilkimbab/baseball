@@ -237,6 +237,10 @@ func summary_pitch() -> void:
 		_end_play()
 
 
+func shows_running_plays() -> bool:
+	return live()
+
+
 ## Whether a ball in play during the summary is shown on the field (here: all of them).
 func show_in_summary(_play_result: PlayResult) -> bool:
 	return true

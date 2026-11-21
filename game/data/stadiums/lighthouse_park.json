@@ -1,0 +1,76 @@
+{
+  "id": "lighthouse_park",
+  "name": "등대 파크",
+  "surface": "grass",
+  "roof": "open",
+  "orientation_deg": 48,
+  "fence": [
+    {
+      "az": -45,
+      "dist": 101.0,
+      "height": 2.8
+    },
+    {
+      "az": -22,
+      "dist": 118.0,
+      "height": 2.8
+    },
+    {
+      "az": 0,
+      "dist": 122.0,
+      "height": 3.0
+    },
+    {
+      "az": 15,
+      "dist": 112.0,
+      "height": 7.0
+    },
+    {
+      "az": 30,
+      "dist": 103.0,
+      "height": 7.0
+    },
+    {
+      "az": 45,
+      "dist": 95.0,
+      "height": 7.0
+    }
+  ],
+  "foul_territory": {
+    "backstop": 18.0,
+    "width_at_base": 14.0,
+    "width_at_pole": 4.0
+  },
+  "mow": "rings",
+  "bullpens": "foul",
+  "outfield_setback": 1.0,
+  "stands": [
+    {
+      "from_az": 46,
+      "to_az": -46,
+      "rows": [
+        28,
+        18
+      ],
+      "rake_deg": [
+        24,
+        34
+      ],
+      "roof": true
+    },
+    {
+      "from_az": -44,
+      "to_az": 10,
+      "rows": [
+        16
+      ],
+      "rake_deg": [
+        22
+      ]
+    }
+  ],
+  "backdrop": "city",
+  "wall_color": "#1f4a2a",
+  "seat_color": "#2a6e5a",
+  "capacity": 21000
+}

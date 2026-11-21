@@ -100,6 +100,7 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
 ./dev check     # 스크립트 문법·타입 검사
 ./dev play      # Windows에서 실행 (GPU). 제목 → 허브(빠른 경기·감독 리그·커리어·훈련장·불러오기·설정)
                 #   경기 장면 바로: ./dev play res://match/match.tscn -- --innings 9 --team away|home|watch
+                #     --park grand_park|harbor_field|galaxy_dome|lighthouse_park  --time day|dusk|night
                 #   타격: 왼쪽 클릭 컨택, 오른쪽 클릭 강타, Space 번트 / 투구: 1~5 구종, 누르고 떼고 다시 눌러 힘·정확도
                 #   Esc 일시정지(투구 시간·자동 교체 설정), F 작전·교체, Tab 상세, C 코스 분포, F3 관전
                 #   타구가 나가면 — 수비: 방향 키(→1루 ↑2루 ←3루 ↓홈)를 누르고 초록에서 떼어 송구 / 공격: E 모두 진루, Q 모두 귀루 (안 누르면 자동)

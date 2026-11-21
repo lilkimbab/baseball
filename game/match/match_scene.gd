@@ -67,6 +67,8 @@ const ROSTER_PACK := "res://data/rosters/fiction-2026.json"
 @export var innings := 3
 ## Which team the player controls: 0 away, 1 home, -1 watch.
 @export var human_team := 1
+## The park to play in; empty for the home club's own (home_park).
+@export var stadium_id := ""
 ## Clubs from the roster pack (their order in it).
 @export var away_index := 0
 @export var home_index := 1
@@ -227,6 +229,10 @@ func _read_arguments() -> void:
 		human_team = {"away": 0, "home": 1, "watch": -1}.get(str(args["team"]), human_team)
 	if args.has("seed"):
 		seed_value = int(str(args["seed"]))
+	if args.has("park"):
+		stadium_id = str(args["park"])
+	if args.has("time"):
+		time_of_day = StringName(str(args["time"]))
 
 
 func _start_game() -> void:
@@ -242,6 +248,9 @@ func _start_game() -> void:
 	game.rules = rules
 	game.teams = [manager.make_lineup(away, rules, away.next_starter().id), manager.make_lineup(home, rules, home.next_starter().id)]
 	resolver = PhysicalResolver.new(env, catalog_all, manager, Rng.new(seed_value).fork(5))
+	# The home club's park, drawn and played in alike.
+	stadium = StadiumIO.load_park(stadium_id if stadium_id != "" else home_park(home.id))
+	resolver.use_park(stadium)
 	scorer = Scorer.new()
 	GameFlow.start(game)
 	scorer.start(game)
@@ -249,6 +258,14 @@ func _start_game() -> void:
 	_chosen_team = human_team if human_team >= 0 else 1
 	balls = 0
 	strikes = 0
+
+
+## The park a club plays its home games in: each club has one of the parks, always the same.
+static func home_park(club_id: String) -> String:
+	var ids := StadiumIO.ids()
+	if ids.is_empty():
+		return StadiumIO.DEFAULT
+	return ids[absi(hash(club_id)) % ids.size()]
 
 
 # --- Who does what ---
@@ -770,11 +787,23 @@ func _finish_pitch() -> void:
 			continue
 		if loose == null:
 			_apply(e)
-	if loose != null and _show_loose_ball(events, loose):
+	if loose != null and shows_running_plays() and _show_loose_ball(events, loose):
 		return
+	if loose != null and not shows_running_plays():
+		var after := false
+		for e: GameEvent in events:
+			after = after or e == loose
+			if after:
+				_apply(e)
 	if _finish_steal():
 		return
 	_enter(State.RESULT)
+
+
+## Steals, pickoffs and wild pitches are shown on the field (not only reported) when the game
+## is being watched pitch by pitch; a manager's summary only reports them.
+func shows_running_plays() -> bool:
+	return true
 
 
 ## Shows a wild pitch or passed ball: the events from `loose` on wait until it is over.
@@ -961,6 +990,8 @@ func _drain() -> bool:
 ## pickoff throw, the catcher's throw, the cover man, the slide and the call. A double steal
 ## and a throw that gets away are only reported.
 func _show_running(e: GameEvent) -> bool:
+	if not shows_running_plays():
+		return false
 	var play: PlayResult = null
 	if e.kind == GameEvent.Kind.PICKOFF and e.moves.size() == 1 and game.runner_on(1) != null:
 		play = RunningPlay.pickoff(game.runner_on(1).player_id, _stands.get(Position.Kind.B1, PlaySim.base_xy(1)), resolver.motion)

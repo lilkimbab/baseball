@@ -1,0 +1,71 @@
+{
+  "id": "harbor_field",
+  "name": "포구 야구장",
+  "surface": "grass",
+  "roof": "open",
+  "orientation_deg": 55,
+  "fence": [
+    {
+      "az": -45,
+      "dist": 97.0,
+      "height": 2.4
+    },
+    {
+      "az": -22,
+      "dist": 110.0,
+      "height": 2.4
+    },
+    {
+      "az": 0,
+      "dist": 118.0,
+      "height": 2.8
+    },
+    {
+      "az": 22,
+      "dist": 110.0,
+      "height": 2.4
+    },
+    {
+      "az": 45,
+      "dist": 97.0,
+      "height": 2.4
+    }
+  ],
+  "foul_territory": {
+    "backstop": 16.5,
+    "width_at_base": 12.0,
+    "width_at_pole": 3.5
+  },
+  "mow": "checker",
+  "bullpens": "foul",
+  "outfield_setback": 0.5,
+  "stands": [
+    {
+      "from_az": 46,
+      "to_az": -46,
+      "rows": [
+        26,
+        0
+      ],
+      "rake_deg": [
+        26,
+        0
+      ],
+      "roof": false
+    },
+    {
+      "from_az": -44,
+      "to_az": 44,
+      "rows": [
+        14
+      ],
+      "rake_deg": [
+        24
+      ]
+    }
+  ],
+  "backdrop": "sea",
+  "wall_color": "#14324a",
+  "seat_color": "#b33a3a",
+  "capacity": 17000
+}

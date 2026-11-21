@@ -1,0 +1,71 @@
+{
+  "id": "grand_park",
+  "name": "푸른숲 그랜드 파크",
+  "surface": "grass",
+  "roof": "open",
+  "orientation_deg": 62,
+  "fence": [
+    {
+      "az": -45,
+      "dist": 100.0,
+      "height": 2.6
+    },
+    {
+      "az": -22,
+      "dist": 117.0,
+      "height": 2.6
+    },
+    {
+      "az": 0,
+      "dist": 125.0,
+      "height": 2.6
+    },
+    {
+      "az": 22,
+      "dist": 117.0,
+      "height": 2.6
+    },
+    {
+      "az": 45,
+      "dist": 100.0,
+      "height": 2.6
+    }
+  ],
+  "foul_territory": {
+    "backstop": 19.0,
+    "width_at_base": 15.0,
+    "width_at_pole": 5.0
+  },
+  "mow": "diagonal",
+  "bullpens": "outfield",
+  "outfield_setback": 7.0,
+  "stands": [
+    {
+      "from_az": 46,
+      "to_az": -46,
+      "rows": [
+        30,
+        20
+      ],
+      "rake_deg": [
+        24,
+        34
+      ],
+      "roof": true
+    },
+    {
+      "from_az": -44,
+      "to_az": 44,
+      "rows": [
+        18
+      ],
+      "rake_deg": [
+        22
+      ]
+    }
+  ],
+  "backdrop": "hills",
+  "wall_color": "#0f3d2e",
+  "seat_color": "#2d4f86",
+  "capacity": 25000
+}
