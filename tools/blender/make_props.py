@@ -126,6 +126,38 @@ def make_glove():
     return glove
 
 
+def make_outfield_glove():
+    """An outfielder's glove (docs/13 S11-8): 12.75 inches, longer finger stalls and a deeper
+    web than an infielder's 12 inch one, for reach."""
+    bm = bmesh.new()
+    blob(bm, (0.0, -0.045, 0.0), (0.078, 0.072, 0.03))
+    tube(bm, (-0.040, 0.00, 0.0), (-0.068, 0.215, 0.05), 0.022, 0.017, 0.8)
+    tube(bm, (-0.012, 0.00, 0.0), (-0.020, 0.222, 0.055), 0.022, 0.017, 0.8)
+    tube(bm, (0.016, 0.00, 0.0), (0.030, 0.212, 0.05), 0.022, 0.017, 0.8)
+    tube(bm, (0.044, -0.01, 0.0), (0.078, 0.185, 0.04), 0.022, 0.018, 0.8)
+    tube(bm, (-0.060, -0.075, 0.0), (-0.134, 0.095, 0.045), 0.027, 0.021, 0.85)
+    for centre in ((-0.098, 0.06, 0.03), (-0.098, 0.105, 0.04), (-0.094, 0.15, 0.048), (-0.088, 0.185, 0.05)):
+        blob(bm, centre, (0.036, 0.032, 0.011))
+    tube(bm, (-0.062, -0.097, 0.012), (0.062, -0.097, 0.012), 0.022, 0.022)
+    glove = fused("OutfieldGlove", bm, ((-0.036, 0.05, 0.09), 0.068), 0.324)
+    glove.data.materials.append(material("Leather", (0.33, 0.18, 0.08), 0.6))
+    return glove
+
+
+def make_first_base_mitt():
+    """A first baseman's mitt: 12.5 inches long, no separate fingers, a long scoop with a
+    wide web, palm no wider than 8 inches."""
+    bm = bmesh.new()
+    blob(bm, (0.0, 0.02, -0.004), (0.085, 0.15, 0.022))
+    for i in range(14):
+        a = math.tau * i / 14
+        blob(bm, (math.cos(a) * 0.08, 0.03 + math.sin(a) * 0.145, 0.018), (0.028, 0.03, 0.028))
+    tube(bm, (-0.045, -0.105, 0.0), (0.045, -0.105, 0.0), 0.026, 0.026, 0.8)
+    mitt = fused("FirstBaseMitt", bm, ((-0.005, 0.06, 0.09), 0.075), 0.3175, keep=0.2)
+    mitt.data.materials.append(material("Leather", (0.33, 0.18, 0.08), 0.6))
+    return mitt
+
+
 def make_mitt():
     """A catcher's mitt: a thick padded rim round a deep pocket, with no separate fingers."""
     bm = bmesh.new()
@@ -226,6 +258,8 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     export(make_glove(), "glove")
     export(make_mitt(), "mitt")
+    export(make_outfield_glove(), "outfield_glove")
+    export(make_first_base_mitt(), "first_base_mitt")
     export(make_bat(), "bat")
     make_ball_texture(os.path.join(os.path.abspath(OUT), "ball.png"))
 

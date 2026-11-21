@@ -34,7 +34,10 @@ const CHEST_UPRIGHT := 0.0
 const BALL_TUCK: Array[float] = [78.0, 88.0, 60.0]
 ## Equipment built to real sizes by tools/blender/make_props.py. Gloves are modelled in the
 ## hand's own frame (see _hand_frame), for the left hand.
-const PROPS := {&"glove": "res://assets/props/glove.glb", &"mitt": "res://assets/props/mitt.glb", &"bat": "res://assets/props/bat.glb"}
+const PROPS := {
+	&"glove": "res://assets/props/glove.glb", &"mitt": "res://assets/props/mitt.glb", &"bat": "res://assets/props/bat.glb",
+	&"outfield": "res://assets/props/outfield_glove.glb", &"first_base": "res://assets/props/first_base_mitt.glb",
+}
 
 ## Team look and lettering. Change it and call repaint().
 var uniform := UniformStyle.new()
@@ -57,7 +60,8 @@ var _logos: Array[Label3D] = []
 ## Which of the model's four short hair styles shows (1 to 4; 0 none), and its colour.
 var hair := 1
 var hair_color := Color(0.07, 0.06, 0.055)
-## &"glove" for a fielder's glove, &"mitt" for the catcher's.
+## &"glove" for an infielder's or pitcher's glove, &"outfield" for an outfielder's,
+## &"first_base" for a first baseman's mitt, &"mitt" for the catcher's (docs/13 S11-8).
 var glove_kind: StringName = &"glove"
 var _glove_shown: StringName = &""
 

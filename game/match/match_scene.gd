@@ -690,6 +690,9 @@ func _dress_for_half() -> void:
 	for kind: Position.Kind in fielders:
 		_set_body(fielders[kind], field_team.player(field_team.fielder_at(kind)), kind)
 		_logo(fielders[kind], game.fielding())
+		var model := fielders[kind] as SkinnedPuppet
+		if model != null:
+			model.glove_kind = &"outfield" if Position.OUTFIELD.has(kind) else (&"first_base" if kind == Position.Kind.B1 else &"glove")
 	_set_body(catcher, field_team.player(field_team.fielder_at(Position.Kind.C)), Position.Kind.C)
 	_logo(catcher, game.fielding())
 	_logo(pitcher, game.fielding())
