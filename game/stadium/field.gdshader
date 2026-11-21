@@ -20,6 +20,14 @@ uniform vec3 apron : source_color = vec3(0.10, 0.27, 0.10);
 // the mound and the bases.
 uniform int mow = 0;
 uniform float turf = 0.0;
+// Real surfaces (CC0 scans, assets/materials): grass, infield dirt, the warning track's
+// gravel. detail = 1 when they are set; without them the grain above does the work.
+uniform sampler2D grass_tex : source_color, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D grass_nrm : hint_normal, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D dirt_tex : source_color, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D dirt_nrm : hint_normal, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform sampler2D gravel_tex : source_color, repeat_enable, filter_linear_mipmap_anisotropic;
+uniform float detail = 0.0;
 
 varying vec3 wpos;
 
@@ -88,6 +96,21 @@ void fragment() {
 	float clumps = texture(grain, f * 0.11 + vec2(3.7, 1.3)).r;
 	float grit = texture(grain, f * 1.9).r;
 	vec3 soil = dirt * (0.82 + 0.26 * clumps) * (0.88 + 0.24 * grit);
+	if (detail > 0.5) {
+		// Each scan is used as its pattern only (the texture over its own average), so the
+		// park's own greens and its clay keep their colours and the mowing shows through.
+		vec3 g_avg = textureLod(grass_tex, vec2(0.5), 10.0).rgb + vec3(0.001);
+		vec3 g_fine = texture(grass_tex, f * 0.42).rgb / g_avg;
+		vec3 g_broad = texture(grass_tex, f * 0.047 + vec2(0.37, 0.11)).rgb / g_avg;
+		grass = mix(grass_dark, grass_light, stripe) * mix(vec3(1.0), g_fine, 0.8) * mix(vec3(1.0), g_broad, 0.4) * (0.9 + 0.2 * patches);
+		vec3 d_avg = textureLod(dirt_tex, vec2(0.5), 10.0).rgb + vec3(0.001);
+		vec3 d_fine = texture(dirt_tex, f * 0.31).rgb / d_avg;
+		vec3 d_broad = texture(dirt_tex, f * 0.04 + vec2(0.13, 0.57)).rgb / d_avg;
+		soil = dirt * mix(vec3(1.0), d_fine, 0.85) * mix(vec3(1.0), d_broad, 0.4) * (0.9 + 0.16 * clumps);
+		vec3 v_avg = textureLod(gravel_tex, vec2(0.5), 10.0).rgb + vec3(0.001);
+		vec3 crushed = dirt * 0.92 * (texture(gravel_tex, f * 0.55).rgb / v_avg);
+		soil = mix(soil, crushed, track * (1.0 - max(max(home, mound), skin)) * 0.85);
+	}
 	vec3 colour = mix(grass, soil, dirt_mask);
 
 	// Chalk: foul lines out to the fence, and the two batter's boxes.
@@ -124,7 +147,14 @@ void fragment() {
 	colour = mix(colour, apron, beyond);
 
 	ALBEDO = colour;
-	ROUGHNESS = mix(0.9, 0.97, dirt_mask);
-	NORMAL_MAP = texture(grain_normal, f * 0.7).rgb;
-	NORMAL_MAP_DEPTH = mix(0.9, 0.5, dirt_mask);
+	// Mown grass lies over: the lighter stripes are the ones laid away from the eye, a
+	// little glossier.
+	ROUGHNESS = mix(mix(0.93, 0.82, stripe), 0.97, dirt_mask);
+	if (detail > 0.5) {
+		NORMAL_MAP = mix(texture(grass_nrm, f * 0.42).rgb, texture(dirt_nrm, f * 0.31).rgb, dirt_mask);
+		NORMAL_MAP_DEPTH = mix(1.3, 0.9, dirt_mask);
+	} else {
+		NORMAL_MAP = texture(grain_normal, f * 0.7).rgb;
+		NORMAL_MAP_DEPTH = mix(0.9, 0.5, dirt_mask);
+	}
 }

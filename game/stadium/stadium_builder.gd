@@ -51,6 +51,12 @@ var collision: AnalyticField
 var _surface: ShaderMaterial
 var _rng := Rng.new(7)
 var _lamp: StandardMaterial3D
+## The suites' glass and the city's windows light up with the towers; the flags' cloth.
+var _glass: StandardMaterial3D
+## The world beyond the stands (null under a dome).
+var backdrop: Backdrop
+var _flags: ShaderMaterial
+var _flag_spots: Array[Vector3] = []
 ## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
 ## the game on it, docs/13 S13-6).
 var scoreboard: SubViewport
@@ -123,6 +129,13 @@ func _make_surface_material() -> ShaderMaterial:
 	material.set_shader_parameter("fence_dist", distances)
 	material.set_shader_parameter("mow", int(def.mow))
 	material.set_shader_parameter("turf", 1.0 if def.surface == &"turf" else 0.0)
+	if SurfaceLibrary.has("grass") and SurfaceLibrary.has("dirt"):
+		material.set_shader_parameter("grass_tex", SurfaceLibrary.texture("grass", "color"))
+		material.set_shader_parameter("grass_nrm", SurfaceLibrary.texture("grass", "normal"))
+		material.set_shader_parameter("dirt_tex", SurfaceLibrary.texture("dirt", "color"))
+		material.set_shader_parameter("dirt_nrm", SurfaceLibrary.texture("dirt", "normal"))
+		material.set_shader_parameter("gravel_tex", SurfaceLibrary.texture("gravel", "color"))
+		material.set_shader_parameter("detail", 1.0)
 	if def.surface == &"turf":
 		material.set_shader_parameter("grass_light", Color(0.13, 0.4, 0.17))
 		material.set_shader_parameter("grass_dark", Color(0.11, 0.35, 0.15))
@@ -340,7 +353,9 @@ func _build_fence() -> void:
 		along += span
 	face.generate_normals()
 	top.generate_normals()
-	var pads := _material(Color.WHITE, 0.85)
+	var pads := _material(Color.WHITE, 0.7)
+	# Padded vinyl: a fine grain, a soft sheen.
+	SurfaceLibrary.dress(pads, "leather", 1.6, 0.5)
 	pads.albedo_texture = pad_texture(def.wall_color)
 	pads.cull_mode = BaseMaterial3D.CULL_DISABLED
 	_node(face.commit(), pads, "Fence")
@@ -444,7 +459,8 @@ func _build_backstop() -> void:
 
 ## The dugouts along the lines, set into the wall with their floors below the field.
 func _build_dugouts() -> void:
-	var inside := _material(Color(0.12, 0.13, 0.15), 0.85)
+	var inside := _material(Color(0.2, 0.21, 0.24), 0.85)
+	SurfaceLibrary.dress(inside, "concrete", 3.0, 0.9, true)
 	inside.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var trim := _material(def.wall_color.lightened(0.1), 0.7)
 	trim.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -557,6 +573,10 @@ func _build_stands() -> void:
 	rails.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var roofs := SurfaceTool.new()
 	roofs.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var glass := SurfaceTool.new()
+	glass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var steps := SurfaceTool.new()
+	steps.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var dug_from := absf(_line_az(DUGOUT_FROM, 1.0))
 	var dug_to := absf(_line_az(DUGOUT_TO, 1.0))
 	const STEP := 1.5
@@ -591,6 +611,10 @@ func _build_stands() -> void:
 					continue
 				var rise := ROW_DEPTH * tan(deg_to_rad(float(rakes[mini(tier, rakes.size() - 1)])))
 				if tier == 1:
+					# Behind the last row of the lower tier, under the upper one: a band of
+					# glass (the suites and the press box), lit from inside at night.
+					_quad(glass, _rim(az0, out, height + 0.3), _rim(az1, out, height + 0.3), _rim(az1, out, height + 2.3), _rim(az0, out, height + 2.3))
+					_quad(walls, _rim(az0, out, height), _rim(az1, out, height), _rim(az1, out, height + 0.3), _rim(az0, out, height + 0.3))
 					# The upper tier hangs over the back of the lower one, above a concourse;
 					# its front carries a band of ads.
 					out -= 6.0
@@ -598,16 +622,33 @@ func _build_stands() -> void:
 					_quad(walls, _rim(az0, out, height - 2.2), _rim(az1, out, height - 2.2), _rim(az1, out, height - 1.4), _rim(az0, out, height - 1.4))
 					_ad_quad(_rim(az0, out - 0.05, height - 1.4), _rim(az1, out - 0.05, height - 1.4), 1.3)
 				_quad(rails, _rim(az0, out, height + 0.9), _rim(az1, out, height + 0.9), _rim(az1, out, height + 1.0), _rim(az0, out, height + 1.0))
+				var berm := str(section.get("kind", "seats")) == "berm"
 				for row: int in n:
 					var shade := 0.97 + 0.03 * float(row % 2)
 					var c := Color(0.42, 0.42, 0.44) if aisle else (def.seat_color * shade)
-					seats.set_color(c)
+					if berm:
+						# A grass bank to sit on: no seats, no aisles.
+						c = Color(0.2, 0.42, 0.16) * shade
 					var r0 := out + row * ROW_DEPTH
 					var h0 := height + row * rise
-					_quad(seats, _rim(az0, r0, h0), _rim(az1, r0, h0), _rim(az1, r0, h0 + rise), _rim(az0, r0, h0 + rise))
-					seats.set_color(c * 0.9)
-					_quad(seats, _rim(az0, r0, h0 + rise), _rim(az1, r0, h0 + rise), _rim(az1, r0 + ROW_DEPTH, h0 + rise), _rim(az0, r0 + ROW_DEPTH, h0 + rise))
-					if not aisle:
+					if aisle or berm:
+						# Stairs, and grass banks: plain steps.
+						var plain := steps if aisle else seats
+						plain.set_color(c)
+						plain.set_uv(Vector2(0.02, 0.98))
+						_quad(plain, _rim(az0, r0, h0), _rim(az1, r0, h0), _rim(az1, r0, h0 + rise), _rim(az0, r0, h0 + rise))
+						plain.set_color(c * 0.9)
+						_quad(plain, _rim(az0, r0, h0 + rise), _rim(az1, r0, h0 + rise), _rim(az1, r0 + ROW_DEPTH, h0 + rise), _rim(az0, r0 + ROW_DEPTH, h0 + rise))
+					else:
+						# A row of seats: the riser shows their backs, the tread their
+						# cushions, one seat every SEAT_PITCH metres (the seat picture's top
+						# half is a back, its lower half a cushion).
+						var across := deg_to_rad(STEP) * (collision.boundary_distance(mid) + r0) / SEAT_PITCH
+						var u0 := floorf(float(i) * 7.3)
+						seats.set_color(c)
+						_quad_uv(seats, _rim(az0, r0, h0), _rim(az1, r0, h0), _rim(az1, r0, h0 + rise), _rim(az0, r0, h0 + rise), Vector2(u0, 0.5), Vector2(u0 + across, 0.0))
+						_quad_uv(seats, _rim(az0, r0, h0 + rise), _rim(az1, r0, h0 + rise), _rim(az1, r0 + ROW_DEPTH, h0 + rise), _rim(az0, r0 + ROW_DEPTH, h0 + rise), Vector2(u0, 1.0), Vector2(u0 + across, 0.5))
+					if not aisle and not berm:
 						_add_seats(az0, STEP, r0 + ROW_DEPTH * 0.55, h0 + rise, row, tier, fair)
 				out += n * ROW_DEPTH
 				height += n * rise
@@ -619,122 +660,271 @@ func _build_stands() -> void:
 			_quad(walls, _rim(az0, out, top), _rim(az1, out, top), _rim(az1, out, 0.0), _rim(az0, out, 0.0))
 			if roofed:
 				_quad(roofs, _rim(az0, out - 18.0, lid), _rim(az1, out - 18.0, lid), _rim(az1, out + 1.0, lid + 1.0), _rim(az0, out + 1.0, lid + 1.0))
+				# The roof's front edge is a deep beam, and every few metres a column stands
+				# behind the last row to carry it.
+				_quad(roofs, _rim(az0, out - 18.0, lid - 1.3), _rim(az1, out - 18.0, lid - 1.3), _rim(az1, out - 18.0, lid), _rim(az0, out - 18.0, lid))
+				_quad(roofs, _rim(az0, out - 18.0, lid - 1.3), _rim(az1, out - 18.0, lid - 1.3), _rim(az1, out - 16.6, lid - 0.1), _rim(az0, out - 16.6, lid - 0.1))
+				if i % 5 == 0:
+					var half := rad_to_deg(0.28 / (collision.boundary_distance(mid) + out))
+					_quad(walls, _rim(mid - half, out - 0.7, height), _rim(mid + half, out - 0.7, height), _rim(mid + half, out - 0.7, lid), _rim(mid - half, out - 0.7, lid))
+					_quad(walls, _rim(mid, out - 1.0, height), _rim(mid, out - 0.4, height), _rim(mid, out - 0.4, lid), _rim(mid, out - 1.0, lid))
+					# A raking strut from the column out under the roof.
+					_quad(walls, _rim(mid - half, out - 0.7, lid - 5.0), _rim(mid + half, out - 0.7, lid - 5.0), _rim(mid + half, out - 9.0, lid - 0.6), _rim(mid - half, out - 9.0, lid - 0.6))
+			elif fair and i % 6 == 0:
+				_flag_spots.append(_rim(mid, out - 0.2, top))
 	seats.generate_normals()
 	walls.generate_normals()
 	rails.generate_normals()
 	roofs.generate_normals()
-	var seat_material := _material(Color.WHITE, 0.85)
+	glass.generate_normals()
+	var seat_material := _material(Color.WHITE, 0.8)
 	seat_material.vertex_color_use_as_albedo = true
 	seat_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	seat_material.albedo_texture = seat_picture()
+	seat_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	_node(seats.commit(), seat_material, "Seats")
-	var wall_material := _material(def.wall_color.lerp(Color(0.35, 0.36, 0.38), 0.5), 0.85)
+	steps.generate_normals()
+	var step_material := _material(Color.WHITE, 0.9)
+	step_material.vertex_color_use_as_albedo = true
+	step_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	SurfaceLibrary.dress(step_material, "concrete", 3.0, 0.8)
+	_node(steps.commit(), step_material, "Stairs")
+	# Poured concrete (its colour pattern under the park's own wall colour).
+	var wall_material := _material((def.wall_color.lerp(Color(0.35, 0.36, 0.38), 0.5) * 1.35).clamp(), 0.85)
 	wall_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	if def.facade == &"brick":
+		wall_material.albedo_color = (def.wall_color.lerp(Color(0.62, 0.36, 0.26), 0.7) * 1.5).clamp()
+		SurfaceLibrary.dress(wall_material, "bricks", 2.4, 1.0, true)
+	else:
+		SurfaceLibrary.dress(wall_material, "concrete", 4.0, 0.9, true)
 	_node(walls.commit(), wall_material, "StandWalls")
 	var rail_material := _material(Color(0.75, 0.76, 0.78), 0.4)
 	rail_material.metallic = 0.6
 	rail_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	SurfaceLibrary.dress(rail_material, "metal", 1.5, 0.5)
 	_node(rails.commit(), rail_material, "Rails")
-	var roof_material := _material(Color(0.82, 0.83, 0.85), 0.6)
+	var roof_material := _material(Color(0.8, 0.81, 0.84), 0.5)
+	roof_material.metallic = 0.3
 	roof_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# Ribbed sheet: the ribs break up what is otherwise one blank white plane from above.
+	SurfaceLibrary.dress(roof_material, "container", 3.2, 1.0)
 	_node(roofs.commit(), roof_material, "Roof")
+	_glass = _material(Color(0.05, 0.07, 0.1), 0.08)
+	_glass.metallic = 0.5
+	_glass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_glass.emission_enabled = true
+	_glass.emission = Color(1.0, 0.86, 0.62)
+	_glass.emission_energy_multiplier = 0.0
+	_node(glass.commit(), _glass, "Suites")
+	_build_flags()
+
+
+## One seat as a picture, white to take the park's seat colour: the upper half its back seen
+## from the front (rounded, darker toward the gap to the next seat and at the foot), the lower
+## half its cushion seen from above. The far-left corner of the foot is plain (for surfaces
+## with no seats on them).
+static func seat_picture() -> ImageTexture:
+	if _seat_picture != null:
+		return _seat_picture
+	const W := 64
+	const H := 128
+	var image := Image.create(W, H, true, Image.FORMAT_RGB8)
+	for y: int in H:
+		for x: int in W:
+			var back := y < H / 2
+			var u := (float(x) + 0.5) / W
+			var v := (float(y % (H / 2)) + 0.5) / (H / 2)
+			# How far inside the seat's rounded outline this point is (0 at its edge).
+			var q := Vector2(absf(u - 0.5) - 0.34, absf(v - 0.5) - (0.36 if back else 0.3))
+			var edge := Vector2(maxf(q.x, 0.0), maxf(q.y, 0.0)).length() + minf(maxf(q.x, q.y), 0.0) - 0.08
+			var inside := 1.0 - smoothstep(-0.03, 0.03, edge)
+			var light := (1.06 - 0.3 * v) if back else (0.86 + 0.12 * v)
+			var shade := lerpf(0.3, light, inside)
+			image.set_pixel(x, y, Color(shade, shade, shade))
+	for y: int in range(H - 6, H):
+		for x: int in 6:
+			image.set_pixel(x, y, Color.WHITE)
+	image.generate_mipmaps()
+	_seat_picture = ImageTexture.create_from_image(image)
+	return _seat_picture
+
+
+static var _seat_picture: ImageTexture
+
+
+## Flags along the top of the outfield stands (docs/13 S13): a pole every few sections, the
+## cloths waving together in the wind (stadium/flag.gdshader; `wind` 0 slack to 2 a gale).
+func _build_flags() -> void:
+	if _flag_spots.is_empty():
+		return
+	var pole := CylinderMesh.new()
+	pole.top_radius = 0.07
+	pole.bottom_radius = 0.1
+	pole.height = 9.0
+	var poles := MultiMesh.new()
+	poles.transform_format = MultiMesh.TRANSFORM_3D
+	poles.mesh = pole
+	poles.instance_count = _flag_spots.size()
+	var cloth := PlaneMesh.new()
+	cloth.orientation = PlaneMesh.FACE_Z
+	cloth.size = Vector2(3.6, 2.2)
+	cloth.center_offset = Vector3(1.8, 0.0, 0.0)
+	cloth.subdivide_width = 12
+	cloth.subdivide_depth = 2
+	var cloths := MultiMesh.new()
+	cloths.transform_format = MultiMesh.TRANSFORM_3D
+	cloths.use_colors = true
+	cloths.mesh = cloth
+	cloths.instance_count = _flag_spots.size()
+	var colours: Array[Color] = [def.seat_color.lightened(0.15), Color(0.86, 0.14, 0.16), Color(0.1, 0.2, 0.5), Color(0.98, 0.78, 0.2), Color(0.1, 0.5, 0.3)]
+	# The wind comes in from left field: every flag flies the same way.
+	var blow := Basis(Vector3.UP, deg_to_rad(-35.0))
+	for i: int in _flag_spots.size():
+		# (The spots are already in the world's own coordinates: _rim gives those.)
+		var foot := _flag_spots[i]
+		poles.set_instance_transform(i, Transform3D(Basis.IDENTITY, foot + Vector3(0.0, 4.5, 0.0)))
+		cloths.set_instance_transform(i, Transform3D(blow, foot + Vector3(0.0, 7.8, 0.0)))
+		cloths.set_instance_color(i, colours[i % colours.size()])
+	var pole_node := MultiMeshInstance3D.new()
+	pole_node.name = "FlagPoles"
+	pole_node.multimesh = poles
+	pole_node.material_override = _material(Color(0.8, 0.81, 0.83), 0.4)
+	add_child(pole_node)
+	_flags = ShaderMaterial.new()
+	_flags.shader = load("res://stadium/flag.gdshader") as Shader
+	var flag_node := MultiMeshInstance3D.new()
+	flag_node.name = "Flags"
+	flag_node.multimesh = cloths
+	flag_node.material_override = _flags
+	flag_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(flag_node)
+
+
+## How hard the wind blows on the flags: 0 slack, 1 a fresh breeze, 2 a gale.
+func set_wind(strength: float) -> void:
+	if _flags != null:
+		_flags.set_shader_parameter(&"wind", clampf(strength, 0.0, 2.0))
 
 
 # --- Around the park ---
 
 
-## The land beyond the stands and what stands on it far off (docs/13 S13-8): a ring of
-## hills, a city of blocks, or the sea.
+## What lies beyond the stands (docs/13 S13-8): one of thirteen kinds of place, built by
+## Backdrop from the park's `backdrop`.
 func _build_surroundings() -> void:
-	var land := PlaneMesh.new()
-	land.size = Vector2(2400.0, 2400.0)
-	var ground_colour := Color(0.17, 0.24, 0.16) if def.backdrop != &"sea" else Color(0.1, 0.24, 0.34)
-	var far := _add(land, ground_colour, Vector3(0.0, 0.0, -0.6))
-	far.name = "Land"
-	(far.material_override as StandardMaterial3D).roughness = 1.0 if def.backdrop != &"sea" else 0.25
-	match def.backdrop:
-		&"hills":
-			_build_hills(Color(0.2, 0.28, 0.26), 560.0, 35.0, 95.0)
-		&"city":
-			_build_hills(Color(0.26, 0.3, 0.3), 700.0, 20.0, 50.0)
-			_build_city()
-		&"sea":
-			_build_hills(Color(0.24, 0.3, 0.34), 900.0, 10.0, 40.0)
+	_build_landmark()
+	if def.backdrop == &"none":
+		return
+	backdrop = Backdrop.new(def, collision.boundary_distance(0.0) + def.outfield_setback + 62.0)
+	add_child(backdrop)
 
 
-func _build_hills(colour: Color, radius: float, low: float, high: float) -> void:
-	var noise := FastNoiseLite.new()
-	noise.seed = hash(def.id)
-	noise.frequency = 0.012
-	noise.fractal_octaves = 3
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	const STEPS := 240
-	for i: int in STEPS:
-		var a0 := 360.0 * i / STEPS
-		var a1 := 360.0 * (i + 1) / STEPS
-		var h0 := lerpf(low, high, noise.get_noise_1d(a0 * 3.0) * 0.5 + 0.5)
-		var h1 := lerpf(low, high, noise.get_noise_1d(a1 * 3.0) * 0.5 + 0.5)
-		var c := Vector3(0.0, 60.0, 0.0)
-		_quad(tool, Field.to_world(c + at_az(a0, radius)), Field.to_world(c + at_az(a1, radius)), Field.to_world(c + at_az(a1, radius, h1)), Field.to_world(c + at_az(a0, radius, h0)))
-	tool.generate_normals()
-	var m := _material(colour, 1.0)
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_node(tool.commit(), m, "Hills")
-
-
-func _build_city() -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3.ONE
+## A building that is part of the park: the long brick warehouse beyond right field.
+func _build_landmark() -> void:
+	if def.landmark != &"warehouse":
+		return
+	var size := Vector3(230.0, 34.0, 17.0)
+	var middle := at_az(30.0, collision.boundary_distance(30.0) + def.outfield_setback + 30.0)
+	var along := (at_az(46.0, 1.0) - at_az(14.0, 1.0)).normalized()
 	var blocks := MultiMesh.new()
 	blocks.transform_format = MultiMesh.TRANSFORM_3D
 	blocks.use_colors = true
+	blocks.use_custom_data = true
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3.ONE
 	blocks.mesh = mesh
-	blocks.instance_count = 160
-	for i: int in blocks.instance_count:
-		var az := _rng.next_range(-180.0, 180.0)
-		var r := _rng.next_range(380.0, 620.0)
-		var size := Vector3(_rng.next_range(14.0, 30.0), _rng.next_range(18.0, 75.0), _rng.next_range(10.0, 18.0))
-		var p := Field.to_world(Vector3(0.0, 60.0, 0.0) + at_az(az, r, size.y * 0.5))
-		var basis := Basis(Vector3.UP, -deg_to_rad(az)).scaled(size)
-		blocks.set_instance_transform(i, Transform3D(basis, p))
-		var grey := _rng.next_range(0.28, 0.46)
-		blocks.set_instance_color(i, Color(grey, grey, grey * 1.03))
+	blocks.instance_count = 1
+	blocks.set_instance_transform(0, Transform3D(Basis(Vector3.UP, atan2(along.y, along.x)).scaled(size), Field.to_world(middle + Vector3(0.0, 0.0, size.y * 0.5))))
+	blocks.set_instance_color(0, Color(0.78, 0.7, 0.66))
+	blocks.set_instance_custom_data(0, Color(size.x, size.y, size.z, 0.0))
+	var material := ShaderMaterial.new()
+	material.shader = load("res://stadium/city.gdshader") as Shader
+	material.set_shader_parameter(&"front", SurfaceLibrary.texture("facade_a", "color"))
+	material.set_shader_parameter(&"night_front", SurfaceLibrary.texture("facade_night", "color"))
+	material.set_shader_parameter(&"tile", 19.0)
 	var node := MultiMeshInstance3D.new()
-	node.name = "City"
+	node.name = "Warehouse"
 	node.multimesh = blocks
-	var m := _material(Color.WHITE, 0.9)
-	m.vertex_color_use_as_albedo = true
-	node.material_override = m
+	node.material_override = material
 	add_child(node)
 
 
 ## Six light towers behind the stands, each a mast with a bank of lamps facing the field. The
 ## lamps glow when the lights are on (set_lights).
 func _build_light_towers() -> void:
-	_lamp = _material(Color(0.85, 0.86, 0.88), 0.5)
+	# The lamps: rows of round floodlights in a frame, as a picture that also glows.
+	var grid := _lamp_grid(10, 6)
+	_lamp = _material(Color.WHITE, 0.45)
+	_lamp.albedo_texture = grid
 	_lamp.emission_enabled = true
 	_lamp.emission = Color(1.0, 0.97, 0.9)
+	_lamp.emission_texture = grid
 	_lamp.emission_energy_multiplier = 0.0
+	var steel := _material(Color(0.5, 0.51, 0.54), 0.45)
+	steel.metallic = 0.5
+	SurfaceLibrary.dress(steel, "metal", 2.0, 0.5)
 	var mast := CylinderMesh.new()
-	mast.top_radius = 0.5
-	mast.bottom_radius = 0.9
+	mast.top_radius = 0.55
+	mast.bottom_radius = 1.0
 	mast.height = 46.0
-	var bank := BoxMesh.new()
-	bank.size = Vector3(11.0, 6.0, 0.8)
-	for az: float in [-125.0, -70.0, -40.0, 40.0, 70.0, 125.0]:
+	var frame := BoxMesh.new()
+	frame.size = Vector3(13.5, 7.6, 0.7)
+	var face := QuadMesh.new()
+	face.size = Vector2(13.0, 7.2)
+	var arm := BoxMesh.new()
+	arm.size = Vector3(0.3, 0.3, 3.2)
+	var bearings := def.towers if not def.towers.is_empty() else PackedFloat32Array([-125.0, -70.0, -40.0, 40.0, 70.0, 125.0])
+	for az: float in bearings:
 		var reach := collision.boundary_distance(az) + (def.outfield_setback + 22.0 if _is_fair(az) else 40.0)
 		var foot := at_az(az, reach)
-		_add(mast, Color(0.55, 0.56, 0.58), foot + Vector3(0.0, 0.0, 23.0))
-		var lamps := _node(bank, _lamp, "Lamps")
-		lamps.position = Field.to_world(foot + Vector3(0.0, 0.0, 47.0))
+		var pole := _node(mast, steel, "Mast")
+		pole.position = Field.to_world(foot + Vector3(0.0, 0.0, 23.0))
+		var bank := _node(frame, steel, "LampFrame")
+		bank.position = Field.to_world(foot + Vector3(0.0, 0.0, 47.5))
 		var toward := Field.to_world(Vector3(0.0, 40.0, 0.0))
-		lamps.look_at(Vector3(toward.x, lamps.position.y - 20.0, toward.z))
+		bank.look_at(Vector3(toward.x, bank.position.y - 20.0, toward.z))
+		# The face with the lamps, on the side toward the field (a node looks along -Z).
+		var lamps := MeshInstance3D.new()
+		lamps.name = "Lamps"
+		lamps.mesh = face
+		lamps.material_override = _lamp
+		lamps.position = Vector3(0.0, 0.0, -0.37)
+		lamps.rotation.y = PI
+		bank.add_child(lamps)
+		# Two struts from the mast's head to the frame.
+		for side: float in [-1.0, 1.0]:
+			var strut := MeshInstance3D.new()
+			strut.mesh = arm
+			strut.material_override = steel
+			strut.position = Vector3(side * 3.0, -2.6, 1.4)
+			strut.rotation.x = deg_to_rad(40.0)
+			bank.add_child(strut)
+
+
+## A picture of a bank of floodlights: `columns` by `rows` round lamps in a dark frame.
+static func _lamp_grid(columns: int, rows: int) -> ImageTexture:
+	const CELL := 24
+	var image := Image.create(columns * CELL, rows * CELL, true, Image.FORMAT_RGB8)
+	image.fill(Color(0.07, 0.07, 0.08))
+	for y: int in rows * CELL:
+		for x: int in columns * CELL:
+			var d := Vector2(float(x % CELL) + 0.5 - CELL * 0.5, float(y % CELL) + 0.5 - CELL * 0.5).length() / (CELL * 0.5)
+			if d < 0.8:
+				var k := 1.0 - smoothstep(0.55, 0.8, d)
+				image.set_pixel(x, y, Color(0.07, 0.07, 0.08).lerp(Color(0.96, 0.96, 0.92), k))
+	image.generate_mipmaps()
+	return ImageTexture.create_from_image(image)
 
 
 ## Turns the towers' lamps on or off.
-func set_lights(on: bool) -> void:
+## `darkness`: how dark it is beyond the park (0 day, 0.5 dusk, 1 night).
+func set_lights(on: bool, darkness: float = 0.0) -> void:
 	if _lamp != null:
 		_lamp.emission_energy_multiplier = 6.0 if on else 0.0
+	if _glass != null:
+		_glass.emission_energy_multiplier = 1.1 if on else 0.0
+	if backdrop != null:
+		backdrop.set_lights(on, darkness)
 
 
 ## A dome over the whole park: a shallow shell resting on the stands, light panels in its

@@ -1,0 +1,76 @@
+{
+ "id": "hillside_park",
+ "name": "언덕 구장",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 50,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 95,
+   "height": 2.2
+  },
+  {
+   "az": -22,
+   "dist": 108,
+   "height": 2.2
+  },
+  {
+   "az": 0,
+   "dist": 115,
+   "height": 2.2
+  },
+  {
+   "az": 22,
+   "dist": 108,
+   "height": 2.2
+  },
+  {
+   "az": 45,
+   "dist": 95,
+   "height": 2.2
+  }
+ ],
+ "foul_territory": {
+  "backstop": 15.5,
+  "width_at_base": 11.0,
+  "width_at_pole": 2.5
+ },
+ "mow": "rings",
+ "bullpens": "foul",
+ "outfield_setback": 3.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    16
+   ],
+   "rake_deg": [
+    24
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": 44,
+   "rows": [
+    10
+   ],
+   "rake_deg": [
+    16
+   ],
+   "kind": "berm"
+  }
+ ],
+ "backdrop": "mountains",
+ "wall_color": "#1c4a36",
+ "seat_color": "#2f7d5b",
+ "capacity": 9000,
+ "towers": [
+  -120,
+  -60,
+  60,
+  120
+ ]
+}

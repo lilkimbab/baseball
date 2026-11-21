@@ -183,8 +183,10 @@ func _material() -> ShaderMaterial:
 	m.set_shader_parameter("mask", load(MASK) as Texture2D)
 	var info := atlas_info()
 	m.set_shader_parameter("people", info.get("people", 13))
+	m.set_shader_parameter("poses", info.get("poses", 8))
 	m.set_shader_parameter("columns", info.get("columns", 8))
-	m.set_shader_parameter("rows", info.get("rows", 7))
+	m.set_shader_parameter("rows", info.get("rows", 13))
+	m.set_shader_parameter("card", CARD)
 	return m
 
 
@@ -197,6 +199,9 @@ static func atlas_info() -> Dictionary:
 		var parts := line.split(" ", false)
 		if parts.size() >= 2 and parts[1].is_valid_int():
 			out[parts[0]] = int(parts[1])
+		elif parts.size() >= 2 and parts[0] == "poses":
+			# The pictures of each person, by name: how many there are.
+			out["poses"] = parts.size() - 1
 	return out
 
 

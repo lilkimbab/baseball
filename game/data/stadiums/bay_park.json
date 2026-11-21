@@ -1,0 +1,86 @@
+{
+ "id": "bay_park",
+ "name": "베이 파크",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 85,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 103,
+   "height": 2.4
+  },
+  {
+   "az": -20,
+   "dist": 113,
+   "height": 2.4
+  },
+  {
+   "az": 0,
+   "dist": 119,
+   "height": 2.4
+  },
+  {
+   "az": 18,
+   "dist": 126,
+   "height": 5.0
+  },
+  {
+   "az": 32,
+   "dist": 108,
+   "height": 7.6
+  },
+  {
+   "az": 45,
+   "dist": 94,
+   "height": 7.6
+  }
+ ],
+ "foul_territory": {
+  "backstop": 15.5,
+  "width_at_base": 11.0,
+  "width_at_pole": 2.5
+ },
+ "mow": "straight",
+ "bullpens": "foul",
+ "outfield_setback": 2.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    26,
+    20,
+    10
+   ],
+   "rake_deg": [
+    24,
+    32,
+    36
+   ],
+   "roof": false
+  },
+  {
+   "from_az": -44,
+   "to_az": 10,
+   "rows": [
+    16
+   ],
+   "rake_deg": [
+    24
+   ]
+  }
+ ],
+ "backdrop": "harbour",
+ "wall_color": "#7a3b2e",
+ "seat_color": "#1d4d3a",
+ "capacity": 21000,
+ "facade": "brick",
+ "towers": [
+  -125,
+  -70,
+  -40,
+  70,
+  125
+ ]
+}

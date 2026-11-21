@@ -648,7 +648,7 @@ func _move_camera(delta: float) -> void:
 func _build_environment() -> void:
 	lighting = ParkLighting.new(park.def, time_of_day)
 	add_child(lighting)
-	park.set_lights(lighting.lights_on())
+	park.set_lights(lighting.lights_on(), lighting.darkness())
 
 
 func _build_players() -> void:

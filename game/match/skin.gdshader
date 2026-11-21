@@ -19,9 +19,9 @@ uniform sampler2D relief_texture : hint_normal, filter_linear_mipmap_anisotropic
 uniform sampler2D detail_texture : hint_default_white, filter_linear_mipmap;
 uniform sampler2D pore_texture : hint_normal, filter_linear_mipmap, repeat_enable;
 uniform bool has_detail = false;
-uniform float relief_strength : hint_range(0.0, 2.0) = 0.6;
+uniform float relief_strength : hint_range(0.0, 2.0) = 0.45;
 uniform float pore_tiling = 70.0;
-uniform float pore_strength : hint_range(0.0, 1.0) = 0.12;
+uniform float pore_strength : hint_range(0.0, 1.0) = 0.05;
 uniform float occlusion : hint_range(0.0, 1.0) = 0.8;
 uniform float scatter : hint_range(0.0, 1.0) = 0.22;
 
@@ -62,11 +62,13 @@ void fragment() {
 	NORMAL_MAP = n * 0.5 + 0.5;
 
 	float rough = has_detail ? d.g : 0.55;
-	ROUGHNESS = clamp(mix(rough, rough * 0.7, sweat) + (1.0 - ao) * 0.25 + beard * 0.15, 0.3, 0.9);
+	ROUGHNESS = clamp(mix(rough, rough * 0.7, sweat) + (1.0 - ao) * 0.25 + beard * 0.15, 0.42, 0.9);
 	// Skin reflects about 2.8% straight on (0.35 here; 0.5 is 4%), less in the creases.
 	SPECULAR = 0.35 * mix(0.4, 1.0, ao);
-	CLEARCOAT = (0.06 + 0.25 * sweat) * ao * (1.0 - beard);
-	CLEARCOAT_ROUGHNESS = 0.38;
+	// A broad soft sheen, not glints: on the pores' bumps a sharp second highlight broke up
+	// into white specks under the eyes.
+	CLEARCOAT = (0.03 + 0.14 * sweat) * ao * (1.0 - beard);
+	CLEARCOAT_ROUGHNESS = 0.55;
 	SSS_STRENGTH = scatter;
 	RIM = 0.18;
 	RIM_TINT = 0.7;

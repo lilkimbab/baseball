@@ -35,6 +35,16 @@ var backdrop: StringName = &"hills"
 var wall_color := Color(0.06, 0.24, 0.18)
 var seat_color := Color(0.18, 0.32, 0.55)
 var capacity := 20000
+## What the stands' outer walls are built of: &"concrete" or &"brick".
+var facade: StringName = &"concrete"
+## Where the light towers stand (compass bearings from home plate); empty for the usual six.
+var towers := PackedFloat32Array()
+## A building that belongs to the park itself: &"" or &"warehouse" (a long brick warehouse
+## beyond right field).
+var landmark: StringName = &""
+## What the surroundings are laid out from (the park's id, or a club's, so that two clubs in
+## parks of one model do not look out on the same streets).
+var place_seed := ""
 
 
 ## The practice park the duel scene and the headless games have always used: 100 m lines,
@@ -93,4 +103,9 @@ static func from_dictionary(data: Dictionary) -> StadiumDef:
 	if data.has("seat_color"):
 		s.seat_color = Color(str(data["seat_color"]))
 	s.capacity = int(data.get("capacity", s.capacity))
+	s.facade = StringName(str(data.get("facade", "concrete")))
+	for az: Variant in data.get("towers", []):
+		s.towers.append(float(az))
+	s.landmark = StringName(str(data.get("landmark", "")))
+	s.place_seed = s.id
 	return s

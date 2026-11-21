@@ -35,6 +35,11 @@ func lights_on() -> bool:
 	return indoor() or time != &"day"
 
 
+## How dark it is beyond the park: 0 by day, half at dusk, 1 at night.
+func darkness() -> float:
+	return {&"day": 0.0, &"dusk": 0.5, &"night": 1.0}.get(time, 0.0)
+
+
 ## Where the sun is: elevation and compass bearing (degrees) at `hour`, Korean time.
 static func sun_position(hour: float) -> Vector2:
 	var h := deg_to_rad((hour - SOLAR_NOON) * 15.0)
@@ -97,6 +102,35 @@ func _reflections() -> ReflectionProbe:
 	return probe
 
 
+## A photographed sky in place of the painted one (docs/13 S13-7; CC0 skies from Poly Haven,
+## tools/assets/fetch_materials.sh): clouds, haze at the horizon, a real sunset, stars. Each
+## is turned so that its sun stands where the game's sun does (the shadows agree with the
+## sky). SKIES: the file, where its sun is (degrees right of the picture's middle), and how
+## bright it is shown.
+const SKIES := {
+	&"day": ["res://assets/sky/sky_day.hdr", 2.1, 0.55],
+	&"dusk": ["res://assets/sky/sky_dusk.hdr", 18.3, 0.55],
+	&"night": ["res://assets/sky/sky_night.hdr", 34.1, 0.1],
+}
+
+
+func _photographed_sky(env: Environment, sky: Sky) -> void:
+	if indoor() or not SKIES.has(time) or not ResourceLoader.exists(str(SKIES[time][0])):
+		return
+	var spec: Array = SKIES[time]
+	var panorama := PanoramaSkyMaterial.new()
+	panorama.panorama = load(str(spec[0])) as Texture2D
+	panorama.energy_multiplier = float(spec[2])
+	sky.sky_material = panorama
+	# Where the game's sun is, as an angle right of straight out to centre field (at night
+	# the moon stands over right-centre).
+	var dir := sun_direction()
+	var want := rad_to_deg(atan2(dir.x, dir.y)) if dir.z > 0.0 else 25.0
+	env.sky_rotation = Vector3(0.0, deg_to_rad(float(spec[1]) - want), 0.0)
+	# The photograph lights the shade by itself: less of the flat fill.
+	env.ambient_light_sky_contribution = 0.75
+
+
 func _sun_colour() -> Color:
 	return Color(1.0, 0.94, 0.84) if time == &"day" else Color(1.0, 0.72, 0.5)
 
@@ -106,7 +140,9 @@ func _light(toward: Vector3, colour: Color, energy: float, shadows: bool) -> Dir
 	light.light_color = colour
 	light.light_energy = energy
 	light.shadow_enabled = shadows
-	light.shadow_blur = 1.4
+	# A tighter edge: at 1.4 the dithered half-shadow of a cap or helmet brim showed on the face
+	# as a row of bright specks.
+	light.shadow_blur = 0.7
 	light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	light.directional_shadow_max_distance = 140.0
 	add_child(light)
@@ -163,6 +199,7 @@ func _environment() -> Environment:
 	sky.sky_material = sky_material
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
+	_photographed_sky(env, sky)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	# Shadows lit by the blue sky alone look cold on skin (docs/13 S11-3): part of the ambient
 	# light is the warm light bounced off the grass, dirt and stands.
@@ -182,7 +219,8 @@ func _environment() -> Environment:
 	env.glow_intensity = 0.35 if time == &"day" else 0.55
 	env.glow_bloom = 0.04
 	env.fog_enabled = true
-	env.fog_density = 0.0009 if not indoor() else 0.0004
+	# Thin haze: hills a kilometre off keep their colour and their shape.
+	env.fog_density = 0.00042 if not indoor() else 0.0004
 	env.fog_sun_scatter = 0.15
 	env.fog_sky_affect = 0.2
 	env.adjustment_enabled = true

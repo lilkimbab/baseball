@@ -1,0 +1,96 @@
+{
+ "id": "warehouse_yards",
+ "name": "웨어하우스 야드",
+ "surface": "grass",
+ "roof": "open",
+ "orientation_deg": 30,
+ "fence": [
+  {
+   "az": -45,
+   "dist": 101.5,
+   "height": 4.0
+  },
+  {
+   "az": -25,
+   "dist": 111,
+   "height": 4.0
+  },
+  {
+   "az": 0,
+   "dist": 125,
+   "height": 2.2
+  },
+  {
+   "az": 20,
+   "dist": 113,
+   "height": 2.2
+  },
+  {
+   "az": 30,
+   "dist": 106,
+   "height": 6.4
+  },
+  {
+   "az": 45,
+   "dist": 97,
+   "height": 6.4
+  }
+ ],
+ "foul_territory": {
+  "backstop": 15.5,
+  "width_at_base": 11.0,
+  "width_at_pole": 2.5
+ },
+ "mow": "checker",
+ "bullpens": "outfield",
+ "outfield_setback": 3.0,
+ "stands": [
+  {
+   "from_az": 46,
+   "to_az": -46,
+   "rows": [
+    28,
+    18
+   ],
+   "rake_deg": [
+    24,
+    34
+   ],
+   "roof": true
+  },
+  {
+   "from_az": -44,
+   "to_az": -8,
+   "rows": [
+    16,
+    10
+   ],
+   "rake_deg": [
+    24,
+    34
+   ]
+  },
+  {
+   "from_az": -6,
+   "to_az": 12,
+   "rows": [
+    10
+   ],
+   "rake_deg": [
+    22
+   ]
+  }
+ ],
+ "backdrop": "downtown",
+ "wall_color": "#234a34",
+ "seat_color": "#1e3f2c",
+ "capacity": 21000,
+ "facade": "brick",
+ "landmark": "warehouse",
+ "towers": [
+  -125,
+  -70,
+  -40,
+  125
+ ]
+}

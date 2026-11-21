@@ -157,7 +157,7 @@ func start() -> void:
 	if away_index == home_index:
 		return
 	pending = true
-	var where := StadiumIO.load_park(park).name if park != "" else StadiumIO.load_park(MatchScene.home_park(_clubs[home_index].id)).name
+	var where := StadiumIO.load_park(park).name if park != "" else MatchScene.home_def(_clubs[home_index]).name
 	var when: String = {"day": "주간 경기", "dusk": "석양 경기", "night": "야간 경기"}.get(time, "")
 	go("res://match/manager_match.tscn" if style == "manager" else "res://match/match.tscn",
 		{"away": _clubs[away_index], "home": _clubs[home_index], "title": "친선 경기", "line": "%s · %s · %d이닝" % [where, when, Settings.innings]})

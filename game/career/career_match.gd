@@ -58,7 +58,7 @@ func _start_game() -> void:
 	my_team = cs.my_side(game)
 	var today := cs.club_game()
 	if today != null:
-		_play_at_home(today.home, today.day)
+		_play_at_home(today.home, today.day, CareerSession.career_season.season.teams.get(today.home))
 	me = cs.career.player.id
 	Settings.ensure_loaded()
 	pitch_all = Settings.pitch_all

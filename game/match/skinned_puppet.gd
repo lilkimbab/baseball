@@ -239,6 +239,9 @@ func _load_model() -> void:
 		var flap := model.find_child("HelmetFlap" + side, true, false) as MeshInstance3D
 		if flap != null:
 			_flaps[side] = flap
+			# The flap's thin front edge threw a hairline shadow down the cheek, like a tear
+			# track; the helmet's shell shades the face without it.
+			flap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_logos.clear()
 	# Detail too small to see from afar stops being drawn there (docs/13 S11-10); the body and
 	# clothes drop to simpler meshes with distance by themselves (the import makes their LODs).
@@ -424,6 +427,9 @@ func _use_prop(part: StringName, prop: StringName, colour: Color, roughness: flo
 	surface.normal_scale = 0.6
 	surface.uv1_triplanar = true
 	surface.uv1_scale = Vector3.ONE * grain_scale
+	if part == &"Glove":
+		# A glove is leather: the scan's grain and creases, and oiled leather's uneven sheen.
+		SurfaceLibrary.dress(surface, "leather", 0.14, 1.0, false, false)
 	_parts[part].mesh = source.mesh
 	_parts[part].material_override = surface
 	scene.free()
@@ -1091,11 +1097,9 @@ func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
 		material.clearcoat_enabled = true
 		material.clearcoat = 0.55
 		material.clearcoat_roughness = 0.08
-		material.normal_enabled = true
-		material.normal_texture = _grain()
-		material.normal_scale = 0.06
+		# Moulded plastic under the coat: fine scuffs from a season's use.
 		material.uv1_triplanar = true
-		material.uv1_scale = Vector3.ONE * 6.0
+		SurfaceLibrary.dress(material, "plastic", 0.3, 0.35, false, false)
 	else:
 		material.normal_enabled = true
 		material.normal_texture = _grain()
@@ -1104,6 +1108,11 @@ func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
 		material.uv1_scale = Vector3.ONE * 13.0
 		if source == "Socks" or source == "Cap" or source == "Collar" or source == "GearTrim":
 			_make_fabric(material)
+		elif source == "Shoes" or source == "Belt" or source == "Gear":
+			# Real leather (a CC0 scan): its grain and the way its sheen breaks up.
+			SurfaceLibrary.dress(material, "leather", 0.16 if source != "Gear" else 0.24, 0.9, false, false)
+		elif source == "Bars":
+			SurfaceLibrary.dress(material, "metal", 0.2, 0.5, false, false)
 	return material
 
 
