@@ -11,7 +11,7 @@ var _frames := 0
 var _view := 0
 var _cam: Camera3D
 var _time := "day"
-const VIEWS := ["bat", "pitch", "high", "outfield", "line"]
+const VIEWS := ["bat", "pitch", "high", "outfield", "line", "board"]
 
 
 func _initialize() -> void:
@@ -58,6 +58,11 @@ func _process(_delta: float) -> bool:
 		"outfield":
 			cam.look_at_from_position(Field.to_world(Vector3(20.0, 100.0, 8.0)), Field.to_world(Vector3(0.0, -10.0, 4.0)))
 			cam.fov = 60.0
+		"board":
+			var face := _scene.park.find_child("Scoreboard", false, false) as Node3D
+			if face != null:
+				cam.look_at_from_position(Field.to_world(Vector3(0.0, 20.0, 8.0)), face.global_position)
+				cam.fov = 22.0
 		"line":
 			cam.look_at_from_position(Field.to_world(Vector3(4.0, 30.0, 1.8)), Field.to_world(Vector3(26.0, 6.0, 0.5)))
 			cam.fov = 60.0

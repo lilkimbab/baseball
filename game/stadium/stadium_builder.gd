@@ -30,6 +30,10 @@ const EYE_HALF_DEG := 7.0
 const EYE_HEIGHT := 14.0
 ## Foul poles stand this high (m) above the ground.
 const POLE_HEIGHT := 16.0
+## The scoreboard's screen (m); ad boards are AD_LENGTH m long, AD_SLOTS of them to a strip.
+const SCREEN_SIZE := Vector2(28.0, 12.0)
+const AD_LENGTH := 7.0
+const AD_SLOTS := 8
 
 var def: StadiumDef
 var fence: FenceProfile
@@ -39,6 +43,12 @@ var collision: AnalyticField
 var _surface: ShaderMaterial
 var _rng := Rng.new(7)
 var _lamp: StandardMaterial3D
+## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
+## the game on it, docs/13 S13-6).
+var scoreboard: SubViewport
+## Ad boards along the wall behind home and the upper tier's front, made as the stands are.
+var _ads: SurfaceTool
+var _ads_along := 0.0
 
 
 func _init(park: StadiumDef = null) -> void:
@@ -61,6 +71,8 @@ func _ready() -> void:
 	_build_batters_eye()
 	_build_stands()
 	_build_surroundings()
+	_build_scoreboard()
+	_build_ads()
 	if def.roof == &"dome":
 		_build_dome()
 	else:
@@ -520,6 +532,8 @@ static func in_span(az: float, from_az: float, to_az: float) -> bool:
 ## their rake with a stairway every AISLE_EVERY m, a rail along the front of each tier, the
 ## upper tier over the back of the lower one, and a roof over it where there is one.
 func _build_stands() -> void:
+	_ads = SurfaceTool.new()
+	_ads.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var seats := SurfaceTool.new()
 	seats.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var walls := SurfaceTool.new()
@@ -562,10 +576,12 @@ func _build_stands() -> void:
 					continue
 				var rise := ROW_DEPTH * tan(deg_to_rad(float(rakes[mini(tier, rakes.size() - 1)])))
 				if tier == 1:
-					# The upper tier hangs over the back of the lower one, above a concourse.
+					# The upper tier hangs over the back of the lower one, above a concourse;
+					# its front carries a band of ads.
 					out -= 6.0
 					height += 4.5
-					_quad(walls, _rim(az0, out, height - 2.2), _rim(az1, out, height - 2.2), _rim(az1, out, height), _rim(az0, out, height))
+					_quad(walls, _rim(az0, out, height - 2.2), _rim(az1, out, height - 2.2), _rim(az1, out, height - 1.4), _rim(az0, out, height - 1.4))
+					_ad_quad(_rim(az0, out - 0.05, height - 1.4), _rim(az1, out - 0.05, height - 1.4), 1.3)
 				_quad(rails, _rim(az0, out, height + 0.9), _rim(az1, out, height + 0.9), _rim(az1, out, height + 1.0), _rim(az0, out, height + 1.0))
 				for row: int in n:
 					var shade := 0.97 + 0.03 * float(row % 2)
@@ -664,7 +680,7 @@ func _build_city() -> void:
 		var p := Field.to_world(Vector3(0.0, 60.0, 0.0) + at_az(az, r, size.y * 0.5))
 		var basis := Basis(Vector3.UP, -deg_to_rad(az)).scaled(size)
 		blocks.set_instance_transform(i, Transform3D(basis, p))
-		var grey := _rng.next_range(0.45, 0.7)
+		var grey := _rng.next_range(0.28, 0.46)
 		blocks.set_instance_color(i, Color(grey, grey, grey * 1.03))
 	var node := MultiMeshInstance3D.new()
 	node.name = "City"
@@ -688,7 +704,7 @@ func _build_light_towers() -> void:
 	mast.height = 46.0
 	var bank := BoxMesh.new()
 	bank.size = Vector3(11.0, 6.0, 0.8)
-	for az: float in [-125.0, -70.0, -28.0, 28.0, 70.0, 125.0]:
+	for az: float in [-125.0, -70.0, -40.0, 40.0, 70.0, 125.0]:
 		var reach := collision.boundary_distance(az) + (def.outfield_setback + 22.0 if _is_fair(az) else 40.0)
 		var foot := at_az(az, reach)
 		_add(mast, Color(0.55, 0.56, 0.58), foot + Vector3(0.0, 0.0, 23.0))
@@ -741,3 +757,100 @@ func _build_dome() -> void:
 	ring.radial_segments = 96
 	var wall := _node(ring, m, "DomeWall")
 	wall.position = Field.to_world(Vector3(0.0, 55.0, 4.5))
+
+
+# --- The scoreboard and the ads ---
+
+
+## A board for an ad strip from a to b (world, along the bottom edge), `high` m tall; the
+## texture runs on along the strip, board after board.
+func _ad_quad(a: Vector3, b: Vector3, high: float) -> void:
+	var span := a.distance_to(b)
+	var u0 := _ads_along / AD_LENGTH
+	var u1 := (_ads_along + span) / AD_LENGTH
+	_quad_uv(_ads, a + Vector3.UP * high, b + Vector3.UP * high, b, a, Vector2(u0 / float(AD_SLOTS), 0.0), Vector2(u1 / float(AD_SLOTS), 1.0))
+	_ads_along += span
+
+
+## The sponsors' boards: one strip of them drawn once into a viewport, and the bands that show
+## it — along the wall behind home between the dugouts and along the upper tiers' fronts.
+func _build_ads() -> void:
+	var reach := absf(_line_az(DUGOUT_FROM, 1.0))
+	const STEPS := 60
+	for i: int in STEPS:
+		var az0 := reach + (360.0 - 2.0 * reach) * i / STEPS
+		var az1 := reach + (360.0 - 2.0 * reach) * (i + 1) / STEPS
+		_ad_quad(_rim(az0, -0.03, 0.15), _rim(az1, -0.03, 0.15), 0.95)
+	var strip := SubViewport.new()
+	strip.size = Vector2i(AD_SLOTS * 256, 64)
+	strip.render_target_update_mode = SubViewport.UPDATE_ONCE
+	strip.transparent_bg = false
+	var boards := AdStrip.new()
+	boards.size = Vector2(strip.size)
+	boards.sponsors = AdStrip.load_sponsors()
+	boards.slots = AD_SLOTS
+	strip.add_child(boards)
+	add_child(strip)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = strip.get_texture()
+	m.texture_repeat = true
+	m.roughness = 0.6
+	m.emission_enabled = true
+	m.emission_texture = strip.get_texture()
+	m.emission_energy_multiplier = 0.25
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_ads.generate_normals()
+	_node(_ads.commit(), m, "Ads")
+
+
+## The scoreboard: a screen 28 by 12 m on a frame above the outfield stands in left-centre,
+## facing home.
+func _build_scoreboard() -> void:
+	var az := -21.0
+	var rows := 14
+	var rake := 22.0
+	for section: Dictionary in def.stands:
+		if in_span(az, float(section["from_az"]), float(section["to_az"])):
+			rows = int((section.get("rows", [14]) as Array)[0])
+			rake = float((section.get("rake_deg", [22]) as Array)[0])
+	var r := fence.distance_at(az) + def.outfield_setback + rows * ROW_DEPTH + 5.0
+	var bottom := 2.2 + rows * ROW_DEPTH * tan(deg_to_rad(rake)) + 3.0
+	var centre := at_az(az, r, bottom + SCREEN_SIZE.y * 0.5)
+	var facing := Field.to_world(Vector3(0.0, 0.0, bottom))
+	scoreboard = SubViewport.new()
+	scoreboard.size = Vector2i(1400, 600)
+	scoreboard.transparent_bg = false
+	scoreboard.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var blank := ColorRect.new()
+	blank.color = Color(0.02, 0.02, 0.03)
+	blank.size = Vector2(scoreboard.size)
+	scoreboard.add_child(blank)
+	var title := Label.new()
+	title.text = def.name
+	title.add_theme_font_size_override("font_size", 96)
+	title.add_theme_font_override("font", UiTheme.font(700))
+	title.position = Vector2(80.0, 240.0)
+	blank.add_child(title)
+	add_child(scoreboard)
+	var frame := BoxMesh.new()
+	frame.size = Vector3(SCREEN_SIZE.x + 1.6, SCREEN_SIZE.y + 1.6, 1.2)
+	var back := _node(frame, _material(Color(0.12, 0.13, 0.15), 0.8), "ScoreboardFrame")
+	back.position = Field.to_world(centre + at_az(az, 0.7) - at_az(az, 0.0))
+	back.look_at(facing, Vector3.UP)
+	var quad := QuadMesh.new()
+	quad.size = SCREEN_SIZE
+	var screen := StandardMaterial3D.new()
+	screen.albedo_texture = scoreboard.get_texture()
+	screen.emission_enabled = true
+	screen.emission_texture = scoreboard.get_texture()
+	screen.emission_energy_multiplier = 1.1
+	screen.roughness = 0.4
+	var face := _node(quad, screen, "Scoreboard")
+	face.position = Field.to_world(centre)
+	face.look_at(facing, Vector3.UP)
+	face.rotate_object_local(Vector3.UP, PI)
+	for side: float in [-1.0, 1.0]:
+		var leg := BoxMesh.new()
+		leg.size = Vector3(1.2, bottom, 1.2)
+		var across := Vector3(cos(deg_to_rad(az)), -sin(deg_to_rad(az)), 0.0) * (SCREEN_SIZE.x * 0.35 * side)
+		_add(leg, Color(0.2, 0.21, 0.23), at_az(az, r + 0.7) + across + Vector3(0.0, 0.0, bottom * 0.5))
