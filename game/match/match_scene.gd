@@ -762,11 +762,41 @@ func _finish_pitch() -> void:
 		_batter_at_start = game.batter_id()
 		_enter(State.RESULT)
 		return
+	# A pitch that got by the catcher is shown before the runners move up.
+	var loose: GameEvent = null
 	for e: GameEvent in events:
-		_apply(e)
+		if e.kind == GameEvent.Kind.WILD_PITCH or e.kind == GameEvent.Kind.PASSED_BALL:
+			loose = e
+			continue
+		if loose == null:
+			_apply(e)
+	if loose != null and _show_loose_ball(events, loose):
+		return
 	if _finish_steal():
 		return
 	_enter(State.RESULT)
+
+
+## Shows a wild pitch or passed ball: the events from `loose` on wait until it is over.
+func _show_loose_ball(events: Array[GameEvent], loose: GameEvent) -> bool:
+	var runners: Array[String] = [_id_on(1), _id_on(2), _id_on(3)]
+	var side := -1.0 if duel.ball.pos.x < 0.0 else 1.0
+	_play = RunningPlay.loose_ball(runners, duel.ball.pos, side, resolver.motion)
+	_moves = PlayMoves.read(_play.timeline, _play.calls, false)
+	_running = true
+	_running_pitch = false
+	_play_time = 0.0
+	_pending.clear()
+	var after := false
+	for e: GameEvent in events:
+		after = after or e == loose
+		if after:
+			_pending.append(e)
+	_runners_at_start = runners
+	_batter_at_start = ""
+	_steal_jump = NAN
+	_enter(State.RESULT)
+	return true
 
 
 func _id_on(base: int) -> String:
