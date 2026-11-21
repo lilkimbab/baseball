@@ -14,6 +14,7 @@ import os
 import sys
 
 import bmesh
+from mathutils.bvhtree import BVHTree
 import bpy
 from mathutils import Vector
 
@@ -272,9 +273,11 @@ def prepare_body(body, rig):
     return feet, head
 
 
-def make_garment(body, name, regions, lift, flare, slots):
-    """Copies the faces of some regions into a new mesh, lifts it off the skin, smooths away
-    the anatomy underneath and unwraps it front/back."""
+def make_garment(body, name, regions, looseness, slots, anatomy_of):
+    """Copies the faces of some regions into a new mesh, subdivides it once for a smoother
+    outline, lifts every point off the skin by how loose the garment is there (looseness:
+    vertex -> metres, docs/13 S11-2), smooths away the anatomy underneath and unwraps it
+    front/back. The copied skin weights make it move with the body."""
     obj = body.copy()
     obj.data = body.data.copy()
     obj.name = obj.data.name = name
@@ -284,12 +287,27 @@ def make_garment(body, name, regions, lift, flare, slots):
     bm.from_mesh(obj.data)
     region = bm.faces.layers.int["region"]
     bmesh.ops.delete(bm, geom=[f for f in bm.faces if f[region] not in regions], context='FACES')
+    bm.to_mesh(obj.data)
+    bm.free()
+    # One level of subdivision; applying the modifier carries the bone weights and the face
+    # regions over to the new points and faces.
+    sub = obj.modifiers.new("Subdivide", 'SUBSURF')
+    sub.levels = 1
+    sub.render_levels = 1
+    with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+        bpy.ops.object.modifier_apply(modifier=sub.name)
+
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    region = bm.faces.layers.int["region"]
+    anatomy = anatomy_of(obj, bm)
     bm.normal_update()
     hem = {v for e in bm.edges if e.is_boundary for v in e.verts}
+    lifts = {v: looseness(v, anatomy, v in hem) for v in bm.verts}
     for v in bm.verts:
-        v.co += v.normal * (lift + (flare if v in hem else 0.0))
+        v.co += v.normal * lifts[v]
     inner = [v for v in bm.verts if v not in hem]
-    for _ in range(4):
+    for _ in range(6):
         bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.normal_update()
 
@@ -603,8 +621,66 @@ def main():
             print("make_player: build %s %s width %.3f m depth %.3f m" % (
                 BUILD, label, max(c.x for c in trunk) - min(c.x for c in trunk), max(c.y for c in trunk) - min(c.y for c in trunk)))
     feet, head_points = prepare_body(body, rig)
-    jersey = make_garment(body, "Jersey", (JERSEY,), 0.018, 0.012, [JERSEY])
-    pants = make_garment(body, "Pants", (PANTS, BELT), 0.012, 0.010, [PANTS, BELT])
+    def anatomy_of(obj, bm):
+        a = Anatomy(obj, rig, bm)
+        a.waist = top * BELT_CENTRE
+        return a
+
+    chest_z = top * 0.72
+
+    def dominant(v, a):
+        best, weight = "", 0.0
+        for group, w in v[a.deform].items():
+            name = a.bone_of_group.get(group)
+            if name and w > weight:
+                best, weight = name, w
+        return best
+
+    def jersey_looseness(v, a, hem):
+        """A uniform top (docs/13 S11-2, A from photographs): 12-18 cm more round the chest
+        than the body, roomier below the chest before it is tucked in, close at the collar,
+        wide sleeves flaring to the hem above the elbow, a few soft folds where it is tucked."""
+        bone = dominant(v, a)
+        if bone.startswith("upperarm_"):
+            t = min(max(a.along(bone, v.co) / SLEEVE_HEM, 0.0), 1.0)
+            return 0.020 + 0.026 * t
+        lift = 0.025
+        if v.co.z < chest_z:
+            lift += 0.007
+        if v.co.y > 0.0:
+            lift += 0.003
+        above_belt = v.co.z - (a.waist + BELT_HALF)
+        if above_belt < 0.15:
+            lift = 0.012 + (lift - 0.012) * max(above_belt, 0.0) / 0.15
+            lift += 0.003 * math.sin(above_belt * 2.0 * math.pi / 0.05)
+        neck = a.outside_neckline(v.co)
+        if neck < 0.04:
+            lift = 0.010 + (lift - 0.010) * neck / 0.04
+        return lift
+
+    def pants_looseness(v, a, hem):
+        """Baseball trousers: roomy at the seat and thighs, narrowing below the knee to the
+        hem, close at the belt, gathered a little over the calf."""
+        bone = dominant(v, a)
+        if bone.startswith("thigh_"):
+            t = min(max(a.along(bone, v.co), 0.0), 1.0)
+            seat = 0.006 if v.co.y > 0.0 and t < 0.35 else 0.0
+            return 0.034 - 0.008 * t + seat
+        if bone.startswith("calf_"):
+            t = min(max(a.along(bone, v.co) / PANTS_HEM, 0.0), 1.0)
+            return 0.024 - 0.014 * t + 0.003 * math.sin(t * 2.0 * math.pi * 4.0)
+        if abs(v.co.z - a.waist) < BELT_HALF + 0.01:
+            return 0.012
+        return 0.028 + (0.008 if v.co.y > 0.0 else 0.0)
+
+    jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of)
+    pants = make_garment(body, "Pants", (PANTS, BELT), pants_looseness, [PANTS, BELT], anatomy_of)
+    # How far the jersey stands off the body at chest height (docs/13 S11-2: 2 to 5 cm).
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    tree = BVHTree.FromObject(body, depsgraph)
+    gaps = [tree.find_nearest(v.co)[3] for v in jersey.data.vertices if abs(v.co.z - chest_z) < 0.02 and abs(v.co.x) < 0.17]
+    if gaps:
+        print("make_player: build %s jersey off the chest %.1f cm on average" % (BUILD, 100.0 * sum(gaps) / len(gaps)))
     # Catcher's gear is built from the body before the covered skin is removed.
     gear = [make_shell(body, rig, "ChestProtector", is_chest, 0.045, "Gear"),
             make_shell(body, rig, "ShinGuards", is_shin, 0.032, "Gear")]
