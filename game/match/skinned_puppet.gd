@@ -796,6 +796,7 @@ static func _grain() -> NoiseTexture2D:
 func _paint() -> void:
 	var plain := {
 		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap, "Collar": uniform.trim,
+		"Undershirt": uniform.cap.darkened(0.2),
 		"Gear": uniform.cap.darkened(0.25), "Bars": Color(0.09, 0.09, 0.1),
 		"Shoes": Color(0.06, 0.06, 0.07), "Belt": Color(0.05, 0.05, 0.06),
 	}

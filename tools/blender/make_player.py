@@ -82,7 +82,11 @@ BELT_CENTRE = 0.575
 # How far skin continues under a hem before it is removed, so no gap shows.
 TUCK = 0.05
 
-SKIN, HANDS, JERSEY, BELT, PANTS, SOCKS, SHOES = range(7)
+SKIN, HANDS, JERSEY, BELT, PANTS, SOCKS, SHOES, UNDERSHIRT = range(8)
+# The jersey's neckline (docs/13 S11-7): a V in front, from the sides of the neck down to
+# where the button placket starts; the undershirt's round neck shows inside it.
+V_DEPTH = 0.105
+V_TOP_HALF = 0.062
 
 BONE_NAMES = {
     "Root": "Root", "pelvis": "Hips", "spine_01": "Spine", "spine_02": "Chest", "spine_03": "UpperChest",
@@ -107,6 +111,7 @@ COLOURS = {
     "Pants": (0.88, 0.88, 0.90), "Belt": (0.04, 0.04, 0.05), "Socks": (0.10, 0.15, 0.35),
     "Shoes": (0.05, 0.05, 0.06), "Cap": (0.10, 0.15, 0.35), "Helmet": (0.10, 0.15, 0.35),
     "Collar": (0.10, 0.15, 0.35), "Gear": (0.08, 0.10, 0.20), "Bars": (0.10, 0.10, 0.11),
+    "Undershirt": (0.10, 0.15, 0.35),
 }
 
 
@@ -211,6 +216,17 @@ class Anatomy:
 
     NECK_RADIUS = 0.082
 
+    def v_half_width(self, z):
+        """Half the width of the V at a height (0 below its point)."""
+        below = z - (self.collar_co.z - V_DEPTH)
+        return max(V_TOP_HALF * below / V_DEPTH, 0.0)
+
+    def in_vneck(self, point):
+        """Inside the jersey's V at the front (where the undershirt shows)."""
+        if point.y > self.collar_co.y or point.z < self.collar_co.z - V_DEPTH:
+            return False
+        return abs(point.x - self.collar_co.x) < self.v_half_width(point.z)
+
     def outside_neckline(self, point):
         """Distance (m) from the neck opening; 0 or less means bare neck. The opening is a
         cylinder around the neck, so the tops of the shoulders stay covered."""
@@ -229,6 +245,8 @@ class Anatomy:
             covered = self.outside_neckline(c)
             if covered <= 0.0:
                 return SKIN, 0.0
+            if self.in_vneck(c):
+                return UNDERSHIRT, 0.0
             if c.z > self.waist + BELT_HALF:
                 return JERSEY, covered
             return (BELT if c.z > self.waist - BELT_HALF else PANTS), 1.0
@@ -275,6 +293,23 @@ def prepare_body(body, rig):
     torso = {"pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r"}
     for z in (anatomy.waist + BELT_HALF, anatomy.waist - BELT_HALF):
         cut(bm, anatomy, torso, Vector((0.0, 0.0, z)), Vector((0.0, 0.0, 1.0)))
+    # The V of the neckline: two planes through its sides, cutting only the front of the chest
+    # near the neck, so its edges are straight lines rather than steps along the faces.
+    top = anatomy.collar_co
+    tip = Vector((top.x, top.y, top.z - V_DEPTH))
+    near = [f for f in bm.faces if anatomy.bone(f) in torso and f.calc_center_median().y < top.y
+            and top.z - V_DEPTH - 0.03 < f.calc_center_median().z < top.z + 0.05]
+    for sign in (1.0, -1.0):
+        along = Vector((sign * V_TOP_HALF, 0.0, V_DEPTH)).normalized()
+        normal = along.cross(Vector((0.0, 1.0, 0.0))).normalized()
+        geom = set(near)
+        for f in near:
+            geom.update(f.edges)
+            geom.update(f.verts)
+        bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-5, plane_co=tip, plane_no=normal)
+        bm.faces.ensure_lookup_table()
+        near = [f for f in bm.faces if anatomy.bone(f) in torso and f.calc_center_median().y < top.y
+                and top.z - V_DEPTH - 0.03 < f.calc_center_median().z < top.z + 0.05]
     for side in ("l", "r"):
         cut(bm, anatomy, {"upperarm_" + side}, *anatomy.plane("upperarm_" + side, SLEEVE_HEM))
         cut(bm, anatomy, {"calf_" + side}, *anatomy.plane("calf_" + side, PANTS_HEM))
@@ -295,7 +330,7 @@ def prepare_body(body, rig):
     return feet, head
 
 
-def make_garment(body, name, regions, looseness, slots, anatomy_of):
+def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_neckline=None):
     """Copies the faces of some regions into a new mesh, subdivides it once for a smoother
     outline, lifts every point off the skin by how loose the garment is there (looseness:
     vertex -> metres, docs/13 S11-2), smooths away the anatomy underneath and unwraps it
@@ -333,6 +368,8 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of):
     inner = [v for v in bm.verts if v not in hem]
     for _ in range(6):
         bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    if snap_neckline is not None:
+        snap_neckline(hem, anatomy)
     bm.normal_update()
 
     # Front/back planar UVs: u runs across the body, v from the bottom to the top of the
@@ -466,7 +503,7 @@ def strip_body(body):
     hidden = [f for f in bm.faces if f[region] == SHOES or (f[region] in (JERSEY, BELT, PANTS) and f[depth] > TUCK)]
     bmesh.ops.delete(bm, geom=hidden, context='FACES')
     for face in bm.faces:
-        face.material_index = {HANDS: 1, SOCKS: 2}.get(face[region], 0)
+        face.material_index = {HANDS: 1, SOCKS: 2, UNDERSHIRT: 3}.get(face[region], 0)
     # Keep the textured skin if there is one; the hands get their own copy so the game can
     # swap them for batting gloves.
     textured = body.data.materials[0] if len(body.data.materials) > 0 else None
@@ -478,7 +515,7 @@ def strip_body(body):
     else:
         skin, hands = material("Skin"), material("Hands")
     body.data.materials.clear()
-    for mat in (skin, hands, material("Socks")):
+    for mat in (skin, hands, material("Socks"), material("Undershirt")):
         body.data.materials.append(mat)
     bm.to_mesh(body.data)
     bm.free()
@@ -786,7 +823,32 @@ def main():
             return 0.012
         return 0.028 + (0.008 if v.co.y > 0.0 else 0.0)
 
-    jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of)
+    def snap_neckline(hem, a):
+        """Puts the jersey's neckline exactly on its curve (docs/13 S11-7): the V's straight
+        sides in front, a circle round the neck elsewhere. Returns how far the edge was from
+        the curve before, at most."""
+        worst = 0.0
+        axis = a.collar_n
+        for v in hem:
+            rel = v.co - a.collar_co
+            up = rel.dot(axis)
+            if up < -V_DEPTH - 0.03 or up > 0.06:
+                continue
+            if v.co.y < a.collar_co.y and v.co.z < a.collar_co.z + 0.005:
+                # The V: move across to its side line at this height.
+                want = a.v_half_width(v.co.z)
+                dx = abs(v.co.x - a.collar_co.x)
+                if want > 0.0 and abs(dx - want) < 0.03:
+                    worst = max(worst, abs(dx - want))
+                    v.co.x = a.collar_co.x + math.copysign(want, v.co.x - a.collar_co.x)
+                continue
+            radial = rel - axis * up
+            if radial.length > 1e-4 and abs(radial.length - (Anatomy.NECK_RADIUS + 0.01)) < 0.03:
+                worst = max(worst, abs(radial.length - (Anatomy.NECK_RADIUS + 0.01)))
+                v.co = a.collar_co + axis * up + radial.normalized() * (Anatomy.NECK_RADIUS + 0.01)
+        print("make_player: neckline snapped (edge was up to %.1f mm off the curve)" % (worst * 1000.0))
+
+    jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of, snap_neckline)
     pants = make_garment(body, "Pants", (PANTS, BELT), pants_looseness, [PANTS, BELT], anatomy_of)
     # How far the jersey stands off the body at chest height (docs/13 S11-2: 2 to 5 cm).
     depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -801,7 +863,7 @@ def main():
     trim_hair(hair, head_points)
     optional = [*gear, make_mask(head_points, rig), make_helmet_flap(head_points, rig, "Left"),
                 make_helmet_flap(head_points, rig, "Right"), make_helmet(head_points, rig)]
-    parts = [body, jersey, pants, make_collar(rig), make_shoes(feet, rig), *face_parts, *hair,
+    parts = [body, jersey, pants, make_shoes(feet, rig), *face_parts, *hair,
              make_cap(head_points, rig), make_cap_button(head_points, rig), *optional]
 
     for old, new in BONE_NAMES.items():

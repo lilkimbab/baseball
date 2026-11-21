@@ -112,7 +112,6 @@ func test_catchers_gear_is_only_shown_when_worn() -> void:
 	puppet.apply(PuppetClips.catcher())
 	for piece: String in ["Mask", "ChestProtector", "ShinGuards"]:
 		assert_true((puppet.find_child(piece, true, false) as MeshInstance3D).visible, "%s shown on the catcher" % piece)
-	assert_not_null(puppet.find_child("Collar", true, false), "the jersey has a collar band")
 
 
 func test_batting_gloves_cover_the_hands() -> void:
@@ -583,3 +582,26 @@ func test_every_player_on_a_club_has_his_own_face() -> void:
 		seen[key] = true
 	# The same player always gets the same face.
 	assert_eq(puppet.set_face("p00007"), puppet.set_face("p00007"))
+
+
+# --- S11-7 neckline ---
+
+
+func test_a_v_neck_shows_the_undershirt_and_no_collar_ring() -> void:
+	var puppet := _model()
+	assert_null(puppet.find_child("Collar", true, false), "the ring round the neck is gone")
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	var undershirt := -1
+	for surface: int in body.mesh.get_surface_count():
+		if body.mesh.surface_get_material(surface).resource_name == "Undershirt":
+			undershirt = surface
+	assert_gte(undershirt, 0, "the undershirt shows inside the V")
+	# It lies at the front of the chest, below the neck.
+	var verts: PackedVector3Array = body.mesh.surface_get_arrays(undershirt)[Mesh.ARRAY_VERTEX]
+	var top := SkinnedPuppet.mesh_top(body.mesh)
+	var centre := Vector3.ZERO
+	for v: Vector3 in verts:
+		centre += v
+	centre /= verts.size()
+	assert_between(centre.y / top, 0.76, 0.86, "at the base of the neck")
+	assert_gt(centre.z, 0.0, "in front (the model faces +Z)")
