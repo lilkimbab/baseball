@@ -280,3 +280,57 @@ func test_a_runner_picked_off_dives_back_head_first() -> void:
 		assert_true(slides[0].head_first)
 	assert_true(play.calls[0].out)
 	assert_eq(play.calls[0].base, 1)
+
+
+# --- Throw styles, the stretch, backpedalling, rounding the bases ---
+
+
+func test_throws_are_made_to_suit_the_distance_and_the_fielder() -> void:
+	assert_eq(PlayMoves.throw_style("F:2B", 6.0), &"toss", "a flip to the bag")
+	assert_eq(PlayMoves.throw_style("F:SS", 28.0), &"snap", "across the infield")
+	assert_eq(PlayMoves.throw_style("F:3B", 38.0), &"over", "a long one from third")
+	assert_eq(PlayMoves.throw_style("F:CF", 60.0), &"crow_hop", "in from the outfield")
+	assert_eq(PlayMoves.throw_style("F:C", 38.0), &"over")
+	for style: StringName in [&"over", &"snap", &"toss", &"crow_hop"]:
+		for i: int in 17:
+			var p := PuppetClips.throw_styled(-0.6 + i * 0.075, style)
+			assert_true(p.hips.is_finite() and p.r_hand.is_finite() and p.l_foot.is_finite(), "%s %d" % [style, i])
+	# The release is where the arm is out in front, whatever the style.
+	for style: StringName in [&"over", &"snap", &"crow_hop"]:
+		assert_gt(-PuppetClips.throw_styled(0.0, style).r_hand.z, 0.3, "%s releases in front" % style)
+	assert_lt(PuppetClips.throw_styled(0.0, &"toss").r_hand.y, 1.0, "a toss is underhand")
+
+
+func test_the_first_baseman_stretches_with_a_foot_on_the_bag() -> void:
+	var p := PuppetClips.first_base_stretch()
+	assert_lt(Vector2(p.r_foot.x, p.r_foot.z).length(), 0.2, "back foot on the bag")
+	assert_gt(-p.l_foot.z, 0.8, "front foot well out toward the throw")
+	assert_gt(-p.l_hand.z, 0.9, "glove out at the end of the reach")
+
+
+func test_a_backpedal_steps_both_feet() -> void:
+	var a := PuppetClips.backpedal(0.0)
+	var b := PuppetClips.backpedal(1.0)
+	assert_gt(absf(a.l_foot.z - b.l_foot.z), 0.3)
+	assert_lt(a.lean, 0.0, "upright, leaning back a little")
+
+
+func test_a_runner_rounds_the_bases_he_passes() -> void:
+	# A ball into the gap: the batter goes for two and swings out before first.
+	var found := false
+	for attempt: int in 60:
+		var spray := -30.0 + (attempt % 12) * 5.0
+		var r := _run(_hit(160.0 + (attempt / 12) * 4.0, 16.0, spray), [], 0, attempt)
+		if r.result != PaResult.Kind.DOUBLE:
+			continue
+		found = true
+		var track := r.timeline.tracks["R:b"]
+		var widest := 0.0
+		for k: Vector4 in track:
+			var at := Vector2(k.y, k.z)
+			# Distance off the first-base line (the line x = y) on the way there.
+			if at.length() > 15.0 and at.length() < 26.0:
+				widest = maxf(widest, absf(at.x - at.y) / sqrt(2.0))
+		assert_between(widest, 0.6, 2.0, "swings out before first (attempt %d)" % attempt)
+		break
+	assert_true(found, "some ball went for a double")

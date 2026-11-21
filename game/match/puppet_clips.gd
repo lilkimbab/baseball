@@ -235,6 +235,47 @@ static func dive(side: float = -1.0) -> PuppetPose:
 	return _pose(a.call(0.4 * s, 0.35, 0.3), 70.0 * s, 0.0, 62.0, a.call(0.2 * s, 0.4, 0.7), a.call(1.1 * s, 0.32, 0.75), a.call(-0.2 * s, 0.25, -0.6), a.call(-0.05 * s, 0.15, -0.75))
 
 
+## A throw of the given style, t in seconds from the release (negative before): &"over" the
+## full overhand, &"snap" an infielder's quick, shorter-armed throw from a lower slot,
+## &"toss" an underhand flip for a few metres, &"crow_hop" an outfielder's hop onto the back
+## foot before a long throw (docs/13 S12-3).
+static func throw_styled(t: float, style: StringName) -> PuppetPose:
+	var a := PuppetPose.at
+	match style:
+		&"toss":
+			var times := PackedFloat32Array([-0.3, -0.1, 0.0, 0.2, 0.45])
+			var poses: Array[PuppetPose] = [
+				_pose(a.call(0.0, 0.8, 0.0), 0.0, 0.0, 30.0, a.call(0.25, 0.7, 0.2), a.call(-0.2, 0.75, 0.3), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.1)),
+				_pose(a.call(0.0, 0.78, 0.0), 0.0, 0.0, 34.0, a.call(0.25, 0.55, -0.1), a.call(-0.25, 0.8, 0.25), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.2)),
+				_pose(a.call(0.0, 0.8, 0.1), 0.0, 0.0, 30.0, a.call(0.15, 0.8, 0.45), a.call(-0.25, 0.8, 0.2), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.25)),
+				_pose(a.call(0.0, 0.84, 0.15), 0.0, 0.0, 24.0, a.call(0.12, 1.15, 0.55), a.call(-0.25, 0.85, 0.2), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.25)),
+				fielder_ready(),
+			]
+			return _sample(times, poses, t)
+		&"snap":
+			var times := PackedFloat32Array([-0.25, -0.08, 0.0, 0.15, 0.4])
+			var poses: Array[PuppetPose] = [
+				_pose(a.call(0.0, 0.86, 0.0), -50.0, -15.0, 12.0, a.call(0.15, 1.15, 0.15), a.call(-0.05, 1.15, 0.25), a.call(0.28, 0.08, -0.05), a.call(-0.28, 0.08, 0.22)),
+				_pose(a.call(0.0, 0.84, 0.0), -60.0, -30.0, 10.0, a.call(0.55, 1.3, -0.25), a.call(-0.45, 1.2, 0.3), a.call(0.25, 0.08, -0.12), a.call(-0.28, 0.1, 0.4)),
+				_pose(a.call(0.02, 0.84, 0.18), 5.0, 20.0, 26.0, a.call(0.5, 1.35, 0.45), a.call(-0.35, 1.0, 0.15), a.call(0.2, 0.12, -0.15), a.call(-0.22, 0.08, 0.45)),
+				_pose(a.call(0.0, 0.82, 0.25), 25.0, 25.0, 36.0, a.call(-0.05, 0.85, 0.65), a.call(-0.35, 0.95, 0.12), a.call(0.25, 0.25, 0.1), a.call(-0.22, 0.08, 0.45)),
+				fielder_ready(),
+			]
+			return _sample(times, poses, t)
+		&"crow_hop":
+			# The hop: up off the front foot and onto the back one, the body moving at the target.
+			var hop := throw_at(t)
+			var lift := smoothstep(-0.55, -0.42, t) * (1.0 - smoothstep(-0.3, -0.18, t))
+			var travel := smoothstep(-0.55, -0.1, t) * 0.45
+			hop.hips += Vector3(0.0, 0.12 * lift, -travel)
+			hop.r_hand += Vector3(0.0, 0.0, -travel)
+			hop.l_hand += Vector3(0.0, 0.0, -travel)
+			hop.l_foot += Vector3(0.0, 0.2 * lift, -travel)
+			hop.r_foot += Vector3(0.0, 0.25 * lift, -travel * 0.9)
+			return hop
+	return throw_at(t)
+
+
 ## A throw, t in seconds from the release (negative before): the glove arm points at the
 ## target as the ball goes back, the body turns through, and follows through.
 static func throw_at(t: float) -> PuppetPose:
@@ -248,6 +289,21 @@ static func throw_at(t: float) -> PuppetPose:
 		fielder_ready(),
 	]
 	return _sample(times, poses, t)
+
+
+## The first baseman stretching for a throw: his right foot on the bag, the left one lunging
+## toward the thrower, the glove reaching out at the end of it.
+static func first_base_stretch() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.05, 0.72, 0.35), 0.0, 0.0, 30.0, a.call(0.2, 0.95, 0.35), a.call(-0.05, 1.0, 1.05), a.call(0.15, 0.08, 0.0), a.call(-0.12, 0.08, 0.95))
+
+
+## Backpedalling under a fly ball, facing it: upright, short steps back. phase as run().
+static func backpedal(phase: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var left := _pose(a.call(0.0, 0.92, 0.0), 0.0, 0.0, -4.0, a.call(0.24, 1.0, 0.12), a.call(-0.24, 1.0, 0.12), a.call(0.14, 0.2, 0.22), a.call(-0.14, 0.08, -0.25))
+	var right := _pose(a.call(0.0, 0.92, 0.0), 0.0, 0.0, -4.0, a.call(0.24, 1.0, 0.12), a.call(-0.24, 1.0, 0.12), a.call(0.14, 0.08, -0.25), a.call(-0.14, 0.2, 0.22))
+	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))
 
 
 ## A feet-first slide into a base, the body back and the lead leg out.

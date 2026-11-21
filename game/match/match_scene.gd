@@ -21,6 +21,17 @@ const BLOCK_BELOW := 0.18
 const FRAME_PULL := 0.04
 ## After this long (s) into a result the catcher is still, and is left as he is.
 const CATCHER_SETTLED := 0.45
+## Fielders drifting back slower than this (m/s) under a fly ball backpedal; faster, they turn
+## and run. Running puppets turn at most TURN_RATE rad/s: a first step, not a snap.
+const BACKPEDAL_BELOW := 4.5
+const TURN_RATE := 10.0
+
+
+func _turn(p: Puppet, yaw: float) -> void:
+	var gap := wrapf(yaw - p.rotation.y, -PI, PI)
+	p.rotation.y += clampf(gap, -TURN_RATE * _frame_time, TURN_RATE * _frame_time)
+
+
 ## A sprint (m/s): running poses are drawn from a jog at 0 to a sprint at this speed.
 const SPRINT := 8.0
 
@@ -134,6 +145,9 @@ var _runners_at_start: Array[String] = ["", "", ""]
 var _batter_at_start := ""
 var _between := 0.0
 var _half_key := ""
+var _dropped_bat: MeshInstance3D
+## The batter lets go of the bat this long (s) into the play.
+const BAT_DROPPED_AT := 0.2
 ## Seconds since the plate umpire called time (negative: he has not).
 var _time_called := -1.0
 ## The play being shown is a steal or a pickoff (RunningPlay), not a ball in play.
@@ -151,6 +165,7 @@ func _ready() -> void:
 	_box = Field.to_field(batter.position)
 	_box.x = -absf(_box.x)
 	_build_officials()
+	_build_dropped_bat()
 	_half_key = _half_name()
 	_dress_for_half()
 	var layer := hud.get_parent()
@@ -635,6 +650,7 @@ func _finish_pitch() -> void:
 		_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
 		_batter_at_start = game.batter_id()
 		_open_choice()
+		_drop_bat()
 		_enter(State.RESULT)
 		return
 	if play != null and play.foul:
@@ -700,6 +716,7 @@ func step(delta: float) -> void:
 
 func _end_play() -> void:
 	_play_time = -1.0
+	_dropped_bat.visible = false
 	_running = false
 	_choice_open = false
 	_charge = -1.0
@@ -864,6 +881,36 @@ func _build_fielders() -> void:
 		r.show_glove = false
 		r.visible = false
 		runner_puppets.append(r)
+
+
+## The bat the batter lets go of when he runs, left lying by the plate during the play.
+func _build_dropped_bat() -> void:
+	_dropped_bat = MeshInstance3D.new()
+	var path: String = SkinnedPuppet.PROPS[&"bat"]
+	if ResourceLoader.exists(path):
+		var scene := (load(path) as PackedScene).instantiate()
+		_dropped_bat.mesh = (scene.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+		scene.free()
+	else:
+		var stick := CylinderMesh.new()
+		stick.top_radius = 0.033
+		stick.bottom_radius = 0.013
+		stick.height = PuppetClips.BAT_LENGTH
+		_dropped_bat.mesh = stick
+	var wood := StandardMaterial3D.new()
+	wood.albedo_color = Color(0.74, 0.57, 0.36)
+	wood.roughness = 0.42
+	_dropped_bat.material_override = wood
+	_dropped_bat.visible = false
+	add_child(_dropped_bat)
+
+
+## Lays the bat down where the batter stood, pointing roughly back toward the dugout he
+## came from, at a slant that changes from play to play.
+func _drop_bat() -> void:
+	var at := batter.position + Field.to_world(Vector3(0.35, 0.3, 0.0)) - Field.to_world(Vector3.ZERO)
+	var yaw := PI * 0.5 + (float(_pitch_count % 7) - 3.0) * 0.25
+	_dropped_bat.transform = Transform3D(Basis(Vector3.UP, yaw) * Basis(Vector3.BACK, PI * 0.5), Vector3(at.x, 0.034, at.z))
 
 
 func _build_officials() -> void:
@@ -1258,6 +1305,7 @@ func _update_pip() -> void:
 
 func _show_play(t: float) -> void:
 	var tl := _play.timeline
+	_dropped_bat.visible = not _running and _batter_at_start != "" and not _play.foul and t > BAT_DROPPED_AT
 	ball_actor.show_at(_ball_at(tl, t))
 	for kind: Position.Kind in fielders:
 		var key := "F:%s" % Position.code(kind)
@@ -1334,7 +1382,7 @@ func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 		match m.kind:
 			PlayMoves.Kind.THROW:
 				p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
-				p.apply(PuppetClips.throw_at(t - m.time))
+				p.apply(PuppetClips.throw_styled(t - m.time, m.style))
 				return
 			PlayMoves.Kind.TAG:
 				# Down to the bag with the ball in the glove, where the runner's foot comes.
@@ -1357,12 +1405,25 @@ func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 					from = Vector2(m.at.x - now.x, m.at.y - now.y)
 				if from.length() > 0.05:
 					p.rotation.y = _yaw_toward(Vector2.ZERO, from)
+				# The first baseman takes a throw on the bag with a stretch toward it.
+				if key == "F:1B" and Vector2(m.at.x, m.at.y).distance_to(PlaySim.base_xy(1)) < 1.0 and m.at.z > 0.6:
+					var reach := smoothstep(-0.3, -0.05, t - m.time) * (1.0 - smoothstep(0.1, 0.25, t - m.time))
+					catch_at(p, PuppetClips.first_base_stretch(), p.to_local(Field.to_world(_ball_at(tl, t))), reach)
+					return
 				# On the run his legs keep running under the catch.
 				var legs := PuppetClips.run_at(_stride(p, speed), speed / SPRINT) if speed > RUN_POSE_SPEED else null
 				catch(p, _ball_at(tl, t), t - m.time, legs)
 				return
 	if speed > RUN_POSE_SPEED:
-		p.rotation.y = _yaw_toward(Vector2.ZERO, step)
+		# Drifting back under a fly ball a fielder faces it and backpedals; otherwise he turns
+		# and runs.
+		var ball := _ball_at(tl, t)
+		var to_ball := Vector2(ball.x - now.x, ball.y - now.y)
+		if key.begins_with("F:") and ball.z > 3.0 and speed < BACKPEDAL_BELOW and step.dot(to_ball) < -0.5 * step.length() * to_ball.length():
+			_turn(p, _yaw_toward(here, Vector2(ball.x, ball.y)))
+			p.apply(PuppetClips.backpedal(-_stride(p, speed)))
+			return
+		_turn(p, _yaw_toward(Vector2.ZERO, step))
 		p.apply(PuppetClips.run_at(_stride(p, speed), speed / SPRINT))
 	else:
 		var ball := _ball_at(tl, t)

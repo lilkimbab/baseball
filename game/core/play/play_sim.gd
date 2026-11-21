@@ -9,6 +9,9 @@ extends RefCounted
 ## make them, from what they can see, with some misjudgement.
 
 const SAMPLE_DT := 1.0 / 30.0
+## A runner rounding a base swings ROUND_OUT m wide of the line, ROUND_FROM m before it.
+const ROUND_FROM := 4.5
+const ROUND_OUT := 1.2
 ## Seconds a runner takes to ease up after he is put out (shown after the play is over).
 const EASE_UP := 0.8
 ## A play on a lead runner is worth making when the ball should beat him by this much.
@@ -994,6 +997,14 @@ func _runner_frames(r: PlayRunner) -> void:
 		if r.is_out() and base == last:
 			_out_frames(key, prev, prev_time, p, when, r.time)
 			return
+		if base < last and base < 4:
+			# Rounding the bag: he swings out a little before it, toward foul ground or the
+			# outfield, to take it at an angle (docs/13 S12-5).
+			var into := (p - prev).normalized()
+			var outward := (p - Vector2(0.0, Field.BASE_DISTANCE * sqrt(0.5))).normalized()
+			var share := ROUND_FROM / maxf(prev.distance_to(p), ROUND_FROM)
+			var swing := p - into * ROUND_FROM + outward * ROUND_OUT
+			out.timeline.add(key, lerpf(prev_time, when, 1.0 - share), Vector3(swing.x, swing.y, 0.0))
 		out.timeline.add(key, when, Vector3(p.x, p.y, 0.0))
 		prev = p
 		prev_time = when
