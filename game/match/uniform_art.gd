@@ -71,6 +71,12 @@ func _draw_jersey(half_px: float) -> void:
 		_centred(style.wordmark, Vector2(front, _m(0.2)), 0.075, style.ink, style.trim.lerp(style.jersey, 0.15), -0.07)
 	if style.number > 0:
 		_centred(str(style.number), Vector2(front + _m(0.085), _m(0.31)), 0.1, style.ink)
+	# A round patch on the left sleeve (the left of the front half) with the club's letter.
+	if style.patch != "":
+		var at := Vector2(_m(0.07), _m(0.09))
+		draw_circle(at, _m(0.034), style.trim)
+		draw_circle(at, _m(0.029), style.jersey.lerp(Color.WHITE, 0.3))
+		_centred(style.patch, at, 0.034, style.trim)
 	# Back: name above a large number.
 	var back := half_px * 1.5
 	if style.player_name != "":
@@ -79,7 +85,19 @@ func _draw_jersey(half_px: float) -> void:
 		_centred(str(style.number), Vector2(back, _m(0.33)), 0.2, style.ink)
 
 
-func _draw_pants(_half_px: float) -> void:
+func _draw_pants(half_px: float) -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), style.pants)
 	if style.pants_pinstripes:
 		_stripes(style.pinstripe)
+	# The side seams are the outer edges of each half: a stripe of the club colour down them.
+	if style.pants_stripe:
+		var w := _m(0.012)
+		for half: int in 2:
+			var x0 := half_px * half
+			draw_rect(Rect2(x0, _m(0.05), w, size.y), style.trim)
+			draw_rect(Rect2(x0 + half_px - w, _m(0.05), w, size.y), style.trim)
+	# Belt loops round the waistband, at the front and back.
+	for half: int in 2:
+		var x0 := half_px * half
+		for f: float in [0.18, 0.38, 0.62, 0.82] as Array[float]:
+			draw_rect(Rect2(x0 + half_px * f - _m(0.006), 0.0, _m(0.012), _m(0.045)), style.pants.darkened(0.12))
