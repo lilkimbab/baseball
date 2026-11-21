@@ -464,3 +464,38 @@ func test_a_figure_changes_body_between_players() -> void:
 	puppet.apply(PuppetClips.fielder_ready())
 	puppet.set_body(1.70, &"heavy")
 	assert_almost_eq(puppet.upper_arm / arm, 1.70 / 1.83, 0.02)
+
+
+# --- S11-3 skin and light ---
+
+
+func test_skin_scatters_light_and_eyes_are_glossy() -> void:
+	var puppet := _model()
+	var skin: StandardMaterial3D = null
+	var eyes: StandardMaterial3D = null
+	for part: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
+		for surface: int in part.mesh.get_surface_count():
+			var m := part.get_surface_override_material(surface) as StandardMaterial3D
+			if m == null:
+				continue
+			if part.mesh.surface_get_material(surface).resource_name == "Skin":
+				skin = m
+			if part.name == &"Eyes":
+				eyes = m
+	assert_not_null(skin)
+	assert_true(skin.subsurf_scatter_enabled, "light scatters under the skin")
+	assert_true(skin.subsurf_scatter_skin_mode)
+	assert_not_null(skin.roughness_texture, "some places shine, others are matte")
+	assert_not_null(eyes)
+	assert_lt(eyes.roughness, 0.1, "a wet cornea")
+
+
+func test_shadows_are_not_lit_blue() -> void:
+	var scene := (load("res://match/duel.tscn") as PackedScene).instantiate() as DuelScene
+	scene.use_motion = false
+	add_child_autofree(scene)
+	var env := (scene.find_children("*", "WorldEnvironment", true, false)[0] as WorldEnvironment).environment
+	assert_lt(env.ambient_light_sky_contribution, 1.0, "part of the ambient light is warm bounce light")
+	assert_gte(env.ambient_light_color.r, env.ambient_light_color.b)
+	var sun := scene.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
+	assert_gt(sun.light_color.r, sun.light_color.b, "a warm sun")
