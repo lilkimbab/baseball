@@ -104,3 +104,182 @@ static func run(phase: float) -> PuppetPose:
 	var left := _pose(a.call(0.0, 0.92, 0.05), 0.0, 8.0, 16.0, a.call(0.22, 1.12, 0.3), a.call(-0.22, 0.88, -0.25), a.call(0.12, 0.3, -0.42), a.call(-0.12, 0.1, 0.42))
 	var right := _pose(a.call(0.0, 0.92, 0.05), 0.0, -8.0, 16.0, a.call(0.22, 0.88, -0.25), a.call(-0.22, 1.12, 0.3), a.call(0.12, 0.1, 0.42), a.call(-0.12, 0.3, -0.42))
 	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))
+
+
+# --- Fielding, throwing, running and umpiring (docs/13 S12, stage A key poses) ---
+
+
+## How high (m) a foot comes up when it steps.
+const STEP_LIFT := 0.06
+## A ball this far (m) to one side of a fielder is dived for.
+const DIVE_WIDTH := 1.1
+
+
+## Fielder's ready position as the pitch is delivered: lower, weight forward on the balls of
+## the feet, glove open in front.
+static func fielder_crouch() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.74, 0.05), 0.0, 0.0, 30.0, a.call(0.26, 0.62, 0.38), a.call(-0.26, 0.6, 0.4), a.call(0.38, 0.08, 0.02), a.call(-0.38, 0.08, 0.02))
+
+
+## A fielder stepping in as the pitch is delivered, k from 0 (ready, where he stood) to 1 (in
+## his crouch, `distance` m nearer the plate). The body moves at an even pace; the right foot
+## steps first, then the left, each planted while the other moves, so neither slides.
+static func creep(k: float, distance: float) -> PuppetPose:
+	var u := clampf(k, 0.0, 1.0)
+	var ready := fielder_ready()
+	var crouch := fielder_crouch()
+	var pose := ready.blend(crouch, smoothstep(0.4, 1.0, u))
+	var body := distance * u
+	# Each foot widens to the crouch only while it is in the air.
+	var right := smoothstep(0.0, 1.0, clampf(2.0 * u, 0.0, 1.0))
+	var left := smoothstep(0.0, 1.0, clampf(2.0 * u - 1.0, 0.0, 1.0))
+	pose.r_foot = ready.r_foot.lerp(crouch.r_foot, right) + Vector3(0.0, STEP_LIFT * sin(PI * right), body - distance * right)
+	pose.l_foot = ready.l_foot.lerp(crouch.l_foot, left) + Vector3(0.0, STEP_LIFT * sin(PI * left), body - distance * left)
+	return pose
+
+
+## One shuffle step of a runner's secondary lead, u from 0 to 1, moving `length` m to his
+## right (`side` 1) or left (-1): the trailing foot comes in, then the leading foot goes out.
+## The body moves at an even pace and each foot stays put while the other moves.
+static func shuffle(u: float, length: float, side: float = 1.0) -> PuppetPose:
+	var v := clampf(u, 0.0, 1.0)
+	var pose := lead_off()
+	var body := length * v
+	var trail := length * smoothstep(0.0, 1.0, clampf(2.0 * v, 0.0, 1.0)) - body
+	var lead := length * smoothstep(0.0, 1.0, clampf(2.0 * v - 1.0, 0.0, 1.0)) - body
+	var up := Vector3.UP * STEP_LIFT
+	var trail_up := up * sin(PI * clampf(2.0 * v, 0.0, 1.0))
+	var lead_up := up * sin(PI * clampf(2.0 * v - 1.0, 0.0, 1.0))
+	if side >= 0.0:
+		pose.l_foot += Vector3(trail, 0.0, 0.0) + trail_up
+		pose.r_foot += Vector3(lead, 0.0, 0.0) + lead_up
+	else:
+		pose.r_foot += Vector3(-trail, 0.0, 0.0) + trail_up
+		pose.l_foot += Vector3(-lead, 0.0, 0.0) + lead_up
+	return pose
+
+
+## Running at `speed` (0 a jog, 1 a sprint): longer strides, more lean and arm swing as it
+## goes up. phase advances one stride per unit.
+static func run_at(phase: float, speed: float) -> PuppetPose:
+	var s := clampf(speed, 0.0, 1.0)
+	var a := PuppetPose.at
+	var reach := lerpf(0.3, 0.55, s)
+	var lift := lerpf(0.18, 0.32, s)
+	var arm := lerpf(0.12, 0.3, s)
+	var lean := lerpf(8.0, 18.0, s)
+	var left := _pose(a.call(0.0, 0.93, 0.05), 0.0, 8.0, lean, a.call(0.22, 0.98 + arm, arm + 0.1), a.call(-0.22, 0.98 - arm * 0.5, -arm), a.call(0.12, lift, -reach), a.call(-0.12, 0.1, reach))
+	var right := _pose(a.call(0.0, 0.93, 0.05), 0.0, -8.0, lean, a.call(0.22, 0.98 - arm * 0.5, -arm), a.call(-0.22, 0.98 + arm, arm + 0.1), a.call(0.12, 0.1, reach), a.call(-0.12, lift, -reach))
+	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))
+
+
+## Coming to a stop: the weight back, the feet wide.
+static func braking() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.82, -0.08), 0.0, 0.0, 6.0, a.call(0.3, 0.9, 0.15), a.call(-0.3, 0.9, 0.15), a.call(0.3, 0.08, 0.3), a.call(-0.3, 0.08, -0.25))
+
+
+## Fielding a ground ball: knees bent, glove down in front of the body, out to the glove side
+## for a forehand (`side` < 0) or across to the throwing-hand side for a backhand (`side` > 0).
+static func ground_catch(side: float = 0.0) -> PuppetPose:
+	var a := PuppetPose.at
+	var reach := clampf(side, -1.0, 1.0)
+	var p := _pose(a.call(-0.12 * reach, 0.6, 0.05), -20.0 * reach, 0.0, 48.0, a.call(0.18, 0.3, 0.45), a.call(-0.06 - 0.45 * maxf(-reach, 0.0) + 0.3 * maxf(reach, 0.0), 0.12, 0.55), a.call(0.42, 0.08, 0.05), a.call(-0.42, 0.08, 0.15))
+	return p
+
+
+## The catch for a ball at `local` (in the fielder's own space, as PuppetPose.at gives it)
+## and `height` above the ground: a dive for one well wide of him and low enough, a ground
+## ball, chest-high, or overhead.
+static func catch_for(local: Vector3, height: float) -> PuppetPose:
+	if absf(local.x) > DIVE_WIDTH and height < 1.3:
+		return dive(signf(local.x))
+	if height < 0.5:
+		return ground_catch(clampf(local.x / 0.6, -1.0, 1.0))
+	if height < 1.7:
+		return chest_catch()
+	return overhead_catch()
+
+
+## Catching at chest height, both hands up in front.
+static func chest_catch() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.92, 0.0), 0.0, 0.0, 8.0, a.call(0.12, 1.3, 0.38), a.call(-0.08, 1.38, 0.42), a.call(0.25, 0.08, 0.0), a.call(-0.25, 0.08, 0.12))
+
+
+## A fly ball over the head: glove up high, the throwing hand ready beside it.
+static func overhead_catch() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, -6.0, a.call(0.16, 1.95, 0.2), a.call(-0.1, 2.15, 0.22), a.call(0.22, 0.08, 0.0), a.call(-0.22, 0.08, 0.1))
+
+
+## A dive: laid out toward the glove side, glove reaching for the ball.
+static func dive(side: float = -1.0) -> PuppetPose:
+	var a := PuppetPose.at
+	var s := signf(side) if side != 0.0 else -1.0
+	return _pose(a.call(0.4 * s, 0.35, 0.3), 70.0 * s, 0.0, 62.0, a.call(0.2 * s, 0.4, 0.7), a.call(1.1 * s, 0.32, 0.75), a.call(-0.2 * s, 0.25, -0.6), a.call(-0.05 * s, 0.15, -0.75))
+
+
+## A throw, t in seconds from the release (negative before): the glove arm points at the
+## target as the ball goes back, the body turns through, and follows through.
+static func throw_at(t: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var times := PackedFloat32Array([-0.35, -0.12, 0.0, 0.18, 0.45])
+	var poses: Array[PuppetPose] = [
+		_pose(a.call(0.0, 0.9, 0.0), -60.0, -20.0, 6.0, a.call(0.1, 1.2, 0.15), a.call(-0.05, 1.2, 0.25), a.call(0.25, 0.08, -0.05), a.call(-0.25, 0.08, 0.25)),
+		_pose(a.call(0.0, 0.88, -0.05), -75.0, -35.0, 4.0, a.call(0.45, 1.55, -0.35), a.call(-0.5, 1.3, 0.35), a.call(0.2, 0.08, -0.15), a.call(-0.3, 0.12, 0.55)),
+		_pose(a.call(0.02, 0.86, 0.25), 10.0, 25.0, 30.0, a.call(0.4, 1.6, 0.55), a.call(-0.35, 1.05, 0.2), a.call(0.18, 0.14, -0.2), a.call(-0.2, 0.08, 0.6)),
+		_pose(a.call(0.0, 0.82, 0.35), 30.0, 30.0, 45.0, a.call(-0.2, 0.75, 0.8), a.call(-0.35, 0.95, 0.15), a.call(0.25, 0.35, 0.2), a.call(-0.2, 0.08, 0.6)),
+		fielder_ready(),
+	]
+	return _sample(times, poses, t)
+
+
+## A feet-first slide into a base, the body back and the lead leg out.
+static func slide() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.32, -0.15), 0.0, 0.0, -55.0, a.call(0.35, 0.55, -0.35), a.call(-0.35, 0.6, -0.3), a.call(0.15, 0.12, 0.95), a.call(-0.2, 0.25, 0.35))
+
+
+## A head-first slide (diving back to a base, or into one).
+static func head_first() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.28, -0.2), 0.0, 0.0, 80.0, a.call(0.2, 0.25, 0.85), a.call(-0.2, 0.25, 0.85), a.call(0.15, 0.2, -0.85), a.call(-0.15, 0.2, -0.85))
+
+
+## A runner's lead off a base: wide stance, low, hands loose, facing home.
+static func lead_off() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.78, 0.0), 0.0, 0.0, 22.0, a.call(0.25, 0.75, 0.2), a.call(-0.25, 0.75, 0.2), a.call(0.42, 0.08, 0.0), a.call(-0.42, 0.08, 0.0))
+
+
+## Umpire signals, t seconds after the call. Strike or out: the right fist punched up. Safe:
+## both arms swept out flat. Foul: both arms up. Home run: right hand circling over the head.
+static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var stand := _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 4.0, a.call(0.22, 0.88, 0.05), a.call(-0.22, 0.88, 0.05), a.call(0.18, 0.08, 0.0), a.call(-0.18, 0.08, 0.0))
+	var sign: PuppetPose
+	match kind:
+		&"strike", &"out":
+			sign = _pose(a.call(0.0, 0.95, 0.0), -20.0, 0.0, 2.0, a.call(0.35, 1.75, 0.0), a.call(-0.15, 1.0, 0.15), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.05))
+		&"safe":
+			sign = _pose(a.call(0.0, 0.88, 0.0), 0.0, 0.0, 20.0, a.call(0.85, 1.2, 0.25), a.call(-0.85, 1.2, 0.25), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.0))
+		&"foul":
+			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.3, 2.05, 0.05), a.call(-0.3, 2.05, 0.05), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))
+		&"home_run":
+			var turn := t * TAU * 1.5
+			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.2 + 0.08 * cos(turn), 2.05, 0.08 * sin(turn)), a.call(-0.2, 0.9, 0.05), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))
+		_:
+			return stand
+	var up := smoothstep(0.0, 0.25, t)
+	var down := 1.0 - smoothstep(1.2, 1.6, t)
+	return stand.blend(sign, minf(up, down))
+
+
+## Walking, for the pitcher coming back to the rubber and anyone strolling. phase as run().
+static func walk(phase: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var left := _pose(a.call(0.0, 0.95, 0.0), 0.0, 4.0, 3.0, a.call(0.24, 0.86, 0.12), a.call(-0.24, 0.86, -0.1), a.call(0.12, 0.1, -0.28), a.call(-0.12, 0.08, 0.28))
+	var right := _pose(a.call(0.0, 0.95, 0.0), 0.0, -4.0, 3.0, a.call(0.24, 0.86, -0.1), a.call(-0.24, 0.86, 0.12), a.call(0.12, 0.08, 0.28), a.call(-0.12, 0.1, -0.28))
+	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))

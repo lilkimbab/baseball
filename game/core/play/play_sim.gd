@@ -9,6 +9,8 @@ extends RefCounted
 ## make them, from what they can see, with some misjudgement.
 
 const SAMPLE_DT := 1.0 / 30.0
+## Seconds a runner takes to ease up after he is put out (shown after the play is over).
+const EASE_UP := 0.8
 ## A play on a lead runner is worth making when the ball should beat him by this much.
 const SURE_MARGIN := 0.15
 ## Balls fielded farther out than this are outfield plays, even by an infielder.
@@ -654,7 +656,10 @@ func _play_on(r: PlayRunner, thrower: PlayFielder, from: Vector2, held: float, r
 		_chain.append(str(b.receiver.number()))
 	_hold(b.receiver, b.time, base_xy(base))
 	var judged := margin + rng.next_normal() * m.bang_bang_sd
-	out.calls.append(PlayCall.make(maxf(need, runner_at), base, judged > 0.0, absf(judged)))
+	# The call comes as the play is made: a force out when the ball is held on the bag, a tag
+	# or a safe call when the runner gets there.
+	var call_at := need if judged > 0.0 and forced else maxf(need, runner_at)
+	out.calls.append(PlayCall.make(call_at, base, judged > 0.0, absf(judged)))
 	if judged > 0.0:
 		r.put_out(base, RunnerMove.OutKind.FORCE if forced else RunnerMove.OutKind.TAG, need)
 		_outs += 1
@@ -967,14 +972,33 @@ func _runner_frames(r: PlayRunner) -> void:
 	out.timeline.add(key, 0.0, Vector3(spot.x, spot.y, 0.0))
 	out.timeline.add(key, maxf(r.start, 0.0), Vector3(spot.x, spot.y, 0.0))
 	var last := r.out_at if r.is_out() else r.to
+	var prev_time := maxf(r.start, 0.0)
+	var prev := spot
 	for base: int in range(r.from + 1, last + 1):
 		var p := base_xy(base)
-		var when := _arrive(r, base) if not (r.is_out() and base == last) else r.time
+		var when := _arrive(r, base)
 		if r.is_out() and base == last:
-			# Put out a stride short of the bag.
-			var prev := base_xy(base - 1)
-			p = p + (prev - p).normalized() * 1.0
+			_out_frames(key, prev, prev_time, p, when, r.time)
+			return
 		out.timeline.add(key, when, Vector3(p.x, p.y, 0.0))
+		prev = p
+		prev_time = when
+
+
+## A runner put out on his way from `from` (left at `left`) to the bag at `bag` (which he would
+## reach at `arrive`): where he is at the out, at his own pace, no nearer than a stride short;
+## then he eases up over the next moment, which the play's length does not wait for.
+func _out_frames(key: String, from: Vector2, left: float, bag: Vector2, arrive: float, out_time: float) -> void:
+	var path := bag - from
+	var stride_short := maxf(1.0 - 1.0 / maxf(path.length(), 1.0), 0.0)
+	var f := clampf((out_time - left) / maxf(arrive - left, 0.01), 0.0, stride_short)
+	var at := from + path * f
+	out.timeline.add(key, out_time, Vector3(at.x, at.y, 0.0))
+	var pace := path.length() / maxf(arrive - left, 0.01)
+	var ease_to := from + path * minf(f + pace * EASE_UP * 0.5 / maxf(path.length(), 1.0), stride_short)
+	var length := out.timeline.duration
+	out.timeline.add(key, out_time + EASE_UP, Vector3(ease_to.x, ease_to.y, 0.0))
+	out.timeline.duration = length
 
 
 func _finish() -> void:

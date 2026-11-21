@@ -8,7 +8,8 @@ extends SceneTree
 ##          default 2: waits between pitches pass faster>  --to-end: play the game out and
 ##          photograph the screen after it  --menus: the player's side, with the pause menu
 ##          and the pitch clock  --manager: the manager mode (situation board, orders menu,
-##          a ball in play shown from the summary)
+##          a ball in play shown from the summary)  --moves: a close camera on each catch,
+##          throw and slide in the plays (docs/13 S12)
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -21,6 +22,9 @@ var _was_playing := false
 var _to_end := false
 var _menus := false
 var _manager := false
+var _moves := false
+var _close: Camera3D
+var _shot_moves := {}
 
 
 func _initialize() -> void:
@@ -33,6 +37,12 @@ func _initialize() -> void:
 	_scene = packed.instantiate() as MatchScene
 	_to_end = args.has("to-end")
 	_menus = args.has("menus")
+	_moves = args.has("moves")
+	if _moves:
+		Engine.time_scale = 1.0
+		_close = Camera3D.new()
+		_close.fov = 38.0
+		root.add_child.call_deferred(_close)
 	_scene.human_team = 1 if _menus else -1
 	_scene.innings = 3
 	_scene.seed_value = int(str(args.get("seed", "20261121")))
@@ -71,7 +81,9 @@ func _process(_delta: float) -> bool:
 	if _frames % 600 == 0:
 		print("match_shots: fps %.0f" % Engine.get_frames_per_second())
 	var playing := _scene._play_time >= 0.0 and _scene._play != null and not _scene._play.foul
-	if playing:
+	if _moves:
+		_close_up(playing)
+	elif playing:
 		for at: float in [0.5, 1.5, 3.0, 5.0]:
 			var tag := "%d_play_%.1f" % [_seen, at]
 			if _scene._play_time >= at and not _taken.has(tag) and _scene._play_time < _scene._play.timeline.duration + 0.5:
@@ -111,6 +123,29 @@ func _manager_shots() -> bool:
 	if _taken.has("orders") and playing and not _taken.has("play"):
 		_shoot("play")
 	return _taken.has("play") and _due.is_empty()
+
+
+## Cuts to a close camera on whoever is catching, throwing or sliding, a moment into it.
+func _close_up(playing: bool) -> void:
+	if not playing or _scene._moves == null:
+		if _close.current:
+			_scene.camera.make_current()
+		return
+	var tl := _scene._play.timeline
+	var t := _scene._play_time
+	for key: String in _scene._moves.by_key:
+		for m: PlayMoves.Moment in _scene._moves.by_key[key]:
+			var at := m.time + (0.0 if m.kind == PlayMoves.Kind.CATCH else 0.12)
+			var tag := "%d_%s_%s_%.1f" % [_seen, key.replace(":", ""), PlayMoves.Kind.keys()[m.kind], m.time]
+			if t >= at and t < at + 0.2 and not _shot_moves.has(tag):
+				_shot_moves[tag] = true
+				var who := tl.position(key, t)
+				var spot := Field.to_world(Vector3(who.x, who.y, 0.0))
+				var side := Field.to_world(Vector3(who.x, who.y, 0.0) + Vector3(who.y, -who.x, 0.0).normalized() * 4.0)
+				_close.look_at_from_position(side + Vector3.UP * 1.4, spot + Vector3.UP * 0.8)
+				_close.make_current()
+				_shoot(tag)
+				return
 
 
 func _shoot(tag: String) -> void:

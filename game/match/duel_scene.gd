@@ -77,6 +77,8 @@ var _rng: Rng
 var _ai_rng: Rng
 var _pitch_count := 0
 var _pitch_clock := -1.0
+## Officials in the middle of a signal.
+var _signalling: Dictionary[Puppet, bool] = {}
 var _swing_clock := -1.0
 var _swing_lead := 0.11
 var _swing_height := 0.8
@@ -452,7 +454,22 @@ func _update_pointer() -> void:
 		aim_point = at
 
 
+## Poses an umpire making a call, or puts him back as he stands when `pose` is null. Only
+## a change is applied, so the officials cost nothing while they stand still.
+func signal_call(u: Puppet, pose: PuppetPose) -> void:
+	if pose != null:
+		u.frame_time = _frame_time
+		u.apply(pose)
+		_signalling[u] = true
+	elif _signalling.has(u):
+		_signalling.erase(u)
+		u.apply(PuppetClips.umpire())
+
+
 func _pose_players() -> void:
+	# The plate umpire's right fist goes up for a called strike; a ball gets no signal.
+	var strike := state == State.RESULT and duel.result == PitchDuel.Result.CALLED_STRIKE
+	signal_call(umpire, PuppetClips.umpire_signal(&"strike", state_time) if strike else null)
 	# The pitcher holds the ball until release and watches the plate; the batter watches the
 	# ball once it is on its way, and the pitcher's hand before that.
 	var ball_out := state == State.LIVE or state == State.RESULT
@@ -583,6 +600,7 @@ func _build_players() -> void:
 	pitcher = _add_puppet(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), PI, home, Color(0.1, 0.15, 0.35), use_models)
 	batter = _add_puppet(Vector3(-1.05, 0.25, 0.0), -PI / 2.0, away, Color(0.75, 0.12, 0.12), use_models)
 	batter.show_bat = true
+	batter.show_glove = false
 	batter.headgear = &"helmet"
 	batter.left_grip = Puppet.Grip.BAT
 	batter.right_grip = Puppet.Grip.BAT

@@ -12,6 +12,30 @@ const PLAY_TAIL := 0.9
 const TRANSITION := 2.0
 ## Puppet speed (m/s) above which the run cycle plays.
 const RUN_POSE_SPEED := 0.8
+## A sprint (m/s): running poses are drawn from a jog at 0 to a sprint at this speed.
+const SPRINT := 8.0
+
+
+## Advances a puppet's running stride by this frame at `speed` m/s and returns where in the
+## stride he is: one step per unit, steps lengthening from about a metre at a jog to two at a
+## sprint, so the feet keep pace with the ground (docs/13 S12: no foot sliding).
+func _stride(p: Puppet, speed: float) -> float:
+	var step := lerpf(1.0, 2.0, clampf(speed / SPRINT, 0.0, 1.0))
+	_strides[p] = _strides.get(p, 0.0) + speed * _frame_time / step
+	return _strides[p]
+
+
+## Rounds of moving the glove hand by how far its pocket is from the ball.
+const CATCH_IK_PASSES := 5
+## The most (m) a catch moves the body toward a ball out of the arm's reach.
+const MAX_BODY_SHIFT := 0.6
+## Fielders step in this far (m) over the last CREEP_LEAD seconds before the release.
+const CREEP := 0.6
+const CREEP_LEAD := 0.7
+## Runners' secondary lead: SHUFFLES shuffle steps of SHUFFLE m, each SHUFFLE_TIME s.
+const SHUFFLE := 0.55
+const SHUFFLES := 2
+const SHUFFLE_TIME := 0.3
 const ROSTER_PACK := "res://data/rosters/fiction-2026.json"
 
 @export var innings := 3
@@ -81,13 +105,22 @@ var _chosen_team := 1
 var _arsenal: Array[AiPitcher.Option] = []
 var _play: PlayResult
 var _play_time := -1.0
+## Who catches, throws and slides when in the play being shown (S12).
+var _moves: PlayMoves
+## Where each fielder stood and each runner led off when the pitch began, and how far into
+## the creep and the secondary lead the last poses were.
+var _stands: Dictionary[Position.Kind, Vector2] = {}
+var _leads: Array[Vector2] = []
+var _cast_k := -1.0
+var _cast_lead := -1.0
 var _pending: Array[GameEvent] = []
 ## Who was on each base when the play started (their tracks are keyed by id).
 var _runners_at_start: Array[String] = ["", "", ""]
 var _batter_at_start := ""
 var _between := 0.0
 var _half_key := ""
-var _phase := 0.0
+## Where each running puppet is in his stride (steps).
+var _strides: Dictionary[Puppet, float] = {}
 ## Where a right-handed batter stands in the box (field coordinates).
 var _box := Vector3(-1.05, 0.25, 0.0)
 
@@ -457,6 +490,7 @@ func _finish_pitch() -> void:
 	banner_time = 2.4
 	if play != null and not play.foul:
 		_play = play
+		_moves = PlayMoves.read(play.timeline, play.calls)
 		_play_time = 0.0
 		_pending = events
 		_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
@@ -466,6 +500,7 @@ func _finish_pitch() -> void:
 	if play != null and play.foul:
 		# Show the foul's flight briefly.
 		_play = play
+		_moves = PlayMoves.read(play.timeline, play.calls)
 		_play_time = 0.0
 		_pending = events
 		_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
@@ -738,6 +773,39 @@ func _club(side: int) -> Team:
 	return null
 
 
+## Fielders' and runners' part in each pitch (docs/13 S12): as the pitcher delivers, the
+## fielders take two steps in and drop into their crouch, and the runners shuffle out to a
+## secondary lead. Poses change only while they move.
+func _pose_cast() -> void:
+	if _pitch_clock < 0.0 or game.over:
+		return
+	var release := release_time()
+	var k := smoothstep(release - CREEP_LEAD, release, _pitch_clock)
+	var lead := clampf((_pitch_clock - release) / SHUFFLE_TIME, 0.0, float(SHUFFLES))
+	if absf(k - _cast_k) < 0.02 and absf(lead - _cast_lead) < 0.02:
+		return
+	_cast_k = k
+	_cast_lead = lead
+	for kind: Position.Kind in _stands:
+		var f := fielders[kind]
+		var p := _stands[kind]
+		var at := p + (Vector2(0.0, 0.5) - p).normalized() * (CREEP * k)
+		f.position = Field.to_world(Vector3(at.x, at.y, 0.0))
+		f.frame_time = _frame_time
+		f.apply(PuppetClips.creep(k, CREEP))
+	for i: int in 3:
+		var r := runner_puppets[i]
+		if not r.visible or i >= _leads.size():
+			continue
+		var toward := (PlaySim.base_xy(i + 2) - PlaySim.base_xy(i + 1)).normalized()
+		var at := _leads[i] + toward * (SHUFFLE * lead)
+		r.position = Field.to_world(Vector3(at.x, at.y, 0.0))
+		var side := signf(r.to_local(r.position + Field.to_world(Vector3(toward.x, toward.y, 0.0)) - Field.to_world(Vector3.ZERO)).x)
+		var step := lead - floorf(lead) if lead < float(SHUFFLES) else 1.0
+		r.frame_time = _frame_time
+		r.apply(PuppetClips.shuffle(step, SHUFFLE, side) if lead > 0.0 else PuppetClips.lead_off())
+
+
 ## Puts everyone where they stand before a pitch.
 func _place_cast() -> void:
 	var bats_left := settings.bats_left
@@ -751,6 +819,10 @@ func _place_cast() -> void:
 		f.rotation.y = _yaw_toward(p, Vector2(0.0, 0.5))
 		f.apply(PuppetClips.fielder_ready())
 		f.visible = true
+		_stands[kind] = p
+	_cast_k = 0.0
+	_cast_lead = 0.0
+	_leads.clear()
 	pitcher.position = Field.to_world(Vector3(0.0, Field.RUBBER_Y - (0.06 if pitch_motion != null else 0.0), Field.MOUND_HEIGHT))
 	pitcher.rotation.y = PI
 	pitcher.scale.x = -1.0 if settings.throws_left else 1.0
@@ -774,9 +846,12 @@ func _place_cast() -> void:
 		var base := PlaySim.base_xy(i + 1)
 		var toward := (PlaySim.base_xy(i + 2) - base).normalized()
 		var lead := base + toward * resolver.motion.leads[i]
+		while _leads.size() <= i:
+			_leads.append(Vector2.ZERO)
+		_leads[i] = lead
 		r.position = Field.to_world(Vector3(lead.x, lead.y, 0.0))
 		r.rotation.y = _yaw_toward(lead, Vector2.ZERO)
-		r.apply(PuppetClips.fielder_ready())
+		r.apply(PuppetClips.lead_off())
 	var next_up := game.batting_team()
 	on_deck.position = Field.to_world(Vector3(11.0 if game.batting() == GameState.HOME else -11.0, -1.5, 0.0))
 	on_deck.visible = next_up.lineup.size() > 0
@@ -849,13 +924,15 @@ func refresh(delta: float) -> void:
 	_show_target()
 	if _play_time >= 0.0 and _play != null:
 		_frame_time = delta
-		_phase += delta * 2.6
 		_show_play(_play_time)
 		_move_camera_play(delta)
 		hud.queue_redraw()
 		_redraw_overlays()
 		return
 	super.refresh(delta)
+	_pose_cast()
+	for u: Puppet in base_umpires:
+		signal_call(u, null)
 	_redraw_overlays()
 
 
@@ -961,22 +1038,114 @@ func _show_play(t: float) -> void:
 	if tl.tracks.has(batter_key):
 		batter.scale.x = 1.0
 		_move_puppet(batter, tl, batter_key, t)
+	_umpire_signals(t)
 
 
-## Moves a puppet along its track, facing the way it goes, running or standing.
+## The umpires' calls during a play: the base umpire nearest a close play signals safe or out,
+## the plate umpire signals a foul ball, a base umpire circles his hand for a home run.
+func _umpire_signals(t: float) -> void:
+	var calls: Dictionary[Puppet, PuppetPose] = {}
+	for c: PlayCall in _play.calls:
+		if t < c.time or t > c.time + 1.6:
+			continue
+		var base := PlaySim.base_xy(c.base)
+		var nearest := -1
+		var best := INF
+		for i: int in base_umpires.size():
+			var u := Field.to_field(base_umpires[i].position)
+			var d := Vector2(u.x - base.x, u.y - base.y).length()
+			if d < best:
+				best = d
+				nearest = i
+		if nearest >= 0:
+			# At the plate the plate umpire makes the call.
+			var who := umpire if c.base == 4 else base_umpires[nearest]
+			calls[who] = PuppetClips.umpire_signal(&"out" if c.out else &"safe", t - c.time)
+	if _play.result == PaResult.Kind.HOME_RUN and t > 1.0:
+		calls[base_umpires[0]] = PuppetClips.umpire_signal(&"home_run", t - 1.0)
+	if _play.foul:
+		calls[umpire] = PuppetClips.umpire_signal(&"foul", t)
+	var everyone: Array[Puppet] = [umpire]
+	everyone.append_array(base_umpires)
+	for u: Puppet in everyone:
+		signal_call(u, calls.get(u) as PuppetPose)
+
+
+## Moves a puppet along its track: throwing, catching or sliding at its moments (docs/13
+## S12), otherwise running at its pace facing the way it goes, or ready facing the ball.
 func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 	var now := tl.position(key, t)
 	var ahead := tl.position(key, t + 0.1)
 	p.position = Field.to_world(Vector3(now.x, now.y, 0.0))
 	var step := Vector2(ahead.x - now.x, ahead.y - now.y)
+	var speed := step.length() / 0.1
 	p.frame_time = _frame_time
-	if step.length() / 0.1 > RUN_POSE_SPEED:
+	var here := Vector2(now.x, now.y)
+	var m: PlayMoves.Moment = _moves.now(key, t) if _moves != null else null
+	if m != null:
+		match m.kind:
+			PlayMoves.Kind.THROW:
+				p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
+				p.apply(PuppetClips.throw_at(t - m.time))
+				return
+			PlayMoves.Kind.SLIDE:
+				if here.distance_to(Vector2(m.at.x, m.at.y)) > 0.3:
+					p.rotation.y = _yaw_toward(here, Vector2(m.at.x, m.at.y))
+				p.apply(PuppetClips.slide() if t >= m.time - 0.15 else PuppetClips.run_at(_stride(p, speed), 1.0))
+				return
+			PlayMoves.Kind.CATCH:
+				# Square to where the ball comes from; it may be off to one side of him.
+				var coming := m.at - _ball_at(tl, m.time - 0.1)
+				var from := Vector2(-coming.x, -coming.y)
+				if from.length() < 0.05:
+					from = Vector2(m.at.x - now.x, m.at.y - now.y)
+				if from.length() > 0.05:
+					p.rotation.y = _yaw_toward(Vector2.ZERO, from)
+				# On the run his legs keep running under the catch.
+				var legs := PuppetClips.run_at(_stride(p, speed), speed / SPRINT) if speed > RUN_POSE_SPEED else null
+				catch(p, _ball_at(tl, t), t - m.time, legs)
+				return
+	if speed > RUN_POSE_SPEED:
 		p.rotation.y = _yaw_toward(Vector2.ZERO, step)
-		p.apply(PuppetClips.run(_phase))
+		p.apply(PuppetClips.run_at(_stride(p, speed), speed / SPRINT))
 	else:
 		var ball := _ball_at(tl, t)
-		p.rotation.y = _yaw_toward(Vector2(now.x, now.y), Vector2(ball.x, ball.y))
-		p.apply(PuppetClips.fielder_ready())
+		p.rotation.y = _yaw_toward(here, Vector2(ball.x, ball.y))
+		p.apply(PuppetClips.lead_off() if key.begins_with("R:") else PuppetClips.fielder_ready())
+
+
+## Poses a fielder catching the ball at `ball` (field coordinates), dt seconds from the
+## moment it arrives: a ground ball, a chest-high or an overhead catch, or a dive for one wide
+## of him. The glove hand is then drawn to the ball itself (catch IK, docs/13 S12-8): from just
+## before the ball arrives till just after, the glove's pocket is where the ball is.
+static func catch(p: Puppet, ball: Vector3, dt: float, legs: PuppetPose = null) -> void:
+	var local := p.to_local(Field.to_world(ball))
+	var pose := PuppetClips.catch_for(local, ball.z)
+	if legs != null and absf(local.x) <= PuppetClips.DIVE_WIDTH:
+		pose.hips = legs.hips
+		pose.hips_yaw = legs.hips_yaw
+		pose.r_foot = legs.r_foot
+		pose.l_foot = legs.l_foot
+	p.apply(pose)
+	var reach := smoothstep(-0.3, -0.05, dt) * (1.0 - smoothstep(0.1, 0.25, dt))
+	if reach <= 0.0:
+		return
+	var base := pose.blend(pose, 0.0)
+	var arm := (p.upper_arm + p.lower_arm) * 0.97
+	for i: int in CATCH_IK_PASSES:
+		pose.l_hand += local - p.glove_pocket()
+		# Out of the arm's reach the body goes to the ball: lower for a grounder, up off the
+		# ground for one over his head, over toward one wide of him.
+		var shoulder: Vector3 = p.joints[&"LeftUpperArm"]
+		var over := shoulder.distance_to(pose.l_hand) - arm
+		if over > 0.0:
+			var shift := ((pose.l_hand - shoulder).normalized() * over).limit_length(MAX_BODY_SHIFT)
+			pose.hips += shift
+			pose.hips.y = maxf(pose.hips.y, 0.4)
+			pose.r_hand += shift
+		p.apply(pose)
+	if reach < 1.0:
+		p.apply(base.blend(pose, reach))
 
 
 ## The ball's position from the key frames, with throws drawn as arcs.
