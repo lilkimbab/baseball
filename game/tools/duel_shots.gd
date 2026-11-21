@@ -27,6 +27,10 @@ var _swing_allowed := true
 var _trail_at := -1
 
 
+## Where the pointer was before the pitch wheel was opened.
+var _spot := Vector2.INF
+
+
 func _initialize() -> void:
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
 	_prefix = args.get("out", _prefix)
@@ -66,10 +70,24 @@ func _process(delta: float) -> bool:
 		for i: int in _scene.pitch_ids.size():
 			if String(_scene.pitch_ids[i]).contains("curve") or String(_scene.pitch_ids[i]).contains("slider"):
 				_scene.selected_pitch = i
-	if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.5 and not _has("aiming"):
+	# The pitch wheel: opened in the middle of the screen, the pointer taken toward a pitch,
+	# photographed, and let go.
+	if _scene.human_pitches() and state == DuelScene.State.PRE_PITCH:
+		var middle := Vector2(root.get_visible_rect().size) * Vector2(0.5, 0.45)
+		if _scene.state_time > 0.3 and _scene.state_time < 0.5 and not _scene.wheel_open and not _has("wheel"):
+			_spot = _scene.pointer_override
+			_scene.open_wheel(middle)
+			_scene.pointer_override = middle + DuelScene.wheel_direction(mini(3, _scene.pitch_ids.size() - 1)) * 150.0
+		if _scene.wheel_open and _scene.state_time > 0.5:
+			if not _has("wheel"):
+				_shoot("wheel")
+			else:
+				_scene.close_wheel()
+				_scene.pointer_override = _spot
+	if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.75 and not _has("aiming"):
 		_shoot("aiming")
 	if _scene.human_pitches():
-		if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.6:
+		if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.9:
 			_scene.press_pitch_button()
 		elif state == DuelScene.State.CHARGE and _scene.power > 0.9:
 			_scene.release_pitch_button()

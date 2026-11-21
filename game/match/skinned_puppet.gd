@@ -20,7 +20,12 @@ const LIMBS: Array[Array] = [
 
 ## Worn only by those who wear them (Puppet.gear): the umpire's mask; the catcher's
 ## hockey-style helmet (shell, cage, throat guard), chest protector and shin guards.
-const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards"]
+const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards", &"PoloCollar", &"BallBags", &"UmpireCap"]
+## What an umpire wears over the body every figure has (tools/blender/officials.py): a polo
+## shirt's collar; and behind the plate his mask over his cap and the ball bags on his belt.
+const UMPIRE_GEAR: Array[StringName] = [&"PoloCollar"]
+## (His cap has a short bill, to go under the mask: worn with `headgear` none.)
+const PLATE_UMPIRE_GEAR: Array[StringName] = [&"Mask", &"PoloCollar", &"BallBags", &"UmpireCap"]
 ## A catcher's gear, as one list.
 const CATCHER_GEAR: Array[StringName] = [&"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards"]
 ## Metres beyond which small parts are not drawn (A): the eyes, brows and lashes are a few
@@ -471,7 +476,16 @@ func _show_gear() -> void:
 	if button != null:
 		button.visible = _cap.visible
 	for i: int in _logos.size():
-		_logos[i].visible = logo != "" and (_cap.visible if i == 0 else _helmet.visible)
+		_logos[i].visible = logo != "" and ((_cap.visible or gear.has(&"UmpireCap")) if i == 0 else _helmet.visible)
+	# The piping down the trousers, on the uniforms that have it.
+	var stripe := _model.find_child("PantsStripe", true, false) as MeshInstance3D
+	if stripe != null:
+		stripe.visible = uniform.pants_stripe
+	# Under a cap or a helmet all that shows of the hair is what is cropped close to the
+	# skull (drawn on the skin, match/skin.gdshader); the locks are for a bare head.
+	var bare := headgear == &"none" and not gear.has(&"CatcherHelmet") and not gear.has(&"UmpireCap")
+	for part: Node in _model.find_children("Hair*", "MeshInstance3D", true, false):
+		(part as MeshInstance3D).visible = bare and String(part.name) == "Hair%d" % hair
 	for piece: StringName in _gear_parts:
 		_gear_parts[piece].visible = gear.has(piece)
 
@@ -859,12 +873,25 @@ static func _grain() -> NoiseTexture2D:
 
 func _paint() -> void:
 	var plain := {
-		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap, "Collar": uniform.trim,
-		"Undershirt": uniform.cap.darkened(0.2),
-		"Gear": uniform.cap.darkened(0.25), "Bars": Color(0.05, 0.05, 0.055),
-		"HelmetPads": Color(0.045, 0.045, 0.05), "GearTrim": uniform.cap.darkened(0.35),
+		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap,
+		# The neck's trim: in the club colour on a jersey with piping or sleeve bands, plain otherwise.
+		"Collar": uniform.trim if (uniform.piping or uniform.sleeve_bands > 0) else uniform.jersey.darkened(0.04),
+		"Undershirt": uniform.undershirt,
+		# The catcher's gear in the club's colour, bound in a darker one: nearly black, its
+		# padding and edges could not be told apart at the plate.
+		"Gear": uniform.cap.lightened(0.05), "Bars": Color(0.05, 0.05, 0.055),
+		"HelmetPads": Color(0.045, 0.045, 0.05), "GearTrim": uniform.cap.darkened(0.55),
 		"Shoes": Color(0.06, 0.06, 0.07), "Belt": Color(0.05, 0.05, 0.06),
+		"Soles": Color(0.88, 0.88, 0.86), "Laces": Color(0.9, 0.9, 0.9), "Buckle": Color(0.42, 0.42, 0.44),
+		"Piping": uniform.trim, "MaskPads": Color(0.2, 0.14, 0.09),
 	}
+	if uniform.official:
+		# An umpire's shoes are black all over, his belt and bags black leather.
+		plain["Soles"] = Color(0.05, 0.05, 0.055)
+		plain["Laces"] = Color(0.06, 0.06, 0.065)
+		plain["Gear"] = Color(0.05, 0.05, 0.06)
+		plain["GearTrim"] = Color(0.04, 0.04, 0.05)
+		plain["Bars"] = Color(0.03, 0.03, 0.035)
 	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in part.mesh.get_surface_count():
 			var original := part.mesh.surface_get_material(surface)
@@ -872,13 +899,12 @@ func _paint() -> void:
 			if source == "Jersey" or source == "Pants":
 				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
 			elif source == "Hands":
-				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original, build))
+				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original, build, _has_limbs(part)))
 			elif source == "Skin":
-				part.set_surface_override_material(surface, _skin(original, build))
+				part.set_surface_override_material(surface, _skin(original, build, _has_limbs(part)))
 			elif part.name == &"Eyes":
 				part.set_surface_override_material(surface, _eyes(original))
 			elif String(part.name).begins_with("Hair"):
-				part.visible = String(part.name) == "Hair%d" % hair
 				part.set_surface_override_material(surface, _hair_material(original))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
@@ -886,6 +912,8 @@ func _paint() -> void:
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif plain.has(source):
 				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
+		if part.name == &"PantsStripe":
+			part.visible = uniform.pants_stripe
 
 
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
@@ -898,12 +926,13 @@ static var _pores: NoiseTexture2D
 ## skin shines and where it is matte, where the beard grows — and the painted skin's own fine
 ## relief, pores, a second sharp highlight for oil and sweat, light scattering under the
 ## surface and a sheen at the edges. Without the maps (an older model) the shader still runs.
-static func _skin(original: Material, for_build: StringName = &"standard") -> Material:
+static func _skin(original: Material, for_build: StringName = &"standard", limbs: bool = false) -> Material:
 	var base := original as StandardMaterial3D
 	if base == null:
 		return original
 	var key := base.get_instance_id()
 	if _skin_copies.has(key):
+		_skin_copies[key].set_shader_parameter(&"has_limbs", limbs)
 		return _skin_copies[key]
 	var m := ShaderMaterial.new()
 	m.shader = SKIN_SHADER
@@ -915,10 +944,27 @@ static func _skin(original: Material, for_build: StringName = &"standard") -> Ma
 		m.set_shader_parameter(&"has_detail", true)
 	if ResourceLoader.exists(SKIN_RELIEF):
 		m.set_shader_parameter(&"relief_texture", load(SKIN_RELIEF))
-	else:
-		m.set_shader_parameter(&"relief_strength", 0.0)
+		m.set_shader_parameter(&"has_relief", true)
+	# The veins and tendons of the arms, drawn from the model's own arm coordinates.
+	m.set_shader_parameter(&"vein_table", SkinVeins.table())
+	var wander := PackedFloat32Array()
+	wander.resize(8)
+	for i: int in SkinVeins.ARM.size():
+		wander[i] = float(SkinVeins.ARM[i]["wander"])
+	m.set_shader_parameter(&"vein_wander", wander)
+	m.set_shader_parameter(&"has_limbs", limbs)
 	_skin_copies[key] = m
 	return m
+
+
+## Does this part of the model carry the arm coordinates the skin shader draws veins from
+## (vertex colours and a second UV map; tools/blender/make_player.py)?
+static func _has_limbs(part: MeshInstance3D) -> bool:
+	var mesh := part.mesh as ArrayMesh
+	if mesh == null or mesh.get_surface_count() == 0:
+		return false
+	var format := mesh.surface_get_format(0)
+	return (format & Mesh.ARRAY_FORMAT_COLOR) != 0 and (format & Mesh.ARRAY_FORMAT_TEX_UV2) != 0
 
 
 static func _skin_pores() -> NoiseTexture2D:
@@ -943,25 +989,54 @@ func set_logo(letter: String, colour: Color) -> void:
 	if _logos.is_empty() and letter != "":
 		for gear: MeshInstance3D in [_cap, _helmet]:
 			var box := gear.get_aabb()
-			var front := Vector3(box.get_center().x, box.position.y + box.size.y * (0.62 if gear == _cap else 0.58), box.end.z + 0.002)
+			# On the front panel: a cap's 5 cm below its top, a helmet's a little above its middle.
+			var y := box.end.y - 0.05 if gear == _cap else box.position.y + box.size.y * 0.58
+			var front := _front_of(gear, y)
+			var above := _front_of(gear, y + 0.015)
+			var below := _front_of(gear, y - 0.015)
+			# Laid on the panel's own slope, a hair off the surface.
+			var slope := atan2(below.z - above.z, 0.03)
 			var attach := BoneAttachment3D.new()
 			attach.bone_name = "Head"
 			_skeleton.add_child(attach)
 			var label := Label3D.new()
-			label.pixel_size = 0.0009
-			label.font = UiTheme.font(700)
+			label.pixel_size = 0.0006
+			label.font = UniformArt.cap_font(uniform)
 			label.font_size = 64
 			label.outline_size = 0
 			label.double_sided = false
+			label.shaded = true
 			label.visibility_range_end = 40.0
 			var rest := _skeleton.get_bone_global_rest(_bone[&"Head"])
-			label.transform = rest.affine_inverse() * Transform3D(Basis.IDENTITY, front)
+			var basis := Basis(Vector3.RIGHT, -slope)
+			label.transform = rest.affine_inverse() * Transform3D(basis, front + basis.z * 0.0015)
 			attach.add_child(label)
 			_logos.append(label)
 	for label: Label3D in _logos:
 		label.text = letter
 		label.modulate = colour
+		# A league's initials (an umpire's cap) are set smaller than a club's one letter.
+		label.pixel_size = 0.0006 / maxf(1.0, letter.length() * 0.62)
+		label.font = UniformArt.cap_font(uniform)
+		# Embroidered with an edge in the club's second colour, when it has one.
+		label.outline_size = 10 if uniform.outline.a > 0.0 else 0
+		label.outline_modulate = uniform.outline
 	_show_gear()
+
+
+## The front of a piece of headgear at a height (model space, +Z ahead): the furthest forward
+## its surface comes within 2 cm of the middle.
+static func _front_of(part: MeshInstance3D, y: float) -> Vector3:
+	var best := Vector3(0.0, y, -INF)
+	for surface: int in part.mesh.get_surface_count():
+		var verts: PackedVector3Array = part.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for v: Vector3 in verts:
+			if absf(v.x) < 0.02 and absf(v.y - y) < 0.009 and v.z > best.z:
+				best = Vector3(0.0, y, v.z)
+	if best.z == -INF:
+		var box := part.get_aabb()
+		best.z = box.end.z
+	return best
 
 
 ## Hair (docs/13 S11-4): the style's strand texture as a cut-out, tinted to the player's colour.
@@ -1017,6 +1092,12 @@ func set_face(seed_text: String) -> Dictionary[String, float]:
 	_mesh.set_instance_shader_parameter(&"tone", SKIN_FAIR.lerp(SKIN_TANNED, sun))
 	_mesh.set_instance_shader_parameter(&"stubble", 0.15 + 0.6 * rng.next_float())
 	_mesh.set_instance_shader_parameter(&"sweat", 0.2 + 0.35 * rng.next_float())
+	# Veins show on lean arms and hardly at all on heavy ones; no two men's alike.
+	var lean: float = {&"lean": 0.75, &"standard": 0.55, &"solid": 0.35, &"heavy": 0.15}.get(build, 0.5)
+	out["veins"] = clampf(lean + 0.5 * (rng.next_float() - 0.5), 0.05, 1.0)
+	_mesh.set_instance_shader_parameter(&"veins", out["veins"])
+	_mesh.set_instance_shader_parameter(&"vein_seed", 100.0 * rng.next_float())
+	_mesh.set_instance_shader_parameter(&"hair_tint", hair_color)
 	out["tone"] = sun
 	return out
 
@@ -1035,7 +1116,10 @@ func _brow_material(original: Material) -> Material:
 	var m := base.duplicate() as StandardMaterial3D
 	m.albedo_color = (hair_color * 3.0).clamp() if hair_color.v < 0.3 else hair_color
 	m.alpha_scissor_threshold = 0.22
-	m.roughness = 0.6
+	# Matte: with a sheen, single hairs of the lashes caught the sun as white specks beside
+	# and under the eyes.
+	m.roughness = 1.0
+	m.metallic_specular = 0.0
 	return m
 
 
@@ -1045,6 +1129,8 @@ func set_hair(style: int, colour: Color) -> void:
 		return
 	hair = style
 	hair_color = colour
+	if _mesh != null:
+		_mesh.set_instance_shader_parameter(&"hair_tint", hair_color)
 	repaint()
 
 
@@ -1056,11 +1142,14 @@ static func _eyes(original: Material) -> Material:
 	if base == null:
 		return original
 	var m := base.duplicate() as StandardMaterial3D
-	m.roughness = 0.08
+	# The painted iris is a light red-brown; in sunlight it glowed red. Dark brown, nearly
+	# black a few steps away, as most Korean players' eyes are; the white a little grey.
+	m.albedo_color = Color(0.5, 0.46, 0.44)
+	m.roughness = 0.15
 	m.metallic_specular = 0.5
 	m.clearcoat_enabled = true
-	m.clearcoat = 0.35
-	m.clearcoat_roughness = 0.03
+	m.clearcoat = 0.3
+	m.clearcoat_roughness = 0.08
 	return m
 
 
@@ -1084,13 +1173,15 @@ static func _solid(original: Material, cutout: bool) -> Material:
 func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = colour
-	material.roughness = {"Helmet": 0.32, "Shoes": 0.45, "Belt": 0.4, "Gear": 0.5, "Bars": 0.45,
-		"HelmetPads": 0.85, "GearTrim": 0.75}.get(source, 0.85)
+	material.roughness = {"Helmet": 0.32, "Shoes": 0.5, "Belt": 0.62, "Gear": 0.5, "Bars": 0.45,
+		"HelmetPads": 0.85, "GearTrim": 0.75, "Soles": 0.7, "Laces": 0.9, "Buckle": 0.35}.get(source, 0.85)
 	if source != "Shoes" and source != "Socks":
 		material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	if source == "Bars":
 		# Powder-coated steel: dark, a dull metallic sheen.
 		material.metallic = 0.6
+	if source == "Buckle":
+		material.metallic = 0.9
 	if source == "Helmet":
 		# A painted shell under a clear coat: the coat carries the sharp reflection (the
 		# stadium, from the park's reflection probe), the paint under it is satin.
@@ -1106,9 +1197,9 @@ func _plain_material(source: String, colour: Color) -> StandardMaterial3D:
 		material.normal_scale = 0.5
 		material.uv1_triplanar = true
 		material.uv1_scale = Vector3.ONE * 13.0
-		if source == "Socks" or source == "Cap" or source == "Collar" or source == "GearTrim":
+		if source == "Socks" or source == "Cap" or source == "Collar" or source == "GearTrim" or source == "Piping":
 			_make_fabric(material)
-		elif source == "Shoes" or source == "Belt" or source == "Gear":
+		elif source == "Shoes" or source == "Belt" or source == "Gear" or source == "MaskPads":
 			# Real leather (a CC0 scan): its grain and the way its sheen breaks up.
 			SurfaceLibrary.dress(material, "leather", 0.16 if source != "Gear" else 0.24, 0.9, false, false)
 		elif source == "Bars":
@@ -1133,7 +1224,7 @@ func _glove_material() -> StandardMaterial3D:
 func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMaterial3D:
 	var bounds := part.mesh.get_aabb().size
 	var half_size := Vector2(bounds.x, bounds.y)
-	var pixels_per_metre := 1000.0 if is_jersey else 520.0
+	var pixels_per_metre := 1100.0 if is_jersey else 560.0
 	var old := part.get_node_or_null("Art")
 	if old != null:
 		old.free()
@@ -1146,7 +1237,8 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	art.garment = UniformArt.Garment.JERSEY if is_jersey else UniformArt.Garment.PANTS
 	art.style = uniform
 	art.half_size = half_size
-	art.font = _lettering_font()
+	if is_jersey:
+		_place_lettering(art, part.mesh.get_aabb())
 	art.size = Vector2(viewport.size)
 	viewport.add_child(art)
 	part.add_child(viewport)
@@ -1170,7 +1262,9 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	if ResourceLoader.exists(stem + "_folds.png"):
 		material.normal_enabled = true
 		material.normal_texture = load(stem + "_folds.png") as Texture2D
-		material.normal_scale = 2.0
+		# (At twice this the creases caught the light like wet cloth, most of all on a dark
+		# jersey and at the fork of the trousers.)
+		material.normal_scale = 1.0 if is_jersey else 0.9
 	# The creases are darker inside (baked with the folds): the light does not reach into them.
 	if ResourceLoader.exists(stem + "_shade.png"):
 		material.ao_enabled = true
@@ -1217,10 +1311,10 @@ static func _weave(colour: Color) -> ImageTexture:
 static func _make_fabric(material: StandardMaterial3D) -> void:
 	# Polyester knit: a soft sheen at grazing angles, otherwise matte (more sheen than this
 	# and a dark jersey looked like satin).
-	material.roughness = 0.8
-	material.metallic_specular = 0.38
+	material.roughness = 0.86
+	material.metallic_specular = 0.3
 	material.rim_enabled = true
-	material.rim = 0.22
+	material.rim = 0.16
 	material.rim_tint = 0.7
 	material.detail_enabled = true
 	material.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
@@ -1282,12 +1376,27 @@ static func _white() -> ImageTexture:
 	return _white_texture
 
 
-static var _font: SystemFont
+## How far along the upper arm the sleeve ends (tools/blender/make_player.py, SLEEVE_HEM), and
+## how far below the base of the neck the V of the jersey's neck comes to its point (V_DEPTH).
+const SLEEVE_HEM := 0.66
+const V_DEPTH := 0.105
 
 
-static func _lettering_font() -> Font:
-	if _font == null:
-		_font = SystemFont.new()
-		_font.font_names = PackedStringArray(["Pretendard", "Noto Sans KR", "Noto Sans CJK KR", "Malgun Gothic", "NanumGothic"])
-		_font.font_weight = 900
-	return _font
+## Tells the jersey's painter where things are on this model, in metres on the front of the
+## jersey from its top-left corner: the point of the V, the line of the chest, and each sleeve
+## (the wearer's left first), so the lettering, the sleeve trim and the patches land on them.
+func _place_lettering(art: UniformArt, box: AABB) -> void:
+	var top := box.end.y
+	var tall := mesh_top(_mesh.mesh)
+	art.chest = top - tall * 0.72
+	var neck := _skeleton.get_bone_global_rest(_bone[&"Neck"]).origin
+	art.neck_point = top - (neck.y - V_DEPTH)
+	art.sleeves.clear()
+	for side: String in ["Left", "Right"]:
+		var shoulder := _skeleton.get_bone_global_rest(_bone[StringName(side + "UpperArm")]).origin
+		var elbow := _skeleton.get_bone_global_rest(_bone[StringName(side + "LowerArm")]).origin
+		var along := Vector2(elbow.x - shoulder.x, -(elbow.y - shoulder.y))
+		art.sleeves.append({
+			"shoulder": Vector2(shoulder.x - box.position.x, top - shoulder.y),
+			"along": along.normalized(), "hem": along.length() * SLEEVE_HEM,
+		})

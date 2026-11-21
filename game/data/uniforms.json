@@ -1,0 +1,19 @@
+{
+  "note": "What goes on the uniforms of the made-up league (docs/13 S11-9): each club's nickname and town in Latin letters (KBO clubs wear their nicknames in English at home and their town's or owner's name on the road). The sponsors whose patches the clubs wear are in sponsors.ko.json. A local pack can give a club its own uniform (S18).",
+  "marks": {
+    "시걸스": "Seagulls", "코메츠": "Comets", "팰컨스": "Falcons", "머스탱스": "Mustangs", "스톰즈": "Storms",
+    "파이어버즈": "Firebirds", "웨이브스": "Waves", "레드폭스": "Red Foxes", "바이슨스": "Bisons", "크레인즈": "Cranes",
+    "울브스": "Wolves", "스타즈": "Stars", "해머스": "Hammers", "나이츠": "Knights", "스피어스": "Spears",
+    "볼츠": "Bolts", "포레스터즈": "Foresters", "오터스": "Otters", "퓨마스": "Pumas", "윈즈": "Winds",
+    "레이븐스": "Ravens", "썬더스": "Thunders", "앵커스": "Anchors", "글레이셔스": "Glaciers", "로켓츠": "Rockets",
+    "펠리컨스": "Pelicans", "코디악스": "Kodiaks", "세이버스": "Sabers", "트레일즈": "Trails", "하버스": "Harbors"
+  },
+  "towns": {
+    "한빛": "Hanbit", "누리": "Nuri", "가람": "Garam", "솔내": "Solnae", "새벌": "Saebeol",
+    "마루": "Maru", "나래": "Narae", "아라": "Ara", "다솜": "Dasom", "미르": "Mir",
+    "하늬": "Hanui", "온누리": "Onnuri", "별내": "Byeollae", "보라": "Bora", "소담": "Sodam",
+    "늘봄": "Neulbom", "해담": "Haedam", "윤슬": "Yunseul", "여울": "Yeoul", "라온": "Raon",
+    "도담": "Dodam", "새온": "Saeon", "푸른": "Pureun", "한울": "Hanul", "가온": "Gaon",
+    "들녘": "Deullyeok", "마중": "Majung", "너울": "Neoul", "단비": "Danbi", "새솔": "Saesol"
+  }
+}

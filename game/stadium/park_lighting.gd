@@ -58,6 +58,10 @@ func sun_direction() -> Vector3:
 	return Vector3(cos(el) * sin(rel), cos(el) * cos(rel), sin(el))
 
 
+## The light bounced back from the ground (see _ready).
+var bounce: DirectionalLight3D
+
+
 func _ready() -> void:
 	environment = _environment()
 	var world := WorldEnvironment.new()
@@ -68,6 +72,15 @@ func _ready() -> void:
 	if not indoor() and dir.z > 0.0:
 		sun = _light(dir, _sun_colour(), 1.35 if time == &"day" else 1.0, true)
 		sun.light_angular_distance = 0.6
+		# The light the field and the stands throw back at whatever has its back to the sun
+		# (the batter, the catcher and the umpire seen from the mound: the sun is behind
+		# them by day). Without it their fronts had the sky's even light alone and no shape
+		# — "like an animation". From the side away from the sun and a little below, warm
+		# from the dirt and the grass, casting no shadow.
+		var back := Vector3(-dir.x, -dir.y, 0.0).normalized()
+		bounce = _light((back * cos(deg_to_rad(-14.0)) + Vector3(0.0, 0.0, sin(deg_to_rad(-14.0)))).normalized(),
+				Color(1.0, 0.93, 0.8), 0.22 if time == &"day" else 0.18, false)
+		bounce.light_specular = 0.15
 	if lights_on():
 		# The towers (or the roof's banks) light the field from several sides at once: soft
 		# shadows in more than one direction.
@@ -140,8 +153,9 @@ func _light(toward: Vector3, colour: Color, energy: float, shadows: bool) -> Dir
 	light.light_color = colour
 	light.light_energy = energy
 	light.shadow_enabled = shadows
-	# A tighter edge: at 1.4 the dithered half-shadow of a cap or helmet brim showed on the face
-	# as a row of bright specks.
+	# A fairly tight edge: at 1.4 the half-shadow of a cap or helmet brim lay on the face as a
+	# grey smudge. (The white specks once blamed on it were the skin's clear coat; see
+	# match/skin.gdshader.)
 	light.shadow_blur = 0.7
 	light.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	light.directional_shadow_max_distance = 140.0
@@ -164,7 +178,7 @@ func _environment() -> Environment:
 			sky_material.energy_multiplier = 0.8
 			# Less fill than before: the sunlit side and the shadow side of a face or a fold
 			# differ the way they do in a broadcast picture.
-			env.ambient_light_energy = 0.72
+			env.ambient_light_energy = 0.62
 			env.ambient_light_color = Color(0.62, 0.56, 0.48)
 			env.fog_light_color = Color(0.68, 0.76, 0.86)
 		&"dusk":

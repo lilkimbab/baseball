@@ -19,7 +19,8 @@ static var fullscreen := false
 static var resolution := 2
 ## 0 low, 1 medium, 2 high: shadows and anti-aliasing.
 static var quality := 2
-## Upscaling (AMD FSR 2, built into Godot): 0 off, 1 quality (77% of the pixels drawn),
+## Upscaling (AMD FSR 2, built into Godot): 0 off, 1 quality (88% of the pixels drawn; it was
+## 77% until the players at the plate were seen to be drawn coarse: 72 fps against 85),
 ## 2 balanced (67%), 3 native (full size, for its anti-aliasing alone). FSR 2's temporal
 ## anti-aliasing also calms the shimmer of thin lines far off: seats, nets, chalk.
 static var upscale := 1
@@ -100,7 +101,7 @@ static func apply_rendering(tree: SceneTree) -> void:
 	var vp := tree.root
 	if upscale > 0:
 		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2
-		vp.scaling_3d_scale = [1.0, 0.77, 0.67, 1.0][upscale]
+		vp.scaling_3d_scale = [1.0, 0.88, 0.67, 1.0][upscale]
 		# FSR 2 does its own anti-aliasing.
 		vp.msaa_3d = Viewport.MSAA_DISABLED
 	else:

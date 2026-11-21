@@ -30,29 +30,75 @@ static var _icons: Dictionary[String, Texture2D] = {}
 static var _theme: Theme
 
 
-## The text face at a weight: Paperlogy 500 medium, 600 semibold, 700 bold (Pretendard if the
-## files are missing). One family for everything Korean, heavier for what matters more.
+## The text face at a weight: Paperlogy 500 medium, 600 semibold, 700 bold (a system face if
+## the files are missing). One family for everything Korean, heavier for what matters more.
 static func font(weight: int = 600) -> Font:
 	if _fonts.has(weight):
 		return _fonts[weight]
 	var file := "Paperlogy-SemiBold.woff2"
-	var spare := "Pretendard-SemiBold.otf"
 	if weight <= 500:
 		file = "Paperlogy-Medium.woff2"
-		spare = "Pretendard-Regular.otf"
 	elif weight >= 700:
 		file = "Paperlogy-Bold.woff2"
-		spare = "Pretendard-Bold.otf"
 	var loaded := load("res://ui/fonts/" + file) as Font if ResourceLoader.exists("res://ui/fonts/" + file) else null
 	if loaded == null:
-		loaded = load("res://ui/fonts/" + spare) as Font
-	if loaded == null:
 		var system := SystemFont.new()
-		system.font_names = PackedStringArray(["Pretendard", "Noto Sans KR", "Malgun Gothic"])
+		system.font_names = PackedStringArray(["Noto Sans KR", "Malgun Gothic", "NanumGothic"])
 		system.font_weight = weight
 		loaded = system
 	_fonts[weight] = loaded
 	return loaded
+
+
+## A face for a place in the game (docs/05 section 5; the user: "the same font is used
+## everywhere: find the right one for each situation"). Real broadcasts, scoreboards and
+## advertising each have their own lettering, and the game reads as one flat layer without it:
+##   &"menu"       the menus (Paperlogy)
+##   &"broadcast"  the graphics a broadcast lays over a game: the score bug, the bottom bar,
+##                 the pitch panel, the commentary line (S-Core Dream, a television gothic)
+##   &"impact"     what is shouted: an umpire's call, a judgment on a swing or a pitch
+##                 (Black Han Sans, heavy and tight)
+##   &"board"      the stadium's scoreboard: lamps, so a dot-matrix face (Galmuri)
+##   &"wall"       painted on the park: distances on the fence (College Block)
+##   &"ad_*"       sponsors' boards, each brand its own: ad_heavy, ad_square, ad_round,
+##                 ad_script, ad_slab, ad_plain
+## Figures and Latin capitals everywhere are numeric() (Barlow Condensed).
+const FACES := {
+	&"broadcast": ["res://ui/fonts/SCoreDream-Medium.woff", "res://ui/fonts/SCoreDream-Bold.woff", "res://ui/fonts/SCoreDream-Heavy.woff"],
+	&"impact": ["res://assets/fonts/uniform/BlackHanSans-Regular.ttf"],
+	&"board": ["res://ui/fonts/Galmuri11-Bold.ttf"],
+	&"wall": ["res://assets/fonts/uniform/CollegeBlock-Bold.ttf"],
+	&"ad_heavy": ["res://assets/fonts/uniform/BlackHanSans-Regular.ttf"],
+	&"ad_square": ["res://assets/fonts/uniform/DoHyeon-Regular.ttf"],
+	&"ad_round": ["res://ui/fonts/GmarketSans-Medium.woff", "res://ui/fonts/GmarketSans-Bold.woff"],
+	&"ad_script": ["res://assets/fonts/uniform/Lobster-Regular.ttf"],
+	&"ad_slab": ["res://assets/fonts/uniform/Rye-Regular.ttf"],
+}
+static var _faces: Dictionary[String, Font] = {}
+
+
+## The face for a place (see FACES) at a weight; the menus' face if there is none for it.
+static func face(role: StringName, weight: int = 600) -> Font:
+	var key := "%s:%d" % [role, weight]
+	if _faces.has(key):
+		return _faces[key]
+	var out: Font = null
+	if FACES.has(role):
+		var files: Array = FACES[role]
+		# Lighter to heavier: the first for text, the last for the heaviest.
+		var pick := 0 if weight <= 500 else (files.size() - 1 if weight >= 800 else mini(1, files.size() - 1))
+		var path := str(files[pick])
+		if ResourceLoader.exists(path):
+			var loaded := load(path) as Font
+			# Anything the face lacks (Korean in a Latin face, a rare sign) comes from the menus'.
+			var with_spare := FontVariation.new()
+			with_spare.base_font = loaded
+			with_spare.fallbacks = [font(weight)]
+			out = with_spare
+	if out == null:
+		out = font(weight)
+	_faces[key] = out
+	return out
 
 
 ## How much to scale a 1080-line size for a screen this tall.

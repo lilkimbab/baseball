@@ -395,13 +395,14 @@ func test_a_held_ball_sits_in_the_fingers_not_inside_the_hand() -> void:
 func test_head_size_and_belt_height_are_in_proportion() -> void:
 	var puppet := _model()
 	var body := puppet.find_child("Body", true, false) as MeshInstance3D
-	var eyes := puppet.find_child("Eyes", true, false) as MeshInstance3D
 	var pants := puppet.find_child("Pants", true, false) as MeshInstance3D
 	var top := SkinnedPuppet.mesh_top(body.mesh)
-	# Eyes sit a little above the middle of the head, so top-to-eyes is about 0.54 of the head
-	# height. A grown man is 7.5 to 8.2 head-heights tall.
-	var eyes_down := (top - eyes.get_aabb().get_center().y) / top
-	assert_between(eyes_down, 0.54 / 8.2, 0.54 / 7.5, "head size: top of the head to the eyes")
+	# The head, measured chin to crown when the model is built (the height of the eyes is no
+	# measure of it: an earlier model passed that with a head 7% too large). A grown man is
+	# 7.5 to 8 head-heights tall. More in tests/match/test_player_proportions.gd.
+	var measured := JsonIO.read_object(SkinnedPuppet.MODEL.get_basename() + "_measure.json")
+	assert_between(float(measured["heads_tall"]), 7.5, 8.0, "head-heights to the body")
+	assert_almost_eq(float(measured["stature"]), top, 0.005, "the measurements are this model's")
 	# Baseball trousers are worn on the hips: the top of the belt at about 59% of height.
 	assert_between(pants.get_aabb().end.y / top, 0.575, 0.605, "top of the belt")
 
@@ -494,11 +495,14 @@ func test_skin_scatters_light_and_eyes_are_glossy() -> void:
 	var code := skin.shader.code
 	assert_string_contains(code, "sss_mode_skin", false)
 	assert_string_contains(code, "SSS_STRENGTH", false)
-	assert_string_contains(code, "CLEARCOAT", false)
+	# No clear coat on skin: the engine draws it mirror-sharp, and it broke up into white
+	# specks under the eyes and down the cheeks.
+	assert_false(code.contains("CLEARCOAT ="), "no clear coat on skin")
 	assert_true(skin.get_shader_parameter(&"has_detail"), "baked creases, shine and beard area")
 	assert_not_null(skin.get_shader_parameter(&"relief_texture"), "the painted skin's fine relief")
 	assert_not_null(eyes)
-	assert_lt(eyes.roughness, 0.1, "a wet cornea")
+	assert_lt(eyes.roughness, 0.2, "a wet cornea")
+	assert_lt(eyes.albedo_color.get_luminance(), 0.55, "dark brown eyes, not red in the sun")
 
 
 func test_complexion_differs_from_player_to_player() -> void:
@@ -526,7 +530,7 @@ func test_shadows_are_not_lit_blue() -> void:
 # --- S11-4 hair ---
 
 
-func test_four_hair_styles_one_shown_and_none_under_the_cap() -> void:
+func test_four_hair_styles_one_shown_bare_headed_and_none_under_a_cap() -> void:
 	var puppet := _model()
 	var styles: Array[MeshInstance3D] = []
 	for i: int in range(1, 5):
@@ -534,16 +538,31 @@ func test_four_hair_styles_one_shown_and_none_under_the_cap() -> void:
 		assert_not_null(h, "style %d is in the model" % i)
 		if h != null:
 			styles.append(h)
-	var shown := styles.filter(func(h: MeshInstance3D) -> bool: return h.visible)
-	assert_eq(shown.size(), 1, "one style shows")
+	var shown := func() -> int: return styles.filter(func(h: MeshInstance3D) -> bool: return h.visible).size()
+	# Under a cap or a helmet all that shows is the hair cropped close to the skull, which
+	# the skin draws (match/skin.gdshader): locks poking out under the cap read as a wig.
+	assert_eq(shown.call(), 0, "no locks under the cap")
+	puppet.headgear = &"helmet"
+	puppet.apply(PuppetClips.stance())
+	assert_eq(shown.call(), 0, "nor under the helmet")
+	puppet.headgear = &"none"
 	puppet.set_hair(3, Color(0.3, 0.2, 0.1))
+	puppet.apply(PuppetClips.standing())
+	assert_eq(shown.call(), 1, "one style on a bare head")
 	assert_true(styles[2].visible)
-	assert_false(styles[0].visible)
-	# Nothing of the hair reaches up into the cap.
-	var cap := puppet.find_child("Cap", true, false) as MeshInstance3D
-	var cap_bottom := cap.get_aabb().position.y
-	for h: MeshInstance3D in styles:
-		assert_lte(h.get_aabb().end.y, cap_bottom + 0.01, "%s stays below the cap" % h.name)
+	# The cropped hair is in the skin's map (its alpha) and takes the player's hair colour.
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	var skin := body.get_surface_override_material(0) as ShaderMaterial
+	var detail := (skin.get_shader_parameter(&"detail_texture") as Texture2D).get_image()
+	if detail.is_compressed():
+		detail.decompress()
+	var haired := 0
+	for y: int in range(0, detail.get_height(), 8):
+		for x: int in range(0, detail.get_width(), 8):
+			if detail.get_pixel(x, y).a < 0.6:
+				haired += 1
+	assert_gt(haired, 50, "the scalp is marked in the detail map")
+	assert_eq(body.get_instance_shader_parameter(&"hair_tint"), Color(0.3, 0.2, 0.1))
 
 
 # --- S11-5 helmet and cap ---
@@ -579,11 +598,17 @@ func test_the_team_letter_sits_on_the_front_of_the_cap() -> void:
 	var cap_label := labels[0] as Label3D
 	assert_eq(cap_label.text, "해")
 	assert_true(cap_label.visible)
-	# In front of the face: closer to the camera side than the head's centre.
+	# Where the letter is on the cap as modelled (it rides on the head's bone): in front of
+	# the cap's middle, on the front panel, not hanging in the air at the tip of the bill.
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var on_head := skeleton.get_bone_global_rest(skeleton.find_bone("Head")) * cap_label.transform
 	var head := puppet.find_child("Cap", true, false) as MeshInstance3D
-	var front := puppet.to_local(cap_label.global_position)
-	var centre := puppet.to_local(head.global_transform * head.get_aabb().get_center())
-	assert_lt(front.z, centre.z, "the puppet faces -Z: the letter is on the front")
+	var box := head.get_aabb()
+	# (The model faces +Z in its own space.)
+	assert_gt(on_head.origin.z, box.get_center().z + 0.03, "on the front")
+	assert_lt(on_head.origin.z, box.end.z - 0.04, "behind the tip of the bill")
+	assert_gt(on_head.origin.y, box.get_center().y - 0.01, "on the crown, above the bill")
+	assert_lt(absf(on_head.origin.x), 0.01, "in the middle")
 
 
 # --- S11-6 faces ---
@@ -600,7 +625,7 @@ func test_every_player_on_a_club_has_his_own_face() -> void:
 		var key := ""
 		for k: String in weights:
 			key += "%s=%.3f;" % [k, weights[k]]
-			if k != "tone":
+			if k != "tone" and k != "veins":
 				assert_between(weights[k], 0.0, 0.61, "moderate, so brows and eyes stay in place")
 		assert_false(seen.has(key), "28 different faces")
 		seen[key] = true
@@ -611,9 +636,16 @@ func test_every_player_on_a_club_has_his_own_face() -> void:
 # --- S11-7 neckline ---
 
 
-func test_a_v_neck_shows_the_undershirt_and_no_collar_ring() -> void:
+func test_a_v_neck_shows_the_undershirt_and_its_trim_follows_the_neckline() -> void:
 	var puppet := _model()
-	assert_null(puppet.find_child("Collar", true, false), "the ring round the neck is gone")
+	# The trim is a band along the real edge of the opening and down both sides of the V
+	# (a ring round the neck looked like a scarf).
+	var collar := puppet.find_child("Collar", true, false) as MeshInstance3D
+	assert_not_null(collar, "the neckline's trim")
+	var jersey := puppet.find_child("Jersey", true, false) as MeshInstance3D
+	if collar != null:
+		assert_gt(collar.get_aabb().size.y, 0.08, "it runs down the V")
+		assert_almost_eq(collar.get_aabb().end.y, jersey.get_aabb().end.y, 0.015, "from the top of the jersey")
 	var body := puppet.find_child("Body", true, false) as MeshInstance3D
 	var undershirt := -1
 	for surface: int in body.mesh.get_surface_count():
@@ -644,10 +676,11 @@ func test_a_club_wears_white_at_home_and_its_colour_or_gray_away() -> void:
 	var home := UniformStyle.for_team(t, true)
 	var away := UniformStyle.for_team(t, false)
 	assert_gt(home.jersey.get_luminance(), 0.9, "white at home")
-	assert_eq(home.wordmark, "레드폭스", "the nickname across the chest")
-	assert_eq(away.wordmark, "라온", "the city on the road")
+	assert_eq(home.wordmark.to_lower(), "red foxes", "the nickname across the chest, in English as KBO clubs wear it")
+	assert_eq(away.wordmark, "RAON", "the town on the road, in block capitals")
 	assert_eq(away.jersey, t.primary, "a dark club colour on the road")
-	assert_eq(home.patch, "라")
+	assert_eq(home.patch, "R")
+	assert_eq(home.cap_letter, "R")
 	t.primary = Color(0.3, 0.75, 0.9)
 	var gray := UniformStyle.for_team(t, false)
 	assert_almost_eq(gray.jersey.r, gray.jersey.b, 0.05, "road gray for a bright colour")

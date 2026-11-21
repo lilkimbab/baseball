@@ -26,8 +26,9 @@ func _draw() -> void:
 	if scene == null or scene.game == null:
 		return
 	var g := scene.game
-	var font := UiTheme.font(700)
-	var regular := UiTheme.font(500)
+	# A board of lamps: a dot-matrix face.
+	var font := UiTheme.face(&"board")
+	var regular := UiTheme.face(&"board")
 	# The line score: a row a team, a column an inning, then R H E.
 	var left := 300.0
 	var col := 74.0

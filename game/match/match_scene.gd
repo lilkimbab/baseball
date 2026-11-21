@@ -829,13 +829,12 @@ func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 	model.set_face(p.id)
 
 
-## The club's letter on the cap and helmet (fictional clubs: the first letter of the name).
+## The club's letter on the cap and helmet (the first letter of its nickname in English).
 func _logo(puppet: Puppet, team: int) -> void:
 	var model := puppet as SkinnedPuppet
 	if model == null or _styles.is_empty():
 		return
-	var name := game.teams[team].short_name
-	model.set_logo(name.substr(0, 1) if name != "" else "", _styles[team].trim)
+	model.set_logo(_styles[team].cap_letter, _styles[team].cap_ink())
 
 
 ## Hair colour: nearly black for the local players; the foreign players' run from black to
@@ -1240,13 +1239,12 @@ func _drop_bat() -> void:
 func _build_officials() -> void:
 	fielders[Position.Kind.P] = pitcher
 	fielders[Position.Kind.C] = catcher
-	var officials := UniformStyle.make(Color(0.07, 0.07, 0.08), Color(0.34, 0.35, 0.37), Color(0.07, 0.07, 0.08), Color(0.07, 0.07, 0.08), "")
 	# Base umpires stand behind first and third, outside the line; the second-base umpire
-	# behind the bag, or inside the infield with runners on.
+	# behind the bag, or inside the infield with runners on. Each crew member has his number.
+	var crew: Array[int] = [14, 36, 52]
 	for spot: Vector3 in [Vector3(23.6, 19.4, 0.0), Vector3(-3.0, 44.0, 0.0), Vector3(-23.6, 19.4, 0.0)]:
 		var u := _add_puppet(spot, 0.0, Color(0.08, 0.08, 0.09), Color(0.05, 0.05, 0.06), use_models)
-		_dress(u, UniformStyle.make(officials.jersey, officials.pants, officials.trim, officials.ink, ""), 0, "", false)
-		u.show_glove = false
+		dress_umpire(u, crew[base_umpires.size()], false)
 		u.apply(PuppetClips.umpire())
 		u.rotation.y = _yaw_toward(Vector2(spot.x, spot.y), Vector2.ZERO)
 		base_umpires.append(u)
@@ -1306,16 +1304,7 @@ func _dress_for_half() -> void:
 
 
 func _style_for(team: int) -> UniformStyle:
-	var s := _styles[team]
-	var copy := UniformStyle.make(s.jersey, s.pants, s.trim, s.ink, s.wordmark)
-	copy.cap = s.cap
-	copy.socks = s.socks
-	copy.jersey_pinstripes = s.jersey_pinstripes
-	copy.pants_pinstripes = s.pants_pinstripes
-	copy.pinstripe = s.pinstripe
-	copy.patch = s.patch
-	copy.pants_stripe = s.pants_stripe
-	return copy
+	return _styles[team].copy()
 
 
 ## The club playing as away (0) or home (1): from the roster pack, the league or the career.

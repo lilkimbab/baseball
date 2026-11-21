@@ -92,14 +92,79 @@ func _draw_count() -> void:
 
 
 func _draw_pitch_list() -> void:
-	var origin := Vector2(view.x - 250.0, view.y * 0.5 - 110.0)
-	draw_rect(Rect2(origin - Vector2(14.0, 30.0), Vector2(240.0, 44.0 + scene.pitch_ids.size() * 32.0)), PANEL)
-	_text(origin, "구종", 16, Color(1, 1, 1, 0.7))
-	for i: int in scene.pitch_ids.size():
-		var type := scene.catalog[scene.pitch_ids[i]]
-		var chosen := i == scene.selected_pitch
-		var line := "%d  %s  %d" % [i + 1, type.label, roundi(type.speed_kmh)]
-		_text(origin + Vector2(0.0, 32.0 + i * 32.0), line, 20, GOLD if chosen else INK)
+	# A small ring at the side shows the pitcher's pitches where they are on the wheel; the
+	# larger one opens at the pointer while the right mouse button is held.
+	_wheel(Vector2(view.x - 150.0, view.y * 0.5 - 10.0), 74.0, 36.0, scene.selected_pitch, -1, false)
+	if scene.wheel_open:
+		_wheel(from_screen(scene.wheel_centre), 124.0, 58.0, scene.selected_pitch, scene.wheel_pick, true)
+
+
+## The pitch wheel (the user: "a ring, a doughnut, cut in six; no more circles inside it"):
+## six segments of a ring, a pitch in each — the first straight up, the rest clockwise. The
+## segment the pointer is toward is filled; the pitch already chosen is edged. Nothing in the
+## middle but the name of the pitch.
+func _wheel(centre: Vector2, outer: float, inner: float, chosen: int, toward: int, large: bool) -> void:
+	var count := mini(scene.pitch_ids.size(), DuelScene.WHEEL_SLOTS)
+	var step := TAU / DuelScene.WHEEL_SLOTS
+	var gap := deg_to_rad(2.2 if large else 3.0)
+	for slot: int in DuelScene.WHEEL_SLOTS:
+		# The segment: from 30 degrees before its direction to 30 after, less a gap.
+		var mid := -PI * 0.5 + step * slot
+		var from := mid - step * 0.5 + gap
+		var to := mid + step * 0.5 - gap
+		var shape := PackedVector2Array()
+		var edge := PackedVector2Array()
+		for i: int in 13:
+			var a := lerpf(from, to, i / 12.0)
+			shape.append(centre + Vector2(cos(a), sin(a)) * outer)
+		for i: int in 13:
+			var a := lerpf(to, from, i / 12.0)
+			shape.append(centre + Vector2(cos(a), sin(a)) * inner)
+		edge = shape.duplicate()
+		edge.append(shape[0])
+		var has_pitch := slot < count
+		var lit := has_pitch and slot == toward
+		var is_chosen := has_pitch and slot == chosen
+		var fill := Color(0.05, 0.06, 0.08, 0.3)
+		if has_pitch:
+			fill = Color(GOLD, 0.95) if lit else (Color(0.16, 0.17, 0.21, 0.9) if is_chosen else Color(0.06, 0.07, 0.1, 0.82))
+		draw_colored_polygon(shape, fill)
+		if is_chosen and not lit:
+			draw_polyline(edge, GOLD, 2.5, true)
+		elif has_pitch and not lit:
+			draw_polyline(edge, Color(1, 1, 1, 0.22), 1.2, true)
+		if not has_pitch:
+			continue
+		var type := scene.catalog[scene.pitch_ids[slot]]
+		var at := centre + Vector2(cos(mid), sin(mid)) * (outer + inner) * 0.5
+		var ink := Color(0.07, 0.06, 0.03) if lit else (GOLD if is_chosen else INK)
+		if large:
+			_plain(at + Vector2(-60.0, -3.0), _short(type.label, 5), 16, ink, 120.0)
+			_plain_figure(at + Vector2(-60.0, 18.0), "%d" % roundi(type.speed_kmh), 21, ink, 120.0)
+		else:
+			_plain(at + Vector2(-40.0, 5.0), _short(type.label, 2), 13, ink, 80.0)
+	var shown := toward if toward >= 0 else chosen
+	if shown >= 0 and shown < count:
+		var name := scene.catalog[scene.pitch_ids[shown]].label
+		if large:
+			_text(centre + Vector2(-inner, 6.0), _short(name, 6), 16, GOLD if toward >= 0 else INK, HORIZONTAL_ALIGNMENT_CENTER, inner * 2.0)
+		else:
+			_text(centre + Vector2(-110.0, outer + 26.0), name, 16, GOLD, HORIZONTAL_ALIGNMENT_CENTER, 220.0)
+
+
+## A pitch's name cut to fit a segment ("포심 패스트볼" → "포심").
+static func _short(label: String, letters: int) -> String:
+	var first := label.split(" ")[0]
+	return first.substr(0, letters)
+
+
+## Text and figures without the dark edge the HUD's text has (inside a filled segment).
+func _plain(at: Vector2, line: String, font_size: int, colour: Color, width: float) -> void:
+	draw_string(UiTheme.face(&"broadcast", 700), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
+
+
+func _plain_figure(at: Vector2, line: String, font_size: int, colour: Color, width: float) -> void:
+	draw_string(UiTheme.numeric(false, true), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
 
 
 ## Ring drawn around the pitch target: fills while charging power, then closes in while the
@@ -136,7 +201,7 @@ func _draw_pitch_grade() -> void:
 	var grade := "완벽" if scene.accuracy >= 0.85 else ("좋음" if scene.accuracy >= 0.6 else ("보통" if scene.accuracy >= 0.3 else "빗나감"))
 	var color := GOLD if scene.accuracy >= 0.85 else (GREEN if scene.accuracy >= 0.6 else (INK if scene.accuracy >= 0.3 else RED))
 	draw_arc(centre, 30.0, 0.0, TAU, 40, Color(color, 0.8), 3.0, true)
-	_text(centre + Vector2(-80.0, 8.0), grade, 22, color, HORIZONTAL_ALIGNMENT_CENTER, 160.0)
+	shout(centre + Vector2(-80.0, 9.0), grade, 26, color, HORIZONTAL_ALIGNMENT_CENTER, 160.0)
 
 
 ## The batter's aim: a see-through bat lying where the swing will meet the ball, its sweet
@@ -188,34 +253,39 @@ func _ghost_ball(at: Vector3, alpha: float, colour: Color = Color.WHITE) -> void
 	draw_arc(p, r, 0.0, TAU, 16, Color(0.15, 0.15, 0.18, alpha * 0.8), 1.2, true)
 
 
-## Before the pitch: where the chosen pitch will go, a ball every PATH_STEP s, and an arrow
-## from where it would cross without its spin to where it does — the break.
+## Before the pitch: where the chosen pitch will arrive. A straight fastball is a mark in the
+## zone and nothing more; a pitch that moves has the last of its path bending into the mark.
 func _draw_preview() -> void:
 	var path := scene.preview
-	if path.size() < 3:
+	if path.is_empty():
 		return
+	_tail(path, 1.0, Color(1.0, 0.85, 0.35))
+	var end := path[path.size() - 1]
+	_ghost_ball(end, 0.9, Color(1.0, 0.95, 0.8))
+
+
+## The last of a pitch's path as a line that thickens and brightens toward where it arrives,
+## with the head of an arrow there: which way it is moving as it comes in.
+func _tail(path: PackedVector3Array, strength: float, colour: Color) -> void:
 	var points := PackedVector2Array()
 	for p: Vector3 in path:
 		if _visible(p):
 			points.append(_screen(p))
-	if points.size() >= 2:
-		draw_polyline(points, Color(1.0, 0.85, 0.35, 0.35), 2.0, true)
-	for i: int in range(2, path.size()):
-		_ghost_ball(path[i], lerpf(0.25, 0.85, float(i) / path.size()), Color(1.0, 0.95, 0.8))
-	var end := path[path.size() - 1]
-	var from := scene.preview_straight
-	if from.distance_to(end) > 0.05 and _visible(end) and _visible(from):
-		_arrow(_screen(from), _screen(end), GOLD)
+	if points.size() < 3:
+		return
+	var last := points.size() - 1
+	for i: int in last:
+		var f := float(i + 1) / last
+		draw_line(points[i], points[i + 1], Color(colour, strength * (0.18 + 0.75 * f * f)), 2.0 + 3.5 * f, true)
+	var dir := points[last] - points[maxi(last - 3, 0)]
+	if dir.length() > 2.0:
+		dir = dir.normalized()
+		var side := Vector2(-dir.y, dir.x)
+		var tip := points[last] - dir * 6.0
+		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 11.0 + side * 6.5, tip - dir * 11.0 - side * 6.5]), Color(colour, strength * 0.9))
 
 
-func _arrow(a: Vector2, b: Vector2, colour: Color) -> void:
-	draw_line(a, b, colour, 3.0, true)
-	var dir := (b - a).normalized()
-	var side := Vector2(-dir.y, dir.x)
-	draw_colored_polygon(PackedVector2Array([b + dir * 4.0, b - dir * 12.0 + side * 7.0, b - dir * 12.0 - side * 7.0]), colour)
-
-
-## After a pitch nobody hit: the path it took, a ball every PATH_STEP s, for a moment.
+## After a pitch that moved and nobody hit: the last of the path it took, for a moment.
 func _draw_trail() -> void:
 	var path := scene.trail
 	if path.size() < 3:
@@ -232,8 +302,7 @@ func _draw_trail() -> void:
 		fade = 1.0 - smoothstep(TRAIL_TIME - 0.5, TRAIL_TIME, scene.state_time)
 	if fade <= 0.0:
 		return
-	for i: int in range(2, path.size()):
-		_ghost_ball(path[i], fade * lerpf(0.3, 0.9, float(i) / path.size()))
+	_tail(path, fade, Color(1.0, 1.0, 1.0))
 
 
 ## Speed and pitch type where the ball crossed the plate.
@@ -248,8 +317,8 @@ func _draw_pitch_readout() -> void:
 	var at := _screen(duel.pitch.plate_pos)
 	draw_circle(at, 26.0, Color(0.05, 0.05, 0.08, 0.8))
 	draw_arc(at, 26.0, 0.0, TAU, 32, INK, 2.0, true)
-	_text(at + Vector2(-26.0, 5.0), "%d" % roundi(duel.pitch.release_speed_kmh()), 22, INK, HORIZONTAL_ALIGNMENT_CENTER, 52.0)
-	_text(at + Vector2(-26.0, 20.0), "km/h", 10, Color(1, 1, 1, 0.75), HORIZONTAL_ALIGNMENT_CENTER, 52.0)
+	figure(at + Vector2(-26.0, 6.0), "%d" % roundi(duel.pitch.release_speed_kmh()), 27, INK, HORIZONTAL_ALIGNMENT_CENTER, 52.0, true)
+	figure(at + Vector2(-26.0, 19.0), "KM/H", 11, Color(1, 1, 1, 0.75), HORIZONTAL_ALIGNMENT_CENTER, 52.0)
 	_text(at + Vector2(-110.0, 50.0), duel.decision.type.label, 17, INK, HORIZONTAL_ALIGNMENT_CENTER, 220.0)
 
 
@@ -272,7 +341,7 @@ func _draw_swing_feedback() -> void:
 			color = ORANGE
 		&"miss":
 			color = RED
-	_text(Vector2(0.0, view.y * 0.62), label, 30, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
+	shout(Vector2(0.0, view.y * 0.62), label, 36, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
 	if Settings.hit_info and duel.contact != null and duel.contact.made_contact:
 		var info := "타구 속도 %d km/h   발사각 %d°   방향 %d°" % [roundi(duel.contact.exit_speed_kmh()), roundi(duel.contact.launch_deg()), roundi(duel.contact.spray_deg())]
 		var box := Rect2(Vector2(view.x * 0.5 - 260.0, view.y - 110.0 - bottom_reserved), Vector2(520.0, 42.0))
@@ -284,7 +353,7 @@ func _draw_banner() -> void:
 	if scene.banner_time <= 0.0:
 		return
 	var alpha := clampf(scene.banner_time / 0.4, 0.0, 1.0)
-	_text(Vector2(0.0, view.y * 0.3), scene.banner, 46, Color(1, 1, 1, alpha), HORIZONTAL_ALIGNMENT_CENTER, view.x)
+	shout(Vector2(0.0, view.y * 0.3), scene.banner, 56, Color(1, 1, 1, alpha), HORIZONTAL_ALIGNMENT_CENTER, view.x)
 
 
 func _draw_help() -> void:
@@ -292,6 +361,6 @@ func _draw_help() -> void:
 	if scene.human_bats():
 		line = "왼쪽 클릭 컨택 스윙   오른쪽 클릭 파워 스윙   V 조준 %s      %s" % ["끄기" if scene.aim_enabled else "켜기", line]
 	elif scene.human_pitches():
-		line = "1~%d 구종   마우스 코스   누르고 있기 → 떼기 → 고리가 맞을 때 클릭      %s" % [scene.pitch_ids.size(), line]
+		line = "오른쪽 버튼을 누른 채 구종 쪽으로(또는 1~%d)   마우스 코스   왼쪽 버튼 누르고 있기 → 떼기 → 고리가 맞을 때 클릭      %s" % [mini(scene.pitch_ids.size(), DuelScene.WHEEL_SLOTS), line]
 	draw_rect(Rect2(Vector2(0.0, view.y - 34.0), Vector2(view.x, 34.0)), PANEL)
 	_text(Vector2(16.0, view.y - 11.0), line, 15, Color(1, 1, 1, 0.85))

@@ -33,7 +33,7 @@ const POLE_HEIGHT := 16.0
 ## The scoreboard's screen (m); ad boards are AD_LENGTH m long, AD_SLOTS of them to a strip.
 const SCREEN_SIZE := Vector2(28.0, 12.0)
 const AD_LENGTH := 7.0
-const AD_SLOTS := 8
+const AD_SLOTS := 12
 ## One person a seat this wide (m); the cheering sections run from CHEER_FROM to CHEER_TO
 ## degrees round from centre field, their first CHEER_ROWS rows.
 const SEAT_PITCH := 0.5
@@ -366,6 +366,8 @@ func _build_fence() -> void:
 		var d := fence.distance_at(az)
 		var sign := Label3D.new()
 		sign.text = str(roundi(d))
+		# Painted on the fence in block figures.
+		sign.font = UiTheme.face(&"wall")
 		sign.font_size = 160
 		sign.pixel_size = 0.006
 		sign.outline_size = 0
@@ -989,7 +991,7 @@ func _build_ads() -> void:
 		var az1 := reach + (360.0 - 2.0 * reach) * (i + 1) / STEPS
 		_ad_quad(_rim(az0, -0.03, 0.15), _rim(az1, -0.03, 0.15), 0.95)
 	var strip := SubViewport.new()
-	strip.size = Vector2i(AD_SLOTS * 256, 64)
+	strip.size = Vector2i(AD_SLOTS * 384, 96)
 	strip.render_target_update_mode = SubViewport.UPDATE_ONCE
 	strip.transparent_bg = false
 	var boards := AdStrip.new()
@@ -1035,7 +1037,7 @@ func _build_scoreboard() -> void:
 	var title := Label.new()
 	title.text = def.name
 	title.add_theme_font_size_override("font_size", 96)
-	title.add_theme_font_override("font", UiTheme.font(700))
+	title.add_theme_font_override("font", UiTheme.face(&"board"))
 	title.position = Vector2(80.0, 240.0)
 	blank.add_child(title)
 	add_child(scoreboard)

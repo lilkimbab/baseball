@@ -8,6 +8,8 @@ extends SceneTree
 ## Options: --out <file>  --swing <seconds after contact, default 0.2>  --face (the head and
 ## shoulders only, for the skin)  --tone <0..1, fair to sun-browned>
 ## --stubble <0..1>  --subject catcher|umpire (the catcher's or the umpire's gear, from in front)
+## --behind (the batter from behind on the third-base side: his back, name and number, as in
+## the reference still of a follow-through)
 ## With a recorded swing in the local content pack the batter is shown in that swing;
 ## otherwise in the hand-made follow-through pose.
 
@@ -20,6 +22,7 @@ var _face := false
 var _tone := -1.0
 var _stubble := -1.0
 var _subject := "batter"
+var _behind := false
 
 
 func _initialize() -> void:
@@ -30,6 +33,7 @@ func _initialize() -> void:
 	_tone = float(str(args.get("tone", "-1")))
 	_stubble = float(str(args.get("stubble", "-1")))
 	_subject = str(args.get("subject", "batter"))
+	_behind = args.has("behind")
 	_scene = (load("res://match/duel.tscn") as PackedScene).instantiate() as DuelScene
 	_scene.mode = &"watch"
 	root.add_child(_scene)
@@ -99,6 +103,11 @@ func _compose() -> void:
 		blur.dof_blur_far_distance = 6.0
 		var height := 0.85 if _subject == "catcher" else 1.45
 		_camera.look_at_from_position(Field.to_world(at + Vector3(0.7, 2.6, height + 0.25)), Field.to_world(at + Vector3(0.0, 0.0, height)))
+	if _behind:
+		_camera.fov = 30.0
+		blur.dof_blur_far_distance = 9.0
+		blur.dof_blur_far_transition = 6.0
+		_camera.look_at_from_position(Field.to_world(stands + Vector3(-2.6, -2.3, 1.45)), Field.to_world(stands + Vector3(0.1, 0.2, 1.12)))
 	if _tone >= 0.0:
 		var body := batter.find_child("Body", true, false) as MeshInstance3D
 		body.set_instance_shader_parameter(&"tone", SkinnedPuppet.SKIN_FAIR.lerp(SkinnedPuppet.SKIN_TANNED, _tone))
