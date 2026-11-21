@@ -297,6 +297,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if pause_menu.visible or menu.visible:
 		return
+	if key != null and not key.echo and choice_key(key.keycode, key.pressed):
+		get_viewport().set_input_as_handled()
+		return
 	super._unhandled_input(event)
 	if key != null and key.pressed and not key.echo and key.keycode == KEY_SPACE:
 		bunt()
@@ -326,6 +329,119 @@ func _menu_key(code: Key) -> void:
 		pause_menu.close()
 	else:
 		pause_menu.open()
+
+
+# --- The player's throw and running during a play (docs/05 2.3, 2.4; docs/13 S12) ---
+
+
+## Seconds to fill the throw gauge to the top of its green zone.
+const THROW_CHARGE_TIME := 0.6
+## The choice stays open this long (s) after the first fielder has the ball.
+const DECIDE_GRACE := 0.2
+const THROW_KEYS := {KEY_RIGHT: 1, KEY_UP: 2, KEY_LEFT: 3, KEY_DOWN: 4}
+
+## What the player has chosen in this play, and whether he still can: until the first
+## fielder has the ball (`_decide_at`), keys pressed early count (pre-input).
+var _choice: PlayChoice
+var _choice_open := false
+var _decide_at := 0.0
+## The throw gauge while an arrow key is held (−1 when none is), and the base it is for.
+var _charge := -1.0
+var _charge_base := 0
+
+
+## The player's team is in the field / at bat in this play.
+func _controls_fielding() -> bool:
+	return human_team >= 0 and game.fielding() == human_team and not _running
+
+
+func _controls_running() -> bool:
+	return human_team >= 0 and game.batting() == human_team and not _running
+
+
+func choice_open() -> bool:
+	return _choice_open
+
+
+func choice() -> PlayChoice:
+	return _choice
+
+
+## Where the throw gauge is (0 to PlayChoice.FULL), or −1 when no throw key is held.
+func charge() -> float:
+	return _charge
+
+
+func charging_base() -> int:
+	return _charge_base
+
+
+func _open_choice() -> void:
+	_choice = PlayChoice.new()
+	_charge = -1.0
+	_choice_open = false
+	if not (_controls_fielding() or _controls_running()):
+		return
+	# Open until the first fielder has the ball, and a moment after.
+	var first := INF
+	for key: String in _moves.by_key:
+		if not key.begins_with("F:"):
+			continue
+		for m: PlayMoves.Moment in _moves.by_key[key]:
+			if m.kind == PlayMoves.Kind.CATCH:
+				first = minf(first, m.time)
+	if first == INF:
+		return
+	_decide_at = first + DECIDE_GRACE
+	_choice_open = true
+
+
+## A key during a play: an arrow held and let go to throw (fielding), E or Q for the runners
+## (batting). True when it was taken.
+func choice_key(code: Key, pressed: bool) -> bool:
+	if not _choice_open:
+		return false
+	if _controls_fielding() and THROW_KEYS.has(code):
+		var base: int = THROW_KEYS[code]
+		if pressed:
+			_charge = 0.0
+			_charge_base = base
+		elif _charge >= 0.0 and base == _charge_base:
+			_choice.throw_to = base
+			_choice.gauge = _charge
+			_charge = -1.0
+		return true
+	if _controls_running() and (code == KEY_E or code == KEY_Q):
+		if pressed:
+			_choice.running = 1 if code == KEY_E else -1
+		return true
+	return false
+
+
+func _tick_choice(delta: float) -> void:
+	if not _choice_open:
+		return
+	if _charge >= 0.0:
+		_charge = minf(_charge + delta * PlayChoice.GREEN.y / THROW_CHARGE_TIME, PlayChoice.FULL)
+	if _play_time >= _decide_at:
+		_lock_choice()
+
+
+## The fielder has the ball: the play goes on with what the player chose. A key still held
+## throws where it points, with the gauge where it is.
+func _lock_choice() -> void:
+	_choice_open = false
+	if _charge >= 0.0:
+		_choice.throw_to = _charge_base
+		_choice.gauge = _charge
+		_charge = -1.0
+	if not _choice.has_any():
+		return
+	var events := resolver.replay_ball(game, duel, _choice)
+	_play = resolver.last_play
+	_moves = PlayMoves.read(_play.timeline, _play.calls)
+	_pending = events
+	banner = _pitch_banner(events)
 
 
 ## Opens or closes the manager's menu. It opens only between pitches (or from the pause
@@ -518,6 +634,7 @@ func _finish_pitch() -> void:
 		_pending = events
 		_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
 		_batter_at_start = game.batter_id()
+		_open_choice()
 		_enter(State.RESULT)
 		return
 	if play != null and play.foul:
@@ -572,6 +689,7 @@ func step(delta: float) -> void:
 		return
 	if _play_time >= 0.0:
 		_play_time += delta
+		_tick_choice(delta)
 		state_time = 0.0
 		banner_time = maxf(banner_time - delta, 0.0)
 		if _play_time >= _play.timeline.duration + PLAY_TAIL:
@@ -583,6 +701,8 @@ func step(delta: float) -> void:
 func _end_play() -> void:
 	_play_time = -1.0
 	_running = false
+	_choice_open = false
+	_charge = -1.0
 	for e: GameEvent in _pending:
 		_apply(e)
 	_pending.clear()

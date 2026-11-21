@@ -210,3 +210,49 @@ func test_the_catcher_s_mitt_takes_the_pitch_where_it_arrives() -> void:
 		while scene.state == DuelScene.State.RESULT:
 			scene.step(DT)
 	assert_eq(checked, 3, "three caught pitches looked at")
+
+
+func test_the_player_s_throw_or_running_call_is_taken_when_the_fielder_has_the_ball() -> void:
+	# docs/05 2.3, 2.4: keys pressed while the ball is on its way count once it is fielded.
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = 1
+	scene.innings = 3
+	scene.seed_value = 14
+	scene.use_motion = false
+	add_child_autofree(scene)
+	var rng := Rng.new(3)
+	var swung: Array[bool] = [false]
+	var taken := 0
+	var ticks := 0
+	while taken < 2 and ticks < 120000 and not scene.game.over:
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+		if not scene.choice_open() or scene._play_time > 0.05:
+			continue
+		var fielding := scene._controls_fielding()
+		assert_true(scene.choice_key(KEY_RIGHT if fielding else KEY_E, true))
+		if fielding:
+			for i: int in 30:
+				scene.step(DT)
+			assert_true(scene.choice_key(KEY_RIGHT, false))
+		while scene.choice_open():
+			scene.step(DT)
+		if fielding:
+			assert_eq(scene.choice().throw_to, 1)
+			assert_between(scene.choice().gauge, 0.3, 0.7, "a quarter second of gauge")
+		else:
+			assert_eq(scene.choice().running, 1)
+		assert_eq(scene._play, scene.resolver.last_play, "the play shown is the one played again")
+		taken += 1
+		while scene._play_time >= 0.0:
+			scene.step(DT)
+	assert_eq(taken, 2, "two plays with a choice")
+	# The game goes on to the end with its books straight.
+	while not scene.game.over and ticks < 400000:
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+	assert_true(scene.game.over)
+	for t: int in 2:
+		assert_eq(scene.scorer.book.team_batting(t).runs, scene.game.score[t])

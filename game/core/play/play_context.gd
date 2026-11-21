@@ -22,6 +22,11 @@ var running_with_pitch := false
 ## aggressive −), and a squeeze: the runner on third breaks with the pitch.
 var running_shift := 0.0
 var squeeze := false
+## The player's throw (PlayChoice): the base the first throw goes to (0 the fielder's own
+## choice), its speed against his usual, and how much likelier it is to be off line.
+var throw_to := 0
+var throw_power := 1.0
+var throw_wild := 1.0
 
 
 ## A context for the batter now up in `state`, with the fielders at `positions`.

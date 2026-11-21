@@ -37,6 +37,10 @@ var last_duel: PitchDuel
 var last_play: PlayResult
 ## Pitch-by-pitch counts for the calibration report (null: not kept).
 var tally: PitchTally
+## The random state as the last ball in play began, and whether it was a bunt: replay_ball
+## plays it again from there.
+var _ball_rng := PackedInt64Array()
+var _ball_bunt := false
 
 var _queue: Array[GameEvent] = []
 ## Which plate appearance is under way: inning, half and batter.
@@ -422,6 +426,8 @@ func after_pitch(state: GameState, duel: PitchDuel) -> Array[GameEvent]:
 			events.append(hbp)
 			_close_plate_appearance()
 		_:
+			_ball_rng = rng.get_state()
+			_ball_bunt = bunt
 			var play := play_ball(state, duel, bunt)
 			last_play = play
 			if tally != null:
@@ -437,8 +443,27 @@ func after_pitch(state: GameState, duel: PitchDuel) -> Array[GameEvent]:
 	return events
 
 
-## The ball in play, fielded and run out.
-func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false) -> PlayResult:
+## The ball just put in play, played again from the same moment with the player's choices
+## (docs/05 2.3, 2.4): where the fielder throws and how hard, whether the runners go. The
+## random draws are the same up to the choice, so what has been shown so far still happened.
+## The events replace those after_pitch gave for it.
+func replay_ball(state: GameState, duel: PitchDuel, choice: PlayChoice) -> Array[GameEvent]:
+	rng.set_state(_ball_rng)
+	var play := play_ball(state, duel, _ball_bunt, choice)
+	last_play = play
+	var events: Array[GameEvent] = []
+	if play.foul:
+		events.append(GameEvent.pitch(GameEvent.Call.FOUL_BUNT if _ball_bunt else GameEvent.Call.FOUL))
+	else:
+		var e := GameEvent.plate_appearance(play.result, play.moves, 1)
+		e.fielders = play.fielders
+		e.direction = play.direction
+		events.append(e)
+	return events
+
+
+## The ball in play, fielded and run out; `choice` is the player's, if he made one.
+func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false, choice: PlayChoice = null) -> PlayResult:
 	var orders := tactics[state.fielding()]
 	var positions := alignment.positions(state, fence, duel.settings.bats_left, bunt, orders)
 	var ctx := PlayContext.from_state(state, duel.path, field, positions, motion, bunt)
@@ -447,6 +472,8 @@ func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false) -> PlayRes
 	var offence := tactics[state.batting()]
 	ctx.running_shift = offence.running_shift()
 	ctx.squeeze = bunt and offence.order == Tactics.Order.SQUEEZE
+	if choice != null:
+		choice.apply(ctx)
 	return PlaySim.run(ctx, rng)
 
 

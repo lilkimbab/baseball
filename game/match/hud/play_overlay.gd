@@ -3,8 +3,8 @@ extends HudCanvas
 ## What the screen shows while a ball is in play (docs/13 S6-6, S6-7): the bases marked on
 ## the field, where a fly ball will come down, the fielder going after it ("자동 이동" while
 ## fielding is automatic), an edge that lights up toward a ball off the screen, the runners
-## on a small diamond, and the umpire's call on a close play. The throw gauge comes with the
-## player's own throws (stage S12).
+## on a small diamond, and the umpire's call on a close play. When the player's team is in
+## the field, the throw keys and the gauge; at bat, the running keys (S12).
 
 ## Calls closer than this (seconds between ball and runner) are shown.
 const CLOSE := 0.25
@@ -25,6 +25,7 @@ func _draw() -> void:
 	_edge_glow(scene.ball_position(t))
 	_mini_diamond(tl, t)
 	_call(t)
+	_controls()
 
 
 func _project(field_pos: Vector3) -> Vector2:
@@ -134,3 +135,36 @@ func _call(t: float) -> void:
 		var line := "아웃!" if c.out else "세이프!"
 		var alpha := clampf((c.time + CALL_SHOWN - t) / 0.3, 0.0, 1.0)
 		text(Vector2(0.0, view.y * 0.42), line, 64, Color(UiTheme.RED if c.out else UiTheme.GREEN, alpha), HORIZONTAL_ALIGNMENT_CENTER, view.x, 700)
+
+
+## Bottom centre, until the fielder has the ball: where the throw can go and the gauge, or
+## the runners' keys. What is chosen is lit.
+func _controls() -> void:
+	if not scene.choice_open():
+		return
+	var chosen := scene.choice()
+	var box := Rect2(Vector2(view.x * 0.5 - 300.0, view.y - BottomBar.HEIGHT - 260.0), Vector2(600.0, 122.0))
+	panel(box)
+	if scene._controls_fielding():
+		text(box.position + Vector2(20.0, 34.0), "송구", 20, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+		var keys: Array[String] = ["→ 1루", "↑ 2루", "← 3루", "↓ 홈"]
+		for i: int in 4:
+			var base := i + 1
+			var lit := chosen.throw_to == base or (scene.charge() >= 0.0 and scene.charging_base() == base)
+			text(box.position + Vector2(100.0 + i * 120.0, 34.0), keys[i], 20, UiTheme.INK if lit else Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700 if lit else 500)
+		# The gauge: let go in the green for a firm, accurate throw.
+		var gauge := Rect2(box.position + Vector2(20.0, 60.0), Vector2(560.0, 22.0))
+		draw_rect(gauge, Color(1, 1, 1, 0.12))
+		var per := gauge.size.x / PlayChoice.FULL
+		draw_rect(Rect2(gauge.position + Vector2(PlayChoice.GREEN.x * per, 0.0), Vector2((PlayChoice.GREEN.y - PlayChoice.GREEN.x) * per, gauge.size.y)), Color(UiTheme.GREEN, 0.35))
+		var level := scene.charge() if scene.charge() >= 0.0 else (chosen.gauge if chosen.throw_to > 0 else 0.0)
+		var hot := level > PlayChoice.GREEN.y
+		draw_rect(Rect2(gauge.position, Vector2(level * per, gauge.size.y)), UiTheme.RED if hot else UiTheme.GOLD)
+		text(box.position + Vector2(20.0, 108.0), "방향 키를 누르고 초록에서 떼기 · 안 누르면 자동", 15, Color(1, 1, 1, 0.6))
+	elif scene._controls_running():
+		text(box.position + Vector2(20.0, 34.0), "주루", 20, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+		var go := chosen.running == 1
+		var back := chosen.running == -1
+		text(box.position + Vector2(100.0, 34.0), "E  모두 진루", 20, UiTheme.INK if go else Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700 if go else 500)
+		text(box.position + Vector2(300.0, 34.0), "Q  모두 귀루", 20, UiTheme.INK if back else Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700 if back else 500)
+		text(box.position + Vector2(20.0, 80.0), "누르지 않으면 주자가 스스로 판단", 15, Color(1, 1, 1, 0.6))
