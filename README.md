@@ -103,6 +103,7 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
                 #   타격: 왼쪽 클릭 컨택, 오른쪽 클릭 강타, Space 번트 / 투구: 1~5 구종, 누르고 떼고 다시 눌러 힘·정확도
                 #   Esc 일시정지(투구 시간·자동 교체 설정), F 작전·교체, Tab 상세, C 코스 분포, F3 관전
                 #   타구가 나가면 — 수비: 방향 키(→1루 ↑2루 ←3루 ↓홈)를 누르고 초록에서 떼어 송구 / 공격: E 모두 진루, Q 모두 귀루 (안 누르면 자동)
+                #   도루: 주자가 있을 때 Shift를 누르고 있다가 투수가 움직이는 순간 떼기
                 #   타격 연습 장면: ./dev play res://match/duel.tscn
                 #   감독 리그(시즌): ./dev play res://league/league_screen.tscn
                 #   커리어(선수 만들기부터): ./dev play res://career/creation_screen.tscn

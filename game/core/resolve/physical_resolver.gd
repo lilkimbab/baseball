@@ -41,6 +41,9 @@ var tally: PitchTally
 ## plays it again from there.
 var _ball_rng := PackedInt64Array()
 var _ball_bunt := false
+## The base the player's runner is stealing from on the pitch now being thrown (0 none): set
+## by the scene when he lets go of the steal key, cleared with the next pitch.
+var human_steal := 0
 
 var _queue: Array[GameEvent] = []
 ## Which plate appearance is under way: inning, half and batter.
@@ -269,6 +272,22 @@ func _steal(state: GameState) -> GameEvent:
 	return null
 
 
+## The player's runner stealing from `base` on a pitch the catcher caught: `jump` (s) is how
+## much better or worse his start was than a computer runner's, from when he let go of the
+## key against the pitcher's first move (docs/05 2.4).
+func human_steal_event(state: GameState, base: int, jump: float) -> GameEvent:
+	if not _can_steal(state, base):
+		return null
+	var catcher := _catcher(state)
+	if rng.chance(motion.bad_throw * 2.0 * exp(-(catcher.fielding.accuracy - 50.0) / 40.0)):
+		return stolen_on_wild_throw(state, base)
+	var safe := steal_margin(state, base) + jump + rng.next_normal() * STEAL_SPREAD > 0.0
+	var m := RunnerMove.make(base, base + 1) if safe else RunnerMove.out_at_base(base, base + 1, RunnerMove.OutKind.TAG)
+	var steal := GameEvent.running(GameEvent.Kind.STEAL, [m] as Array[RunnerMove])
+	steal.fielders = "" if safe else ("2-6" if base == 1 else "2-5")
+	return steal
+
+
 ## The catcher's throw on a steal gets away into the outfield: the runner goes on a base
 ## past the one he stole, and a runner ahead moves up too (both on the error).
 static func stolen_on_wild_throw(state: GameState, base: int) -> GameEvent:
@@ -340,6 +359,7 @@ func _catcher_fit(catcher: Player) -> float:
 
 ## A pitch ready to throw between the batter and pitcher now up.
 func new_duel(state: GameState) -> PitchDuel:
+	human_steal = 0
 	var batter := state.batting_team().player(state.batter_id())
 	var pitcher := state.fielding_team().player(state.pitcher_id())
 	var s := DuelSettings.new()
@@ -472,6 +492,7 @@ func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false, choice: Pl
 	var offence := tactics[state.batting()]
 	ctx.running_shift = offence.running_shift()
 	ctx.squeeze = bunt and offence.order == Tactics.Order.SQUEEZE
+	ctx.stealing = human_steal
 	if choice != null:
 		choice.apply(ctx)
 	return PlaySim.run(ctx, rng)

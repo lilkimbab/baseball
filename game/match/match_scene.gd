@@ -150,8 +150,10 @@ var _dropped_bat: MeshInstance3D
 const BAT_DROPPED_AT := 0.2
 ## Seconds since the plate umpire called time (negative: he has not).
 var _time_called := -1.0
-## The play being shown is a steal or a pickoff (RunningPlay), not a ball in play.
+## The play being shown is a steal or a pickoff (RunningPlay), not a ball in play; and it
+## opens with its own pitch (a computer runner's steal) rather than at the catch.
 var _running := false
+var _running_pitch := false
 ## Where each running puppet is in his stride (steps).
 var _strides: Dictionary[Puppet, float] = {}
 ## Where a right-handed batter stands in the box (field coordinates).
@@ -295,6 +297,8 @@ func swing_feedback_visible() -> bool:
 
 
 func help_keys() -> String:
+	if steal_base() > 0:
+		return "Shift 도루(투수가 움직일 때 떼기)   Space 번트   F 작전·교체   Esc 종료"
 	return "Space 번트   F 작전·교체   F3 관전   Esc 종료"
 
 
@@ -313,6 +317,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if pause_menu.visible or menu.visible:
 		return
 	if key != null and not key.echo and choice_key(key.keycode, key.pressed):
+		get_viewport().set_input_as_handled()
+		return
+	if key != null and not key.echo and key.keycode == KEY_SHIFT and steal_key(key.pressed):
 		get_viewport().set_input_as_handled()
 		return
 	super._unhandled_input(event)
@@ -363,6 +370,94 @@ var _decide_at := 0.0
 ## The throw gauge while an arrow key is held (−1 when none is), and the base it is for.
 var _charge := -1.0
 var _charge_base := 0
+
+
+# --- The player's steal (docs/05 2.4) ---
+
+
+## The jump a runner gets by letting go of the key against the pitcher's first move (the
+## start of the delivery): best within GOOD_GO s of it, worse the later; early, the pitcher
+## sees him leave. Seconds better than a computer runner's start.
+const GOOD_GO := 0.15
+const BEST_JUMP := 0.15
+const LATE_COST := 0.5
+const EARLY_JUMP := -0.3
+
+var _steal_held := false
+var _steal_from := 0
+## The jump of the steal on this pitch (NAN when there is none), and the pitch clock when he
+## went.
+var _steal_jump := NAN
+var _steal_go_at := 0.0
+
+
+## The base the player's runner could steal from now (0 when none can): first with second
+## open, else second with third open and fewer than two out.
+func steal_base() -> int:
+	if not human_bats() or _play_time >= 0.0 or not (state == State.PRE_PITCH or state == State.WINDUP):
+		return 0
+	for base: int in [1, 2]:
+		if game.runner_on(base) != null and game.base_empty(base + 1) and not (base == 2 and game.outs == 2):
+			return base
+	return 0
+
+
+func steal_jump() -> float:
+	return _steal_jump
+
+
+## Shift held, then let go as the pitcher starts his delivery. True when the key was taken.
+func steal_key(pressed: bool) -> bool:
+	if pressed:
+		var base := steal_base()
+		if base == 0 or not is_nan(_steal_jump):
+			return false
+		_steal_held = true
+		_steal_from = base
+		return true
+	if not _steal_held:
+		return false
+	_steal_held = false
+	if state == State.LIVE or (_pitch_clock >= 0.0 and _pitch_clock > release_time()):
+		return true
+	_steal_jump = EARLY_JUMP if _pitch_clock < 0.0 else BEST_JUMP - LATE_COST * maxf(_pitch_clock - GOOD_GO, 0.0)
+	_steal_go_at = maxf(_pitch_clock, 0.0)
+	resolver.human_steal = _steal_from
+	banner = "도루 시도!"
+	banner_time = 1.2
+	return true
+
+
+## After a pitch the catcher held: the player's runner, already going, is thrown on.
+func _finish_steal() -> bool:
+	var jump := _steal_jump
+	_steal_jump = NAN
+	_steal_held = false
+	if is_nan(jump) or game.over or game.runner_on(_steal_from) == null:
+		return false
+	var e := resolver.human_steal_event(game, _steal_from, jump)
+	if e == null:
+		return false
+	if e.fielders == "E2":
+		_apply(e)
+		banner = last_text
+		banner_time = 2.2
+		return false
+	var m := e.moves[0]
+	var cover := Position.Kind.SS if _steal_from == 1 else Position.Kind.B3
+	var margin := resolver.steal_margin(game, _steal_from) + jump
+	var play := RunningPlay.steal(_steal_from, game.runner_on(_steal_from).player_id, not m.is_out(), margin, cover, _stands.get(cover, PlaySim.base_xy(_steal_from + 1)), resolver.motion, false)
+	_play = play
+	_moves = PlayMoves.read(play.timeline, play.calls, false)
+	_running = true
+	_running_pitch = false
+	_play_time = 0.0
+	_pending.clear()
+	_pending.append(e)
+	_runners_at_start = [_id_on(1), _id_on(2), _id_on(3)]
+	_batter_at_start = ""
+	_enter(State.RESULT)
+	return true
 
 
 ## The player's team is in the field / at bat in this play.
@@ -637,6 +732,10 @@ func _finish_pitch() -> void:
 	resolver.last_play = null
 	var events := resolver.after_pitch(game, duel)
 	var play := resolver.last_play
+	if play != null:
+		# Hit (or fouled off): the runner's start went into the play, or he goes back.
+		_steal_jump = NAN
+		_steal_held = false
 	banner = _pitch_banner(events)
 	if play != null and play.infield_fly:
 		# The umpire declares it while the ball is in the air.
@@ -665,6 +764,8 @@ func _finish_pitch() -> void:
 		return
 	for e: GameEvent in events:
 		_apply(e)
+	if _finish_steal():
+		return
 	_enter(State.RESULT)
 
 
@@ -718,6 +819,7 @@ func _end_play() -> void:
 	_play_time = -1.0
 	_dropped_bat.visible = false
 	_running = false
+	_running_pitch = false
 	_choice_open = false
 	_charge = -1.0
 	for e: GameEvent in _pending:
@@ -852,6 +954,7 @@ func _show_running(e: GameEvent) -> bool:
 	_play = play
 	_moves = PlayMoves.read(play.timeline, play.calls, false)
 	_running = true
+	_running_pitch = true
 	_play_time = 0.0
 	_pending.clear()
 	_pending.append(e)
@@ -1016,7 +1119,8 @@ func _pose_cast() -> void:
 	var release := release_time()
 	var k := smoothstep(release - CREEP_LEAD, release, _pitch_clock)
 	var lead := clampf((_pitch_clock - release) / SHUFFLE_TIME, 0.0, float(SHUFFLES))
-	if absf(k - _cast_k) < 0.02 and absf(lead - _cast_lead) < 0.02:
+	var stealing := not is_nan(_steal_jump)
+	if absf(k - _cast_k) < 0.02 and absf(lead - _cast_lead) < 0.02 and not stealing:
 		return
 	_cast_k = k
 	_cast_lead = lead
@@ -1032,6 +1136,15 @@ func _pose_cast() -> void:
 		if not r.visible or i >= _leads.size():
 			continue
 		var toward := (PlaySim.base_xy(i + 2) - PlaySim.base_xy(i + 1)).normalized()
+		if stealing and i + 1 == _steal_from:
+			# The player's runner is off with the pitcher's first move.
+			var ran := minf(maxf(_pitch_clock - _steal_go_at, 0.0) * RunningPlay.RUNNER_SPEED, Field.BASE_DISTANCE * 0.7)
+			var going := _leads[i] + toward * ran
+			r.position = Field.to_world(Vector3(going.x, going.y, 0.0))
+			_turn(r, _yaw_toward(Vector2.ZERO, toward))
+			r.frame_time = _frame_time
+			r.apply(PuppetClips.run_at(_stride(r, RunningPlay.RUNNER_SPEED), 1.0))
+			continue
 		var at := _leads[i] + toward * (SHUFFLE * lead)
 		r.position = Field.to_world(Vector3(at.x, at.y, 0.0))
 		var side := signf(r.to_local(r.position + Field.to_world(Vector3(toward.x, toward.y, 0.0)) - Field.to_world(Vector3.ZERO)).x)
@@ -1370,11 +1483,11 @@ func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 	var here := Vector2(now.x, now.y)
 	var m: PlayMoves.Moment = _moves.now(key, t) if _moves != null else null
 	# On a steal the pitcher delivers and the catcher waits in his crouch for the pitch.
-	if _running and key == "F:P" and t < RunningPlay.STEAL_LEAD_IN + 0.4 and _play.calls[0].base != 1:
+	if _running_pitch and key == "F:P" and t < RunningPlay.STEAL_LEAD_IN + 0.4 and _play.calls[0].base != 1:
 		p.rotation.y = PI
 		p.apply(PuppetClips.pitch(t - RunningPlay.STEAL_LEAD_IN + PuppetClips.PITCH_RELEASE))
 		return
-	if _running and key == "F:C" and t < RunningPlay.STEAL_LEAD_IN + RunningPlay.PITCH_FLIGHT:
+	if _running_pitch and key == "F:C" and t < RunningPlay.STEAL_LEAD_IN + RunningPlay.PITCH_FLIGHT:
 		p.rotation.y = 0.0
 		catch_at(p, PuppetClips.catcher(), p.to_local(Field.to_world(_ball_at(tl, t))), smoothstep(-0.3, -0.05, t - RunningPlay.STEAL_LEAD_IN - RunningPlay.PITCH_FLIGHT))
 		return
