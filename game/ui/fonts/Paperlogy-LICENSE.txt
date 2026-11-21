@@ -1,0 +1,6 @@
+Paperlogy (페이퍼로지) Medium / SemiBold / Bold / ExtraBold
+Copyright (c) 2024 이주임 · 김도균 (Freesentation). SIL Open Font License 1.1.
+https://freesentation.blog/paperlogyfont — distributed copy: noonnu.cc
+
+Barlow Condensed: SIL Open Font License 1.1 (BarlowCondensed-OFL.txt), github.com/jpt/barlow
+Pretendard (fallback): SIL Open Font License 1.1 (Pretendard-LICENSE.txt)

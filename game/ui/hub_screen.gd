@@ -1,39 +1,174 @@
 class_name HubScreen
 extends Screen
-## The hub (docs/05 section 5): the main menu in one row along the bottom — quick game, the
-## manager league, the career, the practice field, load, settings — and above it what is in
-## progress. Every screen is within three clicks of here.
+## Home (docs/05 section 5): the club's best player standing in the park on the left, his
+## number huge behind him and his name under him; on the right the next game as a match-up
+## with the way into it, and the four ways to play as picture cards. Everything else is in
+## the bar along the top.
 
-const QUICK := "res://ui/quick_match_screen.tscn"
-const LOAD := "res://ui/load_screen.tscn"
-const SETTINGS := "res://ui/settings_screen.tscn"
-const PRACTICE := "res://match/duel.tscn"
+var _clubs: Array[Team] = []
+
+
+func setup() -> void:
+	vantage = &"home"
+	back = TITLE
+	dock_id = "hub"
+	hints = [["ESC", "타이틀 화면"], ["CLICK", "선택"]]
 
 
 func build() -> void:
-	title("허브")
+	if _clubs.is_empty():
+		_clubs = RosterIO.load_pack(LeagueSession.PACK)
+	var columns := UiKit.hbox(28)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	_build_star(columns)
+	var right := UiKit.vbox(20)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(right)
+	_build_next(right)
+	var cards := UiKit.hbox(16)
+	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right.add_child(cards)
+	var colours := UiTheme.MODE_COLOURS
+	var league := ModeTile.make("리그 모드", "3부 리그에서 정상까지", "trophy", func() -> void: go(dock_path("league")), colours["league"], "LEAGUE", "league")
 	if LeagueSession.season != null:
-		var s := LeagueSession.season
-		line("감독 리그 진행 중: %s · %d년 %d일째" % [(s.teams[s.my_team] as Team).name, s.season_year, s.day + 1], UiTheme.INK)
+		league.status = "진행 중"
+	var career := ModeTile.make("커리어 모드", "신인에서 프랜차이즈 스타로", "user-circle", func() -> void: go(dock_path("career")), colours["career"], "CAREER", "career")
 	if CareerSession.career_season != null:
+		career.status = "진행 중"
+	cards.add_child(ModeTile.make("친선 경기", "두 팀을 골라 바로 플레이", "baseball", func() -> void: go(QUICK), colours["quick"], "EXHIBITION", "exhibition"))
+	cards.add_child(league)
+	cards.add_child(career)
+	cards.add_child(ModeTile.make("연습 모드", "타격 · 투구 자유 연습", "target", func() -> void: go(PRACTICE), colours["practice"], "PRACTICE", "practice"))
+
+
+## The club (the one managed, the career's, or the first of the league's) and its best hitter.
+func _featured() -> Array:
+	var team: Team = null
+	var player: Player = null
+	var season: Season = null
+	if CareerSession.career_season != null and LeagueSession.season == null:
 		var cs := CareerSession.career_season
-		line("커리어 진행 중: %s · %d년 %d일째" % [cs.career.player.name, cs.season.season_year, cs.season.day + 1], UiTheme.INK)
-	if LeagueSession.season == null and CareerSession.career_season == null:
-		line("아래에서 고른다. 감독 리그와 커리어는 매일 자동으로 저장된다.", UiTheme.DIM)
-	var bar := HBoxContainer.new()
-	bar.add_theme_constant_override("separation", 12)
-	bar.position = Vector2(0.0, 0.0)
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0.0, 640.0)
-	content.add_child(spacer)
-	content.add_child(bar)
-	button("빠른 경기", func() -> void: go(QUICK), bar, 250.0)
-	button("감독 리그", func() -> void: go(LeagueSession.SCREEN), bar, 250.0)
-	button("커리어", func() -> void: go(CareerSession.HUB if CareerSession.career_season != null else CareerSession.CREATE), bar, 250.0)
-	button("훈련장", func() -> void: go(PRACTICE), bar, 250.0)
-	button("불러오기", func() -> void: go(LOAD), bar, 250.0)
-	button("설정", func() -> void: go(SETTINGS), bar, 250.0)
-	button("끝내기", func() -> void: get_tree().quit(), bar, 150.0)
+		season = cs.season
+		team = cs.season.teams.get(cs.career.team_id)
+		player = cs.career.player
+	elif LeagueSession.season != null:
+		season = LeagueSession.season
+		team = season.teams[season.my_team]
+	else:
+		team = _clubs[0] if not _clubs.is_empty() else null
+	if team != null and player == null:
+		var best := -1.0
+		for p: Player in team.first_team():
+			var value := p.batting.contact() + p.batting.power() if not p.is_pitcher() else 0.0
+			if value > best:
+				best = value
+				player = p
+	return [team, player, season]
+
+
+func _build_star(parent: Control) -> void:
+	var pick := _featured()
+	var team: Team = pick[0]
+	var player: Player = pick[1]
+	var season: Season = pick[2]
+	var column := UiKit.vbox(6)
+	column.custom_minimum_size.x = 600.0
+	parent.add_child(column)
+	if player == null:
+		return
+	# The man, his number huge behind him.
+	var stand := Control.new()
+	stand.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stand.clip_contents = true
+	column.add_child(stand)
+	var big := UiKit.latin("%d" % player.number, 560, Color(1.0, 1.0, 1.0, 0.08), true)
+	big.set_anchors_preset(Control.PRESET_FULL_RECT)
+	big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	big.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	big.add_theme_constant_override("shadow_offset_y", 0)
+	stand.add_child(big)
+	var stage := PlayerStage.make(600.0, 500.0)
+	stage.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stage.show_player(player, team)
+	stand.add_child(stage)
+	# His name.
+	var row := UiKit.hbox(16)
+	column.add_child(row)
+	row.add_child(UiKit.club_mark(team, 84.0))
+	var words := UiKit.vbox(-2)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_child(UiKit.latin("FRANCHISE PLAYER", 17, tint, true))
+	words.add_child(UiKit.heading(player.name, 46))
+	words.add_child(UiKit.label("%s  ·  %s  ·  No.%d" % [team.name, Position.name_of(player.primary_position()), player.number], 17, UiTheme.DIM, 500))
+	row.add_child(words)
+	var ovr := ClubRules.player_ovr(player, season.ovr, season.catalog) if season != null else (player.batting.contact() + player.batting.power() + player.batting.eye + player.fielding.overall()) / 4.0
+	row.add_child(UiKit.figure("%d" % roundi(ovr), "OVR", UiTheme.rating_color(ovr), 52))
+	var card := UiKit.button("선수 카드", func() -> void: PlayerCard.open_for(self, player, season), "identification-card")
+	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(card)
+
+
+## The next game as a match-up, with the way into it.
+func _build_next(parent: Control) -> void:
+	var s := LeagueSession.season
+	var away: Team = _clubs[QuickMatchScreen.away_index] if not _clubs.is_empty() else null
+	var home: Team = _clubs[QuickMatchScreen.home_index] if _clubs.size() > 1 else null
+	var title_text := "친선 경기"
+	var caption := "EXHIBITION"
+	var colour: Color = UiTheme.MODE_COLOURS["quick"]
+	var line := "%d이닝 · 구장과 시간은 경기 설정에서" % Settings.innings
+	var action := func() -> void: go(QUICK)
+	var word := "경기 설정"
+	if s != null:
+		var g := s.my_game_today()
+		var d := s.division_of(s.my_team)
+		title_text = "다음 경기"
+		caption = "LEAGUE · DAY %d" % (s.day + 1)
+		colour = UiTheme.MODE_COLOURS["league"]
+		line = "%d부 리그 · %d년 시즌" % [d + 1, s.season_year]
+		word = "리그로 이동"
+		action = func() -> void: go(LeagueSession.SCREEN)
+		if g != null:
+			away = s.teams[g.away]
+			home = s.teams[g.home]
+			if g.played:
+				line += " · 경기 종료 %d : %d" % [g.away_score, g.home_score]
+		else:
+			away = null
+			home = s.teams[s.my_team]
+			line += " · 오늘은 경기가 없습니다"
+	var p := GlassPanel.make(title_text, "", 0.0, colour, caption)
+	parent.add_child(p)
+	var row := UiKit.hbox(18)
+	p.body.add_child(row)
+	if away != null:
+		row.add_child(_side(away, "AWAY"))
+		row.add_child(UiKit.number("VS", 60, Color(1.0, 1.0, 1.0, 0.9)))
+	if home != null:
+		row.add_child(_side(home, "HOME"))
+	row.add_child(UiKit.spacer(0.0, 0.0, true))
+	var right := UiKit.vbox(12)
+	right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(right)
+	var info := UiKit.label(line, 17, UiTheme.DIM, 500)
+	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	right.add_child(info)
+	var play := UiKit.button(word, action, "play", "primary", 300.0)
+	play.add_theme_font_size_override("font_size", 24)
+	play.size_flags_horizontal = Control.SIZE_SHRINK_END
+	right.add_child(play)
+
+
+func _side(team: Team, tag: String) -> Control:
+	var box := UiKit.hbox(14)
+	box.add_child(UiKit.club_mark(team, 96.0))
+	var words := UiKit.vbox(-2)
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	words.add_child(UiKit.latin(tag, 16, UiTheme.DIM, true))
+	words.add_child(UiKit.heading(team.name, 26))
+	box.add_child(words)
+	return box
 
 
 ## Loads a save and opens its screen.
@@ -47,7 +182,7 @@ static func load_slot(from: Node, slot: String, mode: String) -> bool:
 		CareerSession.season = cs.season
 		CareerSession.slot = slot
 		if from.is_inside_tree():
-			from.get_tree().change_scene_to_file(CareerSession.HUB)
+			Loading.go(from.get_tree(), CareerSession.HUB)
 		return true
 	var s := SaveIO.load_league(slot)
 	if s == null:
@@ -55,5 +190,5 @@ static func load_slot(from: Node, slot: String, mode: String) -> bool:
 	LeagueSession.season = s
 	LeagueSession.slot = slot
 	if from.is_inside_tree():
-		from.get_tree().change_scene_to_file(LeagueSession.SCREEN)
+		Loading.go(from.get_tree(), LeagueSession.SCREEN)
 	return true

@@ -146,12 +146,12 @@ func _record_result() -> void:
 
 func leave_unplayed() -> void:
 	LeagueSession.pending = null
-	get_tree().change_scene_to_file(LeagueSession.SCREEN)
+	Loading.go(get_tree(), LeagueSession.SCREEN, {"title": "리그로 이동 중"})
 
 
 func back_to_league() -> void:
 	_record_result()
-	get_tree().change_scene_to_file(LeagueSession.SCREEN)
+	Loading.go(get_tree(), LeagueSession.SCREEN, {"title": "리그로 이동 중"})
 
 
 ## The player's side never changes in this mode; F3 does nothing.

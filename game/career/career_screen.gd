@@ -1,216 +1,351 @@
 class_name CareerScreen
-extends Control
-## The career's screen between games (docs/02 section 6, docs/13 S8-3, S8-5): the player's
-## card (place, ratings, growth points, popularity, his numbers on both teams), today's game
-## (played on screen with only his scenes, or at once), the last game's report, growth (spend
-## each field's points on its ratings), and his division's table.
-##
-##   ./dev play res://career/creation_screen.tscn   (then 커리어 시작)
+extends Screen
+## The career's screen between games (docs/02 section 6, docs/13 S8-3, S8-5). Its tabs: today
+## (the player standing beside the day's game — played on screen with only his scenes, or at
+## once — the last game's report and his numbers on both teams), growth (each field's points
+## spent on its ratings; a pitcher's pitches) and his division's table.
 
 const RATING_NAMES := {
-	"contact": "컨택", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루",
+	"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루",
 	"range": "수비 범위", "hands": "포구", "arm": "송구", "accuracy": "송구 정확도",
 	"control": "제구", "stamina": "체력", "velocity": "구속", "movement": "구위·변화", "command": "로케이션",
 }
 const FIELD_NAMES := {"batting": "타격", "fielding": "수비", "running": "주루", "pitching": "투구"}
+const FIELD_ICONS := {"batting": "baseball-helmet", "fielding": "shield", "running": "sneaker-move", "pitching": "person-simple-throw"}
+const CAREER_TABS: Array[Array] = [["home", "오늘"], ["growth", "성장"], ["table", "순위"]]
 
 var message := ""
-var _content: HBoxContainer
+var _tab := "home"
 
 
-func _ready() -> void:
-	theme = UiTheme.theme()
-	var bg := ColorRect.new()
-	bg.color = Color(0.03, 0.05, 0.1)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	_content = HBoxContainer.new()
-	_content.position = Vector2(32.0, 28.0)
-	_content.add_theme_constant_override("separation", 28)
-	add_child(_content)
-	get_viewport().size_changed.connect(_fit)
-	_fit()
-	refresh()
-
-
-func _fit() -> void:
-	var screen := get_viewport().get_visible_rect().size
-	var k := UiTheme.scale_for(screen.y)
-	scale = Vector2(k, k)
-	size = screen / k
+func setup() -> void:
+	heading = "커리어 모드"
+	heading_latin = "CAREER"
+	vantage = &"field"
+	dock_id = "career"
 
 
 func refresh() -> void:
-	for child: Node in _content.get_children():
-		_content.remove_child(child)
-		child.queue_free()
-	if is_inside_tree():
+	if is_inside_tree() and CareerSession.career_season != null:
 		CareerSession.autosave()
+	super.refresh()
+
+
+func build() -> void:
 	var cs := CareerSession.career_season
 	if cs == null:
-		var col := _column(800.0)
-		_line(col, "진행 중인 커리어가 없다.", UiTheme.DIM)
-		_button(col, "선수 만들기", func() -> void: get_tree().change_scene_to_file(CareerSession.CREATE))
+		var p := panel("커리어 모드", "user-circle", null, 0.0, "CAREER")
+		p.body.add_child(UiKit.label("진행 중인 커리어가 없습니다. 선수를 만들어 2군에서 출발하세요.", 20, UiTheme.DIM, 500))
+		p.body.add_child(UiKit.button("선수 생성", func() -> void: go(CareerSession.CREATE), "plus", "primary", 320.0))
 		return
-	_build_card(_column(600.0), cs)
-	_build_growth(_column(560.0), cs)
-	_build_table(_column(560.0), cs)
+	var c := cs.career
+	var s := cs.season
+	var team: Team = s.teams[c.team_id]
+	var phase: String = ["정규 시즌", "포스트시즌", "시즌 종료"][s.phase]
+	set_heading(c.player.name, "%s · %s · %d년 %s %d일차" % [team.name, "1군" if c.first_team else "2군", s.season_year, phase, s.day + 1])
+	if tab_bar != null:
+		var ids: Array = []
+		var labels: Array = []
+		for pair: Array in CAREER_TABS:
+			ids.append(pair[0])
+			labels.append(pair[1])
+		var tabs := UiKit.tabs(ids, labels, _tab, func(id: String) -> void:
+			_tab = id
+			refresh())
+		for b: Node in tabs.get_children():
+			(b as GameButton).tint = tint
+		tab_bar.add_child(tabs)
+	match _tab:
+		"growth":
+			_build_growth(cs)
+		"table":
+			_build_table(cs)
+		_:
+			_build_home(cs, team)
 
 
-func _build_card(col: VBoxContainer, cs: CareerSeason) -> void:
+# --- Today ---
+
+
+func _build_home(cs: CareerSeason, team: Team) -> void:
 	var c := cs.career
 	var p := c.player
 	var s := cs.season
-	var team: Team = s.teams[c.team_id]
+	var columns := UiKit.hbox(20)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	# The man himself.
+	var left := UiKit.vbox(6)
+	left.custom_minimum_size.x = 440.0
+	columns.add_child(left)
+	var stage := PlayerStage.make(440.0, 520.0)
+	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stage.show_player(p, team)
+	left.add_child(stage)
 	var type := cs.rules.type_by_id(c.type_id)
-	_title(col, "%s  #%d" % [p.name, p.number])
-	_line(col, "%s · %s · %s %s" % [cs.rules.position_names.get(c.position, c.position), type.name if type != null else "", team.name, "1군" if c.first_team else "2군"], UiTheme.GOLD)
-	var phase: String = ["정규 시즌", "포스트시즌", "시즌 종료"][s.phase]
-	var avg := 0.0
-	for x: float in c.ratings:
-		avg += x
-	avg = avg / c.ratings.size() if not c.ratings.is_empty() else 0.0
-	_line(col, "%d년 %s · %d일째 · 인기도 %d · 포인트 %d%s" % [s.season_year, phase, s.day + 1, roundi(c.popularity), c.points, ("  · 평균 평점 %.1f" % avg) if avg > 0.0 else ""], UiTheme.INK)
-	var gp := PackedStringArray()
-	for field: String in CareerPlayer.FIELDS:
-		gp.append("%s %d" % [FIELD_NAMES[field], roundi(float(c.gp.get(field, 0.0)))])
-	_line(col, "성장 포인트 · " + " · ".join(gp), UiTheme.INK, 18)
-	var first := _lines(s.book, p.id)
-	var futures := _lines(cs.futures_book, p.id)
-	_line(col, "1군: " + first, UiTheme.DIM, 17)
-	_line(col, "2군: " + futures, UiTheme.DIM, 17)
+	var name_row := UiKit.hbox(12)
+	left.add_child(name_row)
+	name_row.add_child(UiKit.club_mark(team, 72.0))
+	var words := UiKit.vbox(-2)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.add_child(UiKit.latin("No.%d  ·  %s" % [p.number, "FIRST TEAM" if c.first_team else "FARM TEAM"], 17, tint, true))
+	words.add_child(UiKit.heading(p.name, 38))
+	words.add_child(UiKit.label("%s · %s" % [cs.rules.position_names.get(c.position, c.position), type.name if type != null else ""], 16, UiTheme.DIM, 500))
+	name_row.add_child(words)
+	name_row.add_child(UiKit.button("선수 카드", func() -> void: PlayerCard.open_for(self, p, s), "identification-card"))
+
+	var middle := UiKit.vbox(16)
+	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	columns.add_child(middle)
+	_build_today(middle, cs, team)
+	_build_report(middle, cs)
+	_build_numbers(columns, cs)
+
+
+func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
+	var c := cs.career
+	var s := cs.season
+	var p := panel("오늘의 일정", "calendar-blank", parent, 0.0, "DAY %d" % (s.day + 1))
 	if cs.all_star_today:
-		_line(col, "올스타전에 뽑혔다!", UiTheme.GOLD)
-		_button(col, "올스타전 하기 (내 장면만)", func() -> void:
+		p.body.add_child(UiKit.heading("올스타전에 선발되었습니다", 24, UiTheme.ACCENT))
+		var row := UiKit.hbox(10)
+		p.body.add_child(row)
+		row.add_child(UiKit.button("올스타전 출전", func() -> void:
 			cs.special = "all_star"
-			get_tree().change_scene_to_file(CareerSession.MATCH))
-		_button(col, "올스타전 빠른 진행", func() -> void:
+			go(CareerSession.MATCH, {"title": "올스타전"}), "star", "primary"))
+		row.add_child(UiKit.button("빠른 진행", func() -> void:
 			CareerSession.last_report = cs.quick_all_star()
-			refresh())
+			refresh(), "fast-forward"))
 	if cs.derby_waiting:
-		_line(col, "홈런 더비에 나간다 (아웃 %d개까지)" % int(cs.rules.all_star.get("derby_outs", 10)), UiTheme.GOLD)
-		_button(col, "홈런 더비 직접 치기", func() -> void: get_tree().change_scene_to_file(CareerSession.DERBY))
-		_button(col, "홈런 더비 빠른 결과", func() -> void:
+		p.body.add_child(UiKit.heading("홈런 더비 (아웃 %d개)" % int(cs.rules.all_star.get("derby_outs", 10)), 24, UiTheme.ACCENT))
+		var row := UiKit.hbox(10)
+		p.body.add_child(row)
+		row.add_child(UiKit.button("홈런 더비 출전", func() -> void: go(CareerSession.DERBY, {"title": "홈런 더비"}), "fire", "primary"))
+		row.add_child(UiKit.button("빠른 결과", func() -> void:
 			cs.quick_derby()
-			refresh())
+			refresh(), "fast-forward"))
+	var actions := UiKit.hbox(10)
 	if cs.has_game():
 		var g := cs.club_game()
-		var other: Team = s.teams[g.opponent_of(c.team_id)]
-		_line(col, "오늘: %s vs %s (%s)" % ["1군" if c.first_team else "2군", other.name, "홈" if g.home == c.team_id else "원정"], UiTheme.INK)
-		_button(col, "경기하기 (내 장면만)", play_on_screen)
-		_button(col, "빠른 진행", quick)
+		var row := UiKit.hbox(18)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		p.body.add_child(row)
+		row.add_child(UiKit.club_side(s.teams[g.away], "AWAY", 84.0, 22))
+		row.add_child(UiKit.number("VS", 50, Color(1.0, 1.0, 1.0, 0.9)))
+		row.add_child(UiKit.club_side(s.teams[g.home], "HOME", 84.0, 22))
+		var play := UiKit.button("경기 출전", play_on_screen, "play", "primary", 240.0)
+		play.add_theme_font_size_override("font_size", 24)
+		actions.add_child(play)
+		actions.add_child(UiKit.button("빠른 진행", quick, "fast-forward"))
 	elif s.phase != Season.Phase.OVER:
-		_line(col, "오늘은 경기가 없다." if cs.club_game() == null or not c.first_team else "오늘 경기는 끝났다.", UiTheme.DIM)
-		_button(col, "다음 날", next_day)
-	if s.phase != Season.Phase.OVER:
-		_button(col, "시즌 끝까지 빠른 진행", to_end)
+		p.body.add_child(UiKit.label("오늘은 경기가 없습니다." if cs.club_game() == null or not c.first_team else "오늘 경기가 종료되었습니다.", 19, UiTheme.DIM, 500))
+		actions.add_child(UiKit.button("다음 날", next_day, "caret-right", "primary", 200.0))
 	else:
-		_line(col, "시즌이 끝났다.", UiTheme.GOLD)
-	_button(col, "능력치 보기", func() -> void: PlayerCard.open_for(self, c.player, s))
-	_button(col, "허브로", func() -> void: get_tree().change_scene_to_file(Screen.HUB))
+		p.body.add_child(UiKit.heading("시즌이 종료되었습니다", 24, UiTheme.ACCENT))
+	if s.phase != Season.Phase.OVER:
+		actions.add_child(UiKit.button("시즌 끝까지 진행", to_end, "skip-forward"))
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	p.body.add_child(actions)
+	if message != "":
+		p.body.add_child(UiKit.label(message, 17, UiTheme.ACCENT, 600))
+
+
+## The last game: his line, the goal, the rating and medal, what he earned.
+func _build_report(parent: Control, cs: CareerSeason) -> void:
+	var p := panel("지난 경기", "article", parent, 0.0, "LAST GAME")
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var r := CareerSession.last_report
-	if r != null:
+	if r == null:
+		p.body.add_child(UiKit.label("아직 치른 경기가 없습니다.", 18, UiTheme.DIM, 500))
+	else:
+		var top := UiKit.hbox(20)
+		p.body.add_child(top)
+		if r.rating > 0.0:
+			top.add_child(UiKit.figure("%.1f" % r.rating, "평점", UiTheme.ACCENT if r.medal > 0 else UiTheme.INK, 48))
+			var medal := GameRating.MEDALS[r.medal]
+			if medal != "":
+				top.add_child(UiKit.figure(medal, "메달", UiTheme.ACCENT, 40))
+		var words := UiKit.vbox(4)
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		words.add_child(UiKit.label(r.line, 19, UiTheme.INK, 600))
+		words.add_child(UiKit.label("목표: %s  —  %s" % [r.goal, "달성" if r.goal_met else "실패"], 17, UiTheme.GREEN if r.goal_met else UiTheme.DIM, 600))
+		if r.reward != "":
+			words.add_child(UiKit.label("보상: " + r.reward, 17, UiTheme.ACCENT, 600))
+		top.add_child(words)
 		var earned := PackedStringArray()
 		for field: String in r.gp:
 			if r.gp[field] > 0.0:
 				earned.append("%s +%d" % [FIELD_NAMES[field], roundi(r.gp[field])])
-		_line(col, "지난 경기: %s · 목표 %s %s" % [r.line, r.goal, "달성" if r.goal_met else "실패"], UiTheme.INK, 17)
-		if r.rating > 0.0:
-			var medal := GameRating.MEDALS[r.medal]
-			_line(col, "평점 %.1f%s%s" % [r.rating, ("  %s메달" % medal) if medal != "" else "", ("  · 보상 " + r.reward) if r.reward != "" else ""], UiTheme.GOLD if r.medal > 0 else UiTheme.INK, 18)
-		_line(col, "얻은 성장 포인트: " + (", ".join(earned) if not earned.is_empty() else "없음"), UiTheme.INK, 17)
+		p.body.add_child(UiKit.label("획득 성장 포인트: " + (", ".join(earned) if not earned.is_empty() else "없음"), 17, UiTheme.INK, 500))
 		if r.called_up:
-			_line(col, "1군에 등록됐다!", UiTheme.GOLD)
+			p.body.add_child(UiKit.heading("1군에 등록되었습니다!", 22, UiTheme.ACCENT))
 		if r.sent_down:
-			_line(col, "2군으로 내려갔다.", UiTheme.RED)
+			p.body.add_child(UiKit.heading("2군으로 내려갔습니다.", 22, UiTheme.RED))
 		for change: String in r.evolved:
-			_line(col, "구종 진화: " + change, UiTheme.GOLD)
-	if message != "":
-		_line(col, message, UiTheme.GOLD, 17)
-	for entry: String in cs.log:
-		_line(col, entry, UiTheme.DIM, 15)
+			p.body.add_child(UiKit.label("구종 진화: " + change, 17, UiTheme.ACCENT, 600))
+	if not cs.log.is_empty():
+		p.body.add_child(UiKit.rule())
+		var scroll := UiKit.scroll()
+		p.body.add_child(scroll)
+		var lines := UiKit.vbox(2)
+		lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.add_child(lines)
+		for entry: String in cs.log:
+			lines.add_child(UiKit.label(entry, 15, UiTheme.DIM, 500))
+
+
+## His standing (popularity, points, average rating), growth points, and his numbers.
+func _build_numbers(parent: Control, cs: CareerSeason) -> void:
+	var c := cs.career
+	var p := panel("선수 현황", "chart-bar", parent, 460.0, "STATUS")
+	var avg := 0.0
+	for x: float in c.ratings:
+		avg += x
+	avg = avg / c.ratings.size() if not c.ratings.is_empty() else 0.0
+	var figures := UiKit.hbox(0)
+	p.body.add_child(figures)
+	for pair: Array in [["%d" % roundi(c.popularity), "인기도"], ["%d" % c.points, "포인트"], ["%.1f" % avg if avg > 0.0 else "-", "평균 평점"]]:
+		var f := UiKit.figure(str(pair[0]), str(pair[1]), UiTheme.INK, 32)
+		f.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		figures.add_child(f)
+	p.body.add_child(UiKit.rule())
+	p.body.add_child(UiKit.caption("성장 포인트"))
+	var fields: Array[String] = ["batting", "running", "fielding"]
+	if c.is_pitcher():
+		fields = ["pitching"]
+	var gp := UiKit.hbox(0)
+	p.body.add_child(gp)
+	for field: String in fields:
+		var f := UiKit.figure("%d" % roundi(float(c.gp.get(field, 0.0))), FIELD_NAMES[field], tint, 30)
+		f.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		gp.add_child(f)
+	p.body.add_child(UiKit.button("성장 탭으로", func() -> void:
+		_tab = "growth"
+		refresh(), "chart-line-up"))
+	p.body.add_child(UiKit.rule())
+	for pair: Array in [["1군 기록", cs.season.book], ["2군 기록", cs.futures_book]]:
+		p.body.add_child(UiKit.caption(str(pair[0])))
+		var well := UiKit.well(10.0)
+		p.body.add_child(well)
+		var line := UiKit.label(_lines(pair[1], c.player.id), 16, UiTheme.INK, 500)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		well.add_child(line)
 
 
 func _lines(book: StatBook, id: String) -> String:
 	var parts := PackedStringArray()
 	var b: BattingLine = book.batting.get(id)
 	if b != null and b.pa > 0:
-		parts.append("%d경기 타율 %s %d홈런 %d타점 OPS %s" % [b.games, BattingLine.rate_text(b.average()), b.home_runs, b.rbi, BattingLine.rate_text(b.ops())])
+		parts.append("%d경기 · 타율 %s · %d홈런 · %d타점 · OPS %s" % [b.games, BattingLine.rate_text(b.average()), b.home_runs, b.rbi, BattingLine.rate_text(b.ops())])
 	var p: PitchingLine = book.pitching.get(id)
 	if p != null and p.outs > 0:
-		parts.append("%d경기 %s이닝 %d승 %d패 %d세이브 평균자책점 %.2f" % [p.games, p.innings_text(), p.wins, p.losses, p.saves, p.era()])
-	return " / ".join(parts) if not parts.is_empty() else "기록 없음"
+		parts.append("%d경기 · %s이닝 · %d승 %d패 %d세이브 · 평균자책점 %.2f" % [p.games, p.innings_text(), p.wins, p.losses, p.saves, p.era()])
+	return "\n".join(parts) if not parts.is_empty() else "기록 없음"
 
 
-func _build_growth(col: VBoxContainer, cs: CareerSeason) -> void:
+# --- Growth ---
+
+
+func _build_growth(cs: CareerSeason) -> void:
 	var c := cs.career
-	_title(col, "성장")
-	_line(col, "분야의 포인트는 그 분야 능력치에만 쓴다. 높을수록 비싸고, 유형의 강점은 20% 싸다.", UiTheme.DIM, 15)
-	var fields: Array[String] = []
+	content.add_child(UiKit.label("각 분야의 성장 포인트는 그 분야의 능력치에만 사용할 수 있습니다. 능력치가 높을수록 비용이 늘고, 유형의 강점은 20% 저렴합니다.", 16, UiTheme.DIM, 500))
+	var columns := UiKit.hbox(20)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	var fields: Array[String] = ["batting", "running", "fielding"]
 	if c.is_pitcher():
-		fields.append("pitching")
-	else:
-		fields.append_array(["batting", "running", "fielding"])
+		fields = ["pitching"]
 	for field: String in fields:
-		_line(col, "%s · %d포인트" % [FIELD_NAMES[field], roundi(float(c.gp.get(field, 0.0)))], UiTheme.GOLD, 18)
+		var have := float(c.gp.get(field, 0.0))
+		var p := panel(FIELD_NAMES[field], FIELD_ICONS[field], columns, 0.0, "%d GP" % roundi(have))
+		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var ratings: PackedStringArray = cs.rules.ratings[field] if cs.rules.ratings.has(field) else PackedStringArray()
 		for rating: String in ratings:
-			var row := HBoxContainer.new()
-			col.add_child(row)
+			var row := UiKit.hbox(10)
+			p.body.add_child(row)
 			var value := Growth.value(c.player, rating)
-			var shown := "%.1fkm/h" % c.player.pitching.fastball_speed() if rating == "velocity" else str(roundi(value))
-			_cell(row, str(RATING_NAMES.get(rating, rating)), 130.0)
-			_cell(row, shown, 90.0)
+			if rating == "velocity":
+				var l := UiKit.label(str(RATING_NAMES.get(rating, rating)), 17, UiTheme.DIM, 600)
+				l.custom_minimum_size.x = 150.0
+				row.add_child(l)
+				var v := UiKit.number("%.1f km/h" % c.player.pitching.fastball_speed(), 24, Color.WHITE)
+				v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				row.add_child(v)
+			else:
+				row.add_child(StatBar.make(str(RATING_NAMES.get(rating, rating)), value))
 			var price := Growth.cost(c, rating, cs.rules)
-			_cell(row, "다음 %d" % ceili(price), 90.0)
-			var b := Button.new()
-			b.text = "+"
-			b.disabled = float(c.gp.get(field, 0.0)) < price
-			b.pressed.connect(func() -> void:
+			var up := UiKit.button("+ %d" % ceili(price), func() -> void:
 				Growth.raise(c, rating, cs.rules)
-				refresh())
-			row.add_child(b)
+				refresh(), "", "primary" if have >= price else "")
+			up.disabled = have < price
+			up.custom_minimum_size.x = 96.0
+			up.tooltip_text = "성장 포인트 %d 사용" % ceili(price)
+			row.add_child(up)
 	if c.is_pitcher():
-		_build_pitches(col, cs)
+		_build_pitches(columns, cs)
 
 
 ## A pitcher's pitches, how often he has thrown each (they evolve with use), and new ones to
 ## learn with pitching points.
-func _build_pitches(col: VBoxContainer, cs: CareerSeason) -> void:
+func _build_pitches(parent: Control, cs: CareerSeason) -> void:
 	var c := cs.career
 	var catalog := cs.season.catalog
-	_line(col, "구종 (많이 던지고 능력치가 오르면 진화)", UiTheme.GOLD, 18)
+	var p := panel("구종", "baseball", parent, 0.0, "PITCHES")
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.body.add_child(UiKit.label("많이 던지고 능력치가 오르면 구종이 진화합니다.", 15, UiTheme.DIM, 500))
 	for a: ArsenalPitch in c.player.pitching.arsenal:
 		var t: PitchType = catalog.get(a.type)
-		_line(col, "%s %dkm/h · 변화 %d · 로케이션 %d · %d구" % [t.label if t != null else String(a.type), roundi(a.velo_avg), roundi(a.movement), roundi(a.command), int(c.pitch_uses.get(a.type, 0))], UiTheme.INK, 16)
+		var well := UiKit.well(10.0)
+		p.body.add_child(well)
+		var box := UiKit.vbox(2)
+		well.add_child(box)
+		var head_row := UiKit.hbox(10)
+		box.add_child(head_row)
+		var name := UiKit.heading(t.label if t != null else String(a.type), 20)
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head_row.add_child(name)
+		head_row.add_child(UiKit.latin("%d km/h  ·  %d구" % [roundi(a.velo_avg), int(c.pitch_uses.get(a.type, 0))], 18, UiTheme.DIM))
+		box.add_child(StatBar.make("변화", a.movement, -1.0, 90.0))
+		box.add_child(StatBar.make("로케이션", a.command, -1.0, 90.0))
 	for id: StringName in PitchEvolution.learnable(c, cs.rules):
 		var t: PitchType = catalog.get(id)
-		var b := Button.new()
-		b.text = "새 구종: %s (투구 %d포인트)" % [t.label if t != null else String(id), roundi(cs.rules.new_pitch_gp)]
-		b.disabled = float(c.gp.get("pitching", 0.0)) < cs.rules.new_pitch_gp
-		b.add_theme_font_size_override("font_size", 15)
-		b.pressed.connect(func() -> void:
+		var b := UiKit.button("새 구종: %s (%d GP)" % [t.label if t != null else String(id), roundi(cs.rules.new_pitch_gp)], func() -> void:
 			PitchEvolution.learn(c, id, cs.rules, catalog)
-			refresh())
-		col.add_child(b)
+			refresh(), "plus")
+		b.disabled = float(c.gp.get("pitching", 0.0)) < cs.rules.new_pitch_gp
+		p.body.add_child(b)
 
 
-func _build_table(col: VBoxContainer, cs: CareerSeason) -> void:
+func _build_table(cs: CareerSeason) -> void:
 	var s := cs.season
 	var d := s.division_of(cs.career.team_id)
-	_title(col, "%d부 순위" % (d + 1))
+	var p := panel("%d부 리그 순위" % (d + 1), "ranking", null, 0.0, "STANDINGS")
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var table := DataTable.new()
+	table.row_height = 46.0
+	table.set_columns([["순위", 70.0, 1], ["구단", 360.0, 0], ["승", 70.0, 2], ["패", 70.0, 2], ["무", 70.0, 2], ["승률", 100.0, 2], ["게임차", 100.0, 2], ["연속", 100.0, 2]])
 	var i := 0
 	for row: StandingsRow in s.standings[d].ranked():
 		i += 1
-		var mine := row.team_id == cs.career.team_id
-		_line(col, "%d  %s  %d승 %d패 %d무  %s" % [i, s.teams[row.team_id].name, row.wins, row.losses, row.ties, row.pct_text()], UiTheme.GOLD if mine else UiTheme.INK, 17)
+		var at := table.add_row([str(i), s.teams[row.team_id].name, str(row.wins), str(row.losses), str(row.ties), row.pct_text(), "%.1f" % s.standings[d].games_behind(row.team_id), row.streak_text()], row.team_id, {0: UiTheme.ACCENT if i <= 4 else UiTheme.DIM})
+		if row.team_id == cs.career.team_id:
+			table.selected = at
+	p.body.add_child(table)
 
 
 # --- Actions ---
 
 
 func play_on_screen() -> void:
-	get_tree().change_scene_to_file(CareerSession.MATCH)
+	var cs := CareerSession.career_season
+	var g := cs.club_game()
+	var info := {"title": "커리어 · %s" % cs.career.player.name}
+	if g != null:
+		info["away"] = cs.season.teams[g.away]
+		info["home"] = cs.season.teams[g.home]
+		info["line"] = "%d년 시즌 %d일차" % [cs.season.season_year, cs.season.day + 1]
+	go(CareerSession.MATCH, info)
 
 
 func quick() -> void:
@@ -239,49 +374,5 @@ func to_end() -> void:
 			CareerSession.last_report = cs.quick()
 		cs.next_day()
 		guard += 1
-	message = "시즌이 끝났다."
+	message = "시즌이 종료되었습니다."
 	refresh()
-
-
-# --- Building blocks ---
-
-
-func _column(width: float) -> VBoxContainer:
-	var col := VBoxContainer.new()
-	col.custom_minimum_size = Vector2(width, 0.0)
-	col.add_theme_constant_override("separation", 6)
-	_content.add_child(col)
-	return col
-
-
-func _title(col: VBoxContainer, line: String) -> void:
-	var l := Label.new()
-	l.text = line
-	l.add_theme_font_size_override("font_size", 28)
-	l.add_theme_color_override("font_color", UiTheme.GOLD)
-	col.add_child(l)
-
-
-func _line(col: Control, line: String, color: Color, font_size: int = 20) -> void:
-	var l := Label.new()
-	l.text = line
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", color)
-	col.add_child(l)
-
-
-func _cell(row: HBoxContainer, line: String, width: float) -> void:
-	var l := Label.new()
-	l.text = line
-	l.custom_minimum_size = Vector2(width, 0.0)
-	l.add_theme_font_size_override("font_size", 17)
-	row.add_child(l)
-
-
-func _button(col: VBoxContainer, label: String, action: Callable) -> void:
-	var b := Button.new()
-	b.text = label
-	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.pressed.connect(action)
-	col.add_child(b)

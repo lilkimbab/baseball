@@ -75,6 +75,6 @@ func _after_result() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if done and key != null and key.pressed and (key.keycode == KEY_ENTER or key.keycode == KEY_ESCAPE):
-		get_tree().change_scene_to_file(CareerSession.HUB)
+		Loading.go(get_tree(), CareerSession.HUB, {"title": "커리어로 이동 중"})
 		return
 	super._unhandled_input(event)

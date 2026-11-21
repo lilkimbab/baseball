@@ -99,6 +99,9 @@ var _swing_shown := false
 var _recorded_contact := Vector3.ZERO
 var _reach := Vector3.ZERO
 var _frame_time := 1.0 / 60.0
+## Batting practice against some pitches only (their ids; empty: every pitch).
+var practice_pool: Array = []
+var from_practice_menu := false
 
 
 func _ready() -> void:
@@ -107,6 +110,7 @@ func _ready() -> void:
 	_rng = Rng.new(seed_value)
 	_ai_rng = _rng.fork(1)
 
+	_read_practice()
 	park = StadiumBuilder.new(stadium if stadium != null else StadiumDef.standard())
 	add_child(park)
 	field_model = park.collision
@@ -133,6 +137,22 @@ func _ready() -> void:
 	_new_duel()
 	target = duel.zone.center()
 	aim_point = duel.zone.center()
+
+
+## The practice field opened from its menu (PracticeScreen): what to practise, against whom,
+## where and at what hour.
+func _read_practice() -> void:
+	if not PracticeScreen.pending or get_script() != DuelScene:
+		return
+	PracticeScreen.pending = false
+	from_practice_menu = true
+	mode = StringName(PracticeScreen.mode)
+	practice_pool = PracticeScreen.pitch_pool()
+	settings.throws_left = PracticeScreen.pitcher_left
+	settings.bats_left = PracticeScreen.batter_left
+	if PracticeScreen.park != "":
+		stadium = StadiumIO.load_park(PracticeScreen.park)
+	time_of_day = StringName(PracticeScreen.time)
 
 
 func set_mode(new_mode: StringName) -> void:
@@ -236,7 +256,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				# The practice field goes back to the hub; run on its own, it ends the program.
 				if OS.get_cmdline_user_args().is_empty() and ResourceLoader.exists("res://ui/hub_screen.tscn"):
-					get_tree().change_scene_to_file("res://ui/hub_screen.tscn")
+					Loading.go(get_tree(), Screen.PRACTICE if from_practice_menu else Screen.HUB, {"title": "연습 종료"})
 				else:
 					get_tree().quit()
 		if human_pitches() and state == State.PRE_PITCH:
@@ -387,6 +407,13 @@ func _release() -> void:
 
 ## The computer's pitch when the player is not pitching.
 func _ai_pitch_decision() -> PitchDecision:
+	if not practice_pool.is_empty():
+		var some: Dictionary[StringName, PitchType] = {}
+		for id: StringName in practice_pool:
+			if catalog.has(id):
+				some[id] = catalog[id]
+		if not some.is_empty():
+			return AiPitcher.choose(some, duel.zone, _ai_rng)
 	return AiPitcher.choose(catalog, duel.zone, _ai_rng)
 
 

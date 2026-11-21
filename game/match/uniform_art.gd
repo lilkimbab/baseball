@@ -12,6 +12,9 @@ var style: UniformStyle
 ## Size of one half (front or back) in metres.
 var half_size := Vector2(0.72, 0.48)
 var font: Font
+## The pinstripes are laid on along the garment's second UV map instead (SkinnedPuppet, when
+## the model has it), evenly round the legs and sleeves.
+var stripes_on_wrap := false
 
 var _scale := 1.0
 
@@ -52,7 +55,7 @@ func _centred(text: String, centre: Vector2, height_m: float, colour: Color, out
 
 func _draw_jersey(half_px: float) -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), style.jersey)
-	if style.jersey_pinstripes:
+	if style.jersey_pinstripes and not stripes_on_wrap:
 		_stripes(style.pinstripe)
 	var band := _m(0.03)
 	for half: int in 2:
@@ -87,7 +90,7 @@ func _draw_jersey(half_px: float) -> void:
 
 func _draw_pants(half_px: float) -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), style.pants)
-	if style.pants_pinstripes:
+	if style.pants_pinstripes and not stripes_on_wrap:
 		_stripes(style.pinstripe)
 	# The side seams are the outer edges of each half: a stripe of the club colour down them.
 	if style.pants_stripe:

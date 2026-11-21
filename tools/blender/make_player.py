@@ -24,6 +24,7 @@ from bl_ext.user_default.mpfb.services.targetservice import TargetService
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gear  # noqa: E402  (the helmets and the catcher's gear, fitted to this body)
+import fold_maps  # noqa: E402  (softening of the baked fold maps)
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT_GLB = ARGS[0] if ARGS else "player_base.glb"
@@ -838,6 +839,7 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_necklin
             u = 0.5 * across if front else 0.5 + 0.5 * (1.0 - across)
             loop[uv].uv = (u, (loop.vert.co.z - z0) / (z1 - z0))
         face.material_index = slots.index(face[region])
+    wrap_uvs(bm, anatomy_of(obj, bm))
     # Slots first, then the mesh: clearing materials afterwards would reset the indices.
     obj.data.materials.clear()
     for slot in slots:
@@ -846,6 +848,53 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_necklin
     bm.free()
     print("make_player: %s %d faces, x %.2f..%.2f m, z %.2f..%.2f m" % (name, len(obj.data.polygons), x0, x1, z0, z1))
     return obj
+
+
+# Round each part of a garment, the arc length (m) a pinstripe fabric's stripes are counted in
+# (docs/13 S11-9): the cloth's own radius about there, so stripes stay about 2.5 cm apart.
+WRAP_RADIUS = {"leg": 0.085, "arm": 0.065, "trunk": 0.16}
+
+
+def wrap_uvs(bm, anatomy):
+    """A second UV map ("Wrap", UV2 in the game) in metres of cloth: u round the part (each leg
+    from the waist down, the trunk, each sleeve), v along it. The game lays the knit and the
+    trousers' pinstripes along it, so they run evenly round a leg. (On the front/back map the
+    sides of the legs are squeezed and the stripes came out as thick dark curves.) The seams are
+    where a garment has them: down the inside of each leg and between the legs, under each
+    sleeve, down the front of the jersey (the placket)."""
+    bones = anatomy.rig.data.bones
+    wrap = bm.loops.layers.uv.new("Wrap")
+    up = Vector((0.0, 0.0, 1.0))
+    for face in bm.faces:
+        bone = anatomy.bone(face)
+        centre = face.calc_center_median()
+        if bone.startswith(("thigh_", "calf_", "foot_")) or (bone in ("pelvis", "Root") and centre.z < anatomy.waist + 0.05):
+            side = "l" if centre.x > 0.0 else "r"
+            a, b = bones["thigh_" + side].head_local, bones["calf_" + side].tail_local
+            kind, zero = "leg", Vector((1.0 if side == "l" else -1.0, 0.0, 0.0))
+        elif bone.startswith(("upperarm_", "lowerarm_")):
+            side = bone[-1]
+            a, b = bones["upperarm_" + side].head_local, bones["upperarm_" + side].tail_local
+            kind, zero = "arm", up
+        else:
+            a = Vector((0.0, bones["spine_01"].head_local.y, 0.0))
+            b = a + up
+            kind, zero = "trunk", Vector((0.0, 1.0, 0.0))
+        d = (b - a).normalized()
+        # The angle is 0 at `zero` (the outside of a leg, the top of a sleeve, the back of the
+        # trunk) and the seam opposite it.
+        zero = (zero - d * zero.dot(d)).normalized()
+        across = d.cross(zero)
+        first = None
+        for loop in face.loops:
+            rel = loop.vert.co - a
+            angle = math.atan2(rel.dot(across), rel.dot(zero))
+            # A face across the seam is laid out whole on one side of it.
+            if first is None:
+                first = angle
+            else:
+                angle = first + math.atan2(math.sin(angle - first), math.cos(angle - first))
+            loop[wrap].uv = (angle * WRAP_RADIUS[kind], rel.dot(d))
 
 
 def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.045):
@@ -951,6 +1000,7 @@ def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.045
     for mat, node in added:
         mat.node_tree.nodes.remove(node)
     bpy.data.objects.remove(hi)
+    fold_maps.soften(out_png)
     print("make_player: baked %s folds to %s (and the shade in them)" % (garment.name, out_png))
 
 
