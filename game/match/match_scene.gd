@@ -45,6 +45,9 @@ func _stride(p: Puppet, speed: float) -> float:
 	return _strides[p]
 
 
+## Seconds the crowd cheers a hit or a run, and claps an out.
+const CHEER_TIME := 3.0
+const CLAP_TIME := 1.6
 ## The umpires hold up the infield fly call this long (s) into the play.
 const INFIELD_FLY_SIGNAL := 1.6
 ## The plate umpire calls time for this long (s) when play stops for a substitution.
@@ -152,6 +155,12 @@ var _dropped_bat: MeshInstance3D
 const BAT_DROPPED_AT := 0.2
 ## Seconds since the plate umpire called time (negative: he has not).
 var _time_called := -1.0
+var crowd: Crowd
+## What the crowd last reacted to (runs and hits for each side, outs) and how long the
+## reaction lasts yet.
+var _crowd_seen := PackedInt32Array([0, 0, 0, 0, 0])
+var _cheer_left := 0.0
+var _clap_left := 0.0
 var board_screen: ScoreboardScreen
 var _board_clock := 0.0
 var _board_shown := ""
@@ -188,6 +197,7 @@ func _ready() -> void:
 	play_overlay = PlayOverlay.new()
 	play_overlay.scene = self
 	layer.add_child(play_overlay)
+	_build_crowd()
 	# The park's scoreboard shows this game.
 	if park.scoreboard != null:
 		board_screen = ScoreboardScreen.new()
@@ -280,6 +290,59 @@ static func time_for(game_day: int) -> StringName:
 		5:
 			return &"day"
 	return &"night"
+
+
+# --- The crowd (docs/13 S14) ---
+
+
+## How full the park is: night games on weekdays draw fewer than weekend ones.
+func crowd_fill() -> float:
+	return 0.6 if time_of_day == &"night" else 0.85
+
+
+func _build_crowd() -> void:
+	crowd = Crowd.new(park)
+	crowd.fill = crowd_fill()
+	crowd.density = [0.3, 0.6, 1.0][clampi(Settings.quality, 0, 2)]
+	crowd.seed_value = seed_value
+	for side: int in 2:
+		var t := _club(side)
+		if t == null:
+			continue
+		var jersey := UniformStyle.for_team(t, side == 1).jersey
+		var colours: Array[Color] = [jersey, t.primary, t.primary, t.accent]
+		if side == 1:
+			crowd.home_colours = colours
+		else:
+			crowd.away_colours = colours
+	add_child(crowd)
+
+
+## The crowd follows the game: the batting side's cheering section is on its feet, cheers with
+## its arms up when its team gets a hit or a run, and the fielding side's claps an out.
+func _crowd_react(delta: float) -> void:
+	if crowd == null or game == null:
+		return
+	crowd.tick(delta)
+	var hits := scorer.book.hits
+	var now := PackedInt32Array([game.score[0], game.score[1], hits[0], hits[1], game.outs])
+	var batting := game.batting()
+	if now[batting] > _crowd_seen[batting] or now[2 + batting] > _crowd_seen[2 + batting]:
+		_cheer_left = CHEER_TIME
+	if now[4] > _crowd_seen[4]:
+		_clap_left = CLAP_TIME
+	_crowd_seen = now
+	_cheer_left = maxf(_cheer_left - delta, 0.0)
+	_clap_left = maxf(_clap_left - delta, 0.0)
+	var home_bats := batting == GameState.HOME and not game.over
+	var away_bats := batting == GameState.AWAY and not game.over
+	var up := Crowd.State.CHEERING if _cheer_left > 0.0 else Crowd.State.STANDING
+	var fielding_mood := Crowd.State.CLAPPING if _clap_left > 0.0 else Crowd.State.SEATED
+	crowd.set_zone(Crowd.Zone.HOME_CHEER, up if home_bats else fielding_mood)
+	crowd.set_zone(Crowd.Zone.AWAY_CHEER, up if away_bats else fielding_mood)
+	var side_cheer := _cheer_left > 0.0
+	crowd.set_zone(Crowd.Zone.FIRST, Crowd.State.CHEERING if side_cheer and home_bats else Crowd.State.SEATED)
+	crowd.set_zone(Crowd.Zone.THIRD, Crowd.State.CHEERING if side_cheer and away_bats else Crowd.State.SEATED)
 
 
 ## A season's game in the home club's park at its time of day.
@@ -1401,6 +1464,7 @@ static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 
 func refresh(delta: float) -> void:
 	_show_target()
+	_crowd_react(delta)
 	# The scoreboard redraws when what it shows changes (about once a pitch).
 	_board_clock -= delta
 	if board_screen != null and _board_clock <= 0.0:
