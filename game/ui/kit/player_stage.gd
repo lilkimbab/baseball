@@ -93,7 +93,7 @@ func _show() -> void:
 	_puppet.set_hair(1 + absi(hash(p.id)) % 4, MatchScene.hair_color_of(p))
 	_puppet.set_face(p.id)
 	if team != null:
-		_puppet.set_logo(team.short_name.substr(0, 1), Color.WHITE if style.cap.get_luminance() < 0.6 else Color(0.1, 0.1, 0.12))
+		_puppet.set_logo(style.cap_letter, style.cap_ink())
 	_puppet.repaint()
 	_puppet.apply(PuppetClips.standing())
 	_frame(p.height_cm / 100.0)

@@ -113,7 +113,12 @@ Godot 4.7로 만드는 3D 야구 게임. 시뮬레이션으로 흘러가는 경�
                 #     F 작전·예약, Enter 개입(3회), 1·2·4 속도, Space 멈춤, → 타석·Shift+→ 이닝 넘기기
 ./dev editor    # Windows에서 Godot 에디터 열기
 ./dev shot      # WSL에서 화면 캡처 → build/shot.png
-./dev model     # 선수 모델 재생성 (Blender + MPFB)
+./dev model     # 선수 모델 재생성 (Blender + MPFB, 체형 4종, 약 25분). 만들 때마다 몸을 재서 표로 출력한다
+                #   체형 설정만 바꿔 재 보기(3초): blender -b --python tools/blender/try_shapes.py -- standard
+                #   옷이 몸에 놓인 모양 그림: TAILOR=build/tailor.png (정면·측면·뒷면)
+./dev materials # 구장·장비용 스캔 재질과 하늘 사진 받기 (CC0)
+tools/assets/fetch_uniform_fonts.sh   # 실제 유니폼 서체 복각본을 content-local/에 받기 (없으면 공개 서체로 그린다)
+./dev tool-win figure_shots build/figure/a   # 선수 전신을 네 방향에서 (--zoom head|top|arm|legs, --team, --away, --build)
 ./dev props     # 장비(글러브, 미트, 배트, 공)를 실제 규격으로 재생성
 ./dev native    # 공 물리 C++ 라이브러리 빌드(리눅스·윈도우, 없으면 GDScript로 돈다)
 ./dev mocap     # 모션캡처 투구·스윙 받기와 변환 (비상업 자료, git 제외)

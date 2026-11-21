@@ -25,14 +25,29 @@ func from_screen(p: Vector2) -> Vector2:
 	return p / k
 
 
+## Text of the broadcast graphics (the score bug, the bars, the panels): the television face.
 func text(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, weight: int = 600) -> void:
-	var f := UiTheme.font(weight)
+	var f := UiTheme.face(&"broadcast", weight)
 	draw_string_outline(f, at, line, align, width, font_size, 4, Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
 	draw_string(f, at, line, align, width, font_size, color)
 
 
 func text_width(line: String, font_size: int, weight: int = 600) -> float:
-	return UiTheme.font(weight).get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	return UiTheme.face(&"broadcast", weight).get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+
+
+## A figure or Latin capitals (a speed, a count, a score): the condensed face.
+func figure(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, slanted: bool = false) -> void:
+	var f := UiTheme.numeric(slanted, true)
+	draw_string_outline(f, at, line, align, width, font_size, 4, Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
+	draw_string(f, at, line, align, width, font_size, color)
+
+
+## What is shouted (an umpire's call, a judgment): the heavy face, with a dark edge.
+func shout(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0) -> void:
+	var f := UiTheme.face(&"impact")
+	draw_string_outline(f, at, line, align, width, font_size, maxi(font_size / 6, 4), Color(0.03, 0.03, 0.05, 0.9 * color.a))
+	draw_string(f, at, line, align, width, font_size, color)
 
 
 func panel(rect: Rect2, color: Color = UiTheme.PANEL) -> void:

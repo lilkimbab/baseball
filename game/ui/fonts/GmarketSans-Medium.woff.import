@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://cu8evhb4j2gly"
-path="res://.godot/imported/Pretendard-SemiBold.otf-391b3d9d4f9e4f658de306d382175c3b.fontdata"
+uid="uid://ym78vi86xqrt"
+path="res://.godot/imported/GmarketSans-Medium.woff-1951c9db63d708e876416531248be74a.fontdata"
 
 [deps]
 
-source_file="res://ui/fonts/Pretendard-SemiBold.otf"
-dest_files=["res://.godot/imported/Pretendard-SemiBold.otf-391b3d9d4f9e4f658de306d382175c3b.fontdata"]
+source_file="res://ui/fonts/GmarketSans-Medium.woff"
+dest_files=["res://.godot/imported/GmarketSans-Medium.woff-1951c9db63d708e876416531248be74a.fontdata"]
 
 [params]
 

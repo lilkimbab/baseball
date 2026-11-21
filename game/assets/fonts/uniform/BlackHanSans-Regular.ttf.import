@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://bakn4poyxlngv"
-path="res://.godot/imported/Pretendard-Regular.otf-220ccb75853a01e2445e060d24aaa12d.fontdata"
+uid="uid://csijv522leqg"
+path="res://.godot/imported/BlackHanSans-Regular.ttf-47ffa300634e6974c93d95764918b71b.fontdata"
 
 [deps]
 
-source_file="res://ui/fonts/Pretendard-Regular.otf"
-dest_files=["res://.godot/imported/Pretendard-Regular.otf-220ccb75853a01e2445e060d24aaa12d.fontdata"]
+source_file="res://assets/fonts/uniform/BlackHanSans-Regular.ttf"
+dest_files=["res://.godot/imported/BlackHanSans-Regular.ttf-47ffa300634e6974c93d95764918b71b.fontdata"]
 
 [params]
 

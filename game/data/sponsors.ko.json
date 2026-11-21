@@ -1,17 +1,17 @@
 {
-  "note": "Made-up sponsors for the boards round the park (docs/06 6.2-8). A local pack can replace this file.",
+  "note": "Made-up sponsors for the boards round the park and the patches on the uniforms (docs/06 6.2-8, docs/13 S11-9): the name, the name in Latin letters (boards and patches carry it large, as real ones do), the board's colours, the kind of mark drawn beside the name and the brand's own lettering (face: heavy, square, round, script, slab or plain). A local pack can replace this file.",
   "sponsors": [
-    { "name": "한빛전자", "bg": "#1a3f8f", "fg": "#ffffff" },
-    { "name": "푸른우유", "bg": "#ffffff", "fg": "#1d6fb8" },
-    { "name": "바다생명", "bg": "#0d6e74", "fg": "#ffffff" },
-    { "name": "달빛라면", "bg": "#d2312b", "fg": "#ffe14a" },
-    { "name": "새솔은행", "bg": "#f2c230", "fg": "#1b1b1b" },
-    { "name": "별빛통신", "bg": "#5b2a86", "fg": "#ffffff" },
-    { "name": "온누리자동차", "bg": "#222222", "fg": "#ffffff" },
-    { "name": "고래보험", "bg": "#2a8bd2", "fg": "#ffffff" },
-    { "name": "하늘항공", "bg": "#ffffff", "fg": "#c41d3a" },
-    { "name": "숲속커피", "bg": "#3a2618", "fg": "#f3dfc0" },
-    { "name": "도담건설", "bg": "#ff7a1a", "fg": "#ffffff" },
-    { "name": "모아마트", "bg": "#1f8a4c", "fg": "#ffffff" }
+    {"name": "한빛전자", "bg": "#1a3f8f", "fg": "#ffffff", "latin": "HANBIT", "mark": "ring", "face": "round"},
+    {"name": "푸른우유", "bg": "#ffffff", "fg": "#1d6fb8", "latin": "PUREUN MILK", "mark": "bars", "face": "script"},
+    {"name": "바다생명", "bg": "#0d6e74", "fg": "#ffffff", "latin": "BADA LIFE", "mark": "diamond", "face": "plain"},
+    {"name": "달빛라면", "bg": "#d2312b", "fg": "#ffe14a", "latin": "DALBIT", "mark": "wave", "face": "heavy"},
+    {"name": "새솔은행", "bg": "#f2c230", "fg": "#1b1b1b", "latin": "SAESOL BANK", "mark": "dot", "face": "square"},
+    {"name": "별빛통신", "bg": "#5b2a86", "fg": "#ffffff", "latin": "BYEOLBIT", "mark": "slash", "face": "round"},
+    {"name": "온누리자동차", "bg": "#222222", "fg": "#ffffff", "latin": "ONNURI MOTORS", "mark": "ring", "face": "plain"},
+    {"name": "고래보험", "bg": "#2a8bd2", "fg": "#ffffff", "latin": "GORAE", "mark": "bars", "face": "heavy"},
+    {"name": "하늘항공", "bg": "#ffffff", "fg": "#c41d3a", "latin": "HANEUL AIR", "mark": "diamond", "face": "plain"},
+    {"name": "숲속커피", "bg": "#3a2618", "fg": "#f3dfc0", "latin": "SUP COFFEE", "mark": "wave", "face": "script"},
+    {"name": "도담건설", "bg": "#ff7a1a", "fg": "#ffffff", "latin": "DODAM E&C", "mark": "dot", "face": "heavy"},
+    {"name": "모아마트", "bg": "#1f8a4c", "fg": "#ffffff", "latin": "MOA MART", "mark": "slash", "face": "square"}
   ]
 }

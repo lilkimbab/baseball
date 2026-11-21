@@ -10,7 +10,7 @@ the jersey is). Shapes and sizes after the equipment itself:
     game shows one or both) reaching down over the ear to the jaw, with a hole at the ear;
   catcher's helmet (hockey style): shell down over the ears to the jaw and the back of the
     neck, a wire cage across the face with a wide opening for the eyes, a throat guard;
-  umpire's mask: a wire frame with padded brow, chin and side pads, worn over the cap;
+  (the umpire's mask is in officials.py, with the rest of what an umpire wears;)
   chest protector: from the collarbones to the belt and round the ribs, quilted in padded
     cells, bound at the edges;
   shin guards: a knee cap, three plates down the shin with wings over the ankle, and a flap
@@ -271,7 +271,7 @@ def batting_helmet(body, marks, rig):
 
 def _visor(bm, head, brow, pts, thetas, reach=0.05, spread=58.0):
     """A short visor over the eyes, from the shell's front edge, tipped down a little."""
-    inner, outer = [], []
+    lining, inner, outer = [], [], []
     steps = 16
     for k in range(steps + 1):
         a = math.radians(-spread + 2.0 * spread * k / steps)
@@ -280,11 +280,16 @@ def _visor(bm, head, brow, pts, thetas, reach=0.05, spread=58.0):
         base = pts[i][-1]
         out = Vector((math.sin(a), -math.cos(a), 0.0))
         length = reach * math.cos(a * 0.9) ** 0.7
-        # The visor starts inside the shell and above its rim (it runs through the shell):
-        # butted against it, slivers between the two let the sun through onto the face.
+        # The visor starts inside the shell and above its rim (it runs through the shell), and
+        # from there a strip goes on up the inside of the shell: butted against it, or just
+        # overlapping it, slivers between the two let the sun through onto the face as a row
+        # of bright specks from the brow down the cheek.
+        lining.append(bm.verts.new(pts[i][-5] - out * 0.004))
         inner.append(bm.verts.new(base - out * 0.02 + Vector((0.0, 0.0, 0.012))))
         outer.append(bm.verts.new(base + out * (0.004 + length) + Vector((0.0, 0.0, -0.016 * length / reach))))
-    return [bm.faces.new((inner[k], outer[k], outer[k + 1], inner[k + 1])) for k in range(steps)]
+    faces = [bm.faces.new((inner[k], outer[k], outer[k + 1], inner[k + 1])) for k in range(steps)]
+    faces += [bm.faces.new((lining[k], inner[k], inner[k + 1], lining[k + 1])) for k in range(steps)]
+    return faces
 
 
 def _ear_flap(head, side, rim, gap, rig):
@@ -426,36 +431,6 @@ def catcher_helmet(body, marks, rig):
     orient(faces, lambda c: Vector((head.centre.x, head.centre.y, c.z)))
     throat = finish("ThroatGuard", guard, rig, lambda co: [("head", 1.0)], ["HelmetPads"], thickness=0.004)
     return [shell, cage, throat]
-
-
-def umpire_mask(body, marks, rig):
-    """The umpire's mask ("Mask"): a wire frame over the face, padded at brow, chin and sides,
-    worn with the cap."""
-    head = Head(body, marks)
-    eye, chin = marks["eye"], marks["chin"]
-    top, bottom = eye.z + 0.044, chin.z - 0.016
-    at = _cage_surface(head, top, bottom, math.radians(50), 0.028)
-    bars = bmesh.new()
-    eye_line = eye.z - 0.022
-    for z in (top, eye_line, eye.z - 0.055, marks["lips"].z - 0.005, bottom):
-        tube(bars, [at(math.radians(a), z) for a in range(-50, 51, 4)] + [at(math.radians(50), z)], 0.0033)
-    for a, from_z in ((0.0, top), (-12.0, eye_line), (12.0, eye_line), (-25.0, eye_line), (25.0, eye_line),
-                      (-38.0, top), (38.0, top), (-50.0, top), (50.0, top)):
-        zs = [from_z + (bottom - from_z) * k / 10 for k in range(11)]
-        tube(bars, [at(math.radians(a), z) for z in zs], 0.0033)
-    # Pads: strips just behind the frame at the brow and chin and down each side.
-    for z0, z1, a0, a1 in ((top + 0.01, top - 0.02, -40.0, 40.0), (bottom + 0.024, bottom - 0.004, -28.0, 28.0),
-                           (top - 0.01, bottom + 0.012, -50.0, -42.0), (top - 0.01, bottom + 0.012, 42.0, 50.0)):
-        cols = []
-        for a in [a0 + (a1 - a0) * k / 8 for k in range(9)]:
-            col = []
-            for z in [z0 + (z1 - z0) * k / 4 for k in range(5)]:
-                p = at(math.radians(a), z)
-                inward = Vector((head.centre.x, head.centre.y, p.z)) - p
-                col.append(bars.verts.new(p + inward.normalized() * 0.009))
-            cols.append(col)
-        orient(grid_faces(bars, cols, material_of=lambda i, j: 1), lambda c: Vector((head.centre.x, head.centre.y, c.z)))
-    return finish("Mask", bars, rig, lambda co: [("head", 1.0)], ["Bars", "HelmetPads"], thickness=0.0, sharp_deg=80.0)
 
 
 # --- Trunk and legs ---

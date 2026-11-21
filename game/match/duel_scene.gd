@@ -241,6 +241,54 @@ func selected_type() -> PitchType:
 	return catalog[pitch_ids[selected_pitch]]
 
 
+# --- The pitch wheel (docs/05 2.2; the user: "a circle with six directions, as in 2K14: the
+# pitch is chosen by the way the mouse goes") ---
+
+## A pitcher throws six pitches at most: one to each of six directions round a circle, the
+## first straight up and the rest clockwise.
+const WHEEL_SLOTS := 6
+## The pointer has to leave the middle of the wheel by this much (px at 1080 lines) to choose.
+const WHEEL_DEAD := 34.0
+
+## Open while the right mouse button is held before a pitch: its middle on the screen, and
+## the pitch the pointer is toward (-1 in the middle: keep the one already chosen).
+var wheel_open := false
+var wheel_centre := Vector2.ZERO
+var wheel_pick := -1
+
+
+## The direction of a slot of the wheel on the screen (y down): 0 straight up, then clockwise.
+static func wheel_direction(slot: int) -> Vector2:
+	return Vector2.UP.rotated(TAU * slot / WHEEL_SLOTS)
+
+
+## The slot the pointer is toward from the wheel's middle, or -1 in the middle or toward a
+## direction this pitcher has no pitch in.
+func wheel_slot_toward(pointer: Vector2) -> int:
+	var away := pointer - wheel_centre
+	if away.length() < WHEEL_DEAD * maxf(get_viewport().get_visible_rect().size.y / 1080.0, 0.5):
+		return -1
+	var slot := posmod(roundi(Vector2.UP.angle_to(away) / (TAU / WHEEL_SLOTS)), WHEEL_SLOTS)
+	return slot if slot < mini(pitch_ids.size(), WHEEL_SLOTS) else -1
+
+
+## Opens the wheel at a place on the screen (the right mouse button; tools and tests call it).
+func open_wheel(at: Vector2) -> void:
+	if not human_pitches() or state != State.PRE_PITCH:
+		return
+	wheel_open = true
+	wheel_centre = at
+	wheel_pick = -1
+
+
+## Closes the wheel and takes the pitch the pointer was toward, if any.
+func close_wheel() -> void:
+	if wheel_open and wheel_pick >= 0:
+		selected_pitch = wheel_pick
+	wheel_open = false
+	wheel_pick = -1
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo:
@@ -261,7 +309,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					get_tree().quit()
 		if human_pitches() and state == State.PRE_PITCH:
 			var index := key.keycode - KEY_1
-			if index >= 0 and index < pitch_ids.size():
+			if index >= 0 and index < mini(pitch_ids.size(), WHEEL_SLOTS):
 				selected_pitch = index
 
 	var click := event as InputEventMouseButton
@@ -272,7 +320,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			swing(SwingAttempt.Kind.CONTACT)
 		elif click.button_index == MOUSE_BUTTON_RIGHT:
 			swing(SwingAttempt.Kind.POWER)
-	elif human_pitches() and click.button_index == MOUSE_BUTTON_LEFT:
+	elif human_pitches() and click.button_index == MOUSE_BUTTON_RIGHT:
+		if click.pressed:
+			open_wheel(click.position)
+		else:
+			close_wheel()
+	elif human_pitches() and click.button_index == MOUSE_BUTTON_LEFT and not wheel_open:
 		if click.pressed:
 			press_pitch_button()
 		else:
@@ -491,20 +544,32 @@ func _finish_pitch() -> void:
 # --- The pitch's path: before it is thrown (the player's), and after (everyone's) ---
 
 
-## Where the pitch the player has chosen would go, at even steps from the hand to the plate,
-## and where it would cross the plate without its spin (the start of the break arrow).
+## Where the pitch the player has chosen would arrive, and for a pitch that moves the last
+## stretch of its path into the zone (the user: "a four-seam fastball needs only its mark in
+## the zone; show a breaking ball bending a little inside the zone; the path need not start
+## from the pitcher" — drawn from the hand it came out of his neck on the screen and covered
+## him). Empty for no preview; one point for a straight pitch; the tail, ending at the plate,
+## for one that moves.
 var preview := PackedVector3Array()
-var preview_straight := Vector3.ZERO
 var _preview_key := ""
-## Where the last pitch went, recorded as it flew (drawn after it as a trail of balls).
+## The same for the last pitch thrown, recorded as it flew (drawn after it for a moment).
 var trail := PackedVector3Array()
 var _trail_clock := 0.0
-## Seconds between the balls of a path or a trail.
-const PATH_STEP := 0.045
+## Seconds between the points of a tail, and how many of them: the last 0.17 s of flight,
+## about six metres, which is where a breaking ball does what the batter sees.
+const PATH_STEP := 0.014
+const TAIL_POINTS := 12
+## Pitches thrown to go straight: only where they arrive is shown.
+const STRAIGHT_PITCHES: Array[StringName] = [&"four_seam", &"rising_fastball"]
 
 
-## Works out the path of the pitch the player would throw to the target now (docs/05 2.2):
-## from his release point, his pitch type, its spin, without the miss of execution.
+static func goes_straight(type: PitchType) -> bool:
+	return type != null and STRAIGHT_PITCHES.has(type.id)
+
+
+## Works out where the pitch the player would throw to the target now arrives, and how it
+## comes in (docs/05 2.2): from his release point, his pitch type, its spin, without the miss
+## of execution.
 func _update_preview() -> void:
 	if not human_pitches() or not (state == State.PRE_PITCH or state == State.CHARGE or state == State.ACCURACY):
 		preview.clear()
@@ -518,29 +583,42 @@ func _update_preview() -> void:
 		return
 	_preview_key = key
 	var flight := PitchModel.throw_type(cfg, type, settings.release(), target, settings.throws_left)
-	preview = PitchModel.path(cfg, flight, PATH_STEP)
-	preview_straight = flight.plate_pos - Vector3(flight.movement.x, 0.0, flight.movement.y)
+	if goes_straight(type):
+		preview = PackedVector3Array([flight.plate_pos])
+		return
+	var whole := PitchModel.path(cfg, flight, PATH_STEP)
+	preview = whole.slice(maxi(whole.size() - TAIL_POINTS, 0))
 
 
-## Keeps the pitch's path as it flies, for the trail drawn after it.
+## Keeps the end of the pitch's path as it flies, for the tail drawn after it.
 func _record_trail(delta: float) -> void:
 	if duel == null or duel.pitch == null:
 		return
 	if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT:
 		if trail.is_empty() or duel.time < 0.02:
 			trail.clear()
-			trail.append(duel.pitch.release_pos)
 			_trail_clock = 0.0
+		if duel.decision != null and goes_straight(duel.decision.type):
+			return
 		_trail_clock += delta
 		if _trail_clock >= PATH_STEP and duel.ball.pos.y > Field.PLATE_FRONT_Y - 0.5:
 			_trail_clock = 0.0
 			trail.append(duel.ball.pos)
+			if trail.size() > TAIL_POINTS:
+				trail.remove_at(0)
 	elif state == State.PRE_PITCH or state == State.WINDUP:
 		trail.clear()
 
 
 func _update_pointer() -> void:
 	var mouse := pointer_override if pointer_override.is_finite() else get_viewport().get_mouse_position()
+	if wheel_open:
+		# The pointer is choosing a pitch: the target stays where it was.
+		if not human_pitches() or state != State.PRE_PITCH:
+			wheel_open = false
+		else:
+			wheel_pick = wheel_slot_toward(mouse)
+			return
 	var origin := camera.project_ray_origin(mouse)
 	var dir := camera.project_ray_normal(mouse)
 	var plane := Plane(Vector3.BACK, -Field.PLATE_FRONT_Y)
@@ -679,10 +757,7 @@ func _build_players() -> void:
 	catcher.apply(PuppetClips.catcher())
 	# The plate umpire stands behind the catcher in black and grey.
 	umpire = _add_puppet(Vector3(0.25, -2.3, 0.0), 0.0, Color(0.08, 0.08, 0.09), Color(0.05, 0.05, 0.06), use_models)
-	var officials := UniformStyle.make(Color(0.07, 0.07, 0.08), Color(0.34, 0.35, 0.37), Color(0.07, 0.07, 0.08), Color(0.07, 0.07, 0.08), "")
-	_dress(umpire, officials, 0, "", false)
-	umpire.show_glove = false
-	umpire.gear = [&"Mask"]
+	dress_umpire(umpire, 27, true)
 	umpire.apply(PuppetClips.umpire())
 	_build_fielders()
 
@@ -706,6 +781,28 @@ func _build_fielders() -> void:
 		_dress(fielder, style, numbers[i], names[i], false)
 		fielder.look_at_world(Field.to_world(Vector3(0.0, 0.0, 1.0)))
 		fielder.apply(PuppetClips.fielder_ready())
+
+
+## Dresses an umpire (docs/13 S11-8): the polo shirt and charcoal trousers, his number on
+## the sleeve; behind the plate his mask and ball bags too, and a thicker trunk for the chest
+## protector he wears under the shirt.
+func dress_umpire(puppet: Puppet, number: int, at_the_plate: bool) -> void:
+	var style := UniformStyle.for_official(number)
+	puppet.show_glove = false
+	puppet.gear = (SkinnedPuppet.PLATE_UMPIRE_GEAR if at_the_plate else SkinnedPuppet.UMPIRE_GEAR).duplicate()
+	if at_the_plate:
+		# His short-billed cap is part of his gear.
+		puppet.headgear = &"none"
+	var model := puppet as SkinnedPuppet
+	if model != null:
+		# Umpires are grown men of every build but lean.
+		var builds: Array[StringName] = [&"solid", &"standard", &"heavy", &"solid"]
+		model.set_body(1.76 + 0.02 * (number % 5), &"heavy" if at_the_plate and number % 2 == 0 else (&"solid" if at_the_plate else builds[number % builds.size()]))
+		model.set_hair(1 + number % 4, Color(0.09, 0.08, 0.075).lerp(Color(0.45, 0.45, 0.46), 0.5 if number % 3 == 0 else 0.0))
+		model.set_face("umpire%d" % number)
+	_dress(puppet, style, number, "", false)
+	if model != null:
+		model.set_logo(style.cap_letter, style.cap_ink())
 
 
 func _dress(puppet: Puppet, style: UniformStyle, number: int, player_name: String, with_gloves: bool) -> void:

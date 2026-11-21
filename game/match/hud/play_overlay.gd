@@ -137,7 +137,7 @@ func _call(t: float) -> void:
 			continue
 		var line := "아웃!" if c.out else "세이프!"
 		var alpha := clampf((c.time + CALL_SHOWN - t) / 0.3, 0.0, 1.0)
-		text(Vector2(0.0, view.y * 0.42), line, 64, Color(UiTheme.RED if c.out else UiTheme.GREEN, alpha), HORIZONTAL_ALIGNMENT_CENTER, view.x, 700)
+		shout(Vector2(0.0, view.y * 0.42), line, 72, Color(UiTheme.RED if c.out else UiTheme.GREEN, alpha), HORIZONTAL_ALIGNMENT_CENTER, view.x)
 
 
 ## Bottom centre, until the fielder has the ball: where the throw can go and the gauge, or

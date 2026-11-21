@@ -9,6 +9,7 @@ meshes with front/back UVs for lettering and stripes. Shoes are convex shells ar
 feet. A cap and a batting helmet are added, and bones are renamed to the names the game uses
 (Godot's humanoid profile). The output of MakeHuman/MPFB is CC0.
 """
+import json
 import math
 import os
 import sys
@@ -25,38 +26,53 @@ from bl_ext.user_default.mpfb.services.targetservice import TargetService
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gear  # noqa: E402  (the helmets and the catcher's gear, fitted to this body)
 import fold_maps  # noqa: E402  (softening of the baked fold maps)
+import anthropometry  # noqa: E402  (the body's measurements, against published tables)
+import kit  # noqa: E402  (the cap, the shoes and the belt buckle)
+import officials  # noqa: E402  (the umpires' mask, polo collar and ball bags)
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT_GLB = ARGS[0] if ARGS else "player_base.glb"
 PREVIEW = ARGS[1] if len(ARGS) > 1 and ARGS[1] != "-" else None
 BUILD = ARGS[2] if len(ARGS) > 2 else "standard"
 
-# Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/12, section 4). More
-# muscle and weight than an average man of that height: chest depth about 14% of height.
-MACRO = {"gender": 1.0, "age": 0.5, "muscle": 0.95, "weight": 0.55, "height": 0.6, "proportions": 0.85}
-# Corrections checked against anthropometric tables (docs/12, section 4). Arms: the body above
-# comes out at 29.9% of height from shoulder to wrist against 31.6%, so they are lengthened.
-# Head: it comes out about 8.5 head-heights tall against 7.8 for a grown man, so the head is
-# enlarged by about 7%.
+# Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/12, section 4). Every
+# setting below was chosen by measuring the body it gives (tools/blender/anthropometry.py, which
+# prints the table on every build) against the US Army's survey of men (ANSUR II) and, for
+# girths, the upper part of its range: a ballplayer is broader in the shoulders and thicker in
+# the neck, forearms and legs than a soldier of the same height.
+MACRO = {"gender": 1.0, "age": 0.5, "muscle": 1.0, "weight": 0.62, "height": 0.6, "proportions": 0.85}
 SHAPE = {
+    # Arms: MakeHuman's come out at 29.9% of height from shoulder to wrist against 31.6%.
     "measure-upperarm-length-incr": 0.25, "measure-lowerarm-length-incr": 0.25,
-    "head-scale-vert-incr": 0.4, "head-scale-horiz-incr": 0.4, "head-scale-depth-incr": 0.4,
-    # A man's face (docs/13 S11-6): a wider, firmer jaw and chin, cheekbones, a brow ridge,
-    # a thicker neck. Without these the default face reads as a woman's at close range.
+    # Head. MakeHuman's is the right size for an average man (23.6 cm chin to crown at 1.76 m,
+    # 58 cm round) but long front to back and narrow (21.4 by 15.1 cm; Korean men average
+    # about 19 by 15.7). It is shortened front to back, widened a little, and made a little
+    # less tall: a head does not grow with the body, and these are tall men. About 7.7
+    # head-heights to the body. (An earlier version enlarged the head by 7% from a wrong
+    # measurement and came out 6.9 heads tall with the chin 4 cm above the shoulders.)
+    "head-scale-vert-decr": 0.18, "head-scale-horiz-incr": 0.15,
+    "head-back-scale-depth-decr": 0.5, "head-scale-depth-decr": 0.3,
+    # A man's face (docs/13 S11-6): a wider, firmer jaw and chin, cheekbones, a brow ridge.
+    # Without these the default face reads as a woman's at close range.
     "chin-width-incr": 0.3, "chin-bones-incr": 0.35, "l-cheek-bones-incr": 0.25, "r-cheek-bones-incr": 0.25,
-    "eyebrows-trans-forward": 0.35, "forehead-nubian-incr": 0.2, "measure-neck-circ-incr": 0.15, "head-square": 0.25,
-    # An athlete's build (the reference game's players, and photographs): broad shoulders and
-    # back tapering to a narrow waist and hips, a flat stomach. Without these the uniform
-    # hung on a pear shape and the players looked heavy.
-    # The breadth is the back's muscle (latissimus), not the "V shape" key: that one moves the
-    # shoulder joints apart, past a fifth of height and the anthropometric tables the
-    # proportion tests pin (0.5 of it put them 24% of height apart).
-    "torso-muscle-dorsi-incr": 0.5,
-    "torso-muscle-pectoral-incr": 0.3, "measure-waist-circ-decr": 0.35, "measure-hips-circ-decr": 0.4,
-    "hip-scale-horiz-decr": 0.25, "stomach-pregnant-decr": 0.4, "buttocks-volume-decr": 0.2,
-    # Thighs: the muscle setting above swells them most of all; taken back so the legs are an
-    # athlete's and not a speed skater's.
-    "l-upperleg-muscle-decr": 0.45, "r-upperleg-muscle-decr": 0.45,
+    "eyebrows-trans-forward": 0.35, "forehead-nubian-incr": 0.2, "head-square": 0.25,
+    # Neck. With this much muscle the shoulders rise to 3 cm under the chin; a man's chin is
+    # about 8 cm above the tops of his shoulders. Longer, and as thick as an athlete's (41 cm
+    # at 1.83 m).
+    "neck-scale-vert-incr": 0.65, "measure-neck-circ-incr": 0.7,
+    # Shoulders and back: the breadth is the deltoids and the back's muscle (latissimus), not
+    # the "V shape" key, which moves the shoulder joints apart past the tables.
+    "l-upperarm-shoulder-muscle-incr": 0.3, "r-upperarm-shoulder-muscle-incr": 0.3,
+    "torso-muscle-dorsi-incr": 0.5, "torso-muscle-pectoral-incr": 0.3, "torso-scale-depth-incr": 0.2,
+    # The trunk below the ribs: MakeHuman's muscular man has a dancer's waist (77 cm) and a
+    # small seat. A ballplayer's power is in his hips and legs: waist about 86 cm, seat 98 cm.
+    "measure-waist-circ-incr": 0.7, "buttocks-volume-incr": 0.25, "measure-hips-circ-incr": 0.15,
+    # Forearms and wrists (25 and 15 cm round on MakeHuman's man; 30 and 17.5 on a real one).
+    "l-lowerarm-muscle-incr": 0.4, "r-lowerarm-muscle-incr": 0.4,
+    "l-lowerarm-fat-incr": 0.3, "r-lowerarm-fat-incr": 0.3, "measure-wrist-circ-incr": 0.2,
+    # Knees, calves and ankles likewise; feet to 27.5 cm.
+    "measure-knee-circ-incr": 0.2, "measure-calf-circ-incr": 0.15, "measure-ankle-circ-incr": 0.3,
+    "l-foot-scale-incr": 0.2, "r-foot-scale-incr": 0.2,
 }
 # Faces that differ from player to player: shape keys the game sets per player (morph
 # targets in the model). Each name is one key; pairs give both directions.
@@ -74,10 +90,18 @@ RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
 # of the same height. Weight rises with muscle first (athletes), then with mass. The trunk's
 # width and depth at chest and waist are printed for the build checks.
 BUILDS = {
-    "lean": {"muscle": 0.85, "weight": 0.35},
-    "standard": {"muscle": 0.95, "weight": 0.55},
-    "solid": {"muscle": 1.0, "weight": 0.7},
-    "heavy": {"muscle": 1.0, "weight": 0.88},
+    "lean": {"muscle": 0.92, "weight": 0.5},
+    "standard": {"muscle": 1.0, "weight": 0.62},
+    "solid": {"muscle": 0.95, "weight": 0.72},
+    "heavy": {"muscle": 0.75, "weight": 1.0},
+}
+# Settings a build adds to SHAPE. A heavier man carries it on his trunk: with MakeHuman's
+# muscle at full and its weight high, the arms came out a bodybuilder's (48 cm round) on a
+# 86 cm waist. Weights at 1.83 m: lean 80 kg, standard 89, solid 96, heavy 105.
+BUILD_SHAPE = {
+    "lean": {"measure-waist-circ-incr": 0.5},
+    "solid": {"measure-waist-circ-incr": 0.9},
+    "heavy": {"measure-waist-circ-incr": 1.0, "stomach-pregnant-incr": 0.2},
 }
 
 # Hair (docs/13 S11-4): MakeHuman's four short styles (CC0, from MPFB's system assets). Every
@@ -88,9 +112,11 @@ HAIR_TEXTURE = 512
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 # Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
-SLEEVE_HEM = 0.62
-PANTS_HEM = 0.9
-BELT_HALF = 0.024
+# Sleeves end at the middle of the biceps; the trousers reach the tops of the shoes.
+SLEEVE_HEM = 0.66
+PANTS_HEM = 0.965
+# A baseball belt is 1.5 in (38 mm) wide.
+BELT_HALF = 0.019
 # Centre of the belt as a fraction of standing height. Baseball trousers are worn on the hips,
 # with the top of the belt at about the top of the hip bones (59% of height), not at the
 # narrowest part of the waist (62%).
@@ -128,6 +154,8 @@ COLOURS = {
     "Shoes": (0.05, 0.05, 0.06), "Cap": (0.10, 0.15, 0.35), "Helmet": (0.10, 0.15, 0.35),
     "Collar": (0.10, 0.15, 0.35), "Gear": (0.08, 0.10, 0.20), "Bars": (0.10, 0.10, 0.11),
     "Undershirt": (0.10, 0.15, 0.35), "HelmetPads": (0.05, 0.05, 0.055), "GearTrim": (0.06, 0.06, 0.07),
+    "Soles": (0.9, 0.9, 0.9), "Laces": (0.92, 0.92, 0.92), "Buckle": (0.7, 0.7, 0.72), "Piping": (0.10, 0.15, 0.35),
+    "MaskPads": (0.55, 0.38, 0.22),
 }
 
 
@@ -261,168 +289,99 @@ def surface_hollows(body, group="body", strength=0.5):
     return hollow
 
 
-# Raised veins (docs/13 S14): on a ballplayer's forearms and the backs of his hands they are
-# what tells skin from plastic at a few metres. Positions after the anatomy (superficial veins
-# of the upper limb), in the model's arms-down pose with the thumbs forward: the angle round
-# the forearm is 0 in front (the thumb side), +90 degrees outward (the back of the forearm),
-# -90 inward (the flexor side, where the veins show most). Each: angle, wander, waves along
-# the arm, phase, from and to (0 elbow, 1 wrist), half-width (m), height.
-FOREARM_VEINS = [
-    (-0.25, 0.22, 4.0, 0.3, 0.0, 1.0, 0.0034, 1.0),   # cephalic, up the thumb side
-    (-1.35, 0.2, 5.0, 1.7, 0.15, 0.85, 0.0030, 0.85),  # median antebrachial, on the flexor side
-    (-2.55, 0.18, 3.5, 2.9, 0.0, 0.7, 0.0032, 0.75),   # basilic, on the little-finger side
-    (0.85, 0.25, 6.0, 0.9, 0.45, 1.0, 0.0026, 0.6),  # a branch over the back of the wrist
-]
-# The median cubital vein crosses the inside of the elbow from the cephalic to the basilic.
-CUBITAL = (0.03, -0.3, 0.22, -2.4, 0.0036, 0.9)
-# The back of the hand: veins from the wrist fanning out between the knuckles (across the
-# hand in metres from its middle, toward the index finger positive; spread over its length).
-HAND_VEINS = [(-0.012, -0.012, 0.8), (0.004, 0.006, 0.9), (0.016, 0.02, 0.7)]
-FOREARM_RADIUS = 0.04
-# How far the veins tilt the surface, per unit of their height per pixel.
-VEIN_SLOPE = 2.2
-
-
-# The lines of a grown man's face (docs/13 S14): the creases from the nose past the corners of
-# the mouth, under the eyes, below the lower lip, across the forehead, between the brows and at
-# the corners of the eyes. Without them MakeHuman's face is a smooth young mask. Each is a
-# polyline in metres from the middle between the eyes (x to the player's left, z up, on the
-# face seen from the front), with a half-width (m) and a depth (0..1); mirrored for both sides
-# where `both`.
-FACE_LINES = [
-    # (points, half-width, depth, both sides)
-    ([(0.017, "lips+0.034"), (0.025, "lips+0.016"), (0.031, "lips+0.0"), (0.035, "lips-0.016")], 0.0022, 1.0, True),
-    ([(0.016, -0.017), (0.025, -0.021), (0.035, -0.021), (0.044, -0.016)], 0.0014, 0.6, True),
-    ([(-0.014, "lips-0.017"), (0.0, "lips-0.02"), (0.014, "lips-0.017")], 0.0016, 0.6, False),
-    ([(-0.04, 0.05), (-0.02, 0.047), (0.0, 0.046), (0.02, 0.047), (0.04, 0.05)], 0.0011, 0.35, False),
-    ([(-0.036, 0.063), (-0.018, 0.06), (0.0, 0.059), (0.018, 0.06), (0.036, 0.063)], 0.0011, 0.3, False),
-    ([(0.006, 0.012), (0.007, 0.03)], 0.0009, 0.3, True),
-    ([(0.05, 0.003), (0.061, 0.007)], 0.0008, 0.35, True),
-    ([(0.05, -0.004), (0.06, -0.01)], 0.0008, 0.35, True),
-]
-# Off (0): drawn as creases they caught the light as dark streaks down the cheek from some
-# angles, like tear tracks. They need to follow the face's own surface, not a front view.
-LINE_SLOPE = 0.0
-
-
-def face_lines(head_pos, marks):
-    """Depth of the face's lines (0..1) per pixel of the relief map, from the baked head
-    positions (see FACE_LINES)."""
-    import numpy as np
-    on = head_pos[..., 0] > 0.01
-    x = (head_pos[..., 0] - 0.5) * 0.3
-    y = (head_pos[..., 1] - 0.5) * 0.3
-    z = (head_pos[..., 2] - 0.5) * 0.3
-    # Only the front of the face (the lines drawn on a front view must not land on the sides
-    # of the head as well).
-    front = on & (y < 0.03)
-    depth = np.zeros_like(x)
-
-    def height(spec):
-        if isinstance(spec, str):
-            base, off = spec[:4], float(spec[4:])
-            return marks[base].z + off
-        return spec
-
-    for points, half, k, both in FACE_LINES:
-        for sign in ((1.0, -1.0) if both else (1.0,)):
-            pts = [(sign * px, height(pz)) for px, pz in points]
-            best = np.full_like(x, 1.0)
-            for (x0, z0), (x1, z1) in zip(pts, pts[1:]):
-                dx, dz = x1 - x0, z1 - z0
-                t = np.clip(((x - x0) * dx + (z - z0) * dz) / (dx * dx + dz * dz), 0.0, 1.0)
-                best = np.minimum(best, np.hypot(x - (x0 + t * dx), z - (z0 + t * dz)))
-            # Fading out toward the ends of each line.
-            depth = np.maximum(depth, k * np.exp(-(best / half) ** 2))
-    return np.where(front, depth, 0.0)
-
-
 def limb_coordinates(body, rig):
-    """Per vertex, where on a forearm or hand it is: (along, cos, sin) and (weight, across, 0),
-    packed into 0..1 for baking. `along` runs 0 at the elbow to 1 at the wrist and on to 2 at
-    the knuckles (stored halved); the angle round the forearm as in FOREARM_VEINS (as cosine
-    and sine, which interpolate across faces where an angle would jump); `across` is the
-    distance across the back of the hand; weight is how much the vertex is forearm or the
-    back of a hand (0 elsewhere)."""
-    import numpy as np
+    """Per vertex, where on an arm or hand it is: (along, cos, sin) and (weight, across, 0),
+    packed into 0..1 for baking. `along` runs -1 at the shoulder, 0 at the elbow, 1 at the
+    wrist and on to 2 at the knuckles (stored as (along + 1) / 3); the angle round the arm as
+    in the game's match/skin_veins.gd (as cosine and sine, which interpolate across faces where an angle would
+    jump); `across` is the distance across the back of the hand; weight is how much the vertex
+    is arm or the back of a hand (0 elsewhere)."""
     bones = rig.data.bones
     groups = {g.index: g.name for g in body.vertex_groups}
     limb = [(0.0, 0.5, 0.5)] * len(body.data.vertices)
     extra = [(0.0, 0.5, 0.0)] * len(body.data.vertices)
+    pack = lambda t: (t + 1.0) / 3.0
     for side, sign in (("l", 1.0), ("r", -1.0)):
+        shoulder = bones["upperarm_" + side].head_local
         elbow = bones["lowerarm_" + side].head_local
         wrist = bones["lowerarm_" + side].tail_local
         knuckle = bones["middle_01_" + side].head_local
         across = bones["index_01_" + side].head_local - bones["pinky_01_" + side].head_local
-        fore_axis = wrist - elbow
         hand_axis = knuckle - wrist
         back_of_hand = hand_axis.cross(across).normalized() * -sign
         across_dir = (across - hand_axis * (across.dot(hand_axis) / hand_axis.length_squared)).normalized()
         middle = (bones["index_01_" + side].head_local + bones["pinky_01_" + side].head_local) * 0.5
-        print("make_player: %s hand back faces %s (outward %.2f)" % (side, tuple(round(c, 2) for c in back_of_hand), back_of_hand.x * sign))
+
+        def angle_round(co, start, end):
+            """The angle round the bone start-end at a point (0 in front, + outward)."""
+            d = (end - start).normalized()
+            r = co - start
+            r -= d * r.dot(d)
+            front = Vector((0.0, -1.0, 0.0))
+            front = (front - d * front.dot(d)).normalized()
+            out = Vector((sign, 0.0, 0.0))
+            out = (out - d * out.dot(d)).normalized()
+            return math.atan2(r.dot(out), r.dot(front))
+
+        fore_axis = wrist - elbow
+        upper_axis = elbow - shoulder
         for v in body.data.vertices:
-            fore = hand = 0.0
+            upper = fore = hand = 0.0
             for e in v.groups:
                 name = groups.get(e.group, "")
-                if name.startswith("lowerarm") and name.endswith("_" + side):
+                if not name.endswith("_" + side):
+                    continue
+                if name.startswith("upperarm"):
+                    upper += e.weight
+                elif name.startswith("lowerarm"):
                     fore += e.weight
                 elif name == "hand_" + side:
                     hand += e.weight
-            if fore + hand < 0.3:
+            total = upper + fore + hand
+            if total < 0.3:
                 continue
-            if fore >= hand:
-                t = min(max((v.co - elbow).dot(fore_axis) / fore_axis.length_squared, 0.0), 1.0)
-                axis = fore_axis.normalized()
-                centre = elbow + fore_axis * t
-                r = v.co - centre
-                r -= axis * r.dot(axis)
-                front = Vector((0.0, -1.0, 0.0))
-                front = (front - axis * front.dot(axis)).normalized()
-                out = Vector((sign, 0.0, 0.0))
-                out = (out - axis * out.dot(axis)).normalized()
-                a = math.atan2(r.dot(out), r.dot(front))
-                limb[v.index] = (t * 0.5, math.cos(a) * 0.5 + 0.5, math.sin(a) * 0.5 + 0.5)
-                extra[v.index] = (min(fore + hand, 1.0), 0.5, 0.0)
-            else:
+            if hand > fore and hand > upper:
                 t = 1.0 + min(max((v.co - wrist).dot(hand_axis) / hand_axis.length_squared, 0.0), 1.0)
                 facing = _smooth(0.1, 0.5, v.normal.dot(back_of_hand))
-                u = (v.co - middle).dot(across_dir)
-                limb[v.index] = (t * 0.5, 0.5, 0.5)
-                extra[v.index] = (min(fore + hand, 1.0) * facing, u * 5.0 + 0.5, 0.0)
+                limb[v.index] = (pack(t), 0.5, 0.5)
+                extra[v.index] = (min(total, 1.0) * facing, (v.co - middle).dot(across_dir) * 5.0 + 0.5, 0.0)
+                continue
+            # Past the elbow along the forearm (m, negative above it): one coordinate down the
+            # whole arm, and the angle taken round the upper arm above the elbow, round the
+            # forearm below it and a blend of the two across it (the two bones are not in
+            # line, and a jump there would show as a crease in everything drawn from this).
+            past = (v.co - elbow).dot(fore_axis.normalized())
+            above = (elbow - v.co).dot(upper_axis.normalized())
+            if past >= 0.0:
+                t = min(past / fore_axis.length, 1.0)
+            else:
+                t = -min(max(above, 0.0) / upper_axis.length, 1.0)
+            w = _smooth(-0.05, 0.05, past)
+            a_fore, a_upper = angle_round(v.co, elbow, wrist), angle_round(v.co, shoulder, elbow)
+            c = math.cos(a_fore) * w + math.cos(a_upper) * (1.0 - w)
+            sn = math.sin(a_fore) * w + math.sin(a_upper) * (1.0 - w)
+            norm = math.hypot(c, sn) or 1.0
+            limb[v.index] = (pack(t), c / norm * 0.5 + 0.5, sn / norm * 0.5 + 0.5)
+            extra[v.index] = (min(total, 1.0), 0.5, 0.0)
     return limb, extra
 
 
-def forearm_veins(coords, extra):
-    """Height of the veins (0..1) per pixel of the relief map, from the baked limb coordinates."""
-    import numpy as np
-    t = coords[..., 0] * 2.0
-    a = np.arctan2(coords[..., 2] * 2.0 - 1.0, coords[..., 1] * 2.0 - 1.0)
-    weight = extra[..., 0]
-    u = (extra[..., 1] - 0.5) / 5.0
-    wrap = lambda x: (x + math.pi) % (2.0 * math.pi) - math.pi
-    smooth = lambda lo, hi, x: np.clip((x - lo) / (hi - lo), 0.0, 1.0) ** 2 * (3.0 - 2.0 * np.clip((x - lo) / (hi - lo), 0.0, 1.0))
-    height = np.zeros_like(t)
-    fore = (t > 0.0) & (t < 1.0)
-    for a0, wander, waves, phase, t0, t1, half, k in FOREARM_VEINS:
-        path = a0 + wander * np.sin(waves * t + phase) + 0.1 * np.sin(2.7 * waves * t + 1.3 * phase)
-        d = wrap(a - path) * FOREARM_RADIUS
-        span = smooth(t0, t0 + 0.12, t) * (1.0 - smooth(t1 - 0.12, t1, t))
-        # Veins swell toward the wrist, where there is less flesh over them.
-        height += k * np.exp(-(d / half) ** 2) * span * (0.6 + 0.4 * t)
-    c_t0, c_a0, c_t1, c_a1, c_half, c_k = CUBITAL
-    along = np.clip((t - c_t0) / (c_t1 - c_t0), 0.0, 1.0)
-    d = wrap(a - (c_a0 + (c_a1 - c_a0) * along)) * FOREARM_RADIUS
-    height += c_k * np.exp(-(d / c_half) ** 2) * smooth(c_t0 - 0.02, c_t0 + 0.03, t) * (1.0 - smooth(c_t1 - 0.03, c_t1 + 0.02, t))
-    height = np.where(fore, height, 0.0)
-    hand = (t >= 1.0) & (t < 2.0)
-    th = t - 1.0
-    for u0, spread, k in HAND_VEINS:
-        path = u0 + spread * th + 0.003 * np.sin(9.0 * th + u0 * 400.0)
-        h = k * np.exp(-((u - path) / 0.0028) ** 2) * smooth(0.0, 0.2, th) * (1.0 - smooth(0.6, 0.85, th))
-        height += np.where(hand, h, 0.0)
-    height = np.clip(height, 0.0, 1.0) * weight
-    # Softened by a pixel: round, not ridged.
-    return _box(_box(height, 1), 1)
+def store_limb_coordinates(body, rig):
+    """Keeps the arm coordinates in the model for the game's skin shader, which draws the
+    veins and tendons of the arms and hands from them, as fine as the screen is and different
+    on every player (match/skin.gdshader, match/skin_veins.gd): in the vertex colour (along,
+    cos, sin, weight) and in a second UV map (across the back of the hand, 1 on a hand)."""
+    limb, extra = limb_coordinates(body, rig)
+    mesh = body.data
+    attr = mesh.color_attributes.get("Limb") or mesh.color_attributes.new("Limb", 'FLOAT_COLOR', 'POINT')
+    for v in mesh.vertices:
+        attr.data[v.index].color = (*limb[v.index], extra[v.index][0])
+    mesh.color_attributes.active_color = attr
+    mesh.color_attributes.render_color_index = list(mesh.color_attributes).index(attr)
+    layer = mesh.uv_layers.get("Limb") or mesh.uv_layers.new(name="Limb")
+    for loop in mesh.loops:
+        i = loop.vertex_index
+        layer.data[loop.index].uv = (extra[i][1], 1.0 if limb[i][0] > 2.0 / 3.0 + 1e-4 else 0.0)
 
 
 def body_marks(body, top):
@@ -453,12 +412,15 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
         eyes, nostrils, mouth and ears, between the fingers; not the shadow of an arm, which
         moves) times the hollows of the surface (between the muscles of the shoulders, arms
         and neck, the collarbones, the knuckles), G roughness (the forehead and nose shine,
-        the lips more), B where the beard grows (for stubble), A 1 - half the veins' height
-        (for their colour);
+        the lips more), B where the beard grows (for stubble), A 1 - half of where the hair
+        grows on the scalp (cropped hair, drawn on the skin);
       relief (the same for every build): the painted skin's fine detail (creases, grain,
-        knuckles) as a normal map, from the texture's own light and dark: the high-pass of
-        its brightness taken as height; and the raised veins of the forearms and the backs of
-        the hands (see forearm_veins).
+        knuckles) as the x and y of a normal map, from the texture's own light and dark (the
+        high-pass of its brightness taken as height); and in its third channel how
+        fine-grained the skin is there.
+    (The veins and tendons of the arms are not baked: the arms' part of the texture is too
+    coarse for anything a few millimetres wide. The game's shader draws them from the arm
+    coordinates kept in the model, see store_limb_coordinates.)
     `hidden` are objects left out of the occlusion (hair, brows, lashes)."""
     import numpy as np
     scene = bpy.context.scene
@@ -498,18 +460,25 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
     attr = body.data.color_attributes.new("SkinDetail", 'FLOAT_COLOR', 'POINT')
     for v in verts:
         attr.data[v.index].color = (cavity[v.index], roughness(v.co, v.index), beard(v.co, v.index), 1.0)
-    # Where on the face (for the lines of the face): position relative to the eyes, packed
-    # into 0..1 over a 30 cm box; 0 off the head.
-    head_attr = body.data.color_attributes.new("HeadPos", 'FLOAT_COLOR', 'POINT')
+    # Cropped hair: the scalp down to the hairline, the sideburns and the nape.
+    scalp_attr = body.data.color_attributes.new("Scalp", 'FLOAT_COLOR', 'POINT')
     for v in verts:
-        rel = (v.co - eye) / 0.3 + Vector((0.5, 0.5, 0.5))
-        on_head = v.co.z > chin.z - 0.03 and v.co.y < ear.y + 0.02
-        head_attr.data[v.index].color = (*(rel if on_head else Vector((0.0, 0.0, 0.0))), 1.0)
-    limb_attr = body.data.color_attributes.new("LimbCoords", 'FLOAT_COLOR', 'POINT')
-    extra_attr = body.data.color_attributes.new("LimbExtra", 'FLOAT_COLOR', 'POINT')
+        w = scalp_w[v.index] * (1.0 - ears_w[v.index])
+        if v.co.y > ear.y + 0.01:
+            # The nape: cut in a curve, lowest in the middle and rounding up behind the ears
+            # (MakeHuman's own outline there is a stepped block).
+            line = ear.z - 0.05 + 0.5 * max(abs(v.co.x) - 0.03, 0.0)
+            w *= _smooth(line - 0.01, line + 0.01, v.co.z)
+        scalp_attr.data[v.index].color = (w, w, w, 1.0)
+    # How fine-grained the skin is, by part: the face keeps all of its painted grain and its
+    # pores; the hands most of it; on the arms the same grain is twice the size (their part of
+    # the texture is coarser) and reads as goose flesh, so little of it is kept there.
+    fine_attr = body.data.color_attributes.new("Fine", 'FLOAT_COLOR', 'POINT')
     for v in verts:
-        limb_attr.data[v.index].color = (*limb[v.index], 1.0)
-        extra_attr.data[v.index].color = (*limb_extra[v.index], 1.0)
+        t, weight = limb[v.index][0] * 3.0 - 1.0, limb_extra[v.index][0]
+        on_head = v.co.z > chin.z - 0.03 and v.co.y < ear.y + 0.03
+        fine = 1.0 if on_head else (0.3 if weight <= 0.0 else (0.6 if t >= 1.0 else 0.16))
+        fine_attr.data[v.index].color = (fine, fine, fine, 1.0)
 
     # A bake material on every face for the time being.
     kept = list(body.data.materials)
@@ -547,15 +516,12 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
     relief_size = 2048
     for name, kind, samples, attribute_name, bake_size in (
             ('AO', 'AO', 32, "SkinDetail", size), ('EMIT', 'EMIT', 1, "SkinDetail", size),
-            ('LIMB', 'EMIT', 1, "LimbCoords", relief_size), ('LIMB2', 'EMIT', 1, "LimbExtra", relief_size),
-            ('HEAD', 'EMIT', 1, "HeadPos", relief_size)):
+            ('SCALP', 'EMIT', 1, "Scalp", size), ('FINE', 'EMIT', 1, "Fine", relief_size)):
         image = bpy.data.images.new("Skin" + name, bake_size, bake_size, alpha=False, float_buffer=True)
         image.colorspace_settings.name = "Non-Color"
         target.image = image
         attribute.attribute_name = attribute_name
         scene.cycles.samples = samples
-        # Limb coordinates must not run on past the edges of their islands into others.
-        scene.render.bake.margin = 8 if name in ('AO', 'EMIT') else 2
         bpy.ops.object.bake(type=kind)
         images[name] = _pixels(image)
     scene.render.bake.margin = 8
@@ -567,20 +533,18 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
         body.data.materials.append(m)
     for p, i in zip(body.data.polygons, kept_index):
         p.material_index = i
-    for name in ("SkinDetail", "LimbCoords", "LimbExtra", "HeadPos"):
+    for name in ("SkinDetail", "Scalp", "Fine"):
         body.data.color_attributes.remove(body.data.color_attributes[name])
 
-    veins = forearm_veins(images['LIMB'], images['LIMB2'])
-    lines = face_lines(images['HEAD'], {k: (v - eye) for k, v in (("lips", lips), ("chin", chin), ("ear", ear))})
     ao, emitted = images['AO'], images['EMIT']
     detail = np.ones((size, size, 4), dtype=np.float32)
     detail[..., 0] = ao[..., 0] * np.where(emitted[..., 1] > 0.1, emitted[..., 0], 1.0)
-    f = relief_size // size
-    detail[..., 0] *= 1.0 - 0.12 * (LINE_SLOPE > 0.0) * lines.reshape(size, f, size, f).mean(axis=(1, 3))
     detail[..., 1] = emitted[..., 1]
     detail[..., 2] = emitted[..., 2]
-    # Stored as 1 - height/2: an image importer fills fully clear pixels with their neighbours' colour.
-    detail[..., 3] = 1.0 - 0.5 * veins.reshape(size, f, size, f).mean(axis=(1, 3))
+    # Where the hair grows on the scalp. Stored as 1 - half of it: an image importer fills
+    # fully clear pixels with their neighbours' colour.
+    # (Softened: the hairline follows the mesh's faces otherwise, in straight steps.)
+    detail[..., 3] = 1.0 - 0.5 * _box(_box(images['SCALP'][..., 0], 5), 5)
     _save(detail, detail_png, alpha=True)
 
     # Relief from the painted skin, on the islands of the UV map only (no slopes at their edges).
@@ -606,19 +570,14 @@ def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
     gy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5
     spread = float(np.std(np.concatenate([gx[inside], gy[inside]])))
     k = 0.1 / max(spread, 1e-6)
-    nx, ny = np.clip(-gx * k, -0.6, 0.6), np.clip(-gy * k, -0.6, 0.6)
-    if n == relief_size:
-        # Veins stand up; the lines of the face are creases (down).
-        height = veins * VEIN_SLOPE - lines * LINE_SLOPE
-        vx = (np.roll(height, -1, axis=1) - np.roll(height, 1, axis=1)) * 0.5
-        vy = (np.roll(height, -1, axis=0) - np.roll(height, 1, axis=0)) * 0.5
-        nx = np.clip(nx - vx, -0.7, 0.7)
-        ny = np.clip(ny - vy, -0.7, 0.7)
-    nz = np.sqrt(np.maximum(1.0 - nx * nx - ny * ny, 0.0))
+    fine = images['FINE'][..., 0] if n == relief_size else np.full((n, n), 0.3, dtype=np.float32)
+    fine = _box(fine.astype(np.float32), 4)
+    nx, ny = np.clip(-gx * k * fine, -0.6, 0.6), np.clip(-gy * k * fine, -0.6, 0.6)
     relief = np.ones((n, n, 4), dtype=np.float32)
     relief[..., 0] = nx * 0.5 + 0.5
     relief[..., 1] = ny * 0.5 + 0.5
-    relief[..., 2] = nz * 0.5 + 0.5
+    # (The game rebuilds the normal's third part; this channel says how fine the skin is.)
+    relief[..., 2] = fine
     _save(relief, relief_png)
     print("make_player: baked skin detail %s and relief %s" % (detail_png, relief_png))
 
@@ -649,6 +608,7 @@ class Anatomy:
         head = rig.data.bones["head"]
         self.collar_n = (head.head_local - neck.head_local).normalized()
         self.collar_co = neck.head_local + self.collar_n * 0.012
+        self._normals = self.neck_normals()
 
     def bone(self, face):
         totals = {}
@@ -672,7 +632,16 @@ class Anatomy:
         end = self.rig.data.bones["%s_%s" % (self.CHILD[stem], side)].head_local
         return start.lerp(end, fraction), (end - start).normalized()
 
-    NECK_RADIUS = 0.082
+    NECK_RADIUS = 0.08
+    NECK_SIDES = 20
+
+    def neck_normals(self):
+        """Outward directions of the sides of the neck opening (a many-sided prism round the
+        neck's axis: its outline can then be cut exactly, plane by plane)."""
+        side = self.collar_n.cross(Vector((0.0, 1.0, 0.0))).normalized()
+        fore = side.cross(self.collar_n).normalized()
+        return [side * math.cos(2.0 * math.pi * k / self.NECK_SIDES) + fore * math.sin(2.0 * math.pi * k / self.NECK_SIDES)
+                for k in range(self.NECK_SIDES)]
 
     def v_half_width(self, z):
         """Half the width of the V at a height (0 below its point)."""
@@ -687,10 +656,10 @@ class Anatomy:
 
     def outside_neckline(self, point):
         """Distance (m) from the neck opening; 0 or less means bare neck. The opening is a
-        cylinder around the neck, so the tops of the shoulders stay covered."""
+        prism round the neck, so the tops of the shoulders stay covered."""
         rel = point - self.collar_co
         up = rel.dot(self.collar_n)
-        radial = (rel - self.collar_n * up).length
+        radial = max(rel.dot(n) for n in self._normals)
         return max(radial - self.NECK_RADIUS, 0.0) + max(-up, 0.0)
 
     def region(self, face):
@@ -721,7 +690,8 @@ class Anatomy:
             length = (self.rig.data.bones[bone].head_local - self.plane(bone, 1.0)[0]).length
             return (PANTS, (PANTS_HEM - t) * length) if t < PANTS_HEM else (SOCKS, 0.0)
         if bone.startswith(("foot_", "ball_")):
-            return SHOES, 1.0
+            # The sock goes on down into the shoe: the ankle above the shoe's collar is sock.
+            return (SOCKS, 0.0) if c.z > kit.SOCK_LINE else (SHOES, 1.0)
         return HANDS, 0.0
 
 
@@ -768,6 +738,28 @@ def prepare_body(body, rig):
         bm.faces.ensure_lookup_table()
         near = [f for f in bm.faces if anatomy.bone(f) in torso and f.calc_center_median().y < top.y
                 and top.z - V_DEPTH - 0.03 < f.calc_center_median().z < top.z + 0.05]
+    # The neck opening, cut exactly along its outline: each side of the prism round the neck
+    # (only the faces that side passes through), then the plane across the base of the neck.
+    for normal in anatomy.neck_normals() + [None]:
+        bm.faces.ensure_lookup_table()
+        chosen = []
+        for f in bm.faces:
+            rel = f.calc_center_median() - top
+            if rel.length > 0.16 or anatomy.bone(f) not in torso:
+                continue
+            if normal is not None:
+                flat = rel - anatomy.collar_n * rel.dot(anatomy.collar_n)
+                if flat.length < 1e-4 or flat.normalized().dot(normal) < math.cos(2.6 * math.pi / Anatomy.NECK_SIDES):
+                    continue
+            chosen.append(f)
+        geom = set(chosen)
+        for f in chosen:
+            geom.update(f.edges)
+            geom.update(f.verts)
+        if normal is None:
+            bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-5, plane_co=top, plane_no=anatomy.collar_n)
+        else:
+            bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-5, plane_co=top + normal * Anatomy.NECK_RADIUS, plane_no=normal)
     for side in ("l", "r"):
         cut(bm, anatomy, {"upperarm_" + side}, *anatomy.plane("upperarm_" + side, SLEEVE_HEM))
         cut(bm, anatomy, {"calf_" + side}, *anatomy.plane("calf_" + side, PANTS_HEM))
@@ -779,7 +771,7 @@ def prepare_body(body, rig):
     for face in bm.faces:
         face.smooth = True
         face[region], face[depth] = anatomy.region(face)
-        if face[region] == SHOES:
+        if anatomy.bone(face).startswith(("foot_", "ball_")):
             feet["l" if face.calc_center_median().x > 0.0 else "r"].extend(v.co.copy() for v in face.verts)
     head = [v.co.copy() for v in bm.verts
             if any(anatomy.bone_of_group.get(g) == "head" and w > 0.6 for g, w in v[deform].items())]
@@ -788,7 +780,7 @@ def prepare_body(body, rig):
     return feet, head
 
 
-def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_neckline=None):
+def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_neckline=None, drape=None):
     """Copies the faces of some regions into a new mesh, subdivides it once for a smoother
     outline, lifts every point off the skin by how loose the garment is there (looseness:
     vertex -> metres, docs/13 S11-2), smooths away the anatomy underneath and unwraps it
@@ -799,6 +791,8 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_necklin
     bpy.context.scene.collection.objects.link(obj)
     # Clothes do not need the face keys.
     obj.shape_key_clear()
+    for attr in list(obj.data.color_attributes):
+        obj.data.color_attributes.remove(attr)
 
     bm = bmesh.new()
     bm.from_mesh(obj.data)
@@ -821,13 +815,30 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_necklin
     bm.normal_update()
     hem = {v for e in bm.edges if e.is_boundary for v in e.verts}
     lifts = {v: looseness(v, anatomy, v in hem) for v in bm.verts}
+    skin = {v: v.co.copy() for v in bm.verts}
     for v in bm.verts:
         v.co += v.normal * lifts[v]
+    if drape is not None:
+        drape(bm, anatomy, skin)
     inner = [v for v in bm.verts if v not in hem]
     for _ in range(6):
         bmesh.ops.smooth_vert(bm, verts=inner, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     if snap_neckline is not None:
         snap_neckline(hem, anatomy)
+    if drape is not None:
+        # Again after the smoothing (which leaves the hems where they were and pulls the
+        # rest in a little: the hems came out ragged).
+        drape(bm, anatomy, skin)
+    # Every hem a clean line: each point of an edge moved toward the middle of its two
+    # neighbours along the edge.
+    for _ in range(3):
+        moved = {}
+        for v in hem:
+            beside = [e.other_vert(v).co for e in v.link_edges if e.is_boundary]
+            if len(beside) == 2:
+                moved[v] = v.co * 0.5 + (beside[0] + beside[1]) * 0.25
+        for v, co in moved.items():
+            v.co = co
     bm.normal_update()
 
     # Front/back planar UVs: u runs across the body, v from the bottom to the top of the
@@ -853,6 +864,117 @@ def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_necklin
     bm.free()
     print("make_player: %s %d faces, x %.2f..%.2f m, z %.2f..%.2f m" % (name, len(obj.data.polygons), x0, x1, z0, z1))
     return obj
+
+
+def _majorant(values):
+    """The least concave curve over a row of numbers: a string pulled tight over their tops.
+    Cloth hangs like that between the widest places of the body under it."""
+    hull = []
+    for i, y in enumerate(values):
+        while len(hull) >= 2:
+            (x1, y1), (x2, y2) = hull[-2], hull[-1]
+            if (y2 - y1) * (i - x1) <= (y - y1) * (x2 - x1):
+                hull.pop()
+            else:
+                break
+        hull.append((i, y))
+    out = list(values)
+    for (x1, y1), (x2, y2) in zip(hull, hull[1:]):
+        for i in range(x1, x2 + 1):
+            out[i] = y1 + (y2 - y1) * (i - x1) / (x2 - x1)
+    return out
+
+
+def hang(verts, skin, start, end, ease, blend, sectors=12, slices=36, hold=1.0, limit=None, settle=None, rest=0.004):
+    """Reshapes part of a garment (a trouser leg, a sleeve, the body of the jersey) from skin
+    pushed out along its normals into cloth that hangs: round the axis start-end, at each
+    place along it the cloth stands `ease(u)` off the widest the body is there, and between
+    two wide places (thigh and calf, chest and belt) it runs straight instead of following
+    the body in (`hold` of the way: 1 a taut straight line). `blend(u)` is how much of the new
+    shape a point takes (0 leaves it as it was). u is 0 at start and 1 at end.
+    `settle` is the way the cloth drops (a sleeve lies on the top of the arm and hangs clear
+    under it): it rests `rest` off the body on the side it drops from, and all its ease
+    gathers on the other."""
+    axis = end - start
+    length = axis.length
+    d = axis / length
+    ref = d.cross(Vector((0.0, 1.0, 0.0)))
+    if ref.length < 0.2:
+        ref = d.cross(Vector((1.0, 0.0, 0.0)))
+    ref.normalize()
+    other = d.cross(ref)
+    coords = {}
+    for v in verts:
+        rel = skin[v] - start
+        u = rel.dot(d) / length
+        coords[v] = (u, Vector((rel.dot(ref), rel.dot(other))))
+    us = [c[0] for c in coords.values()]
+    lo, hi = min(us), max(us)
+    span = max(hi - lo, 1e-6)
+    index = lambda u: min(int((u - lo) / span * slices), slices - 1)
+    # The middle of the body at each slice, then its reach in each direction from there.
+    sums = [[Vector((0.0, 0.0)), 0] for _ in range(slices)]
+    for u, q in coords.values():
+        k = index(u)
+        sums[k][0] = sums[k][0] + q
+        sums[k][1] += 1
+    centres = [(s[0] / s[1]) if s[1] else None for s in sums]
+    known = [c for c in centres if c is not None]
+    for k in range(slices):
+        if centres[k] is None:
+            centres[k] = known[0] if known else Vector((0.0, 0.0))
+    for _ in range(4):
+        centres = [(centres[max(k - 1, 0)] + centres[k] * 2.0 + centres[min(k + 1, slices - 1)]) * 0.25 for k in range(slices)]
+    reach = [[0.0] * sectors for _ in range(slices)]
+    for u, q in coords.values():
+        k = index(u)
+        r = q - centres[k]
+        a = (math.atan2(r.y, r.x) / (2.0 * math.pi)) % 1.0
+        sct = int(a * sectors) % sectors
+        reach[k][sct] = max(reach[k][sct], r.length)
+    for k in range(slices):
+        got = [x for x in reach[k] if x > 0.0]
+        fill = sum(got) / len(got) if got else 0.05
+        row = [x if x > 0.0 else fill for x in reach[k]]
+        # A cross-section without corners.
+        for _ in range(2):
+            row = [(row[(i - 1) % sectors] + 2.0 * row[i] + row[(i + 1) % sectors]) * 0.25 for i in range(sectors)]
+        reach[k] = row
+    drop = None
+    if settle is not None:
+        drop = Vector((settle.dot(ref), settle.dot(other)))
+        drop = drop.normalized() if drop.length > 1e-6 else None
+    shifts = [(drop * max(ease(lo + (k + 0.5) / slices * span) - rest, 0.0)) if drop is not None else Vector((0.0, 0.0))
+              for k in range(slices)]
+    for sct in range(sectors):
+        column = [reach[k][sct] + ease(lo + (k + 0.5) / slices * span) for k in range(slices)]
+        taut = _majorant(column)
+        for k in range(slices):
+            reach[k][sct] = column[k] + (taut[k] - column[k]) * hold
+    for v in verts:
+        u, q = coords[v]
+        w = blend(u)
+        if w <= 0.0:
+            continue
+        f = (u - lo) / span * slices - 0.5
+        k0 = min(max(int(math.floor(f)), 0), slices - 1)
+        k1 = min(k0 + 1, slices - 1)
+        fk = min(max(f - k0, 0.0), 1.0)
+        centre = centres[k0].lerp(centres[k1], fk)
+        r = q - centre
+        a = (math.atan2(r.y, r.x) / (2.0 * math.pi)) % 1.0 * sectors - 0.5
+        s0 = int(math.floor(a)) % sectors
+        s1 = (s0 + 1) % sectors
+        fs = a - math.floor(a)
+        radius = ((reach[k0][s0] * (1.0 - fs) + reach[k0][s1] * fs) * (1.0 - fk)
+                  + (reach[k1][s0] * (1.0 - fs) + reach[k1][s1] * fs) * fk)
+        if r.length < 1e-5:
+            continue
+        flat = centre + shifts[k0].lerp(shifts[k1], fk) + r.normalized() * radius
+        target = start + d * (u * length) + ref * flat.x + other * flat.y
+        if limit is not None:
+            target = limit(target)
+        v.co = v.co.lerp(target, w)
 
 
 # Round each part of a garment, the arc length (m) a pinstripe fabric's stripes are counted in
@@ -902,10 +1024,11 @@ def wrap_uvs(bm, anatomy):
             loop[wrap].uv = (angle * WRAP_RADIUS[kind], rel.dot(d))
 
 
-def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.045):
+def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.022):
     """Bakes a garment's folds into a normal map (docs/13 S11-2): a finer copy of it is hung
     on the body as cloth, held where it is held in life (pinned(co) -> True), given a little
-    more cloth than the body needs (slack) so it gathers into folds as it settles, and the
+    more cloth than the body needs (slack: 2%; at 4.5% a fitted jersey settled into lumps that
+    made the body under it look uneven) so it gathers into folds as it settles, and the
     difference between the settled copy and the garment is baked onto the garment's own UVs.
     The game lays the map on the uniform; the folds stay where the cloth settled."""
     scene = bpy.context.scene
@@ -1009,29 +1132,67 @@ def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.045
     print("make_player: baked %s folds to %s (and the shade in them)" % (garment.name, out_png))
 
 
-def make_collar(rig):
-    """A band round the base of the neck that finishes the jersey's neckline."""
-    neck = rig.data.bones["neck_01"]
-    axis = (rig.data.bones["head"].head_local - neck.head_local).normalized()
-    centre = neck.head_local + axis * 0.012
-    side = axis.cross(Vector((0.0, 1.0, 0.0))).normalized()
-    front = side.cross(axis).normalized()
+def make_collar(jersey, rig, width=0.015):
+    """The trim round the jersey's neckline ("Collar"): a band that follows the real edge of
+    the opening and down both sides of the V, lying on the cloth."""
     bm = bmesh.new()
-    inner, outer = [], []
-    segments = 28
-    for i in range(segments):
-        a = 2.0 * math.pi * i / segments
-        around = side * math.cos(a) + front * math.sin(a)
-        inner.append(bm.verts.new(centre + around * (Anatomy.NECK_RADIUS - 0.012) + axis * 0.016))
-        outer.append(bm.verts.new(centre + around * (Anatomy.NECK_RADIUS + 0.02) - axis * 0.01))
-    for i in range(segments):
-        n = (i + 1) % segments
-        bm.faces.new((inner[i], inner[n], outer[n], outer[i]))
-    return skinned_object("Collar", bm, rig, lambda co: "spine_03", "Collar")
+    bm.from_mesh(jersey.data)
+    bm.normal_update()
+    deform = bm.verts.layers.deform.verify()
+    names = {g.index: g.name for g in jersey.vertex_groups}
+    neck = rig.data.bones["neck_01"].head_local
+    axis = (rig.data.bones["head"].head_local - neck).normalized()
+    centre = neck + axis * 0.012
+    near = lambda v: (v.co - centre).length < Anatomy.NECK_RADIUS + V_DEPTH + 0.05 and v.co.z > centre.z - V_DEPTH - 0.04
+    edges = [e for e in bm.edges if e.is_boundary and all(near(v) for v in e.verts)]
+    surface = BVHTree.FromBMesh(bm)
+    out = bmesh.new()
+    rows, weights = {}, {}
+    for e in edges:
+        for v in e.verts:
+            if v in rows:
+                continue
+            along = Vector()
+            for other in v.link_edges:
+                if other.is_boundary:
+                    w = other.other_vert(v).co - v.co
+                    along += w if along.dot(w) >= 0.0 else -w
+            inward = Vector()
+            for f in v.link_faces:
+                inward += f.calc_center_median() - v.co
+            if along.length > 1e-6:
+                along.normalize()
+                inward -= along * inward.dot(along)
+            if inward.length < 1e-6:
+                continue
+            inward.normalize()
+            row = []
+            for step in (-0.15, 0.5, 1.0):
+                p = v.co + inward * width * step
+                hit = surface.find_nearest(p)
+                normal = hit[1] if hit[0] is not None else v.normal
+                if normal.dot(v.normal) < 0.0:
+                    normal = -normal
+                base = hit[0] if (hit[0] is not None and step > 0.0) else p
+                new = out.verts.new(base + normal * 0.0022)
+                weights[tuple(round(c, 5) for c in new.co)] = [(names[g], w) for g, w in v[deform].items() if g in names and w > 0.01]
+                row.append(new)
+            rows[v] = row
+    faces = []
+    for e in edges:
+        a, b = e.verts
+        if a not in rows or b not in rows:
+            continue
+        for k in range(2):
+            faces.append(out.faces.new((rows[a][k], rows[b][k], rows[b][k + 1], rows[a][k + 1])))
+    gear.orient(faces, lambda c: centre + axis * (c - centre).dot(axis) + Vector((0.0, 0.03, 0.0)))
+    bm.free()
+    return gear.finish("Collar", out, rig, lambda co: weights.get(tuple(round(c, 5) for c in co), [("spine_03", 1.0)]), ["Collar"])
 
 
-def strip_body(body):
-    """Removes skin that is well under clothing or inside the shoes and sets body materials."""
+def strip_body(body, under_jersey=None):
+    """Removes skin that is well under clothing or inside the shoes and sets body materials.
+    under_jersey(face) -> True where the skin left under the jersey's edge is undershirt."""
     bm = bmesh.new()
     bm.from_mesh(body.data)
     region = bm.faces.layers.int["region"]
@@ -1040,6 +1201,10 @@ def strip_body(body):
     bmesh.ops.delete(bm, geom=hidden, context='FACES')
     for face in bm.faces:
         face.material_index = {HANDS: 1, SOCKS: 2, UNDERSHIRT: 3}.get(face[region], 0)
+        # What is left of the chest and shoulders under the jersey's edge is his undershirt
+        # (it goes on under the jersey; bare skin showed as a band round the V of the neck).
+        if face[region] == JERSEY and under_jersey is not None and under_jersey(face):
+            face.material_index = 3
     # Keep the textured skin if there is one; the hands get their own copy so the game can
     # swap them for batting gloves.
     textured = body.data.materials[0] if len(body.data.materials) > 0 else None
@@ -1077,79 +1242,6 @@ def skinned_object(name, bm, rig, weights, mat_name):
     return obj
 
 
-def make_shoes(feet, rig):
-    """A convex shell around each foot hides the toes and reads as a shoe."""
-    bm = bmesh.new()
-    for side in ("l", "r"):
-        verts = [bm.verts.new(co) for co in feet[side]]
-        hull = bmesh.ops.convex_hull(bm, input=verts)
-        unused = {g for g in hull.get("geom_unused", []) + hull.get("geom_interior", []) if isinstance(g, bmesh.types.BMVert)}
-        bmesh.ops.delete(bm, geom=list(unused), context='VERTS')
-    bm.normal_update()
-    for v in bm.verts:
-        v.co += v.normal * 0.005
-        v.co.z = max(v.co.z, 0.0)
-
-    def weights(co):
-        side = "l" if co.x > 0.0 else "r"
-        toes = rig.data.bones["ball_" + side].head_local
-        return ("ball_" if co.y < toes.y else "foot_") + side
-    return skinned_object("Shoes", bm, rig, weights, "Shoes")
-
-
-def head_box(head_points):
-    xs = [p.x for p in head_points]
-    ys = [p.y for p in head_points]
-    zs = [p.z for p in head_points]
-    centre = Vector(((max(xs) + min(xs)) * 0.5, (max(ys) + min(ys)) * 0.5, 0.0))
-    return centre, (max(xs) - min(xs)) * 0.5, (max(ys) - min(ys)) * 0.5, max(zs), max(zs) - min(zs)
-
-
-def dome(bm, centre, rx, ry, rz, down, face_open=None):
-    """Half-ellipsoid shell reaching `down` radians below its equator. If face_open is a
-    height, vertices on the front (-Y) half are not allowed below it, leaving the face clear."""
-    rings, segments = 9, 24
-    rows = []
-    for r in range(rings + 1):
-        phi = (math.pi * 0.5 + down) * r / rings
-        row = []
-        for seg in range(segments):
-            theta = 2.0 * math.pi * seg / segments
-            p = centre + Vector((rx * math.sin(phi) * math.cos(theta), ry * math.sin(phi) * math.sin(theta), rz * math.cos(phi)))
-            if face_open is not None and math.sin(theta) < -0.25:
-                p.z = max(p.z, face_open)
-            row.append(bm.verts.new(p))
-        rows.append(row)
-    for r in range(rings):
-        for seg in range(segments):
-            n = (seg + 1) % segments
-            bm.faces.new((rows[r][seg], rows[r][n], rows[r + 1][n], rows[r + 1][seg]))
-
-
-def brim(bm, centre, rx, ry, z, reach, spread_deg):
-    """Curved strip in front of the face (-Y is forward in Blender)."""
-    inner, outer = [], []
-    steps = 10
-    for i in range(steps + 1):
-        a = math.radians(-spread_deg + 2.0 * spread_deg * i / steps)
-        inner.append(bm.verts.new(Vector((centre.x + rx * 0.98 * math.sin(a), centre.y - ry * 0.98 * math.cos(a), z))))
-        out = reach * math.cos(a) ** 0.6
-        outer.append(bm.verts.new(Vector((centre.x + (rx + 0.012) * math.sin(a), centre.y - (ry * math.cos(a) + out), z - 0.012))))
-    for i in range(steps):
-        bm.faces.new((inner[i], inner[i + 1], outer[i + 1], outer[i]))
-
-
-def make_cap(head_points, rig):
-    """Fitted cap: a dome over the skull and a brim over the eyes."""
-    centre, half_w, half_d, top, height = head_box(head_points)
-    rx, ry, rz = half_w + 0.010, half_d + 0.010, height * 0.40
-    centre.z = top - rz + 0.012
-    bm = bmesh.new()
-    dome(bm, centre, rx, ry, rz, 0.22)
-    brim(bm, centre, rx, ry, centre.z + rz * math.cos(math.pi * 0.5 + 0.12), 0.075, 70.0)
-    return skinned_object("Cap", bm, rig, lambda co: "head", "Cap")
-
-
 def add_hair(body):
     """Fits the four short styles to the body (before its helper geometry is removed: the
     fitting needs the original mesh). Returns the hair objects, named Hair1 to Hair4."""
@@ -1178,32 +1270,64 @@ def add_hair(body):
     return hair
 
 
-def trim_hair(hair, head_points):
-    """Cuts away the hair that would be under the cap (above its rim): a cap fits close to the
-    skull, so hair left there would show through it. Returns how many points were left above
-    the rim (0)."""
-    centre, half_w, half_d, top, height = head_box(head_points)
-    rz = height * 0.40
-    cap_centre_z = top - rz + 0.012
-    rim = cap_centre_z - rz * math.sin(0.22)
-    left = 0
+def trim_hair(hair, under_cap):
+    """Cuts away the hair that would be under the cap (under_cap(point) -> True): a cap fits
+    close to the skull, so hair left there would show through it."""
     for obj in hair:
         bm = bmesh.new()
         bm.from_mesh(obj.data)
-        bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z > rim - 0.004], context='VERTS')
-        left += sum(1 for v in bm.verts if v.co.z > rim)
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if under_cap(v.co)], context='VERTS')
         bm.to_mesh(obj.data)
         bm.free()
         print("make_player: %s %d faces below the cap" % (obj.name, len(obj.data.polygons)))
-    return left
 
 
-def make_cap_button(head_points, rig):
-    """The button on top of the cap."""
-    centre, half_w, half_d, top, height = head_box(head_points)
-    bm = bmesh.new()
-    dome(bm, Vector((centre.x, centre.y, top + 0.012)), 0.009, 0.009, 0.006, 0.0)
-    return skinned_object("CapButton", bm, rig, lambda co: "head", "Cap")
+def tailor_views(path, shown, top):
+    """Flat views from the front, the side and the back of the given objects in their rest
+    pose (TAILOR=<file.png> on a build), for checking how the clothes sit on the body."""
+    scene = bpy.context.scene
+    scene.render.engine = 'BLENDER_WORKBENCH'
+    scene.display.shading.light = 'STUDIO'
+    scene.display.shading.color_type = 'MATERIAL'
+    scene.render.film_transparent = False
+    scene.render.resolution_x, scene.render.resolution_y = 900, 1300
+    for obj in bpy.data.objects:
+        if obj.type == 'MESH':
+            obj.hide_render = obj not in shown
+    cam = bpy.data.objects.new("TailorCam", bpy.data.cameras.new("TailorCam"))
+    cam.data.type = 'ORTHO'
+    cam.data.ortho_scale = top * 1.06
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+    for suffix, at in (("_front", Vector((0.0, -6.0, top * 0.5))), ("_side", Vector((6.0, 0.0, top * 0.5))),
+                       ("_back", Vector((0.0, 6.0, top * 0.5)))):
+        cam.location = at
+        cam.rotation_euler = (Vector((0.0, 0.0, top * 0.5)) - at).to_track_quat('-Z', 'Y').to_euler()
+        scene.render.filepath = os.path.splitext(path)[0] + suffix + ".png"
+        bpy.ops.render.render(write_still=True)
+    bpy.data.objects.remove(cam)
+    for obj in bpy.data.objects:
+        obj.hide_render = False
+
+
+def fit_report(body_tree, garment, label, levels):
+    """Prints how far a garment stands off the body at some heights: in front, behind and at
+    the sides (cm). levels: {name: z}."""
+    for name, z in levels.items():
+        gaps = {"front": [], "back": [], "side": []}
+        for v in garment.data.vertices:
+            if abs(v.co.z - z) > 0.012:
+                continue
+            where = "side"
+            if abs(v.co.x) < 0.06:
+                where = "front" if v.co.y < 0.0 else "back"
+            elif abs(v.co.x) < 0.1:
+                continue
+            hit = body_tree.find_nearest(v.co)
+            if hit[0] is not None:
+                gaps[where].append(hit[3])
+        print("make_player: fit %s %s %s" % (BUILD, label, name) + "".join(
+            "  %s %.1f cm" % (k, 100.0 * sum(g) / len(g)) for k, g in gaps.items() if g))
 
 
 def render_preview(path, target_z, close=False):
@@ -1251,7 +1375,7 @@ def main():
     # this body's shoulders, elbows, hips and knees.
     body = HumanService.create_human(mask_helpers=True, detailed_helpers=True, extra_vertex_groups=True,
                                      feet_on_ground=False, scale=0.1, macro_detail_dict=macro)
-    for name, weight in SHAPE.items():
+    for name, weight in {**SHAPE, **BUILD_SHAPE.get(BUILD, {})}.items():
         TargetService.load_target(body, TargetService.target_full_path(name), weight=weight, name=name)
     rig = HumanService.add_builtin_rig(body, "game_engine", import_weights=True)
     face_parts = add_skin_and_face(body)
@@ -1260,9 +1384,17 @@ def main():
     for name in FACE_KEYS:
         TargetService.load_target(body, TargetService.target_full_path(name), weight=0.0, name="face_" + name)
     stand_on_ground(body, rig)
-    hair = add_hair(body)
     stem = os.path.splitext(OUT_GLB)[0]
     marks = body_marks(body, max(v.co.z for v in body.data.vertices))
+    # The body's measurements against the tables (docs/12 section 4), kept next to the model.
+    numbers = anthropometry.measure(body, rig, marks, bpy)
+    for line in anthropometry.report(numbers):
+        print("make_player: measure %s %s" % (BUILD, line))
+    with open(stem + "_measure.json", "w") as f:
+        json.dump({k: round(v, 4) for k, v in numbers.items()}, f, indent=1, sort_keys=True)
+    if os.environ.get("MEASURE_ONLY"):
+        return
+    hair = add_hair(body)
     bake_skin_maps(body, rig, [*hair, *[p for p in face_parts if p.name != "Eyes"]], stem + "_skin_detail.png",
                    os.path.join(os.path.dirname(OUT_GLB), "player_skin_relief.png"))
     if os.environ.get("SKIN_ONLY"):
@@ -1295,78 +1427,102 @@ def main():
         return best
 
     def jersey_looseness(v, a, hem):
-        """A uniform top (docs/13 S11-2, A from photographs): 12-18 cm more round the chest
-        than the body, roomier below the chest before it is tucked in, close at the collar,
-        wide sleeves flaring to the hem above the elbow, a few soft folds where it is tucked."""
+        """How far the cloth starts off the skin (the hang below then lets it fall straight):
+        close at the collar, and lying on the tops of the shoulders, where a jersey rests."""
         bone = dominant(v, a)
         if bone.startswith("upperarm_"):
             t = min(max(a.along(bone, v.co) / SLEEVE_HEM, 0.0), 1.0)
-            return 0.016 + 0.018 * t
-        lift = 0.018
+            return 0.007 + 0.006 * t
+        lift = 0.012
         if v.co.z < chest_z:
-            lift += 0.004
-        if v.co.y > 0.0:
-            lift += 0.003
+            lift += 0.002
+        # Cloth lies on whatever faces up.
+        lift *= 1.0 - 0.55 * _smooth(0.35, 0.85, v.normal.z)
         above_belt = v.co.z - (a.waist + BELT_HALF)
-        if above_belt < 0.15:
-            lift = 0.012 + (lift - 0.012) * max(above_belt, 0.0) / 0.15
-            lift += 0.003 * math.sin(above_belt * 2.0 * math.pi / 0.05)
+        if above_belt < 0.04:
+            lift = 0.007 + (lift - 0.007) * max(above_belt, 0.0) / 0.04
         neck = a.outside_neckline(v.co)
         if neck < 0.04:
-            lift = 0.010 + (lift - 0.010) * neck / 0.04
+            lift = 0.005 + (lift - 0.005) * neck / 0.04
         return lift
 
+    def jersey_drape(bm, a, skin):
+        """A uniform top (docs/13 S11-2, from photographs): fitted — it follows the chest and
+        the back a centimetre off them, runs a little straighter than the body from the
+        chest to where it is tucked in (a tucked jersey is pulled down, not hung), and the
+        sleeves lie on the tops of the arms and hang open under them."""
+        belt_top = a.waist + BELT_HALF
+        # Below the armpits the trunk is the ribs and the back; above, the shoulders (which
+        # the jersey rests on and follows).
+        armpit = rig.data.bones["upperarm_l"].head_local.z - 0.075
+        trunk = [v for v in bm.verts if not dominant(v, a).startswith(("upperarm_", "lowerarm_")) and skin[v].z < armpit]
+        mid_y = sum(skin[v].y for v in trunk) / len(trunk)
+        low, high = Vector((0.0, mid_y, belt_top)), Vector((0.0, mid_y, armpit))
+        tuck = 0.03 / (high.z - low.z)
+        hang(trunk, skin, low, high, lambda u: 0.005 + 0.005 * _smooth(0.0, tuck, u),
+             lambda u: 1.0 - _smooth(0.5, 1.0, u), sectors=16, hold=0.2)
+        for side in ("l", "r"):
+            bone = "upperarm_" + side
+            sleeve = [v for v in bm.verts if dominant(v, a) == bone]
+            start, end = rig.data.bones[bone].head_local, rig.data.bones["lowerarm_" + side].head_local
+            d = (end - start).normalized()
+            under = Vector((0.0, 0.0, -1.0))
+            under = (under - d * under.dot(d)).normalized()
+            hang(sleeve, skin, start, end, lambda u: 0.006 + 0.010 * _smooth(0.15, SLEEVE_HEM, u),
+                 lambda u: _smooth(0.15, 0.4, u), sectors=10, slices=16, hold=0.5, settle=under)
+
     def pants_looseness(v, a, hem):
-        """Baseball trousers: roomy at the seat and thighs, narrowing below the knee to the
-        hem, close at the belt, gathered a little over the calf."""
+        """How far the cloth starts off the skin (the hang below shapes the legs): close at the
+        belt, a little room over the seat."""
         bone = dominant(v, a)
-        # Cloth hangs from the widest part of the thigh past the knee: it does not follow the
-        # leg in where the knee is narrower (close to the skin there, the trousers bulged at
-        # the thigh and pinched at the knee like riding breeches).
         if bone.startswith("thigh_"):
-            t = min(max(a.along(bone, v.co), 0.0), 1.0)
-            seat = 0.003 if v.co.y > 0.0 and t < 0.35 else 0.0
-            return 0.014 + 0.020 * _smooth(0.5, 1.0, t) + seat
-        if bone.startswith("calf_"):
-            t = min(max(a.along(bone, v.co) / PANTS_HEM, 0.0), 1.0)
-            return 0.034 - 0.020 * _smooth(0.0, 0.35, t) - 0.006 * _smooth(0.35, 1.0, t) + 0.002 * math.sin(t * 2.0 * math.pi * 4.0)
-        if abs(v.co.z - a.waist) < BELT_HALF + 0.01:
             return 0.010
-        return 0.019 + (0.004 if v.co.y > 0.0 else 0.0)
+        if bone.startswith("calf_"):
+            return 0.008
+        if abs(v.co.z - a.waist) < BELT_HALF + 0.01:
+            return 0.007
+        return 0.010 + (0.002 if v.co.y > 0.0 else 0.0)
 
-    def snap_neckline(hem, a):
-        """Puts the jersey's neckline exactly on its curve (docs/13 S11-7): the V's straight
-        sides in front, a circle round the neck elsewhere. Returns how far the edge was from
-        the curve before, at most."""
-        worst = 0.0
-        axis = a.collar_n
-        for v in hem:
-            rel = v.co - a.collar_co
-            up = rel.dot(axis)
-            if up < -V_DEPTH - 0.03 or up > 0.06:
-                continue
-            if v.co.y < a.collar_co.y and v.co.z < a.collar_co.z + 0.005:
-                # The V: move across to its side line at this height.
-                want = a.v_half_width(v.co.z)
-                dx = abs(v.co.x - a.collar_co.x)
-                if want > 0.0 and abs(dx - want) < 0.03:
-                    worst = max(worst, abs(dx - want))
-                    v.co.x = a.collar_co.x + math.copysign(want, v.co.x - a.collar_co.x)
-                continue
-            radial = rel - axis * up
-            if radial.length > 1e-4 and abs(radial.length - (Anatomy.NECK_RADIUS + 0.01)) < 0.03:
-                worst = max(worst, abs(radial.length - (Anatomy.NECK_RADIUS + 0.01)))
-                v.co = a.collar_co + axis * up + radial.normalized() * (Anatomy.NECK_RADIUS + 0.01)
-        print("make_player: neckline snapped (edge was up to %.1f mm off the curve)" % (worst * 1000.0))
+    def pants_drape(bm, a, skin):
+        """Baseball trousers: each leg hangs from the widest of the thigh past the knee to the
+        calf and on to an open hem over the shoe. (Skin pushed out along its normals bulged
+        at the thigh and pinched at the knee like riding breeches.)"""
+        for side, sign in (("l", 1.0), ("r", -1.0)):
+            leg = [v for v in bm.verts if dominant(v, a) in ("thigh_" + side, "calf_" + side)]
+            start, end = rig.data.bones["thigh_" + side].head_local, rig.data.bones["foot_" + side].head_local
 
-    jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of, snap_neckline)
-    pants = make_garment(body, "Pants", (PANTS, BELT), pants_looseness, [PANTS, BELT], anatomy_of)
+            def ease(u):
+                # Room at the thigh and knee, closer over the calf, then out to an open hem
+                # wide enough to sit over the shoe.
+                return 0.008 - 0.003 * _smooth(0.5, 0.72, u) + 0.010 * _smooth(0.8, 0.98, u)
+
+            def apart(p, sign=sign):
+                # The legs of a pair of trousers do not pass through each other.
+                if p.x * sign < 0.003:
+                    p = p.copy()
+                    p.x = 0.003 * sign
+                return p
+
+            # (Fitted: with more ease and a straighter fall the legs were two wide tubes, and
+            # a batter in his stance looked heavy.)
+            hang(leg, skin, start, end, ease, lambda u: _smooth(0.16, 0.34, u), sectors=12, slices=40, hold=0.42, limit=apart)
+
+    jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of, None, jersey_drape)
+    pants = make_garment(body, "Pants", (PANTS, BELT), pants_looseness, [PANTS, BELT], anatomy_of, None, pants_drape)
     # How far the jersey stands off the body at chest height (docs/13 S11-2: 2 to 5 cm).
     depsgraph = bpy.context.evaluated_depsgraph_get()
     tree = BVHTree.FromObject(body, depsgraph)
     gaps = [tree.find_nearest(v.co)[3] for v in jersey.data.vertices if abs(v.co.z - chest_z) < 0.02 and abs(v.co.x) < 0.17]
     if gaps:
         print("make_player: build %s jersey off the chest %.1f cm on average" % (BUILD, 100.0 * sum(gaps) / len(gaps)))
+    belt_top = top * BELT_CENTRE + BELT_HALF
+    shoulder_z = rig.data.bones["upperarm_l"].head_local.z
+    fit_report(tree, jersey, "jersey", {"shoulder blades": shoulder_z - 0.05, "chest": chest_z, "ribs": (chest_z + belt_top) * 0.5,
+                                        "over the belt": belt_top + 0.03})
+    knee_z = rig.data.bones["calf_l"].head_local.z
+    fit_report(tree, pants, "pants", {"seat": top * 0.5, "thigh": (top * 0.47 + knee_z) * 0.5, "knee": knee_z, "calf": knee_z * 0.68, "hem": 0.11})
+    if os.environ.get("TAILOR"):
+        tailor_views(os.environ["TAILOR"], [body, jersey, pants], top)
     # Folds (docs/13 S11-2): the jersey hangs from the shoulders and is tucked in at the belt;
     # the trousers hang from the belt and are held at the hem over the socks.
     jz = [v.co.z for v in jersey.data.vertices]
@@ -1383,12 +1539,25 @@ def main():
     helmet, flaps = gear.batting_helmet(body, marks, rig)
     catcher_head = gear.catcher_helmet(body, marks, rig)
     catcher_gear = [gear.chest_protector(jersey, rig, marks), gear.shin_guards(pants, body, rig), *catcher_head]
-    umpire = gear.umpire_mask(body, marks, rig)
-    strip_body(body)
-    trim_hair(hair, head_points)
-    optional = [*catcher_gear, umpire, *flaps, helmet]
-    parts = [body, jersey, pants, make_shoes(feet, rig), *face_parts, *hair,
-             make_cap(head_points, rig), make_cap_button(head_points, rig), *optional]
+    officials.material = material
+    umpire = officials.mask(body, marks, rig)
+    umpire_kit = [officials.polo_collar(jersey, rig, Anatomy.NECK_RADIUS),
+                  officials.ball_bags(pants, rig, top * BELT_CENTRE, BELT_HALF)]
+    kit.material = material
+    gear.material = material
+    collar = make_collar(jersey, rig)
+    cap, cap_button, under_cap = kit.cap(body, marks, rig)
+    # The plate umpire's cap has a short bill, to go under his mask.
+    umpire_kit.append(kit.cap(body, marks, rig, name="UmpireCap", bill=0.034)[0])
+    buckle = kit.buckle(pants, rig, top * BELT_CENTRE, BELT_HALF)
+    piping = kit.side_piping(pants, rig, top * BELT_CENTRE - BELT_HALF - 0.004, p_bottom + 0.004)
+    neck_at = rig.data.bones["neck_01"].head_local
+    strip_body(body, lambda f: (f.calc_center_median() - neck_at).length < Anatomy.NECK_RADIUS + V_DEPTH + 0.06
+               and abs(f.calc_center_median().x) < Anatomy.NECK_RADIUS + 0.05)
+    store_limb_coordinates(body, rig)
+    trim_hair(hair, under_cap)
+    optional = [*catcher_gear, umpire, *umpire_kit, *flaps, helmet]
+    parts = [body, jersey, collar, pants, buckle, piping, kit.shoes(feet, rig), *face_parts, *hair, cap, cap_button, *optional]
 
     for old, new in BONE_NAMES.items():
         if old in rig.data.bones:
@@ -1405,7 +1574,8 @@ def main():
     bpy.context.view_layer.objects.active = rig
     bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB', use_selection=True, export_apply=False,
                               export_yup=True, export_skins=True, export_animations=False, export_morph=True,
-                              export_morph_normal=True)
+                              export_morph_normal=True, export_vertex_color='ACTIVE', export_all_vertex_colors=False,
+                              export_active_vertex_color_when_no_material=True)
     print("make_player: wrote", OUT_GLB)
     if PREVIEW:
         # The preview shows a catcher in his gear, then close-ups of the catcher's helmet, the
@@ -1424,4 +1594,5 @@ def main():
             print("make_player: preview", out)
 
 
-main()
+if __name__ == "__main__":
+    main()

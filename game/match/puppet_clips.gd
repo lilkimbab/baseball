@@ -356,7 +356,7 @@ static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
 ## Standing at ease, arms by the sides: the figure in the menus (player card, portraits).
 static func standing() -> PuppetPose:
 	var a := PuppetPose.at
-	return _pose(a.call(0.0, 0.93, 0.0), 0.0, 0.0, 1.0, a.call(0.225, 0.8, 0.05), a.call(-0.225, 0.8, 0.05), a.call(0.13, 0.08, 0.0), a.call(-0.13, 0.08, 0.0))
+	return _pose(a.call(0.0, 0.955, 0.0), 0.0, 0.0, 1.5, a.call(0.25, 0.83, 0.07), a.call(-0.25, 0.83, 0.07), a.call(0.12, 0.08, 0.0), a.call(-0.12, 0.08, 0.0))
 
 
 static func walk(phase: float) -> PuppetPose:

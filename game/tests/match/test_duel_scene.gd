@@ -288,19 +288,73 @@ func test_the_path_of_a_pitch_runs_from_the_hand_to_the_plate() -> void:
 	assert_lt(flight.movement.y, -0.1, "and breaks down")
 
 
-func test_the_player_sees_his_pitch_s_path_before_he_throws() -> void:
+func test_the_player_sees_where_his_pitch_arrives_before_he_throws() -> void:
 	var scene := _start(&"pitch")
 	for i: int in 30:
 		scene.step(DT)
 		scene.refresh(DT)
 	assert_eq(scene.state, DuelScene.State.PRE_PITCH)
-	assert_gt(scene.preview.size(), 10, "the path is drawn while he aims")
-	assert_lt(scene.preview[scene.preview.size() - 1].distance_to(scene.target), 0.03, "and ends at his target")
+	# A straight fastball: its mark in the zone and nothing else. A pitch that moves: only
+	# the last few metres of its path, bending into the mark. Nothing starts at the pitcher
+	# (drawn from his hand, the path came out of his neck on the screen).
+	for i: int in scene.pitch_ids.size():
+		scene.selected_pitch = i
+		scene.refresh(DT)
+		var type := scene.selected_type()
+		var path := scene.preview
+		assert_false(path.is_empty(), "%s: something is shown while he aims" % type.id)
+		assert_lt(path[path.size() - 1].distance_to(scene.target), 0.03, "%s: it ends at his target" % type.id)
+		if DuelScene.goes_straight(type):
+			assert_eq(path.size(), 1, "%s: only where it arrives" % type.id)
+		else:
+			assert_between(path.size(), 4, DuelScene.TAIL_POINTS, "%s: the end of its path" % type.id)
+			assert_lt(path[0].y, Field.PLATE_FRONT_Y + 9.0, "%s: from no further than a few metres out" % type.id)
+			assert_gt(path[0].y, path[path.size() - 1].y, "%s: coming in" % type.id)
+	scene.selected_pitch = 0
+	scene.refresh(DT)
 	var first := scene.preview.duplicate()
 	scene.target += Vector3(0.2, 0.0, -0.2)
 	scene.pointer_override = scene.camera.unproject_position(Field.to_world(scene.target))
 	scene.refresh(DT)
 	assert_ne(scene.preview[scene.preview.size() - 1], first[first.size() - 1], "it follows the target")
+
+
+func test_the_pitch_wheel_chooses_the_pitch_the_pointer_goes_toward() -> void:
+	var scene := _start(&"pitch")
+	for i: int in 30:
+		scene.step(DT)
+		scene.refresh(DT)
+	assert_eq(scene.state, DuelScene.State.PRE_PITCH)
+	# Six directions round a ring: the first pitch straight up, the rest clockwise.
+	assert_eq(DuelScene.WHEEL_SLOTS, 6, "a pitcher throws six pitches at most")
+	assert_almost_eq(DuelScene.wheel_direction(0).angle_to(Vector2.UP), 0.0, 0.001)
+	assert_gt(DuelScene.wheel_direction(1).x, 0.5, "the second to the upper right")
+	assert_gt(DuelScene.wheel_direction(3).y, 0.9, "the fourth straight down")
+	var middle := Vector2(640.0, 360.0)
+	var aim := scene.target
+	scene.selected_pitch = 0
+	for slot: int in scene.pitch_ids.size():
+		scene.open_wheel(middle)
+		assert_true(scene.wheel_open)
+		scene.pointer_override = middle + DuelScene.wheel_direction(slot) * 120.0
+		scene.refresh(DT)
+		assert_eq(scene.wheel_pick, slot, "the pointer is toward pitch %d" % (slot + 1))
+		assert_eq(scene.target, aim, "the target does not move while a pitch is chosen")
+		scene.close_wheel()
+		assert_eq(scene.selected_pitch, slot)
+		assert_false(scene.wheel_open)
+	# In the middle of the wheel, or toward a direction with no pitch, nothing changes.
+	scene.open_wheel(middle)
+	scene.pointer_override = middle + Vector2(3.0, 2.0)
+	scene.refresh(DT)
+	assert_eq(scene.wheel_pick, -1, "the middle chooses nothing")
+	if scene.pitch_ids.size() < DuelScene.WHEEL_SLOTS:
+		scene.pointer_override = middle + DuelScene.wheel_direction(DuelScene.WHEEL_SLOTS - 1) * 120.0
+		scene.refresh(DT)
+		assert_eq(scene.wheel_pick, -1, "no pitch in that direction")
+	var before := scene.selected_pitch
+	scene.close_wheel()
+	assert_eq(scene.selected_pitch, before, "the pitch already chosen is kept")
 
 
 func test_the_batter_aims_with_the_pointer_by_default() -> void:
