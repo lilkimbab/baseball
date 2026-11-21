@@ -16,6 +16,11 @@ const REACH := 1.2
 ## from the bag.
 const CLOSE := 1.2
 const SLIDE_FROM := 1.5
+## Throws shorter than TOSS_WITHIN (m) are flipped underhand; infielders snap them under
+## SNAP_WITHIN; outfielders crow-hop beyond CROW_HOP_BEYOND.
+const TOSS_WITHIN := 9.0
+const SNAP_WITHIN := 32.0
+const CROW_HOP_BEYOND := 35.0
 ## A runner who slides into a base he was this near (m) at the start is diving back to it.
 const BACK_TO := 6.0
 const STEP := 0.04
@@ -30,6 +35,8 @@ class Moment:
 	var at := Vector3.ZERO
 	## A slide head first: diving back to the base he left.
 	var head_first := false
+	## How a throw is made (PuppetClips.throw_styled).
+	var style: StringName = &"over"
 
 	static func make(k: Kind, t: float, where: Vector3) -> Moment:
 		var m := Moment.new()
@@ -74,7 +81,9 @@ static func read(tl: PlayTimeline, calls: Array[PlayCall], batted: bool = true) 
 		var to := Vector3(throw[1].y, throw[1].z, throw[1].w)
 		var thrower := _nearest(tl, fielders, release, from)
 		if thrower != "":
-			moves._add(thrower, Moment.make(Kind.THROW, release, to))
+			var throw_m := Moment.make(Kind.THROW, release, to)
+			throw_m.style = throw_style(thrower, Vector2(from.x, from.y).distance_to(Vector2(to.x, to.y)))
+			moves._add(thrower, throw_m)
 		var receiver := _nearest(tl, fielders, arrive, to)
 		if receiver != "" and receiver != thrower:
 			moves._add(receiver, Moment.make(Kind.CATCH, arrive, to))
@@ -119,6 +128,19 @@ static func read(tl: PlayTimeline, calls: Array[PlayCall], batted: bool = true) 
 					break
 				when += STEP
 	return moves
+
+
+## How a fielder throws over `distance` m: a flip for a few metres, an infielder's snap
+## across the infield, an outfielder's crow hop on a long one, otherwise overhand.
+static func throw_style(key: String, distance: float) -> StringName:
+	if distance < TOSS_WITHIN:
+		return &"toss"
+	var outfielder := key in ["F:LF", "F:CF", "F:RF"]
+	if outfielder and distance > CROW_HOP_BEYOND:
+		return &"crow_hop"
+	if key in ["F:1B", "F:2B", "F:SS", "F:3B"] and distance < SNAP_WITHIN:
+		return &"snap"
+	return &"over"
 
 
 static func _nearest(tl: PlayTimeline, keys: Array[String], time: float, point: Vector3) -> String:
