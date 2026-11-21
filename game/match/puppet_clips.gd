@@ -86,6 +86,20 @@ static func catcher(mitt_height: float = 0.72) -> PuppetPose:
 	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 24.0, a.call(0.22, 0.55, 0.1), a.call(-0.04, mitt, 0.5), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
 
 
+## The catcher putting down the sign: right hand deep between his thighs, mitt on his left
+## knee to screen it from the first-base coach.
+static func catcher_sign() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 18.0, a.call(0.02, 0.4, 0.12), a.call(-0.28, 0.5, 0.3), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
+
+
+## The catcher blocking a pitch in the dirt: down on both knees, square to the ball, the mitt
+## between his knees and his chin tucked so the ball drops in front of him.
+static func catcher_block() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.52, 0.05), 0.0, 0.0, 28.0, a.call(0.12, 0.3, 0.35), a.call(-0.02, 0.12, 0.42), a.call(0.28, 0.1, -0.42), a.call(-0.28, 0.1, -0.42))
+
+
 static func fielder_ready() -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.84, 0.0), 0.0, 0.0, 22.0, a.call(0.24, 0.72, 0.3), a.call(-0.24, 0.72, 0.3), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.0))
@@ -256,6 +270,7 @@ static func lead_off() -> PuppetPose:
 
 ## Umpire signals, t seconds after the call. Strike or out: the right fist punched up. Safe:
 ## both arms swept out flat. Foul: both arms up. Home run: right hand circling over the head.
+## Infield fly: the right arm straight up. Time: both hands up, palms out.
 static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
 	var a := PuppetPose.at
 	var stand := _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 4.0, a.call(0.22, 0.88, 0.05), a.call(-0.22, 0.88, 0.05), a.call(0.18, 0.08, 0.0), a.call(-0.18, 0.08, 0.0))
@@ -267,6 +282,10 @@ static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
 			sign = _pose(a.call(0.0, 0.88, 0.0), 0.0, 0.0, 20.0, a.call(0.85, 1.2, 0.25), a.call(-0.85, 1.2, 0.25), a.call(0.3, 0.08, 0.0), a.call(-0.3, 0.08, 0.0))
 		&"foul":
 			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.3, 2.05, 0.05), a.call(-0.3, 2.05, 0.05), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))
+		&"infield_fly":
+			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.12, 2.15, 0.12), a.call(-0.2, 0.9, 0.05), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))
+		&"time":
+			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.35, 1.95, 0.25), a.call(-0.35, 1.95, 0.25), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))
 		&"home_run":
 			var turn := t * TAU * 1.5
 			sign = _pose(a.call(0.0, 0.95, 0.0), 0.0, 0.0, 0.0, a.call(0.2 + 0.08 * cos(turn), 2.05, 0.08 * sin(turn)), a.call(-0.2, 0.9, 0.05), a.call(0.2, 0.08, 0.0), a.call(-0.2, 0.08, 0.0))

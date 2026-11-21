@@ -5,17 +5,19 @@ extends RefCounted
 ## to, who receives each throw, which runner slides into which base. MatchScene turns these
 ## into poses.
 
-enum Kind { CATCH, THROW, SLIDE }
+enum Kind { CATCH, THROW, SLIDE, TAG }
 
 ## Seconds around each moment that its pose takes: a catch from just before the ball arrives
 ## to just after, a throw from the wind-up to the follow-through, a slide from the drop.
-const WINDOW := {Kind.CATCH: Vector2(-0.3, 0.25), Kind.THROW: Vector2(-0.35, 0.45), Kind.SLIDE: Vector2(-0.35, 0.6)}
+const WINDOW := {Kind.CATCH: Vector2(-0.3, 0.25), Kind.THROW: Vector2(-0.35, 0.45), Kind.SLIDE: Vector2(-0.35, 0.6), Kind.TAG: Vector2(-0.25, 0.4)}
 ## How near (m, on the ground) a fielder must be to the ball to be the one who gets it.
 const REACH := 1.2
 ## A play this close (s between runner and ball) gets a slide, and it is down this far (m)
 ## from the bag.
 const CLOSE := 1.2
 const SLIDE_FROM := 1.5
+## A runner who slides into a base he was this near (m) at the start is diving back to it.
+const BACK_TO := 6.0
 const STEP := 0.04
 ## Seconds after contact before anyone can field the ball.
 const LEAVES_BAT := 0.2
@@ -26,6 +28,8 @@ class Moment:
 	var time := 0.0
 	## Where the ball is (a catch), where it goes (a throw), or the base (a slide).
 	var at := Vector3.ZERO
+	## A slide head first: diving back to the base he left.
+	var head_first := false
 
 	static func make(k: Kind, t: float, where: Vector3) -> Moment:
 		var m := Moment.new()
@@ -39,7 +43,9 @@ class Moment:
 var by_key: Dictionary[String, Array] = {}
 
 
-static func read(tl: PlayTimeline, calls: Array[PlayCall]) -> PlayMoves:
+## `batted` false for a steal or a pickoff, where the play starts with a throw rather than a
+## ball off the bat.
+static func read(tl: PlayTimeline, calls: Array[PlayCall], batted: bool = true) -> PlayMoves:
 	var moves := PlayMoves.new()
 	var fielders: Array[String] = []
 	for key: String in tl.tracks:
@@ -49,7 +55,7 @@ static func read(tl: PlayTimeline, calls: Array[PlayCall]) -> PlayMoves:
 	var first_throw := tl.throws[0][0].x if not tl.throws.is_empty() else tl.duration
 	# Not at the bat itself, where the ball starts beside the catcher.
 	var t := LEAVES_BAT
-	var caught := false
+	var caught := not batted
 	while t <= first_throw and not caught:
 		var ball := tl.position("ball", t)
 		if ball.z < 2.7:
@@ -72,21 +78,44 @@ static func read(tl: PlayTimeline, calls: Array[PlayCall]) -> PlayMoves:
 		var receiver := _nearest(tl, fielders, arrive, to)
 		if receiver != "" and receiver != thrower:
 			moves._add(receiver, Moment.make(Kind.CATCH, arrive, to))
+	# On a tag play the fielder at the bag puts the glove down where the runner comes in.
+	var runners: Array[String] = []
+	for key: String in tl.tracks:
+		if key.begins_with("R:"):
+			runners.append(key)
+	for c: PlayCall in calls:
+		if not c.tag:
+			continue
+		var base := PlaySim.base_xy(c.base)
+		var bag := Vector3(base.x, base.y, 0.0)
+		var fielder := _nearest(tl, fielders, c.time, bag)
+		var runner := _nearest(tl, runners, c.time, bag)
+		if fielder == "":
+			continue
+		var at := bag
+		if runner != "":
+			var r := tl.position(runner, c.time)
+			at = Vector3(r.x, r.y, 0.0).lerp(bag, 0.5)
+		moves._add(fielder, Moment.make(Kind.TAG, c.time - 0.05, Vector3(at.x, at.y, 0.15)))
 	# Runners slide into a base where the play on them is close.
 	for key: String in tl.tracks:
 		if not key.begins_with("R:"):
 			continue
+		var track := tl.tracks[key]
+		var start := Vector2(track[0].y, track[0].z)
 		for c: PlayCall in calls:
-			# A runner going to first runs through the bag; at the other bases he slides
-			# whenever there is a play on him, unless it is not close at all.
-			if absf(c.margin) > CLOSE or c.base == 1:
+			# The batter runs through first base; elsewhere a runner slides whenever there is
+			# a play on him, unless it is not close at all.
+			if absf(c.margin) > CLOSE or (c.base == 1 and start.length() < 3.0):
 				continue
 			var base := PlaySim.base_xy(c.base)
 			var when := c.time - 2.0
 			while when <= c.time + 1.5:
 				var at := tl.position(key, when)
 				if Vector2(at.x - base.x, at.y - base.y).length() < SLIDE_FROM:
-					moves._add(key, Moment.make(Kind.SLIDE, when, Vector3(base.x, base.y, 0.0)))
+					var slide := Moment.make(Kind.SLIDE, when, Vector3(base.x, base.y, 0.0))
+					slide.head_first = start.distance_to(base) < BACK_TO
+					moves._add(key, slide)
 					break
 				when += STEP
 	return moves
@@ -111,10 +140,12 @@ func _add(key: String, m: Moment) -> void:
 	(by_key[key] as Array).sort_custom(func(a: Moment, b: Moment) -> bool: return a.time < b.time)
 
 
-## The moment whose pose is on at time t for a track, or null.
+## The moment whose pose is on at time t for a track, or null. Where two overlap the later
+## one wins: the throw takes over from the catch, the tag from taking the throw.
 func now(key: String, t: float) -> Moment:
+	var on: Moment = null
 	for m: Moment in by_key.get(key, []):
 		var w: Vector2 = WINDOW[m.kind]
 		if t >= m.time + w.x and t <= m.time + w.y:
-			return m
-	return null
+			on = m
+	return on

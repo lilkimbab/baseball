@@ -372,6 +372,11 @@ func _ai_react() -> void:
 	AiBatter.react(duel, _ai_rng)
 
 
+## The plate umpire is making some other signal than the pitch's (a full game's "time").
+func _umpire_busy() -> bool:
+	return false
+
+
 ## Hand the pitch over as soon as the ball is hit, instead of following it to rest.
 func _finish_on_contact() -> bool:
 	return false
@@ -469,7 +474,8 @@ func signal_call(u: Puppet, pose: PuppetPose) -> void:
 func _pose_players() -> void:
 	# The plate umpire's right fist goes up for a called strike; a ball gets no signal.
 	var strike := state == State.RESULT and duel.result == PitchDuel.Result.CALLED_STRIKE
-	signal_call(umpire, PuppetClips.umpire_signal(&"strike", state_time) if strike else null)
+	if not _umpire_busy():
+		signal_call(umpire, PuppetClips.umpire_signal(&"strike", state_time) if strike else null)
 	# The pitcher holds the ball until release and watches the plate; the batter watches the
 	# ball once it is on its way, and the pitcher's hand before that.
 	var ball_out := state == State.LIVE or state == State.RESULT
