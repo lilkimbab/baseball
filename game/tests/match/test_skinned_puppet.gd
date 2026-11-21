@@ -499,3 +499,26 @@ func test_shadows_are_not_lit_blue() -> void:
 	assert_gte(env.ambient_light_color.r, env.ambient_light_color.b)
 	var sun := scene.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 	assert_gt(sun.light_color.r, sun.light_color.b, "a warm sun")
+
+
+# --- S11-4 hair ---
+
+
+func test_four_hair_styles_one_shown_and_none_under_the_cap() -> void:
+	var puppet := _model()
+	var styles: Array[MeshInstance3D] = []
+	for i: int in range(1, 5):
+		var h := puppet.find_child("Hair%d" % i, true, false) as MeshInstance3D
+		assert_not_null(h, "style %d is in the model" % i)
+		if h != null:
+			styles.append(h)
+	var shown := styles.filter(func(h: MeshInstance3D) -> bool: return h.visible)
+	assert_eq(shown.size(), 1, "one style shows")
+	puppet.set_hair(3, Color(0.3, 0.2, 0.1))
+	assert_true(styles[2].visible)
+	assert_false(styles[0].visible)
+	# Nothing of the hair reaches up into the cap.
+	var cap := puppet.find_child("Cap", true, false) as MeshInstance3D
+	var cap_bottom := cap.get_aabb().position.y
+	for h: MeshInstance3D in styles:
+		assert_lte(h.get_aabb().end.y, cap_bottom + 0.01, "%s stays below the cap" % h.name)

@@ -46,6 +46,9 @@ var height := 1.83
 ## The body build (docs/13 S11-1): &"lean", &"standard", &"solid" or &"heavy", each a model
 ## built by ./dev model.
 var build: StringName = &"standard"
+## Which of the model's four short hair styles shows (1 to 4; 0 none), and its colour.
+var hair := 1
+var hair_color := Color(0.07, 0.06, 0.055)
 ## &"glove" for a fielder's glove, &"mitt" for the catcher's.
 var glove_kind: StringName = &"glove"
 var _glove_shown: StringName = &""
@@ -770,6 +773,10 @@ func _paint() -> void:
 				part.set_surface_override_material(surface, _skin(original))
 			elif part.name == &"Eyes":
 				part.set_surface_override_material(surface, _eyes(original))
+			elif String(part.name).begins_with("Hair"):
+				part.visible = String(part.name) == "Hair%d" % hair
+				part.set_surface_override_material(surface, _hair_material(original))
+				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
 				part.set_surface_override_material(surface, _solid(original, true))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -842,6 +849,27 @@ static func _skin_sheen() -> NoiseTexture2D:
 		ramp.set_color(1, Color(0.8, 0.8, 0.8))
 		_sheen.color_ramp = ramp
 	return _sheen
+
+
+## Hair (docs/13 S11-4): the style's strand texture as a cut-out, tinted to the player's colour.
+func _hair_material(original: Material) -> Material:
+	var base := _solid(original, true) as StandardMaterial3D
+	if base == null:
+		return original
+	var m := base.duplicate() as StandardMaterial3D
+	m.albedo_color = hair_color * 2.2
+	m.roughness = 0.55
+	m.alpha_scissor_threshold = 0.4
+	return m
+
+
+## A player's hair: style 1 to 4 and colour.
+func set_hair(style: int, colour: Color) -> void:
+	if style == hair and colour == hair_color:
+		return
+	hair = style
+	hair_color = colour
+	repaint()
 
 
 ## Eyes: a wet, glossy surface, so the sky shows as a highlight on the cornea.

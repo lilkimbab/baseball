@@ -49,6 +49,13 @@ BUILDS = {
     "heavy": {"muscle": 0.95, "weight": 1.0},
 }
 
+# Hair (docs/13 S11-4): MakeHuman's four short styles (CC0, from MPFB's system assets). Every
+# model carries all four; the game shows one per player. Hair under the cap is cut away, so
+# only the sides, back and sideburns show below it. Textures are scaled down to this size.
+HAIR_STYLES = ["short01", "short02", "short03", "short04"]
+HAIR_TEXTURE = 512
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+
 # Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
 SLEEVE_HEM = 0.62
 PANTS_HEM = 0.9
@@ -565,6 +572,54 @@ def make_helmet(head_points, rig):
     return skinned_object("Helmet", bm, rig, lambda co: "head", "Helmet")
 
 
+def add_hair(body):
+    """Fits the four short styles to the body (before its helper geometry is removed: the
+    fitting needs the original mesh). Returns the hair objects, named Hair1 to Hair4."""
+    import zipfile
+    assets = os.path.join(ROOT, ".tools", "mpfb-dl", "system_assets.zip")
+    out_dir = os.path.join(ROOT, "build", "hair")
+    hair = []
+    if not os.path.exists(assets):
+        print("make_player: no MakeHuman system assets, no hair")
+        return hair
+    with zipfile.ZipFile(assets) as z:
+        for name in z.namelist():
+            if any(name.startswith("hair/%s/" % s) for s in HAIR_STYLES) and not name.endswith("/"):
+                z.extract(name, out_dir)
+    for i, style in enumerate(HAIR_STYLES):
+        mhclo = os.path.join(out_dir, "hair", style, style + ".mhclo")
+        obj = HumanService.add_mhclo_asset(mhclo, body, asset_type="Hair", subdiv_levels=0, material_type="MAKESKIN")
+        obj.name = obj.data.name = "Hair%d" % (i + 1)
+        for slot in obj.material_slots:
+            if slot.material is not None:
+                slot.material.name = "Hair"
+                for node in slot.material.node_tree.nodes if slot.material.node_tree else []:
+                    if node.type == 'TEX_IMAGE' and node.image is not None and node.image.size[0] > HAIR_TEXTURE:
+                        node.image.scale(HAIR_TEXTURE, HAIR_TEXTURE)
+        hair.append(obj)
+    return hair
+
+
+def trim_hair(hair, head_points):
+    """Cuts away the hair that would be under the cap (above its rim): a cap fits close to the
+    skull, so hair left there would show through it. Returns how many points were left above
+    the rim (0)."""
+    centre, half_w, half_d, top, height = head_box(head_points)
+    rz = height * 0.40
+    cap_centre_z = top - rz + 0.012
+    rim = cap_centre_z - rz * math.sin(0.22)
+    left = 0
+    for obj in hair:
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z > rim - 0.004], context='VERTS')
+        left += sum(1 for v in bm.verts if v.co.z > rim)
+        bm.to_mesh(obj.data)
+        bm.free()
+        print("make_player: %s %d faces below the cap" % (obj.name, len(obj.data.polygons)))
+    return left
+
+
 def render_preview(path, target_z):
     scene = bpy.context.scene
     scene.render.engine = 'CYCLES'
@@ -610,6 +665,7 @@ def main():
     face_parts = add_skin_and_face(body)
     TargetService.bake_targets(body)
     stand_on_ground(body, rig)
+    hair = add_hair(body)
 
     # Width and depth of the trunk at chest and waist height (before the skin under the clothes
     # is removed); the arms hang beside it, so only the middle is measured.
@@ -685,8 +741,9 @@ def main():
     gear = [make_shell(body, rig, "ChestProtector", is_chest, 0.045, "Gear"),
             make_shell(body, rig, "ShinGuards", is_shin, 0.032, "Gear")]
     strip_body(body)
+    trim_hair(hair, head_points)
     optional = [*gear, make_mask(head_points, rig), make_helmet(head_points, rig)]
-    parts = [body, jersey, pants, make_collar(rig), make_shoes(feet, rig), *face_parts,
+    parts = [body, jersey, pants, make_collar(rig), make_shoes(feet, rig), *face_parts, *hair,
              make_cap(head_points, rig), *optional]
 
     for old, new in BONE_NAMES.items():
