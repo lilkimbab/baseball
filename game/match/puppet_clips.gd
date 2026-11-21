@@ -353,6 +353,12 @@ static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
 
 
 ## Walking, for the pitcher coming back to the rubber and anyone strolling. phase as run().
+## Standing at ease, arms by the sides: the figure in the menus (player card, portraits).
+static func standing() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.93, 0.0), 0.0, 0.0, 1.0, a.call(0.26, 0.8, 0.04), a.call(-0.26, 0.8, 0.04), a.call(0.14, 0.08, 0.0), a.call(-0.14, 0.08, 0.0))
+
+
 static func walk(phase: float) -> PuppetPose:
 	var a := PuppetPose.at
 	var left := _pose(a.call(0.0, 0.95, 0.0), 0.0, 4.0, 3.0, a.call(0.24, 0.86, 0.12), a.call(-0.24, 0.86, -0.1), a.call(0.12, 0.1, -0.28), a.call(-0.12, 0.08, 0.28))

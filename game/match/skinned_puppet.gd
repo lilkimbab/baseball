@@ -470,6 +470,10 @@ func _show_gear() -> void:
 		_gear_parts[piece].visible = gear.has(piece)
 
 
+## How far a lifted foot's toes hang down, past the right angle to the shin (degrees).
+const FOOT_HANG_DEG := 32.0
+
+
 ## Sets the bones from pelvis to upper chest, spreading the turn and lean between the two
 ## frames along the spine.
 func _turn_spine(basis_for: Dictionary[int, Basis], pelvis: Basis, chest: Basis) -> void:
@@ -622,12 +626,20 @@ func _orient_hand(basis_for: Dictionary[int, Basis], side: String, frame: Dictio
 
 
 ## A foot near the ground lies flat, pointing where the knee points; a lifted foot follows
-## the shin.
+## the shin, its toes hanging down as a relaxed foot's do (at right angles to the shin, as at
+## rest, it stuck out stiff as a board under the pitcher's lifted knee).
 func _orient_foot(basis_for: Dictionary[int, Basis], side: String, lift: float) -> void:
 	var lower := _bone[StringName(side + "LowerLeg")]
 	var foot := _bone[StringName(side + "Foot")]
 	var shin_turn := basis_for[lower] * _rest[lower].basis.inverse()
 	var follow := shin_turn * _rest[foot].basis
+	var hang := smoothstep(0.08, 0.3, lift)
+	if hang > 0.0:
+		var shin_down := (_to_skeleton.basis * (joints[StringName(side + "Foot")] - joints[StringName(side + "LowerLeg")])).normalized()
+		var toes_now := (shin_turn * _toe_rest[side]).normalized()
+		var axis := toes_now.cross(shin_down)
+		if axis.length() > 1e-3:
+			follow = Basis(axis.normalized(), deg_to_rad(FOOT_HANG_DEG) * hang) * follow
 	var toes := _to_puppet.basis * (shin_turn * _toe_rest[side])
 	var level := Vector2(toes.x, toes.z)
 	var steep := 1.0 - smoothstep(0.15, 0.7, level.length() / toes.length())
@@ -1133,6 +1145,17 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = viewport.get_texture()
 	_make_fabric(material)
+	# The garment's second UV map is metres of cloth round each leg, the trunk and each sleeve
+	# (make_player.py, wrap_uvs): the knit follows it, evenly round the limb and fixed to the cloth.
+	# The trousers' pinstripes too; the jersey's stay in its painted texture, under the lettering.
+	if _has_wrap_uv(part):
+		var stripes := not is_jersey and uniform.pants_pinstripes
+		material.uv2_triplanar = false
+		material.uv2_scale = Vector3.ONE / WEAVE_TILE
+		material.detail_albedo = _weave(uniform.pinstripe if stripes else Color(0, 0, 0, 0))
+		material.detail_normal = _knit_wrap()
+		material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
+		art.stripes_on_wrap = not is_jersey
 	# The folds the cloth settled into, baked for this build (tools/blender/make_player.py).
 	var stem := "%s_%s" % [model_for(build).get_basename(), "jersey" if is_jersey else "pants"]
 	if ResourceLoader.exists(stem + "_folds.png"):
@@ -1143,9 +1166,40 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	if ResourceLoader.exists(stem + "_shade.png"):
 		material.ao_enabled = true
 		material.ao_texture = load(stem + "_shade.png") as Texture2D
-		material.ao_light_affect = 0.55
+		material.ao_light_affect = 0.35
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return material
+
+
+## One tile of the cloth's second UV map (m): a pinstripe's spacing (two knit tiles across).
+const WEAVE_TILE := 0.025
+static var _weaves: Dictionary[Color, ImageTexture] = {}
+
+
+static func _has_wrap_uv(part: MeshInstance3D) -> bool:
+	var mesh := part.mesh as ArrayMesh
+	return mesh != null and mesh.get_surface_count() > 0 and (mesh.surface_get_format(0) & Mesh.ARRAY_FORMAT_TEX_UV2) != 0
+
+
+## One tile of pinstripe for the cloth's second UV map: clear, with a thin line of the stripe
+## colour down one edge (clear everywhere when the colour is).
+static func _weave(colour: Color) -> ImageTexture:
+	if _weaves.has(colour):
+		return _weaves[colour]
+	const N := 64
+	var image := Image.create(N, N, true, Image.FORMAT_RGBA8)
+	image.fill(Color(colour.r, colour.g, colour.b, 0.0))
+	if colour.a > 0.0:
+		# 2.2 mm wide in a 25 mm tile, with soft edges.
+		for x: int in N:
+			var d := absf(float(x) + 0.5 - N * 0.5) / N * WEAVE_TILE
+			var a := clampf(1.0 - (d - 0.0011) / 0.0006, 0.0, 1.0)
+			if a > 0.0:
+				for y: int in N:
+					image.set_pixel(x, y, Color(colour.r, colour.g, colour.b, a))
+	image.generate_mipmaps()
+	_weaves[colour] = ImageTexture.create_from_image(image)
+	return _weaves[colour]
 
 
 ## Woven polyester rather than painted plastic: a fine knit in the surface (a detail normal
@@ -1174,16 +1228,31 @@ static var _white_texture: ImageTexture
 
 ## A knit: rows of small interlocking loops, as a normal map (one tile).
 static func _knit() -> ImageTexture:
-	if _knit_texture != null:
-		return _knit_texture
-	const N := 64
+	if _knit_texture == null:
+		_knit_texture = _knit_tile(4, 8, 64)
+	return _knit_texture
+
+
+## The knit for a garment's second UV map, whose tile is wider (WEAVE_TILE): more loops a
+## tile, so they come out the same size.
+static func _knit_wrap() -> ImageTexture:
+	if _knit_wrap_texture == null:
+		_knit_wrap_texture = _knit_tile(7, 14, 112)
+	return _knit_wrap_texture
+
+
+static var _knit_wrap_texture: ImageTexture
+
+
+static func _knit_tile(columns: int, rows: int, size_px: int) -> ImageTexture:
+	var N := size_px
 	var height := PackedFloat32Array()
 	height.resize(N * N)
 	for y: int in N:
 		for x: int in N:
-			# Two columns of loops a tile, each loop a rounded bump, offset row by row.
-			var u := fmod(float(x) / N * 4.0 + (0.5 if (y * 8 / N) % 2 == 1 else 0.0), 1.0)
-			var v := fmod(float(y) / N * 8.0, 1.0)
+			# Columns of loops, each loop a rounded bump, offset row by row.
+			var u := fmod(float(x) / N * columns + (0.5 if (y * rows / N) % 2 == 1 else 0.0), 1.0)
+			var v := fmod(float(y) / N * rows, 1.0)
 			height[y * N + x] = sin(u * PI) * sin(v * PI)
 	var image := Image.create(N, N, true, Image.FORMAT_RGB8)
 	for y: int in N:
@@ -1193,8 +1262,7 @@ static func _knit() -> ImageTexture:
 			var n := Vector3(-dx * 1.2, -dy * 1.2, 1.0).normalized()
 			image.set_pixel(x, y, Color(n.x * 0.5 + 0.5, n.y * 0.5 + 0.5, n.z * 0.5 + 0.5))
 	image.generate_mipmaps(true)
-	_knit_texture = ImageTexture.create_from_image(image)
-	return _knit_texture
+	return ImageTexture.create_from_image(image)
 
 
 static func _white() -> ImageTexture:

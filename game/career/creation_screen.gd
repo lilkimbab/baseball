@@ -1,20 +1,27 @@
 class_name CreationScreen
-extends Control
-## Making the career player (docs/02 section 6.1, docs/13 S8-1): name and number, batting and
-## throwing hands, body and looks, position and type, then the club and the season length.
-##
-##   ./dev play res://career/creation_screen.tscn
+extends Screen
+## Making the career's player (docs/02 section 6.1, docs/13 S8-1): the player stands on the
+## left as he is being made, with his starting ratings as a chart; in the middle who he is
+## (name, number, hands, build, looks); on the right what he plays (position, type), the club
+## he joins and the season's length.
 
 var spec := PlayerCreator.Spec.new()
 var team_id := ""
 var games := 36
 var rules: CareerRules
-var _content: VBoxContainer
 var _clubs: Array[Team] = []
+var _start: GameButton
+
+
+func setup() -> void:
+	heading = "선수 생성"
+	heading_latin = "CREATE PLAYER"
+	subheading = "커리어 모드의 주인공을 만듭니다 · 2군에서 출발합니다"
+	vantage = &"field"
+	dock_id = "career"
 
 
 func _ready() -> void:
-	theme = UiTheme.theme()
 	rules = CareerIO.load_default()
 	_clubs = RosterIO.load_pack(LeagueSession.PACK)
 	spec.type_id = rules.batter_types[0].id
@@ -22,98 +29,115 @@ func _ready() -> void:
 	spec.skin = rules.skins[1]
 	spec.hair = rules.hairs[0]
 	spec.beard = rules.beards[0]
-	var bg := ColorRect.new()
-	bg.color = Color(0.03, 0.05, 0.1)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
-	_content = VBoxContainer.new()
-	_content.position = Vector2(48.0, 32.0)
-	_content.add_theme_constant_override("separation", 8)
-	add_child(_content)
-	get_viewport().size_changed.connect(_fit)
-	_fit()
-	refresh()
+	super._ready()
 
 
-func _fit() -> void:
-	var screen := get_viewport().get_visible_rect().size
-	var k := UiTheme.scale_for(screen.y)
-	scale = Vector2(k, k)
-	size = screen / k
+func build() -> void:
+	var preview := PlayerCreator.create(spec, rules, PitchCatalogIO.load_default())
+	var team: Team = null
+	for t: Team in _clubs:
+		if t.id == team_id:
+			team = t
+	var columns := UiKit.hbox(20)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	# The player as he is being made.
+	var left := UiKit.vbox(4)
+	left.custom_minimum_size.x = 420.0
+	columns.add_child(left)
+	var stage := PlayerStage.make(420.0, 430.0)
+	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	stage.show_player(preview.player, team)
+	left.add_child(stage)
+	var p := preview.player
+	var radar: RadarChart
+	if p.is_pitcher():
+		var catalog := PitchCatalogIO.load_default()
+		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "평정", "변화구"]), PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)]), 300.0)
+	else:
+		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주루", "수비"]), PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 300.0)
+	radar.colour = tint
+	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	left.add_child(radar)
 
-
-func refresh() -> void:
-	for child: Node in _content.get_children():
-		_content.remove_child(child)
-		child.queue_free()
-	_label("커리어 · 선수 만들기", 30, UiTheme.GOLD)
-	var name_row := HBoxContainer.new()
-	_content.add_child(name_row)
+	var who := panel("기본 정보", "identification-card", columns, 0.0, "PROFILE")
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var name_row := UiKit.hbox(12)
+	who.body.add_child(name_row)
+	var name_label := UiKit.label("이름", 18, UiTheme.DIM, 600)
+	name_label.custom_minimum_size.x = 200.0
+	name_row.add_child(name_label)
 	var name_edit := LineEdit.new()
 	name_edit.text = spec.name
+	name_edit.placeholder_text = "선수 이름"
 	name_edit.custom_minimum_size = Vector2(260.0, 0.0)
-	name_edit.text_changed.connect(func(t: String) -> void: spec.name = t)
-	name_row.add_child(_small("이름"))
+	name_edit.text_changed.connect(func(t: String) -> void:
+		spec.name = t
+		_update_start())
 	name_row.add_child(name_edit)
+	var number_label := UiKit.label("등번호", 18, UiTheme.DIM, 600)
+	name_row.add_child(number_label)
 	var number := SpinBox.new()
 	number.min_value = 0
 	number.max_value = 99
 	number.value = spec.number
 	number.value_changed.connect(func(v: float) -> void: spec.number = int(v))
-	name_row.add_child(_small("  등번호"))
 	name_row.add_child(number)
-	_choices("타격", ["R", "L", "S"], ["우타", "좌타", "양타"], String(spec.bats), func(v: String) -> void: spec.bats = StringName(v))
-	_choices("투구", ["R", "L"], ["우투", "좌투"], String(spec.throws), func(v: String) -> void: spec.throws = StringName(v))
-	var body_ids: Array[String] = []
-	var body_names: Array[String] = []
+	choices("타석", ["R", "L", "S"], ["우타", "좌타", "양타"], String(spec.bats), func(v: String) -> void: spec.bats = StringName(v), who.body)
+	choices("투구", ["R", "L"], ["우투", "좌투"], String(spec.throws), func(v: String) -> void: spec.throws = StringName(v), who.body)
+	var body_ids: Array = []
+	var body_names: Array = []
 	for b: CareerRules.Body in rules.bodies:
 		body_ids.append(b.id)
-		body_names.append("%s (%dcm·%dkg)" % [b.name, roundi(b.height), roundi(b.weight)])
-	_choices("체형", body_ids, body_names, spec.body_id, func(v: String) -> void: spec.body_id = v)
-	_choices("피부", Array(rules.skins), Array(rules.skins), spec.skin, func(v: String) -> void: spec.skin = v)
-	_choices("머리", Array(rules.hairs), Array(rules.hairs), spec.hair, func(v: String) -> void: spec.hair = v)
-	_choices("수염", Array(rules.beards), Array(rules.beards), spec.beard, func(v: String) -> void: spec.beard = v)
-	var names: Array[String] = []
-	for p: String in rules.positions:
-		names.append(rules.position_names.get(p, p))
-	_choices("포지션", Array(rules.positions), names, spec.position, func(v: String) -> void:
+		body_names.append("%s %dcm·%dkg" % [b.name, roundi(b.height), roundi(b.weight)])
+	choices("체형", body_ids, body_names, spec.body_id, func(v: String) -> void: spec.body_id = v, who.body)
+	choices("피부", Array(rules.skins), Array(rules.skins), spec.skin, func(v: String) -> void: spec.skin = v, who.body)
+	choices("헤어", Array(rules.hairs), Array(rules.hairs), spec.hair, func(v: String) -> void: spec.hair = v, who.body)
+	choices("수염", Array(rules.beards), Array(rules.beards), spec.beard, func(v: String) -> void: spec.beard = v, who.body)
+	who.body.add_child(UiKit.rule())
+	var names: Array = []
+	for position: String in rules.positions:
+		names.append(rules.position_names.get(position, position))
+	choices("포지션", Array(rules.positions), names, spec.position, func(v: String) -> void:
 		var was_pitcher := CareerRules.is_pitching_position(spec.position)
 		spec.position = v
 		if was_pitcher != CareerRules.is_pitching_position(v):
-			spec.type_id = rules.types_for(v)[0].id)
-	var type_ids: Array[String] = []
-	var type_names: Array[String] = []
+			spec.type_id = rules.types_for(v)[0].id, who.body)
+	var type_ids: Array = []
+	var type_names: Array = []
+	var strengths := ""
 	for t: CareerRules.PlayerType in rules.types_for(spec.position):
 		type_ids.append(t.id)
-		var strong := ", ".join(Array(t.strengths).map(func(k: String) -> String: return _rating_name(k)))
-		type_names.append("%s%s" % [t.name, " (%s)" % strong if strong != "" else ""])
-	_choices("유형", type_ids, type_names, spec.type_id, func(v: String) -> void: spec.type_id = v)
-	var club_ids: Array[String] = []
-	var club_names: Array[String] = []
+		type_names.append(t.name)
+		if t.id == spec.type_id:
+			strengths = ", ".join(Array(t.strengths).map(func(k: String) -> String: return _rating_name(k)))
+	choices("유형", type_ids, type_names, spec.type_id, func(v: String) -> void: spec.type_id = v, who.body)
+	if strengths != "":
+		who.body.add_child(UiKit.label("강점: %s (성장 비용 20%% 할인)" % strengths, 16, UiTheme.DIM, 500))
+
+	var where := panel("입단 구단", "users-three", columns, 520.0, "CLUB")
+	var table := DataTable.new()
+	table.row_height = 36.0
+	table.set_columns([["구단", 320.0, 0], ["리그", 80.0, 1]])
 	for i: int in _clubs.size():
-		club_ids.append(_clubs[i].id)
-		club_names.append("%d부 %s" % [i / 10 + 1, _clubs[i].short_name])
-	_label("구단", 20, UiTheme.GOLD)
-	var grid := GridContainer.new()
-	grid.columns = 6
-	_content.add_child(grid)
-	for i: int in club_ids.size():
-		var b := Button.new()
-		b.text = ("● " if team_id == club_ids[i] else "") + club_names[i]
-		b.add_theme_font_size_override("font_size", 16)
-		var id := club_ids[i]
-		b.pressed.connect(func() -> void:
-			team_id = id
-			refresh())
-		grid.add_child(b)
-	_choices("시즌", ["36", "72", "144"], ["36경기", "72경기", "144경기"], str(games), func(v: String) -> void: games = int(v))
-	var preview := PlayerCreator.create(spec, rules, PitchCatalogIO.load_default())
-	_label(_preview_text(preview), 17, UiTheme.DIM)
-	var start := Button.new()
-	start.text = "커리어 시작 (2군에서 출발)"
-	start.disabled = team_id == "" or spec.name.strip_edges() == ""
-	start.pressed.connect(begin)
-	_content.add_child(start)
+		var at := table.add_row([_clubs[i].name, "%d부" % (i / 10 + 1)], _clubs[i].id)
+		if _clubs[i].id == team_id:
+			table.selected = at
+	table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
+		team_id = str(tag)
+		refresh())
+	where.body.add_child(table)
+	choices("시즌 길이", ["36", "72", "144"], ["36", "72", "144"], str(games), func(v: String) -> void: games = int(v), where.body)
+	_start = UiKit.button("커리어 시작", begin, "play", "primary")
+	_start.add_theme_font_size_override("font_size", 26)
+	where.body.add_child(_start)
+	_update_start()
+
+
+func _update_start() -> void:
+	if _start != null and is_instance_valid(_start):
+		_start.disabled = team_id == "" or spec.name.strip_edges() == ""
+		_start.tooltip_text = "이름을 입력하고 구단을 선택하세요" if _start.disabled else ""
 
 
 ## Starts the career with the choices made (also used by tests).
@@ -121,51 +145,9 @@ func begin() -> void:
 	var c := PlayerCreator.create(spec, rules, PitchCatalogIO.load_default())
 	CareerSession.start(c, team_id, games, int(Time.get_unix_time_from_system()) % 100000)
 	if is_inside_tree() and not Engine.is_editor_hint():
-		get_tree().change_scene_to_file(CareerSession.HUB)
-
-
-func _preview_text(c: CareerPlayer) -> String:
-	var p := c.player
-	if p.is_pitcher():
-		var pitches := PackedStringArray()
-		for a: ArsenalPitch in p.pitching.arsenal:
-			pitches.append("%s %d" % [String(a.type), roundi(a.velo_avg)])
-		return "시작 능력치 · 제구 %d · 구위 %d · 체력 %d · %s" % [roundi(p.pitching.control), roundi(p.pitching.arsenal[0].movement), roundi(p.pitching.stamina), ", ".join(pitches)]
-	return "시작 능력치 · 컨택 %d · 파워 %d · 선구안 %d · 주력 %d · 수비 %d · 어깨 %d" % [roundi(p.batting.contact()), roundi(p.batting.power()), roundi(p.batting.eye), roundi(p.batting.speed), roundi(p.fielding.range), roundi(p.fielding.arm)]
+		go(CareerSession.HUB)
 
 
 static func _rating_name(key: String) -> String:
-	var names := {"contact": "컨택", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루", "range": "수비 범위", "hands": "포구", "arm": "송구", "velocity": "구속", "stuff": "구위", "control": "제구", "command": "로케이션", "movement": "변화", "stamina": "체력"}
+	var names := {"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루", "range": "수비 범위", "hands": "포구", "arm": "송구", "velocity": "구속", "stuff": "구위", "control": "제구", "command": "로케이션", "movement": "변화", "stamina": "체력"}
 	return str(names.get(key, key))
-
-
-func _choices(title: String, ids: Array, labels: Array, current: String, pick: Callable) -> void:
-	var row := HBoxContainer.new()
-	_content.add_child(row)
-	row.add_child(_small(title))
-	for i: int in ids.size():
-		var b := Button.new()
-		b.text = ("● " if str(ids[i]) == current else "") + str(labels[i])
-		b.add_theme_font_size_override("font_size", 16)
-		var id := str(ids[i])
-		b.pressed.connect(func() -> void:
-			pick.call(id)
-			refresh())
-		row.add_child(b)
-
-
-func _label(line: String, font_size: int, color: Color) -> void:
-	var l := Label.new()
-	l.text = line
-	l.add_theme_font_size_override("font_size", font_size)
-	l.add_theme_color_override("font_color", color)
-	_content.add_child(l)
-
-
-func _small(line: String) -> Label:
-	var l := Label.new()
-	l.text = line
-	l.custom_minimum_size = Vector2(80.0, 0.0)
-	l.add_theme_font_size_override("font_size", 17)
-	l.add_theme_color_override("font_color", UiTheme.DIM)
-	return l

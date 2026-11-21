@@ -112,6 +112,9 @@ var pitch_track: PitchTrack
 var play_overlay: PlayOverlay
 var pause_menu: PauseMenu
 var post_game: PostGame
+## What the finished game paid the person playing ("승리 +150P"), for the screen after it.
+var profile_lines := PackedStringArray()
+var _profile_paid := false
 ## The pitch clock (KBO 2026: 18 s with the bases empty, 23 s with runners) runs only while
 ## the player chooses his pitch; seconds left, negative when not running.
 var pitch_clock_on := true
@@ -719,14 +722,29 @@ func set_auto_changes(on: bool) -> void:
 ## Out of the game: back to the hub when there is one to go back to, else the program ends.
 func leave() -> void:
 	if from_menu or ResourceLoader.exists(Screen.HUB) and get_tree().current_scene == self and OS.get_cmdline_user_args().is_empty():
-		get_tree().change_scene_to_file(Screen.HUB)
+		Loading.go(get_tree(), Screen.HUB, {"title": "로비로 이동 중"})
 	else:
 		get_tree().quit()
 
 
-## What the screen after the game says the keys do.
+## What the screen after the game says the keys do (after what the game paid, if anything).
 func post_game_hint() -> String:
-	return "Enter 다시 하기   ·   Esc 끝내기"
+	var keys := "Enter 다시 하기   ·   Esc 끝내기"
+	return keys if profile_lines.is_empty() else "%s      %s" % ["  ·  ".join(profile_lines), keys]
+
+
+## The game is over: points and experience for the person playing (Profile), once. Not when
+## he only watched, and not without a display (tests leave the profile alone).
+func _pay_profile() -> void:
+	if _profile_paid or game == null or not game.over:
+		return
+	_profile_paid = true
+	var mine := own_team()
+	if mine < 0 or DisplayServer.get_name() == "headless":
+		return
+	var bat := scorer.book.team_batting(mine)
+	var pit := scorer.book.team_pitching(mine)
+	profile_lines = Profile.record_game(game.winner == mine, {"hits": bat.hits, "home_runs": bat.home_runs, "runs": game.score[mine], "strikeouts": pit.strikeouts})
 
 
 ## The player's club (0 away, 1 home), or −1 when he only watches.
@@ -1529,6 +1547,7 @@ func refresh(delta: float) -> void:
 
 
 func _redraw_overlays() -> void:
+	_pay_profile()
 	# After the game only the scoreboard and the summary remain.
 	hud.visible = not game.over
 	pitch_track.visible = not game.over

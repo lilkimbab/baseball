@@ -178,6 +178,16 @@ S1부터 지금까지 만든 것을 모두 실행했다: 전체 테스트, 문�
    - 유니폼: 천 시뮬레이션 주름 여유 3→4.5%, 주름 골의 그늘도 같이 구움(`*_shade.png`, 빛이 덜 드는 곳), 주름 노멀 1.6→2.0, 광택 줄임(새틴처럼 보였다)
    - 얼굴 주름: 팔자주름·눈 밑·아랫입술 밑·이마·미간·눈가를 얼굴 기준점 위치에 얕게(처음엔 깊어서 흉터처럼 보였다)
    - 색감: 노출 1.25→1.12, 주변광 0.85→0.72, 대비 1.04→1.1, 채도 1.0→0.9, 근접 그늘(SSAO) 강화
+7. 경기 밖 화면이 텍스트 게임 같음 → 메뉴 전체를 새로 만듦 (진행). 네 번 갈아엎었다: ①남색 유리 패널+작은 아이콘("AI가 만든 것 같다") → ②2K14식 파란 유광("너무 파랗고 우겨넣었다") → ③무채색 단색+레드 → ④**지금: 그래파이트 바탕 + 모드별 색**(친선=주황, 리그=골드, 커리어=블루, 연습=그린, 상점=바이올렛, 주요 버튼=레드). 화면에 들어가면 그 모드 색이 제목·탭·표시에 따라온다
+   - 틀(`ui/screen.gd`): 실시간 야구장 배경(`ui/menu_backdrop.gd`, 화면마다 카메라 위치가 바뀜) + 상단 바(DUGOUT 마크, 모드 탭, 포인트, 불러오기·설정·종료) + 제목 줄(뒤로, 이름, 화면 자체 탭) + 하단 키 안내
+   - 부품(`ui/kit/`): 사선 컷 모서리 패널·버튼 셰이더(`plate.gdshader`), 표(`DataTable`), 능력치 막대, 레이더 차트, 포지션 숙련도 구장 그림, 3D 선수 스테이지(`PlayerStage`: 실제 게임 모델을 유니폼·등번호째로), 구단 엠블럼(구단 색·ID로 그림), 등급 코인, 그림 카드(`ModeTile`: 게임 캡처를 `tools/ui/make_art.sh`로 잘라 씀)
+   - 서체: Paperlogy(제목 ExtraBold, 본문 SemiBold/Medium) + Barlow Condensed(숫자·영문). 한 가족으로 통일(Pretendard→KBO 다이아고딕은 "어색/애매"). 아이콘 Phosphor(MIT, `tools/ui/fetch_icons.sh`)
+   - 화면: 타이틀, 홈(간판 선수 + 다음 경기 + 모드 카드 4장), 친선 경기(양 팀 전력 비교), 연습 모드(새로: 타격/투구/관전, 상대 구종·좌우·구장·시간), 환경 설정(분류 + 스위치), 불러오기, **상점(새로)**, 선수 카드(모델 + 레이더 + 포지션 + 전 능력치)
+   - **리그 모드 내부**(`league/league_screen.gd` 재작성): 탭 오늘/1군/2군/스카우트/특성. 표에서 선수를 고르면 오른쪽에 모델·능력치·조치(훈련, 말소, 등록, 방출, 영입)
+   - **커리어 모드 내부**(`career/career_screen.gd`, `creation_screen.gd` 재작성): 탭 오늘/성장/순위. 선수 생성은 만드는 선수가 왼쪽에 서 있고 레이더가 따라 바뀜
+   - 로딩(`ui/loading.gd`): 경기 진입·복귀는 양 팀 엠블럼 VS + 팁 + 진행 막대, 메뉴 사이는 사선 와이프
+   - 포인트(`ui/profile.gd`): 경기를 마치면 지급(완료 60P, 승리 +90P), 상점에서 커리어 장비(능력치 +1)·특별 훈련(성장 포인트 +10)·구단 자금(구단 포인트 +50) 구매
+   - 캡처 `build/menus/v4_*.png`, 테스트 `tests/ui/test_menus.gd`(화면 전부 열기, 상점 구매, 커리어 탭)
 
 **제안 1~6 (승인)**
 - 6 FSR 2 업스케일링 (적용): 설정 "업스케일링" 끄기/품질(77%)/균형(67%)/원본(AA만), 기본 품질. FSR 2의 시간축 AA가 좌석·그물의 반짝임도 줄인다
@@ -191,9 +201,9 @@ S1부터 지금까지 만든 것을 모두 실행했다: 전체 테스트, 문�
 ```bash
 cd /home/parkjune/baseball
 git add -A .gitignore README.md PROGRESS.md dev docs/ game/ tools/ prototypes/physics-check/check.mjs
-git commit -m "Player feedback round: ball from the hand, bat cursor and pitch paths, real-looking crowd; skin, gear and uniform toward 2K14/The Show; approved proposals 1-6 (native ball physics)
+git commit -m "Player feedback round: ball from the hand, bat cursor and pitch paths, real-looking crowd; skin, gear and uniform toward 2K14/The Show; approved proposals 1-6 (native ball physics); new menus (lobby, league, career, practice, shop, loading)
 
-Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
 git push origin overnight-2026-11-21
 git fetch . overnight-2026-11-21:main
 git push origin main

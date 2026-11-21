@@ -79,7 +79,7 @@ func _ready() -> void:
 	if CareerSession.career_season != null:
 		for c: Dictionary in pause_menu.quit_requested.get_connections():
 			pause_menu.quit_requested.disconnect(c["callable"])
-		pause_menu.quit_requested.connect(func() -> void: get_tree().change_scene_to_file(CareerSession.HUB))
+		pause_menu.quit_requested.connect(func() -> void: Loading.go(get_tree(), CareerSession.HUB, {"title": "커리어로 이동 중"}))
 
 
 func help_keys() -> String:
@@ -256,6 +256,6 @@ func _record_result() -> void:
 func _menu_key(code: Key) -> void:
 	if game.over and CareerSession.career_season != null:
 		_record_result()
-		get_tree().change_scene_to_file(CareerSession.HUB)
+		Loading.go(get_tree(), CareerSession.HUB, {"title": "커리어로 이동 중"})
 		return
 	super._menu_key(code)
