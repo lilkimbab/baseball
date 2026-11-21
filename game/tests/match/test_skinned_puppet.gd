@@ -394,3 +394,73 @@ func test_head_size_and_belt_height_are_in_proportion() -> void:
 	assert_between(eyes_down, 0.54 / 8.2, 0.54 / 7.5, "head size: top of the head to the eyes")
 	# Baseball trousers are worn on the hips: the top of the belt at about 59% of height.
 	assert_between(pants.get_aabb().end.y / top, 0.575, 0.605, "top of the belt")
+
+
+# --- S11-1 builds ---
+
+
+func _model_mesh(b: StringName) -> MeshInstance3D:
+	var scene := (load(SkinnedPuppet.model_for(b)) as PackedScene).instantiate() as Node3D
+	autofree(scene)
+	return scene.find_child("Body", true, false) as MeshInstance3D
+
+
+func test_four_builds_are_built_and_a_heavy_one_is_thicker() -> void:
+	for b: StringName in [&"lean", &"solid", &"heavy"]:
+		assert_ne(SkinnedPuppet.model_for(b), SkinnedPuppet.MODEL, "%s was built" % b)
+	# Compared at the same height: the jersey (made over the body) is deeper front to back at
+	# the chest, where the arms hang clear at the sides.
+	var lean_depth := _chest_depth(&"lean")
+	var heavy_depth := _chest_depth(&"heavy")
+	assert_gt(heavy_depth, lean_depth * 1.12, "heavy %.3f against lean %.3f of height" % [heavy_depth, lean_depth])
+
+
+## Front-to-back depth of the jersey at chest height, as a share of the model's height.
+func _chest_depth(b: StringName) -> float:
+	var scene := (load(SkinnedPuppet.model_for(b)) as PackedScene).instantiate() as Node3D
+	autofree(scene)
+	var body := scene.find_child("Body", true, false) as MeshInstance3D
+	var top := body.get_aabb().end.y
+	var jersey := scene.find_child("Jersey", true, false) as MeshInstance3D
+	var low := INF
+	var high := -INF
+	for surface: int in jersey.mesh.get_surface_count():
+		var verts: PackedVector3Array = jersey.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+		for v: Vector3 in verts:
+			if absf(v.y - top * 0.72) < 0.015 and absf(v.x) < 0.15:
+				low = minf(low, v.z)
+				high = maxf(high, v.z)
+	return (high - low) / top
+
+
+func test_every_build_keeps_the_limb_proportions() -> void:
+	for b: StringName in [&"lean", &"standard", &"solid", &"heavy"]:
+		var puppet := SkinnedPuppet.new()
+		puppet.build = b
+		add_child_autofree(puppet)
+		assert_between(puppet.upper_arm, 0.20, 0.34, "%s upper arm" % b)
+		assert_between(puppet.lower_arm, 0.20, 0.32, "%s forearm" % b)
+		assert_between(puppet.upper_leg, 0.35, 0.50, "%s thigh" % b)
+		assert_between(puppet.lower_leg, 0.35, 0.48, "%s shin" % b)
+		assert_between((puppet.upper_arm + puppet.lower_arm) / puppet.height, 0.28, 0.34, "%s arm share of height" % b)
+
+
+func test_a_player_gets_the_build_for_his_body_and_position() -> void:
+	assert_eq(SkinnedPuppet.build_for(183.0, 75.0), &"lean")
+	assert_eq(SkinnedPuppet.build_for(183.0, 88.0), &"standard")
+	assert_eq(SkinnedPuppet.build_for(183.0, 95.0), &"solid")
+	assert_eq(SkinnedPuppet.build_for(183.0, 105.0), &"heavy")
+	assert_eq(SkinnedPuppet.build_for(183.0, 88.0, Position.Kind.C), &"solid", "a catcher a little thicker")
+	assert_eq(SkinnedPuppet.build_for(183.0, 82.0, Position.Kind.SS), &"lean", "a shortstop a little leaner")
+
+
+func test_a_figure_changes_body_between_players() -> void:
+	var puppet := SkinnedPuppet.new()
+	add_child_autofree(puppet)
+	var arm := puppet.upper_arm
+	puppet.set_body(1.95, &"heavy")
+	assert_eq(puppet.build, &"heavy")
+	assert_almost_eq(puppet.upper_arm / arm, 1.95 / 1.83, 0.02, "the new model is scaled to his height")
+	puppet.apply(PuppetClips.fielder_ready())
+	puppet.set_body(1.70, &"heavy")
+	assert_almost_eq(puppet.upper_arm / arm, 1.70 / 1.83, 0.02)

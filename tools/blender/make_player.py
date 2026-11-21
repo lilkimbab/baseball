@@ -23,7 +23,8 @@ from bl_ext.user_default.mpfb.services.targetservice import TargetService
 
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT_GLB = ARGS[0] if ARGS else "player_base.glb"
-PREVIEW = ARGS[1] if len(ARGS) > 1 else None
+PREVIEW = ARGS[1] if len(ARGS) > 1 and ARGS[1] != "-" else None
+BUILD = ARGS[2] if len(ARGS) > 2 else "standard"
 
 # Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/12, section 4). More
 # muscle and weight than an average man of that height: chest depth about 14% of height.
@@ -37,6 +38,15 @@ SHAPE = {
     "head-scale-vert-incr": 0.4, "head-scale-horiz-incr": 0.4, "head-scale-depth-incr": 0.4,
 }
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
+# Builds (docs/13 S11-1): MPFB weight and muscle for a lean, standard, solid and heavy player
+# of the same height. Weight rises with muscle first (athletes), then with mass. The trunk's
+# width and depth at chest and waist are printed for the build checks.
+BUILDS = {
+    "lean": {"muscle": 0.75, "weight": 0.35},
+    "standard": {"muscle": 0.9, "weight": 0.65},
+    "solid": {"muscle": 1.0, "weight": 0.82},
+    "heavy": {"muscle": 0.95, "weight": 1.0},
+}
 
 # Where the garments end, as a fraction along the limb (0 = upper joint, 1 = lower joint).
 SLEEVE_HEM = 0.62
@@ -567,6 +577,7 @@ def main():
     clear_scene()
     macro = TargetService.get_default_macro_info_dict()
     macro.update(MACRO)
+    macro.update(BUILDS.get(BUILD, {}))
     macro["race"] = dict(RACE)
     # feet_on_ground is left off: it moves the mesh but not the rig that is fitted afterwards.
     # Both are moved to the ground together below.
@@ -582,6 +593,15 @@ def main():
     TargetService.bake_targets(body)
     stand_on_ground(body, rig)
 
+    # Width and depth of the trunk at chest and waist height (before the skin under the clothes
+    # is removed); the arms hang beside it, so only the middle is measured.
+    top = max(v.co.z for v in body.data.vertices)
+    for label, frac in (("chest", 0.72), ("waist", 0.61)):
+        z = top * frac
+        trunk = [v.co for v in body.data.vertices if abs(v.co.z - z) < 0.01 and abs(v.co.x) < 0.17]
+        if trunk:
+            print("make_player: build %s %s width %.3f m depth %.3f m" % (
+                BUILD, label, max(c.x for c in trunk) - min(c.x for c in trunk), max(c.y for c in trunk) - min(c.y for c in trunk)))
     feet, head_points = prepare_body(body, rig)
     jersey = make_garment(body, "Jersey", (JERSEY,), 0.018, 0.012, [JERSEY])
     pants = make_garment(body, "Pants", (PANTS, BELT), 0.012, 0.010, [PANTS, BELT])
