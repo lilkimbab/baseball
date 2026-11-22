@@ -159,15 +159,23 @@ def make_first_base_mitt():
 
 
 def make_mitt():
-    """A catcher's mitt: a thick padded rim round a deep pocket, with no separate fingers."""
+    """A catcher's mitt: a thick padded rim round a deep pocket, with no separate fingers; the
+    rim one even roll (thicker at the thumb and the heel), a web across the gap between the
+    thumb and the fingers, the crease it folds on across the heel."""
     bm = bmesh.new()
-    blob(bm, (-0.01, 0.04, -0.006), (0.115, 0.135, 0.022))                  # back and pocket floor
-    for i in range(18):                                                     # padded rim
-        a = math.tau * i / 18
-        blob(bm, (-0.01 + math.cos(a) * 0.108, 0.04 + math.sin(a) * 0.132, 0.02), (0.036, 0.036, 0.034))
+    blob(bm, (-0.01, 0.04, -0.008), (0.112, 0.132, 0.02))                   # back and pocket floor
+    for i in range(54):                                                     # padded rim
+        a = math.tau * i / 54
+        # Thicker down the thumb side and round the heel; a notch where the web is.
+        thick = 0.031 + 0.006 * max(math.cos(a - math.radians(200.0)), 0.0) + 0.004 * max(math.cos(a - math.radians(270.0)), 0.0)
+        if abs(math.atan2(math.sin(a - math.radians(128.0)), math.cos(a - math.radians(128.0)))) < math.radians(13.0):
+            thick *= 0.55
+        blob(bm, (-0.01 + math.cos(a) * 0.106, 0.04 + math.sin(a) * 0.13, 0.018), (thick, thick, thick * 0.92))
+    # The web: a flat panel inside the rim at the notch.
+    blob(bm, (-0.01 + math.cos(math.radians(128.0)) * 0.082, 0.04 + math.sin(math.radians(128.0)) * 0.1, 0.012), (0.034, 0.04, 0.009))
     tube(bm, (-0.05, -0.1, 0.0), (0.05, -0.1, 0.0), 0.03, 0.03, 0.8)        # heel, where the hand goes in
-    mitt = fused("Mitt", bm, ((-0.012, 0.05, 0.1), 0.085), 0.33, keep=0.18)
-    mitt.data.materials.append(material("Leather", (0.33, 0.18, 0.08), 0.6))
+    mitt = fused("Mitt", bm, ((-0.012, 0.05, 0.1), 0.085), 0.33, voxel=0.0036, keep=0.2)
+    mitt.data.materials.append(material("Leather", (0.3, 0.17, 0.08), 0.78))
     return mitt
 
 

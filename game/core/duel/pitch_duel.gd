@@ -61,7 +61,9 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 	decision = choice
 	var actual := choice.target
 	if not exact:
-		var sigma := PitchModel.command_sigma(settings.command) * lerpf(2.0, 0.5, clampf(choice.quality, 0.0, 1.0))
+		var quality := clampf(choice.quality, 0.0, 1.0)
+		var sigma := PitchModel.command_sigma(settings.command) * (player_scatter(quality) if choice.by_hand else lerpf(2.0, 0.5, quality))
+		sigma *= 1.0 + COLD_SCATTER * choice.cold
 		actual = PitchModel.apply_execution_error(choice.target, sigma, _rng)
 	var type := choice.type
 	pitch = PitchModel.throw_at(cfg, settings.release(), actual, type.speed_kmh * choice.effort,
@@ -81,6 +83,22 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 	bounced = false
 	result = Result.NONE
 	phase = Phase.FLIGHT
+
+
+## How much of his usual miss the player's own pitch has, from his timing on the gauge (0 to
+## 1): let go at the right moment it is PLAYER_BEST of it (two or three centimetres for an
+## average pitcher: the ball goes where he aimed), a twentieth of a second off about 0.45, a
+## tenth 0.8, and missed altogether PLAYER_WORST. (It was the computer's scale, 0.5 to 2: a
+## perfect pitch still missed by 12 cm on average and one a moment late by 22, and aiming
+## felt like it did nothing.)
+const PLAYER_BEST := 0.15
+## A reliever not yet ready misses this much more (times how cold he is).
+const COLD_SCATTER := 0.9
+const PLAYER_WORST := 2.0
+
+
+static func player_scatter(quality: float) -> float:
+	return lerpf(PLAYER_WORST, PLAYER_BEST, pow(clampf(quality, 0.0, 1.0), 0.6))
 
 
 ## The batter starts a swing now. Returns false if it is too late or one is already under way.

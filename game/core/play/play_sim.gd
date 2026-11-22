@@ -31,6 +31,18 @@ const SHORT_THROW := 18.0
 const SHORT_THROW_RELEASE := 0.6
 ## Extra margin the batter wants before stretching a hit (seconds).
 const BATTER_CAUTION := 0.25
+## A batter safe at first runs this far (m) past the bag; a runner who scores walks (m/s)
+## toward the dugout on the third-base side (field x, y of where he heads).
+const OVERRUN := 4.5
+## The height (m) a fly ball is shown caught at by a man waiting under it.
+const SHOWN_CATCH_HEIGHT := 1.5
+const WALK_OFF := 1.8
+const RUN_OFF := Vector2(12.0, 1.0)
+## A fielder at full stretch (a dive) is this far (m) from the ball when he gets it, and on
+## his feet where it was UP_AGAIN s later. One who comes up short is at least MISSED_BY m off.
+const STRETCH := 1.15
+const UP_AGAIN := 0.45
+const MISSED_BY := 1.6
 
 
 ## A fielder's best chance at the ball.
@@ -91,6 +103,8 @@ var _ball_framed := false
 var _catchable := false
 ## Bases the batter took because of errors (not credited as a hit).
 var _batter_error_bases := 0
+## The fielder the player moves himself (PlayContext.manual_fielder), null when there is none.
+var _own: PlayFielder
 
 
 static func run(context: PlayContext, random: Rng) -> PlayResult:
@@ -159,6 +173,13 @@ func _setup(context: PlayContext, random: Rng) -> void:
 	for kind: Position.Kind in ctx.fielders:
 		var f := ctx.fielders[kind]
 		out.timeline.add(_fielder_key(f), 0.0, Vector3(f.pos.x, f.pos.y, 0.0))
+	# Where the player has taken his own fielder.
+	_own = ctx.fielders.get(ctx.manual_fielder)
+	if _own != null:
+		for at: Vector3 in ctx.manual_track:
+			out.timeline.add(_fielder_key(_own), at.x, Vector3(at.y, at.z, 0.0))
+		if ctx.manual_time < 0.0:
+			out.timeline.bystanders.append(_fielder_key(_own))
 
 
 func _lead(base: int) -> float:
@@ -172,7 +193,8 @@ func _play() -> void:
 	if Umpire.is_home_run(ctx.path):
 		_home_run()
 		return
-	var failed: Dictionary[Position.Kind, float] = {}
+	## A man who dropped it or came up short: when he is up again and where he is.
+	var failed: Dictionary[Position.Kind, Vector3] = {}
 	var touch := -1.0
 	var dropped_by: PlayFielder = null
 	var air := _air_catch()
@@ -182,6 +204,17 @@ func _play() -> void:
 		out.infield_fly = _infield_fly(air, fair)
 		if not fair and not _wants_foul_catch(air):
 			air = null
+	_note_flight(air)
+	if _own != null and ctx.manual_time >= 0.0 and ctx.manual_time < _land:
+		# The player's own fielder caught it in the air.
+		_caught(_own_chance())
+		return
+	if air != null and air.f == _own:
+		# It was his to catch and he has not: nobody else was going for it.
+		if out.infield_fly:
+			_infield_fly_dropped(air)
+			return
+		air = null
 	if air != null:
 		if air.slack >= m.routine_slack:
 			if not rng.chance(m.fly_drop * _hands_factor(air.f)):
@@ -190,19 +223,25 @@ func _play() -> void:
 			# A routine fly dropped: an error.
 			touch = air.t
 			dropped_by = air.f
-			failed[air.f.kind] = 0.8
-		elif rng.chance(m.air_catch_chance(air.slack - _wall_cost(air.at))):
-			_caught(air)
-			return
+			failed[air.f.kind] = Vector3(air.t + 0.8, air.at.x, air.at.y)
 		else:
+			var odds := m.air_catch_chance(air.slack - _wall_cost(air.at))
+			var held := rng.chance(odds)
+			_note_hard(air, odds, held, true)
+			if held:
+				_caught(air)
+				return
 			if air.slack >= 0.0:
 				touch = air.t
-			failed[air.f.kind] = 0.6 if air.slack >= 0.0 else 1.0
+			# At full stretch and not enough: off the end of the glove, or by him.
+			_fielder_stretch(air.f, air.t, air.at, false, STRETCH + 0.2 if air.slack >= 0.0 else MISSED_BY)
+			var lies := _last_spot(air.f)
+			failed[air.f.kind] = Vector3(air.t + (0.6 if air.slack >= 0.0 else 1.0), lies.x, lies.y)
 		if out.infield_fly:
 			_infield_fly_dropped(air)
 			return
 
-	var g := _ground_play(failed)
+	var g := _own_chance() if _own != null and ctx.manual_time >= 0.0 else _ground_play(failed)
 	var touch_time := g.t if g != null else -1.0
 	if touch >= 0.0 and (touch_time < 0.0 or touch < touch_time):
 		touch_time = touch
@@ -226,6 +265,41 @@ func _play() -> void:
 		_infield_play(g, dropped_by != null)
 	else:
 		_outfield_play(g, dropped_by != null)
+
+
+## The player's own fielder with the ball, when and where he got it.
+func _own_chance() -> Chance:
+	var c := Chance.make(_own, ctx.manual_time, ctx.manual_at, m.routine_slack)
+	c.extra = 0.6 if ctx.manual_dive else 0.0
+	return c
+
+
+## The earliest fielder f can let a throw go that he could otherwise make at `release`: the
+## player's own fielder waits for the player to say where.
+func _ready_at(f: PlayFielder, release: float) -> float:
+	return maxf(release, ctx.manual_ready) if f == _own else release
+
+
+## Notes a chance that could have gone either way (PlayResult.hard_*): the first of the play.
+func _note_hard(c: Chance, odds: float, held: bool, in_air: bool) -> void:
+	if out.has_hard_chance():
+		return
+	out.hard_fielder = c.f.kind
+	out.hard_time = c.t
+	out.hard_at = c.at
+	out.hard_odds = odds
+	out.hard_made = held
+	out.hard_air = in_air
+
+
+## Notes how far short of the fence a ball in the air came down (or would be caught).
+func _note_flight(air: Chance) -> void:
+	if ctx.field == null or _land == INF or _launch_deg < 15.0:
+		return
+	var at := air.at if air != null else ctx.path.position_at(_land)
+	var az := rad_to_deg(atan2(at.x, at.y))
+	if absf(az) <= 45.0:
+		out.short_of_fence = ctx.field.boundary_distance(az) - Vector2(at.x, at.y).length()
 
 
 ## Seconds a fielder needs to get within `reach` of a spot, slower on the warning track.
@@ -328,10 +402,13 @@ static func _priority(kind: Position.Kind) -> int:
 
 ## The first point a fielder can play the ball after it comes down: charging it if that
 ## leaves him time to set, otherwise on the run or diving (infielders only).
-func _ground_chance(f: PlayFielder) -> Chance:
+## `down`: one who has just dropped it or missed it — (time he is up again, where he is): he
+## goes from there, and plays the ball where it has rolled to by the time he can reach it.
+func _ground_chance(f: PlayFielder, down: Vector3 = Vector3(-1.0, 0.0, 0.0)) -> Chance:
 	var outfielder := Position.OUTFIELD.has(f.kind)
-	var may_dive := not outfielder and f.kind != Position.Kind.C
-	var react := m.reaction_for(f.reach, f.kind)
+	var recovering := down.x >= 0.0
+	var may_dive := not outfielder and f.kind != Position.Kind.C and not recovering
+	var react := m.reaction_for(f.reach, f.kind) if not recovering else down.x
 	var v := m.top_speed_for(f.speed)
 	var first: Chance = null
 	for i: int in _ts.size():
@@ -344,11 +421,13 @@ func _ground_chance(f: PlayFielder) -> Chance:
 		if p.z > m.reach_high:
 			continue
 		var target := Vector2(p.x, p.y)
-		var lower := react + maxf(f.pos.distance_to(target) - m.reach_running, 0.0) / v
+		var start := Vector2(down.y, down.z) if recovering else f.pos
+		var lower := react + maxf(start.distance_to(target) - m.reach_running, 0.0) / v
 		var want := m.comfortable_slack if first != null else (m.diving_slack if may_dive else 0.0)
 		if t - lower < want:
 			continue
-		var slack := t - _time_to(f, target, m.reach_running)
+		var needs := _time_to(f, target, m.reach_running) if not recovering else down.x + m.fielder_time(start, target, m.reach_running, f.speed, f.reach, f.kind)
+		var slack := t - needs
 		if first == null:
 			if slack >= 0.0 or (may_dive and slack >= m.diving_slack and p.z < 1.0):
 				first = Chance.make(f, t, p, slack)
@@ -375,20 +454,29 @@ func _ground_chance(f: PlayFielder) -> Chance:
 
 ## The fielder who plays the ball on the ground. A diving try that misses lets it go on to the
 ## next man.
-func _ground_play(failed: Dictionary[Position.Kind, float]) -> Chance:
+func _ground_play(failed: Dictionary[Position.Kind, Vector3]) -> Chance:
 	var plans: Array[Chance] = []
 	for kind: Position.Kind in ctx.fielders:
-		var c := _ground_chance(ctx.fielders[kind])
+		# The player's own fielder has not got it (or the play would not have come here).
+		if ctx.fielders[kind] == _own:
+			continue
+		# One who has just dropped it goes after it from where he is, a moment later (adding the
+		# moment to his time while keeping the spot had the ball fly back to him from where it
+		# had rolled: tools/play_audit.gd "ball jump").
+		var c := _ground_chance(ctx.fielders[kind], failed.get(kind, Vector3(-1.0, 0.0, 0.0)))
 		if c == null:
 			continue
-		c.t += failed.get(kind, 0.0)
 		plans.append(c)
 	plans.sort_custom(func(a: Chance, b: Chance) -> bool: return a.t < b.t)
 	for c: Chance in plans:
 		if c.dive:
-			if rng.chance(m.catch_chance(c.slack)):
+			var odds := m.catch_chance(c.slack)
+			var held := rng.chance(odds)
+			_note_hard(c, odds, held, false)
+			if held:
 				c.extra = 0.6
 				return c
+			_fielder_stretch(c.f, c.t, c.at, false, MISSED_BY)
 			continue
 		return c
 	return null
@@ -400,6 +488,8 @@ func _retrieve_anyway() -> Chance:
 	var best: Chance = null
 	for kind: Position.Kind in ctx.fielders:
 		var f := ctx.fielders[kind]
+		if f == _own:
+			continue
 		var when := maxf(_ts[_ts.size() - 1], _time_to(f, Vector2(end.x, end.y), m.reach_standing))
 		if best == null or when < best.t:
 			best = Chance.make(f, when, end, 0.0)
@@ -432,13 +522,28 @@ func _wants_foul_catch(c: Chance) -> bool:
 	return true
 
 
+## Where a fielder's track ends (where he is after his last move).
+func _last_spot(f: PlayFielder) -> Vector2:
+	var track: PackedVector4Array = out.timeline.tracks.get(_fielder_key(f), PackedVector4Array())
+	if track.is_empty():
+		return f.pos
+	var last := track[track.size() - 1]
+	return Vector2(last.y, last.z)
+
+
 # --- Outs in the air ---
 
 
 func _caught(c: Chance) -> void:
 	var f := c.f
-	_ball_frames(c.t)
-	_fielder_run(f, c.t, c.at)
+	# Shown taken at chest height by a man waiting under it; the play goes on from c.t.
+	var shown := _shown_catch(c)
+	_ball_frames(shown.t)
+	_fielded(f, shown.t)
+	if c.slack < 0.0:
+		_fielder_stretch(f, c.t, c.at, true)
+	else:
+		_fielder_run(f, shown.t, shown.at)
 	_hold(f, c.t, Vector2(c.at.x, c.at.y))
 	_batter.put_out(1, RunnerMove.OutKind.FLY, c.t)
 	_outs += 1
@@ -451,7 +556,7 @@ func _caught(c: Chance) -> void:
 	for r: PlayRunner in _runners:
 		r.forced = false
 	var at := Vector2(c.at.x, c.at.y)
-	var release := c.t + m.transfer_for(f.kind, f.hands)
+	var release := _ready_at(f, c.t + c.extra + m.transfer_for(f.kind, f.hands))
 	var quick := _launch_deg < 20.0 and c.t < 1.6
 	var limit := 5
 	var tagging: Array[PlayRunner] = []
@@ -461,7 +566,7 @@ func _caught(c: Chance) -> void:
 		if quick:
 			# A line drive: he froze off his base and has to get back before the ball does.
 			var back := c.t + 0.2 + m.time_to_cover(_lead(r.from) + m.secondary_lead, m.top_speed_for(r.speed))
-			var b := _ball_at(f, at, c.t, c.t + m.transfer_for(f.kind, f.hands) * 0.8, r.from)
+			var b := _ball_at(f, at, c.t, _ready_at(f, c.t + c.extra + m.transfer_for(f.kind, f.hands) * 0.8), r.from)
 			if b.time + rng.next_normal() * m.bang_bang_sd < back:
 				_throw_frames(f, at, c.t, b)
 				r.put_out(r.from, RunnerMove.OutKind.FORCE, b.time)
@@ -508,7 +613,9 @@ func _air_out_kind(f: PlayFielder) -> PaResult.Kind:
 ## An infield fly that was not caught: the batter is out all the same and the runners stay.
 func _infield_fly_dropped(c: Chance) -> void:
 	_ball_frames(c.t + 0.5)
-	_fielder_run(c.f, c.t, c.at)
+	# (The player's own fielder is wherever the player has taken him.)
+	if c.f != _own:
+		_fielder_run(c.f, c.t, c.at)
 	_batter.put_out(1, RunnerMove.OutKind.FLY, c.t)
 	_outs += 1
 	out.direction = c.f.number()
@@ -524,12 +631,16 @@ func _infield_play(g: Chance, after_drop: bool) -> void:
 	var at := Vector2(g.at.x, g.at.y)
 	var held := g.t + g.extra
 	_ball_frames(g.t)
-	_fielder_run(f, g.t, g.at)
+	_fielded(f, g.t)
+	if g.dive:
+		_fielder_stretch(f, g.t, g.at, true)
+	else:
+		_fielder_run(f, g.t, g.at)
 	_hold(f, held, at)
 	out.direction = f.number()
 	if not after_drop:
 		_chain.append(str(f.number()))
-	var clean := held + m.transfer_for(f.kind, f.hands) + (0.15 if g.on_run else 0.0)
+	var clean := _ready_at(f, held + m.transfer_for(f.kind, f.hands) + (0.15 if g.on_run else 0.0))
 	var release := clean
 	var bobbled := not after_drop and rng.chance(_bobble_chance(g))
 	if bobbled:
@@ -735,11 +846,12 @@ func _outfield_play(g: Chance, after_drop: bool) -> void:
 	var at := Vector2(g.at.x, g.at.y)
 	var held := g.t + g.extra + (0.15 if g.on_run else 0.0)
 	_ball_frames(g.t)
+	_fielded(f, g.t)
 	_fielder_run(f, g.t, g.at)
 	out.direction = f.number()
 	if not after_drop:
 		_chain.append(str(f.number()))
-	var release := held + m.transfer_for(f.kind, f.hands)
+	var release := _ready_at(f, held + m.transfer_for(f.kind, f.hands))
 	var fumbled := not after_drop and rng.chance(m.ground_bobble * 0.5 * _hands_factor(f))
 	if fumbled:
 		release += 1.0
@@ -962,10 +1074,82 @@ static func _fielder_key(f: PlayFielder) -> String:
 	return "F:%s" % Position.code(f.kind)
 
 
+## Fielder f is at `where` at `at_time`. His first move starts once he has read the ball. A
+## later one (the first baseman who fielded the ball and then takes a throw on the bag) goes on
+## from where the last left him, no sooner than he can run it: he was shown jumping to the bag
+## before he had let go of his throw. The player's own fielder goes on from where the player
+## took him. A move that comes later than the play would end does not make it longer.
 func _fielder_run(f: PlayFielder, at_time: float, where: Vector3) -> void:
 	var key := _fielder_key(f)
-	out.timeline.add(key, minf(m.reaction_for(f.reach, f.kind), at_time), Vector3(f.pos.x, f.pos.y, 0.0))
-	out.timeline.add(key, at_time, Vector3(where.x, where.y, 0.0))
+	var track := out.timeline.tracks[key]
+	var to := Vector3(where.x, where.y, 0.0)
+	if track.size() == 1 and f != _own:
+		out.timeline.add(key, minf(m.reaction_for(f.reach, f.kind), at_time), Vector3(f.pos.x, f.pos.y, 0.0))
+		out.timeline.add(key, at_time, to)
+		return
+	var last := track[track.size() - 1]
+	var d := Vector2(where.x - last.y, where.y - last.z).length()
+	if d < 0.05:
+		return
+	var arrive := maxf(at_time, last.x + d / m.top_speed_for(f.speed))
+	if arrive > at_time + 0.01:
+		var length := out.timeline.duration
+		out.timeline.add(key, arrive, to)
+		out.timeline.duration = length
+	else:
+		out.timeline.add(key, at_time, to)
+
+
+## Fielder f stays where he is until `at_time` (a thrower until he lets go).
+func _fielder_waits(f: PlayFielder, at_time: float) -> void:
+	var key := _fielder_key(f)
+	var track := out.timeline.tracks[key]
+	var last := track[track.size() - 1]
+	if last.x < at_time:
+		out.timeline.add(key, at_time, Vector3(last.y, last.z, 0.0))
+
+
+## Where a catch in the air is shown made: a man with time to wait takes the ball as it comes
+## down past his chest, not at the last moment before it lands (the chance with the most time
+## to spare is the lowest point of the ball's path he can reach, a few centimetres off the
+## grass). The result of the play is worked out from the chance itself.
+func _shown_catch(c: Chance) -> Chance:
+	if c.slack <= 0.05 or c.at.z >= SHOWN_CATCH_HEIGHT:
+		return c
+	var i := clampi(roundi(c.t / SAMPLE_DT), 0, _ts.size() - 1)
+	var earliest := c.t - c.slack + 0.05
+	# Back along the ball's path while it is coming down past his chest and he could already
+	# be there (a line drive stays low for metres: without the second test the catch was
+	# shown ten metres short of him, and he slid there at thirty metres a second).
+	while i > 0 and _ts[i - 1] >= earliest and _ps[i - 1].z <= SHOWN_CATCH_HEIGHT and _ps[i - 1].z >= _ps[i].z \
+			and _time_to(c.f, Vector2(_ps[i - 1].x, _ps[i - 1].y), m.reach_running, true) <= _ts[i - 1] - 0.05:
+		i -= 1
+	return Chance.make(c.f, _ts[i], _ps[i], c.slack - (c.t - _ts[i]))
+
+
+## Notes who first had the ball and when, for the scene (PlayMoves reads the catch from it).
+func _fielded(f: PlayFielder, at_time: float) -> void:
+	if out.timeline.fielded_key == "":
+		out.timeline.fielded_key = _fielder_key(f)
+		out.timeline.fielded_time = at_time
+
+
+## A fielder at full stretch for the ball at `at`: he gets no nearer than a dive's length, and
+## is up where it was a moment later if he has it. If he has not, the try is noted (the scene
+## shows the dive) and he is left where he fell.
+func _fielder_stretch(f: PlayFielder, at_time: float, at: Vector3, got: bool, short: float = STRETCH) -> void:
+	var key := _fielder_key(f)
+	var track := out.timeline.tracks[key]
+	var from := Vector2(track[track.size() - 1].y, track[track.size() - 1].z)
+	var to := Vector2(at.x, at.y)
+	var where := to - (to - from).normalized() * minf(short, from.distance_to(to))
+	_fielder_run(f, at_time, Vector3(where.x, where.y, 0.0))
+	if got:
+		var now := out.timeline.tracks[key]
+		var last := now[now.size() - 1].x
+		out.timeline.add(key, maxf(at_time + UP_AGAIN, last + 0.05), Vector3(at.x, at.y, 0.0))
+	else:
+		out.timeline.add_miss(key, at_time, at)
 
 
 ## The batted ball's own path, up to when it is caught, fielded or dead.
@@ -987,12 +1171,15 @@ func _throw_frames(thrower: PlayFielder, from: Vector2, release: float, b: BallA
 		out.timeline.add("ball", b.time, Vector3(target.x, target.y, 1.0))
 		_fielder_run(thrower, b.time, Vector3(target.x, target.y, 0.0))
 		return
-	out.timeline.add("ball", release, start)
+	# Shown leaving his hand as long before it gets there as a throw that far takes: a short
+	# one is let go sooner than a full throw (_ball_at), and it was drawn from the full throw's
+	# release, crossing ten metres in a few hundredths of a second.
+	var shown_release := minf(maxf(b.time - _throw_time(thrower, b.distance), 0.0), b.time - 0.05)
+	_fielder_waits(thrower, shown_release)
+	out.timeline.add("ball", shown_release, start)
 	out.timeline.add("ball", b.time, Vector3(target.x, target.y, 1.2))
-	out.timeline.add_throw(release, start, b.time, Vector3(target.x, target.y, 1.2))
-	var key := _fielder_key(b.receiver)
-	out.timeline.add(key, m.reaction_for(b.receiver.reach, b.receiver.kind), Vector3(b.receiver.pos.x, b.receiver.pos.y, 0.0))
-	out.timeline.add(key, minf(_cover_time(b.receiver, b.base), b.time), Vector3(target.x, target.y, 0.0))
+	out.timeline.add_throw(shown_release, start, b.time, Vector3(target.x, target.y, 1.2))
+	_fielder_run(b.receiver, minf(_cover_time(b.receiver, b.base), b.time), Vector3(target.x, target.y, 0.0))
 
 
 func _runner_frames(r: PlayRunner) -> void:
@@ -1022,6 +1209,30 @@ func _runner_frames(r: PlayRunner) -> void:
 		out.timeline.add(key, when, Vector3(p.x, p.y, 0.0))
 		prev = p
 		prev_time = when
+	_after_the_bag(r, key, last)
+
+
+## What a runner does once he is safe where he stopped, shown after the play without making it
+## longer: the batter safe at first runs through the bag and comes back to it; one who scored
+## walks off toward the dugout. (They stood on the bag inside the first baseman, and on the
+## plate inside each other.)
+func _after_the_bag(r: PlayRunner, key: String, last: int) -> void:
+	if r.is_out() or last < 1:
+		return
+	var length := out.timeline.duration
+	var when := _arrive(r, last)
+	if last == 4:
+		# Each to his own spot (the batter and the runners would stand inside each other).
+		var off := Vector2(-RUN_OFF.x - float(r.from) * 1.6, RUN_OFF.y + float(r.from) * 1.1)
+		out.timeline.add(key, when + 0.7, Vector3(-1.2, -2.0, 0.0))
+		out.timeline.add(key, when + 0.7 + off.distance_to(Vector2(-1.2, -2.0)) / WALK_OFF, Vector3(off.x, off.y, 0.0))
+	elif last == 1 and r.from == 0:
+		var line := base_xy(1).normalized()
+		var past := base_xy(1) + line * OVERRUN
+		out.timeline.add(key, when + 0.6, Vector3(past.x, past.y, 0.0))
+		var back := base_xy(1) + line * 0.6 + Vector2(line.y, -line.x) * 0.8
+		out.timeline.add(key, when + 0.6 + 1.2 + OVERRUN / WALK_OFF, Vector3(back.x, back.y, 0.0))
+	out.timeline.duration = length
 
 
 ## A runner put out on his way from `from` (left at `left`) to the bag at `bag` (which he would

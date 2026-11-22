@@ -34,6 +34,10 @@ func _init() -> void:
 
 func _ready() -> void:
 	_face = PlateFace.behind(self, look)
+	mouse_entered.connect(func() -> void:
+		if not disabled:
+			GameAudio.ui(get_tree(), "ui/move"))
+	pressed.connect(func() -> void: GameAudio.ui(get_tree(), "ui/select" if look != "primary" else "ui/confirm"))
 	var pad: Array = PADS.get(look, PADS["button"])
 	var side := float(pad[0]) if text != "" else float(pad[1])
 	for state: String in ["normal", "hover", "pressed", "focus", "disabled", "hover_pressed"]:

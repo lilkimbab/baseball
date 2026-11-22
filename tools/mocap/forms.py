@@ -7,9 +7,12 @@ Pitching: every trial is measured — the arm's angle at release (the line from 
 shoulder to the hand, seen by the catcher, against the horizontal), how high the front knee
 comes up, the tempo from the top of the leg lift to release — and only trials that start
 before the leg lift are used (at least 0.6 s of the delivery before the knee is highest). One
-trial per pitcher, his fastest. Twenty are kept: three overhand (60° and up), thirteen
-three-quarter (30-60°), four sidearm (under 30°), spread over leg lift and tempo within each,
-with left-handers among them (their own trials, not mirrored).
+trial per pitcher, his fastest. Twenty are kept: four overhand (52° and up), twelve
+three-quarter (33-52°, those nearest 44° first), four low three-quarter and sidearm (under
+33°), spread over leg lift and tempo within each, with left-handers among them (their own
+trials, not mirrored). The recorded pitchers' arms are low (half of them under 35°; a
+professional's is about 45° on average), and taking every slot evenly made most of the
+game's pitchers look sidearm: "팔각도가 이상하다" (2026-11-22).
 
 Batting: every swing is measured — how high the hands are at address against the batter's
 height, how far the front foot comes up before it lands (a leg kick, a toe tap or no stride),
@@ -45,7 +48,9 @@ def excluded():
         return set()
     with open(EXCLUDE) as handle:
         return set(line.strip() for line in handle if line.strip())
-PITCH_COUNTS = {"overhand": 3, "three_quarter": 13, "sidearm": 4}
+PITCH_COUNTS = {"overhand": 4, "three_quarter": 12, "sidearm": 4}
+# The arm angle the three-quarter forms are taken nearest to.
+THREE_QUARTER_MIDDLE = 44.0
 LEFT_PITCHERS = 4
 SWING_COUNT = 20
 LEFT_BATTERS = 6
@@ -125,9 +130,9 @@ def pitch_metrics():
 
 
 def slot_of(angle):
-    if angle >= 60.0:
+    if angle >= 52.0:
         return "overhand"
-    if angle >= 30.0:
+    if angle >= 33.0:
         return "three_quarter"
     return "sidearm"
 
@@ -147,6 +152,10 @@ def pick_pitches(metrics):
     chosen = []
     for slot, count in PITCH_COUNTS.items():
         pool = [m for m in pitchers if m["slot"] == slot]
+        if slot == "three_quarter":
+            # The common arm, not the edges of the class.
+            pool.sort(key=lambda m: abs(m["arm_angle"] - THREE_QUARTER_MIDDLE))
+            pool = pool[: max(count * 2, count + 4)]
         lefties = [m for m in pool if m["hand"] == "L"]
         # Left-handers first, about their share, then the rest spread over lift and tempo.
         want_left = min(len(lefties), max(1, round(count * LEFT_PITCHERS / 20.0)))

@@ -363,6 +363,22 @@ def limb_coordinates(body, rig):
             norm = math.hypot(c, sn) or 1.0
             limb[v.index] = (pack(t), c / norm * 0.5 + 0.5, sn / norm * 0.5 + 0.5)
             extra[v.index] = (min(total, 1.0), 0.5, 0.0)
+    # Points next to the arm that are not of it (the fingers, the chest at the shoulder) take
+    # their neighbour's place along the arm, with no weight: across the faces between them
+    # the place then stays where it is while the weight fades, instead of running from the
+    # knuckles back to the shoulder (which drew bits of sleeve and vein on the fingers).
+    for _ in range(2):
+        taken = {}
+        for e in body.data.edges:
+            a, b = e.vertices
+            for inside, outside in ((a, b), (b, a)):
+                if extra[inside][0] > 0.0 and extra[outside][0] <= 0.0 and outside not in taken:
+                    taken[outside] = limb[inside]
+        for index, coords in taken.items():
+            if extra[index][0] <= 0.0:
+                limb[index] = coords
+                extra[index] = (1e-6, extra[index][1], 0.0)
+    extra = [(0.0 if w <= 1e-5 else w, across, z) for w, across, z in extra]
     return limb, extra
 
 
@@ -767,10 +783,12 @@ def prepare_body(body, rig):
     bm.faces.ensure_lookup_table()
     region = bm.faces.layers.int.new("region")
     depth = bm.faces.layers.float.new("depth")
+    sock = bm.faces.layers.int.new("sock")
     feet = {"l": [], "r": []}
     for face in bm.faces:
         face.smooth = True
         face[region], face[depth] = anatomy.region(face)
+        face[sock] = 1 if anatomy.bone(face).startswith("calf_") else 0
         if anatomy.bone(face).startswith(("foot_", "ball_")):
             feet["l" if face.calc_center_median().x > 0.0 else "r"].extend(v.co.copy() for v in face.verts)
     head = [v.co.copy() for v in bm.verts
@@ -1197,7 +1215,11 @@ def strip_body(body, under_jersey=None):
     bm.from_mesh(body.data)
     region = bm.faces.layers.int["region"]
     depth = bm.faces.layers.float["depth"]
-    hidden = [f for f in bm.faces if f[region] == SHOES or (f[region] in (JERSEY, BELT, PANTS) and f[depth] > TUCK)]
+    # (The calves are kept whole under the trousers, as sock: a player who wears his trousers
+    # to the knee shows them, and the game cuts the trousers there for him.)
+    sock = bm.faces.layers.int.get("sock")
+    is_sock = lambda f: sock is not None and f[sock] == 1
+    hidden = [f for f in bm.faces if f[region] == SHOES or (f[region] in (JERSEY, BELT, PANTS) and f[depth] > TUCK and not is_sock(f))]
     bmesh.ops.delete(bm, geom=hidden, context='FACES')
     for face in bm.faces:
         face.material_index = {HANDS: 1, SOCKS: 2, UNDERSHIRT: 3}.get(face[region], 0)
@@ -1205,6 +1227,8 @@ def strip_body(body, under_jersey=None):
         # (it goes on under the jersey; bare skin showed as a band round the V of the neck).
         if face[region] == JERSEY and under_jersey is not None and under_jersey(face):
             face.material_index = 3
+        if is_sock(face):
+            face.material_index = 2
     # Keep the textured skin if there is one; the hands get their own copy so the game can
     # swap them for batting gloves.
     textured = body.data.materials[0] if len(body.data.materials) > 0 else None
@@ -1539,6 +1563,7 @@ def main():
     helmet, flaps = gear.batting_helmet(body, marks, rig)
     catcher_head = gear.catcher_helmet(body, marks, rig)
     catcher_gear = [gear.chest_protector(jersey, rig, marks), gear.shin_guards(pants, body, rig), *catcher_head]
+    batter_guards = [gear.elbow_guard(body, jersey, rig), gear.leg_guard(pants, rig)]
     officials.material = material
     umpire = officials.mask(body, marks, rig)
     umpire_kit = [officials.polo_collar(jersey, rig, Anatomy.NECK_RADIUS),
@@ -1556,7 +1581,7 @@ def main():
                and abs(f.calc_center_median().x) < Anatomy.NECK_RADIUS + 0.05)
     store_limb_coordinates(body, rig)
     trim_hair(hair, under_cap)
-    optional = [*catcher_gear, umpire, *umpire_kit, *flaps, helmet]
+    optional = [*catcher_gear, *batter_guards, umpire, *umpire_kit, *flaps, helmet]
     parts = [body, jersey, collar, pants, buckle, piping, kit.shoes(feet, rig), *face_parts, *hair, cap, cap_button, *optional]
 
     for old, new in BONE_NAMES.items():

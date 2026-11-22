@@ -151,3 +151,67 @@ func test_umpires_dress_as_umpires() -> void:
 	assert_not_null(short, "run ./dev model")
 	if short != null:
 		assert_lt(short.get_aabb().end.z, cap.get_aabb().end.z - 0.025, "a shorter bill")
+
+
+func test_each_player_wears_his_uniform_his_own_way() -> void:
+	var seen := {"sleeves": 0, "socks": 0, "elbow": 0, "leg": 0}
+	var puppet := SkinnedPuppet.new()
+	puppet.uniform = UniformStyle.for_team(_clubs()[0], true)
+	add_child_autofree(puppet)
+	for i: int in 40:
+		puppet.set_face("p%05d" % (i + 1))
+		seen["sleeves"] += int(puppet.long_sleeves)
+		seen["socks"] += int(puppet.high_socks)
+		seen["elbow"] += int(puppet.guards.has(&"ElbowGuard"))
+		seen["leg"] += int(puppet.guards.has(&"LegGuard"))
+	for what: String in seen:
+		assert_between(int(seen[what]), 4, 34, "some players and not all: %s" % what)
+	# The same player, the same way every time.
+	puppet.set_face("p00007")
+	var first := [puppet.long_sleeves, puppet.high_socks, puppet.guards.duplicate()]
+	puppet.set_face("p00012")
+	puppet.set_face("p00007")
+	assert_eq([puppet.long_sleeves, puppet.high_socks, puppet.guards.duplicate()], first)
+
+
+func test_guards_go_with_the_helmet_and_trousers_to_the_knee_show_the_socks() -> void:
+	var puppet := SkinnedPuppet.new()
+	puppet.uniform = UniformStyle.for_team(_clubs()[0], true)
+	add_child_autofree(puppet)
+	puppet.guards.assign(SkinnedPuppet.BATTER_GUARDS)
+	puppet.high_socks = true
+	puppet.repaint()
+	var elbow := puppet.find_child("ElbowGuard", true, false) as MeshInstance3D
+	var leg := puppet.find_child("LegGuard", true, false) as MeshInstance3D
+	assert_not_null(elbow, "run ./dev model")
+	if elbow == null:
+		return
+	puppet.headgear = &"cap"
+	puppet.apply(PuppetClips.fielder_ready())
+	assert_false(elbow.visible or leg.visible, "no guards in the field")
+	puppet.headgear = &"helmet"
+	puppet.apply(PuppetClips.stance())
+	assert_true(elbow.visible and leg.visible, "worn at bat")
+	# The guards are on the front arm and leg (the model's left; a left-hander's is mirrored).
+	assert_gt(elbow.get_aabb().get_center().x, 0.1, "the left arm")
+	assert_gt(leg.get_aabb().get_center().x, 0.02, "the left leg")
+	# Trousers to the knee: cut away below it, the calves under them dressed as socks.
+	var pants := puppet.find_child("Pants", true, false) as MeshInstance3D
+	var cloth := pants.get_surface_override_material(0) as StandardMaterial3D
+	assert_eq(cloth.transparency, BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR)
+	var art := pants.get_node("Art").get_child(0) as UniformArt
+	assert_true(art.clip_contents)
+	assert_between(art.size.y / float((pants.get_node("Art") as SubViewport).size.y), 0.4, 0.7, "cut a little below the knee")
+	var body := puppet.find_child("Body", true, false) as MeshInstance3D
+	var socks := -1
+	for surface: int in body.mesh.get_surface_count():
+		if body.mesh.surface_get_material(surface).resource_name == "Socks":
+			socks = surface
+	var top := -INF
+	for v: Vector3 in body.mesh.surface_get_arrays(socks)[Mesh.ARRAY_VERTEX] as PackedVector3Array:
+		top = maxf(top, v.y)
+	assert_gt(top, 0.4, "the socks go up to the knee under the trousers")
+	# An umpire wears his as they are made.
+	puppet.uniform = UniformStyle.for_official(12)
+	puppet.repaint()
+	assert_false(puppet.high_socks or puppet.long_sleeves)

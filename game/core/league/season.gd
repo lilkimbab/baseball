@@ -69,6 +69,18 @@ var clubs: Dictionary[String, Club] = {}
 var condition: Dictionary[String, int] = {}
 var streak: Dictionary[String, int] = {}
 var season_year := 2026
+## The second teams' league (docs/08 R6); null where there is none (the career mode, which
+## plays its own player's second-team games, and batch simulations).
+var farm: FarmLeague
+## Rating points each player has grown this season (Development), for the winter's report.
+var grown: Dictionary[String, float] = {}
+## Players who played in a first-team game today (for growth); emptied when the day ends.
+var played_today: Dictionary[String, bool] = {}
+## The winter before this season (who retired, the rookies, who grew most), for the screens.
+var last_winter: Development.Winter
+## A season of the past being played again (docs/08 R7), and the scenario taken, if any.
+var history: SeasonPack
+var scenario_id := ""
 ## A player who plays whenever he is on the first team (the career player): he starts at his
 ## position, a starter takes his turn, a closer closes and a reliever sets up.
 var featured := ""
@@ -90,6 +102,8 @@ static func create(clubs: Array[Team], per_division: int, games: int, seed_value
 	s.games_per_team = games
 	for t: Team in clubs:
 		s.teams[t.id] = t
+	# Players from a pack (or an old save) get their room to grow.
+	Development.give_rooms(clubs, s.season_year)
 	for d: int in clubs.size() / per_division:
 		var ids := PackedStringArray()
 		for i: int in per_division:
@@ -183,6 +197,9 @@ func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	return GameSim.with_lineups(a, h, game_rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
 
 
+## Pitchers' overalls for the bullpen roles, worked out once a day (play_day empties it):
+## ratings change over a season, and a cache kept from the first day, which a saved game
+## does not carry, gave a season continued and the same season loaded different closers.
 var _overall_cache: Dictionary[String, float] = {}
 
 
@@ -217,6 +234,9 @@ func squad_for(team: Team, on_day: int, starter_id: String) -> Team:
 	view.accent = team.accent
 	view.steal_style = team.steal_style
 	view.bunt_style = team.bunt_style
+	# The manager's own order goes with the squad (anyone not in it today is replaced).
+	view.batting_plan = team.batting_plan
+	view.rotation_plan = team.rotation_plan
 	var managed: Club = clubs.get(team.id)
 	var actives: Array[ClubRules.ColorDef] = []
 	if managed != null:
@@ -285,6 +305,27 @@ func _overnight() -> void:
 	var actives := TeamColors.active(team, club, club_rules, ovr, catalog)
 	club.train(team, func(p: Player) -> int: return season_year - p.born, club_rules, ovr, catalog, TeamColors.training_boost(actives))
 	refresh_candidates()
+
+
+## The day's growth (Development): every player of a club that played today, faster for
+## those who played (first team or second).
+func _develop_day() -> void:
+	var playing: Dictionary[String, bool] = {}
+	for g: ScheduledGame in games_today():
+		if g.played and postseason_of(g) == null:
+			playing[g.away] = true
+			playing[g.home] = true
+	for team_id: String in playing:
+		for p: Player in (teams[team_id] as Team).players:
+			if p.potential <= 0.0:
+				continue
+			var played := played_today.has(p.id) or (farm != null and farm.played_today.has(p.id))
+			var gain := Development.grow_day(p, season_year - p.born, played, games_per_team)
+			if gain > 0.0:
+				grown[p.id] = float(grown.get(p.id, 0.0)) + gain
+	played_today.clear()
+	if farm != null:
+		farm.played_today.clear()
 
 
 ## Today's scouting candidates for the player's club.
@@ -378,6 +419,7 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 		var line: BattingLine = game_book.batting[id]
 		target.bat(id).add(line)
 		played[id] = true
+		played_today[id] = true
 		if playoff == null:
 			_note_recent(id, line, game.day)
 	for side: String in [game.away, game.home]:
@@ -390,6 +432,7 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 		var line: PitchingLine = game_book.pitching[id]
 		target.pitch(id).add(line)
 		usage.note(id, game.day, line.pitches)
+		played_today[id] = true
 
 
 func _note_recent(id: String, line: BattingLine, on_day: int) -> void:
@@ -422,6 +465,9 @@ func recent_line(id: String) -> BattingLine:
 ## Plays today's games with the stat resolver, all but the player's own, which is returned
 ## (null if he has none today or `include_mine` is set).
 func play_day(include_mine: bool = false) -> ScheduledGame:
+	_overall_cache.clear()
+	if farm != null:
+		farm.play_day(self, games_today())
 	var mine: ScheduledGame = null
 	for g: ScheduledGame in games_today():
 		if g.played:
@@ -438,8 +484,11 @@ func play_day(include_mine: bool = false) -> ScheduledGame:
 ## To the next day. The day after the last regular-season game the postseason begins; when
 ## every division has its champion the season is over.
 func advance() -> void:
+	_develop_day()
 	day += 1
 	_overnight()
+	if phase == Phase.REGULAR and farm != null and day % RosterMoves.EVERY_DAYS == 0:
+		RosterMoves.weekly(self)
 	if phase == Phase.REGULAR and regular_season_over():
 		phase = Phase.POSTSEASON
 		postseasons.clear()
@@ -471,6 +520,13 @@ func play_regular_season() -> void:
 
 
 # --- After the season ---
+
+
+## A division's postseason champion ("" until it is decided).
+func champion_of(d: int) -> String:
+	if d < 0 or d >= postseasons.size() or not postseasons[d].finished():
+		return ""
+	return postseasons[d].champion()
 
 
 ## Clubs going up and down (docs/02 section 4.1): each division's postseason champion and

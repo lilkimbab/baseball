@@ -5,11 +5,11 @@ extends RefCounted
 ## to, who receives each throw, which runner slides into which base. MatchScene turns these
 ## into poses.
 
-enum Kind { CATCH, THROW, SLIDE, TAG }
+enum Kind { CATCH, THROW, SLIDE, TAG, MISS }
 
 ## Seconds around each moment that its pose takes: a catch from just before the ball arrives
 ## to just after, a throw from the wind-up to the follow-through, a slide from the drop.
-const WINDOW := {Kind.CATCH: Vector2(-0.3, 0.25), Kind.THROW: Vector2(-0.35, 0.45), Kind.SLIDE: Vector2(-0.35, 0.6), Kind.TAG: Vector2(-0.25, 0.4)}
+const WINDOW := {Kind.CATCH: Vector2(-0.3, 0.25), Kind.THROW: Vector2(-0.35, 0.45), Kind.SLIDE: Vector2(-0.35, 0.6), Kind.TAG: Vector2(-0.25, 0.4), Kind.MISS: Vector2(-0.3, 0.6)}
 ## How near (m, on the ground) a fielder must be to the ball to be the one who gets it.
 const REACH := 1.2
 ## A play this close (s between runner and ball) gets a slide, and it is down this far (m)
@@ -58,15 +58,28 @@ static func read(tl: PlayTimeline, calls: Array[PlayCall], batted: bool = true) 
 	for key: String in tl.tracks:
 		if key.begins_with("F:"):
 			fielders.append(key)
+	# Tries that came up short: a dive at the ball as it goes by.
+	for i: int in tl.miss_keys.size():
+		var miss := tl.misses[i]
+		moves._add(tl.miss_keys[i], Moment.make(Kind.MISS, miss.x, Vector3(miss.y, miss.z, miss.w)))
 	# The first fielder to reach the ball in play.
 	var first_throw := tl.throws[0][0].x if not tl.throws.is_empty() else tl.duration
 	# Not at the bat itself, where the ball starts beside the catcher.
 	var t := LEAVES_BAT
 	var caught := not batted
+	# The play says who had it and when: the catch is then, where the ball was. (Read off the
+	# tracks, it was the first moment the ball came within REACH of a fielder, up to 1.2 m from
+	# him and over his head, and the ball jumped into his glove.)
+	if batted and tl.fielded_key != "" and tl.tracks.has(tl.fielded_key) and tl.fielded_time >= 0.0:
+		moves._add(tl.fielded_key, Moment.make(Kind.CATCH, tl.fielded_time, tl.position("ball", tl.fielded_time)))
+		caught = true
 	while t <= first_throw and not caught:
 		var ball := tl.position("ball", t)
 		if ball.z < 2.7:
 			for key: String in fielders:
+				# (One who has just dived past it is not the man who has it.)
+				if moves._missing(key, t) or tl.bystanders.has(key):
+					continue
 				var f := tl.position(key, t)
 				if Vector2(f.x - ball.x, f.y - ball.y).length() < REACH:
 					moves._add(key, Moment.make(Kind.CATCH, t, ball))
@@ -153,6 +166,14 @@ static func _nearest(tl: PlayTimeline, keys: Array[String], time: float, point: 
 			best_d = d
 			best = key
 	return best
+
+
+## Fielder `key` is in a try that does not get the ball at `t` (or is still on the ground).
+func _missing(key: String, t: float) -> bool:
+	for m: Moment in by_key.get(key, []):
+		if m.kind == Kind.MISS and t >= m.time - 0.5 and t <= m.time + 0.8:
+			return true
+	return false
 
 
 func _add(key: String, m: Moment) -> void:

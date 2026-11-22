@@ -20,7 +20,10 @@ const LIMBS: Array[Array] = [
 
 ## Worn only by those who wear them (Puppet.gear): the umpire's mask; the catcher's
 ## hockey-style helmet (shell, cage, throat guard), chest protector and shin guards.
-const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards", &"PoloCollar", &"BallBags", &"UmpireCap"]
+const OPTIONAL_GEAR: Array[StringName] = [&"Mask", &"CatcherHelmet", &"CatcherCage", &"ThroatGuard", &"ChestProtector", &"ShinGuards", &"PoloCollar", &"BallBags", &"UmpireCap", &"ElbowGuard", &"LegGuard"]
+## What a batter may wear on his front arm and leg (worn with the helmet: at bat and on the
+## bases). Each player wears his own choice of them (set_face).
+const BATTER_GUARDS: Array[StringName] = [&"ElbowGuard", &"LegGuard"]
 ## What an umpire wears over the body every figure has (tools/blender/officials.py): a polo
 ## shirt's collar; and behind the plate his mask over his cap and the ball bags on his belt.
 const UMPIRE_GEAR: Array[StringName] = [&"PoloCollar"]
@@ -85,6 +88,12 @@ var _logos: Array[Label3D] = []
 ## Which of the model's four short hair styles shows (1 to 4; 0 none), and its colour.
 var hair := 1
 var hair_color := Color(0.07, 0.06, 0.055)
+## How this player wears his uniform (set_face decides, from his id): a long-sleeved undershirt
+## under the jersey, his trousers pulled up to the knee over long socks, and which guards he
+## bats in.
+var long_sleeves := false
+var high_socks := false
+var guards: Array[StringName] = []
 ## &"glove" for an infielder's or pitcher's glove, &"outfield" for an outfielder's,
 ## &"first_base" for a first baseman's mitt, &"mitt" for the catcher's (docs/13 S11-8).
 var glove_kind: StringName = &"glove"
@@ -415,6 +424,8 @@ func ball_spot(hand: StringName) -> Vector3:
 func _build_props() -> void:
 	super._build_props()
 	_use_prop(&"Bat", &"bat", Color(0.66, 0.5, 0.32), 0.55, 26.0)
+	if _parts[&"Bat"].material_override != null and ResourceLoader.exists(BatWood.SHADER):
+		_parts[&"Bat"].material_override = BatWood.material()
 
 
 ## Replaces a stand-in shape with the real piece of equipment, if it has been built.
@@ -461,7 +472,7 @@ func _place_props(direction: Vector3) -> void:
 		return
 	if _glove_shown != glove_kind:
 		_glove_shown = glove_kind
-		_use_prop(&"Glove", glove_kind, Color(0.35, 0.19, 0.085), 0.58, 12.0)
+		_use_prop(&"Glove", glove_kind, Color(0.35, 0.19, 0.085), 0.72, 12.0)
 	# The glove is worn: it sits in the hand's frame, knuckles at its origin.
 	glove.transform = _hand_frame["Left"]
 
@@ -480,14 +491,14 @@ func _show_gear() -> void:
 	# The piping down the trousers, on the uniforms that have it.
 	var stripe := _model.find_child("PantsStripe", true, false) as MeshInstance3D
 	if stripe != null:
-		stripe.visible = uniform.pants_stripe
+		stripe.visible = uniform.pants_stripe and not high_socks
 	# Under a cap or a helmet all that shows of the hair is what is cropped close to the
 	# skull (drawn on the skin, match/skin.gdshader); the locks are for a bare head.
 	var bare := headgear == &"none" and not gear.has(&"CatcherHelmet") and not gear.has(&"UmpireCap")
 	for part: Node in _model.find_children("Hair*", "MeshInstance3D", true, false):
 		(part as MeshInstance3D).visible = bare and String(part.name) == "Hair%d" % hair
 	for piece: StringName in _gear_parts:
-		_gear_parts[piece].visible = gear.has(piece)
+		_gear_parts[piece].visible = gear.has(piece) or (headgear == &"helmet" and guards.has(piece))
 
 
 ## How far a lifted foot's toes hang down, past the right angle to the shin (degrees).
@@ -507,7 +518,50 @@ func _turn_spine(basis_for: Dictionary[int, Basis], pelvis: Basis, chest: Basis)
 
 ## Writes bone poses to the skeleton from global transforms, and records where the model's
 ## hands really are so the ball and bat sit in them.
+## The bones as last shown and as last posed (skeleton space), as they were shown at the end
+## of the last frame, and an easing from a pose shown before: the bones it started from, how
+## long it takes and how much of it is left.
+var _shown: Array[Transform3D] = []
+var _target: Array[Transform3D] = []
+var _frame_shown: Array[Transform3D] = []
+var _ease_from: Array[Transform3D] = []
+var _ease_length := 0.0
+var _ease_left := 0.0
+
+
+## Eases from the bones shown at the end of the last frame: the pose given in this frame is
+## shown again from there.
+func ease_from_shown(seconds: float) -> void:
+	if _frame_shown.size() != _rest.size() or seconds <= 0.0:
+		return
+	_ease_from = _frame_shown.duplicate()
+	_ease_length = seconds
+	_ease_left = seconds
+	if _target.size() == _rest.size():
+		_pose_bones(_target.duplicate())
+		_place_props(bat_dir)
+
+
+## The end of a frame: the easing moves on, and what is shown now is kept for the next change.
+func ease_step(dt: float) -> void:
+	_ease_left = maxf(_ease_left - dt, 0.0)
+	_frame_shown = _shown
+
+
+func shown_hips_height() -> float:
+	if _shown.is_empty():
+		return super.shown_hips_height()
+	return (_to_puppet * _shown[_bone[&"Hips"]].origin).y
+
+
 func _pose_bones(globals: Array[Transform3D]) -> void:
+	_target = globals.duplicate()
+	if _ease_left > 0.0 and _ease_from.size() == globals.size():
+		# Part way from the bones shown when the change came to the new pose.
+		var f := smoothstep(0.0, 1.0, 1.0 - _ease_left / _ease_length)
+		for i: int in globals.size():
+			globals[i] = _ease_from[i].interpolate_with(globals[i], f)
+	_shown = globals
 	for i: int in _rest.size():
 		var parent_global := Transform3D.IDENTITY if _parent[i] < 0 else globals[_parent[i]]
 		var local := parent_global.affine_inverse() * globals[i]
@@ -886,6 +940,10 @@ func _paint() -> void:
 		"Piping": uniform.trim, "MaskPads": Color(0.2, 0.14, 0.09),
 	}
 	if uniform.official:
+		# An umpire wears his shirt and trousers as they are made.
+		long_sleeves = false
+		high_socks = false
+		guards.clear()
 		# An umpire's shoes are black all over, his belt and bags black leather.
 		plain["Soles"] = Color(0.05, 0.05, 0.055)
 		plain["Laces"] = Color(0.06, 0.06, 0.065)
@@ -913,7 +971,9 @@ func _paint() -> void:
 			elif plain.has(source):
 				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
 		if part.name == &"PantsStripe":
-			part.visible = uniform.pants_stripe
+			# (Not with the trousers pulled up to the knee: the strip runs to the ankle.)
+			part.visible = uniform.pants_stripe and not high_socks
+	_wear_sleeves()
 
 
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
@@ -1098,8 +1158,31 @@ func set_face(seed_text: String) -> Dictionary[String, float]:
 	_mesh.set_instance_shader_parameter(&"veins", out["veins"])
 	_mesh.set_instance_shader_parameter(&"vein_seed", 100.0 * rng.next_float())
 	_mesh.set_instance_shader_parameter(&"hair_tint", hair_color)
+	# How he wears it (an umpire wears his shirt and trousers as they are).
+	var worn := Rng.new(hash(seed_text + ":wear"))
+	long_sleeves = not uniform.official and worn.next_float() < 0.35
+	var socks_up := not uniform.official and worn.next_float() < 0.3
+	guards.clear()
+	if worn.next_float() < 0.55:
+		guards.append(&"ElbowGuard")
+	if worn.next_float() < 0.4:
+		guards.append(&"LegGuard")
+	_wear_sleeves()
+	if socks_up != high_socks:
+		high_socks = socks_up
+		repaint()
+	_show_gear()
 	out["tone"] = sun
 	return out
+
+
+## The undershirt's sleeves: none below the jersey's, or down to the wrists in its colour
+## (drawn on the arms by the skin's shader, from the arm coordinates in the model).
+func _wear_sleeves() -> void:
+	if _mesh == null:
+		return
+	_mesh.set_instance_shader_parameter(&"sleeve", 1.0 if long_sleeves else 0.0)
+	_mesh.set_instance_shader_parameter(&"sleeve_tint", uniform.undershirt)
 
 
 ## The two ends of the complexions (multipliers on the painted skin, which is pale).
@@ -1245,6 +1328,16 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = viewport.get_texture()
+	if not is_jersey and high_socks:
+		# Trousers worn to the knee: nothing of them is drawn below it (the long socks show).
+		var box := part.mesh.get_aabb()
+		var knee := _skeleton.get_bone_global_rest(_bone[&"LeftLowerLeg"]).origin.y
+		var cut := clampf((box.end.y - (knee - 0.075)) / box.size.y, 0.3, 1.0)
+		viewport.transparent_bg = true
+		art.clip_contents = true
+		art.size.y = viewport.size.y * cut
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+		material.alpha_scissor_threshold = 0.5
 	_make_fabric(material)
 	# The garment's second UV map is metres of cloth round each leg, the trunk and each sleeve
 	# (make_player.py, wrap_uvs): the knit follows it, evenly round the limb and fixed to the cloth.

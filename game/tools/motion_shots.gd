@@ -7,6 +7,9 @@ extends SceneTree
 ## Options: --who pitch|swing   --out <path prefix>   --view side|front|back|plate
 ##          --times <comma-separated seconds; default: a spread over the whole motion>
 ##          --reach <metres up> (swing only: raise the hands, as for a high pitch)
+##          --form <id> (a pitching or batting form from the pack instead of the default)
+##          --events <comma-separated event names: knee_peak, foot_plant, max_layback,
+##          release ...> photographed at those moments of the clip
 ##          --eye x,y,z --centre x,y,z --fov <degrees>   camera in the player's own terms:
 ##          metres to his right, above the ground, and behind him (in front is negative)
 
@@ -60,6 +63,12 @@ func _compose() -> bool:
 	_scene.set_physics_process(false)
 	_scene.hud.visible = false
 	_scene.ball_actor.visible = false
+	if _args.has("form"):
+		var form := StringName(str(_args["form"]))
+		if _who == "pitch":
+			_scene.set_motion(MotionLibrary.find(&"pitch", form), MotionLibrary.find(&"swing"))
+		else:
+			_scene.set_motion(MotionLibrary.find(&"pitch"), MotionLibrary.find(&"swing", form))
 	var clip: JointClip = null
 	if _who == "pitch" and _scene.pitch_motion != null:
 		clip = _scene.pitch_motion.clip
@@ -68,6 +77,9 @@ func _compose() -> bool:
 	if clip == null:
 		print("motion_shots: no recorded %s in the local content pack" % _who)
 		return false
+	for event: String in str(_args.get("events", "")).split(",", false):
+		if clip.events.has(StringName(event)):
+			_times.append(float(clip.events[StringName(event)]))
 	if _times.is_empty():
 		for i: int in 12:
 			_times.append(clip.duration * i / 11.0)

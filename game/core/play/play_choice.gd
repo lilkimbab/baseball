@@ -15,10 +15,17 @@ var throw_to := 0
 var gauge := 0.85
 ## 1 every runner goes, −1 every runner holds (or goes back), 0 the runners' own judgment.
 var running := 0
+## The fielder the player moves himself (PlayContext.manual_*), Position.Kind.DH for none.
+var manual_fielder: Position.Kind = Position.Kind.DH
+var manual_track := PackedVector3Array()
+var manual_time := -1.0
+var manual_at := Vector3.ZERO
+var manual_dive := false
+var manual_ready := 0.0
 
 
 func has_any() -> bool:
-	return throw_to > 0 or running != 0
+	return throw_to > 0 or running != 0 or manual_fielder != Position.Kind.DH
 
 
 ## How much faster than his usual throw the fielder's is.
@@ -56,3 +63,9 @@ func apply(ctx: PlayContext) -> void:
 		ctx.throw_power = throw_power()
 		ctx.throw_wild = throw_wild()
 	ctx.running_shift += running_shift()
+	ctx.manual_fielder = manual_fielder
+	ctx.manual_track = manual_track
+	ctx.manual_time = manual_time
+	ctx.manual_at = manual_at
+	ctx.manual_dive = manual_dive
+	ctx.manual_ready = manual_ready

@@ -138,6 +138,7 @@ static func season_to(s: Season) -> Dictionary:
 			"colors": ["#" + t.primary.to_html(false), "#" + t.secondary.to_html(false), "#" + t.accent.to_html(false)],
 			"styles": [t.steal_style, t.bunt_style], "players": ids, "registered": Array(t.registered),
 			"removed_on": t.removed_on.duplicate(), "rotation_index": t.rotation_index,
+			"batting_plan": t.batting_plan.duplicate(true), "rotation_plan": Array(t.rotation_plan),
 		})
 	var schedules: Array = []
 	for sched: Schedule in s.schedules:
@@ -178,7 +179,43 @@ static func season_to(s: Season) -> Dictionary:
 		"usage": usage, "recent": recent, "sitting": s.sitting.duplicate(), "condition": s.condition.duplicate(),
 		"streak": s.streak.duplicate(), "starters": s._starters.duplicate(),
 		"club": club_to(s.club) if s.club != null else {},
+		"farm": _farm_to(s.farm) if s.farm != null else {},
+		"grown": s.grown.duplicate(), "played_today": s.played_today.keys(),
+		"last_winter": _winter_to(s.last_winter) if s.last_winter != null else {},
+		"history": {"pack": s.history.id, "scenario": s.scenario_id} if s.history != null else {},
 	}
+
+
+static func _farm_to(f: FarmLeague) -> Dictionary:
+	var games: Array = []
+	for g: ScheduledGame in f.results:
+		games.append(_game_to(g))
+	return {"games": games, "book": book_to(f.book), "played_day": f.played_day, "played_today": f.played_today.keys()}
+
+
+static func _farm_from(d: Dictionary, s: Season) -> FarmLeague:
+	var f := FarmLeague.new()
+	for g: Array in d.get("games", []):
+		f.results.append(_game_from(g))
+	f.book = book_from(d.get("book", {}))
+	f.played_day = int(d.get("played_day", -1))
+	for id: Variant in d.get("played_today", []):
+		f.played_today[str(id)] = true
+	f.rebuild(s)
+	return f
+
+
+static func _winter_to(w: Development.Winter) -> Dictionary:
+	return {"year": w.year, "retired": w.retired.duplicate(true), "rookies": w.rookies.duplicate(true), "risers": w.risers.duplicate(true)}
+
+
+static func _winter_from(d: Dictionary) -> Development.Winter:
+	var w := Development.Winter.new()
+	w.year = int(d.get("year", 0))
+	w.retired = (d.get("retired", []) as Array).duplicate(true)
+	w.rookies = (d.get("rookies", []) as Array).duplicate(true)
+	w.risers = (d.get("risers", []) as Array).duplicate(true)
+	return w
 
 
 static func season_from(d: Dictionary) -> Season:
@@ -224,6 +261,8 @@ static func season_from(d: Dictionary) -> Season:
 		for id: String in removed:
 			t.removed_on[id] = int(removed[id])
 		t.rotation_index = int(entry.get("rotation_index", 0))
+		t.batting_plan = (entry.get("batting_plan", []) as Array).duplicate(true)
+		t.rotation_plan = PackedStringArray(entry.get("rotation_plan", []) as Array)
 		s.teams[t.id] = t
 	for ids: Array in d.get("divisions", []):
 		s.divisions.append(PackedStringArray(ids))
@@ -278,6 +317,24 @@ static func season_from(d: Dictionary) -> Season:
 	if not club.is_empty():
 		s.club = club_from(club)
 		s.clubs[s.club.team_id] = s.club
+	var farm: Dictionary = d.get("farm", {})
+	if not farm.is_empty():
+		s.farm = _farm_from(farm, s)
+	var grown: Dictionary = d.get("grown", {})
+	for id: String in grown:
+		s.grown[id] = float(grown[id])
+	for id: Variant in d.get("played_today", []):
+		s.played_today[str(id)] = true
+	var winter: Dictionary = d.get("last_winter", {})
+	if not winter.is_empty():
+		s.last_winter = _winter_from(winter)
+	# A save from before players had room to grow.
+	Development.give_rooms(s.teams.values(), s.season_year)
+	var history: Dictionary = d.get("history", {})
+	if not history.is_empty():
+		s.history = SeasonPack.by_id(str(history.get("pack", "")))
+		s.scenario_id = str(history.get("scenario", ""))
+		s.rules = s.history.rule_set() if s.history != null else s.rules
 	return s
 
 

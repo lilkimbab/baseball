@@ -14,6 +14,9 @@ static var auto_changes := true
 static var interventions := 3
 ## Career pitchers face every batter, not just the ones that matter.
 static var pitch_all := false
+## The player moves the fielder the ball is hit to himself (W A S D, Space to dive); off, the
+## fielders field by themselves and the player only chooses the throw.
+static var manual_fielding := false
 ## Screen.
 static var fullscreen := false
 static var resolution := 2
@@ -26,13 +29,26 @@ static var quality := 2
 static var upscale := 1
 ## Frames a second (0 no limit).
 static var fps_limit := 0
-## Sound (no sound yet; kept for when it comes).
+## Sound (docs/11): the whole, and each part of it (GameAudio's buses).
 static var volume := 0.8
+static var music_volume := 0.7
+static var crowd_volume := 0.9
+static var sfx_volume := 0.9
+static var voice_volume := 0.9
+## The umpire's calls and the announcer read aloud by the system's voice, where it has a
+## Korean one.
+static var voices := true
 ## What the match screen shows.
 static var landing_spot := true
 static var hit_info := true
 static var win_chance := true
 static var commentary := true
+## The broadcast's moments between pitches (introduction, inning cards, batter cards, replays).
+static var broadcast := true
+## For the batter: a circle where the pitch will cross the plate, from the moment it is thrown.
+static var pitch_marker := true
+## Slow-motion close-ups of a crushed ball and of a catch in doubt (PlayHighlight).
+static var highlights := true
 static var _loaded := false
 
 
@@ -55,24 +71,35 @@ static func load_file() -> void:
 	auto_changes = bool(s.get("auto_changes", auto_changes))
 	interventions = int(s.get("interventions", interventions))
 	pitch_all = bool(s.get("pitch_all", pitch_all))
+	manual_fielding = bool(s.get("manual_fielding", manual_fielding))
+	highlights = bool(s.get("highlights", highlights))
 	fullscreen = bool(s.get("fullscreen", fullscreen))
 	resolution = clampi(int(s.get("resolution", resolution)), 0, RESOLUTIONS.size() - 1)
 	quality = clampi(int(s.get("quality", quality)), 0, 2)
 	upscale = clampi(int(s.get("upscale", upscale)), 0, 3)
 	fps_limit = int(s.get("fps_limit", fps_limit))
 	volume = float(s.get("volume", volume))
+	music_volume = float(s.get("music_volume", music_volume))
+	crowd_volume = float(s.get("crowd_volume", crowd_volume))
+	sfx_volume = float(s.get("sfx_volume", sfx_volume))
+	voice_volume = float(s.get("voice_volume", voice_volume))
+	voices = bool(s.get("voices", voices))
+	broadcast = bool(s.get("broadcast", broadcast))
 	landing_spot = bool(s.get("landing_spot", landing_spot))
 	hit_info = bool(s.get("hit_info", hit_info))
 	win_chance = bool(s.get("win_chance", win_chance))
 	commentary = bool(s.get("commentary", commentary))
+	pitch_marker = bool(s.get("pitch_marker", pitch_marker))
 
 
 static func save_file() -> Error:
 	var d := {
 		"format": 1, "innings": innings, "pitch_clock": pitch_clock, "auto_changes": auto_changes,
-		"interventions": interventions, "pitch_all": pitch_all, "fullscreen": fullscreen,
+		"interventions": interventions, "pitch_all": pitch_all, "manual_fielding": manual_fielding,
+		"highlights": highlights, "fullscreen": fullscreen,
 		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,
-		"landing_spot": landing_spot, "hit_info": hit_info, "win_chance": win_chance, "commentary": commentary,
+		"music_volume": music_volume, "crowd_volume": crowd_volume, "sfx_volume": sfx_volume, "voice_volume": voice_volume, "voices": voices, "broadcast": broadcast,
+		"landing_spot": landing_spot, "hit_info": hit_info, "win_chance": win_chance, "commentary": commentary, "pitch_marker": pitch_marker,
 	}
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:

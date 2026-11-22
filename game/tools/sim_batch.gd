@@ -10,6 +10,8 @@ extends SceneTree
 ##          the leagues are played at the same time on worker threads
 ##          --physical: every pitch and ball in play simulated (S5), with the pitch-level checks
 ##          --park <id>: (with --physical) the games are played in that ballpark
+##          --weather: (with --physical) each game in a day's weather and wind (docs/08 R3)
+##          --no-warmup: relievers pitch as if always ready (to measure docs/08 R4)
 ##          --dump <file>: save the totals as JSON instead of printing them
 ##          --merge <file,file,...>: add up saved totals and print them
 ## Prints one line per measure: the simulated value, the target, and "!!" when it is outside
@@ -35,6 +37,7 @@ func _initialize() -> void:
 	var ovr := LeagueEnvIO.load_overall()
 	var leagues := maxi(int(str(args.get("leagues", "4"))), 1)
 	var physical := args.has("physical")
+	GameState.warm_ups_matter = not args.has("no-warmup")
 	# --park <id>: physical games in that ballpark (docs/13 S13) instead of the practice park.
 	var park: StadiumDef = StadiumIO.load_park(str(args["park"])) if args.has("park") else null
 	var names := RosterIO.load_names()
@@ -49,7 +52,7 @@ func _initialize() -> void:
 		var teams: Array[Team] = []
 		for i: int in team_count:
 			teams.append(gen.team(i, 50.0))
-		parts[l] = BatchReport.run(teams, games / leagues, RuleSet.kbo_2026(), env, catalog, ovr, Rng.new(seed_value + l).fork(9), physical, park)
+		parts[l] = BatchReport.run(teams, games / leagues, RuleSet.kbo_2026(), env, catalog, ovr, Rng.new(seed_value + l).fork(9), physical, park, args.has("weather"))
 	var group := WorkerThreadPool.add_group_task(play_league, leagues)
 	WorkerThreadPool.wait_for_group_task_completion(group)
 	var report: BatchReport = parts[0]

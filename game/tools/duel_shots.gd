@@ -89,10 +89,8 @@ func _process(delta: float) -> bool:
 	if _scene.human_pitches():
 		if state == DuelScene.State.PRE_PITCH and _scene.state_time > 0.9:
 			_scene.press_pitch_button()
-		elif state == DuelScene.State.CHARGE and _scene.power > 0.9:
+		elif state == DuelScene.State.CHARGE and _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
 			_scene.release_pitch_button()
-		elif state == DuelScene.State.ACCURACY and _scene.ring >= DuelScene.ACCURACY_SWEET - 0.03:
-			_scene.press_pitch_button()
 	if _scene.human_bats() and _swing_allowed and state == DuelScene.State.LIVE and not _swung:
 		if duel.time >= duel.ideal_contact_time - SwingModel.swing_time(SwingAttempt.Kind.POWER):
 			_scene.swing(SwingAttempt.Kind.POWER)
@@ -111,8 +109,12 @@ func _process(delta: float) -> bool:
 			_swung = false
 			_in_play_shot = false
 		_last_state = state
-	if state == DuelScene.State.ACCURACY and _scene.ring > 0.4 and not _has("gauge"):
+	if state == DuelScene.State.CHARGE and _scene.ring > 0.4 and not _has("gauge"):
 		_shoot("gauge")
+	if state == DuelScene.State.CHARGE and _scene.ring > DuelScene.ACCURACY_SWEET - 0.05 and not _has("gauge_on"):
+		_shoot("gauge_on")
+	if state == DuelScene.State.LIVE and _scene.human_bats() and duel.time > 0.12 and not _has("arrival"):
+		_shoot("arrival")
 	if state == DuelScene.State.WINDUP and _scene.state_time > _scene.release_time() * 0.62 and not _has("windup"):
 		_shoot("windup")
 	if state == DuelScene.State.WINDUP and _scene.state_time > _scene.release_time() - 0.05 and not _has("layback"):

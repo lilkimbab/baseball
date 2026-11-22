@@ -96,6 +96,22 @@ func accel(v: Vector3, w: Vector3) -> Vector3:
 ## One RK4 step of free flight. Updates velocity and spin and returns the proposed new
 ## position; the caller commits it (or tests the swept segment for collisions first).
 func integrate(dt: float) -> Vector3:
+	if batted and cfg.wind != Vector3.ZERO:
+		return _integrate_in_wind(dt)
+	return _integrate_still(dt)
+
+
+## In a steady wind the ball moves through the air as it would through still air, and the air
+## itself moves: step its velocity relative to the air, then carry it with the wind.
+func _integrate_in_wind(dt: float) -> Vector3:
+	var wind: Vector3 = cfg.wind
+	vel -= wind
+	var through_air := _integrate_still(dt)
+	vel += wind
+	return through_air + wind * dt
+
+
+func _integrate_still(dt: float) -> Vector3:
 	if NativePhysics.enabled:
 		var out := NativePhysics.integrate(pos, vel, spin, ssw, batted, _batted_cd, dt, cfg.native)
 		vel = out[1]

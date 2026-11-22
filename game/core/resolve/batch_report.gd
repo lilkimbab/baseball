@@ -21,13 +21,18 @@ var extra_innings := 0
 var plate_appearances := 0
 var starter_outs := 0
 var saves := 0
+## Starters' earned runs (the rest are the bullpen's: team ERA split in two), and how many
+## relievers came in less than ready (GameState.entered_warmth under 0.6).
+var starter_er := 0
+var cold_entries := 0
+var relief_entries := 0
 var failures := 0
 ## Pitch-by-pitch counts when the games were played with the physical resolver.
 var tally: PitchTally
 var _rows := PackedStringArray()
 
 
-static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, physical: bool = false, park: StadiumDef = null) -> BatchReport:
+static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], ovr: Overall, rng: Rng, physical: bool = false, park: StadiumDef = null, weather: bool = false) -> BatchReport:
 	var r := BatchReport.new()
 	if physical:
 		r.tally = PitchTally.new()
@@ -39,6 +44,14 @@ static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: League
 			(sim.resolver as PhysicalResolver).tally = r.tally
 			if park != null:
 				(sim.resolver as PhysicalResolver).use_park(park)
+			if weather:
+				# Each game in a day's weather over the season (docs/08 R3): three in four at
+				# night, the rest by day.
+				var where := park if park != null else StadiumDef.standard()
+				var w := Weather.for_game(where, g % 180, &"night" if g % 4 != 0 else &"day", rng.fork(100000 + g))
+				var resolver := sim.resolver as PhysicalResolver
+				resolver.cfg = w.physics(resolver.cfg, where.orientation_deg)
+				resolver.wind_out = w.wind_out(where.orientation_deg)
 		var counter := EventCounter.new()
 		var guard := 0
 		while not sim.state.over and guard < GameSim.MAX_EVENTS:
@@ -72,6 +85,9 @@ func merge(other: BatchReport) -> void:
 	extra_innings += other.extra_innings
 	starter_outs += other.starter_outs
 	saves += other.saves
+	starter_er += other.starter_er
+	cold_entries += other.cold_entries
+	relief_entries += other.relief_entries
 	if other.tally != null:
 		if tally == null:
 			tally = PitchTally.new()
@@ -87,6 +103,11 @@ func _add(sim: GameSim, counter: EventCounter) -> void:
 		errors += book.errors[t]
 		double_plays += book.double_plays[t]
 		starter_outs += book.pitch(sim.state.teams[t].starter_id).outs
+		starter_er += book.pitch(sim.state.teams[t].starter_id).earned_runs
+	for id: String in sim.state.entered_warmth:
+		relief_entries += 1
+		if float(sim.state.entered_warmth[id]) < 0.6:
+			cold_entries += 1
 	runs += sim.state.score[0] + sim.state.score[1]
 	steal_attempts += counter.steal_attempts
 	steals += counter.steals
@@ -138,6 +159,10 @@ func text(env: LeagueEnv) -> String:
 	_rows.append("%-22s %9s" % ["장타율", BattingLine.rate_text(batting.slugging())])
 	_rows.append("%-22s %9s" % ["인플레이 타율", BattingLine.rate_text(batting.babip())])
 	_rows.append("%-22s %9.2f" % ["선발 이닝/경기", starter_outs / team_games / 3.0])
+	var relief_outs := pitching.outs - starter_outs
+	_rows.append("%-22s %9.2f" % ["선발 평균자책점", starter_er * 27.0 / maxf(starter_outs, 1.0)])
+	_rows.append("%-22s %9.2f" % ["구원 평균자책점", (pitching.earned_runs - starter_er) * 27.0 / maxf(relief_outs, 1.0)])
+	_rows.append("%-22s %9.3f" % ["몸 덜 푼 등판 비율", float(cold_entries) / maxi(relief_entries, 1)])
 	_rows.append("%-22s %9.3f" % ["연장 비율", float(extra_innings) / games])
 	_rows.append("%-22s %9.3f" % ["세이브/경기", float(saves) / games])
 	if tally != null:

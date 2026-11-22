@@ -4,19 +4,24 @@ extends Node3D
 ## pitcher, pitches to an AI batter, or watches the two AIs. No fielding or base running yet:
 ## a ball in play is followed until it stops or leaves the park.
 
+## (ACCURACY is no longer entered: the gauge is one hold of the button, CHARGE.)
 enum State { PRE_PITCH, CHARGE, ACCURACY, WINDUP, LIVE, RESULT }
 
 const TICK := 1.0 / 240.0
 const AI_PITCH_DELAY := 1.3
-const CHARGE_TIME := 0.9
-const ACCURACY_TIME := 0.85
-## Fraction of the accuracy sweep at which the ring is exactly on target.
+## The pitch gauge (docs/05 2.2): the button is held while a ring closes on the target's
+## circle and let go when the two meet; that is the pitch. GAUGE_TIME s from the button going
+## down to the ring closing altogether; it is on the circle at ACCURACY_SWEET of the way. Let
+## go early the pitch is short of his full speed and off; late, at full speed and off.
+const GAUGE_TIME := 1.15
 const ACCURACY_SWEET := 0.75
 const MAX_FOLLOW_TIME := 6.5
 ## How far outside the strike zone the pointer can be put: to the side, and above or below.
 const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
 
-const BAT_CAMERA := [Vector3(0.55, -2.7, 0.9), Vector3(-0.2, 18.4, -0.45), 45.0]
+## The batting camera: straight behind the plate, on the middle of the strike zone (which is
+## then in the middle of the screen; `_camera_preset` puts it on this batter's own zone).
+const BAT_CAMERA := [Vector3(0.0, -2.7, 0.95), Vector3(0.0, 0.43, 0.75), 45.0]
 ## Far behind the mound with a long lens, like the reference footage: the whole pitcher stands
 ## left of centre with his back to the camera, and the batter and catcher sit above him, large
 ## enough to aim at. Solved from a reference frame (reference/target-pitchview.png) by fitting
@@ -121,6 +126,7 @@ func _ready() -> void:
 	ball_actor = BallActor.new()
 	add_child(ball_actor)
 	ball_actor.visible = false
+	_build_aim_props()
 
 	camera = Camera3D.new()
 	camera.far = 700.0
@@ -137,6 +143,11 @@ func _ready() -> void:
 	_new_duel()
 	target = duel.zone.center()
 	aim_point = duel.zone.center()
+	# The sound of it (docs/11): no music under a game, the crowd and the ball instead.
+	MenuMusic.stop()
+	sound = MatchSound.new()
+	sound.scene = self
+	add_child(sound)
 
 
 ## The practice field opened from its menu (PracticeScreen): what to practise, against whom,
@@ -224,6 +235,13 @@ func swing_feedback_visible() -> bool:
 	return true
 
 
+## The marks drawn at the plate (the zone, the pitch's speed, the target, the pitch wheel, the
+## bat cursor) belong to the duel's own camera: a full game hides them while a play is shown
+## from another one.
+func plate_marks_visible() -> bool:
+	return true
+
+
 ## The keys for this scene, for the help line.
 func help_keys() -> String:
 	return "F1 타격   F2 투구   F3 관전   Esc 나가기"
@@ -281,10 +299,13 @@ func open_wheel(at: Vector2) -> void:
 	wheel_pick = -1
 
 
-## Closes the wheel and takes the pitch the pointer was toward, if any.
+## Closes the wheel and takes the pitch the pointer was toward, if any. The pointer goes
+## back to where the wheel was opened: choosing a pitch does not move the aim.
 func close_wheel() -> void:
 	if wheel_open and wheel_pick >= 0:
 		selected_pitch = wheel_pick
+	if wheel_open and not pointer_override.is_finite() and DisplayServer.get_name() != "headless":
+		get_viewport().warp_mouse(wheel_centre)
 	wheel_open = false
 	wheel_pick = -1
 
@@ -340,19 +361,25 @@ func swing(kind: SwingAttempt.Kind) -> void:
 		_begin_swing_pose()
 
 
+## The button goes down: the ring starts to close on the target.
 func press_pitch_button() -> void:
 	if state == State.PRE_PITCH:
 		power = 0.0
+		ring = 0.0
 		_enter(State.CHARGE)
-	elif state == State.ACCURACY:
-		accuracy = clampf(1.0 - absf(ring - ACCURACY_SWEET) / (1.0 - ACCURACY_SWEET), 0.0, 1.0)
+
+
+## The button is let go: that is the pitch, as good as the ring was near the circle.
+func release_pitch_button() -> void:
+	if state == State.CHARGE:
+		accuracy = gauge_accuracy(ring)
 		_begin_windup()
 
 
-func release_pitch_button() -> void:
-	if state == State.CHARGE:
-		ring = 0.0
-		_enter(State.ACCURACY)
+## How well a pitch let go with the ring at `at` (0 to 1) is thrown: 1 on the circle, 0 a
+## quarter of the gauge off it.
+static func gauge_accuracy(at: float) -> float:
+	return clampf(1.0 - absf(at - ACCURACY_SWEET) / (1.0 - ACCURACY_SWEET), 0.0, 1.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -377,10 +404,11 @@ func step(delta: float) -> void:
 				decision = _ai_pitch_decision()
 				_begin_windup()
 		State.CHARGE:
-			power = minf(power + delta / CHARGE_TIME, 1.0)
-		State.ACCURACY:
-			ring += delta / ACCURACY_TIME
+			ring += delta / GAUGE_TIME
+			# He reaches his full speed as the ring reaches the circle.
+			power = clampf(ring / ACCURACY_SWEET, 0.0, 1.0)
 			if ring >= 1.0:
+				# Held too long: the pitch goes anyway, anywhere.
 				accuracy = 0.0
 				_begin_windup()
 		State.WINDUP:
@@ -410,12 +438,95 @@ func _process(delta: float) -> void:
 	refresh(delta)
 
 
+## The player's aim shown as the things themselves (docs/05 2.1, 2.2): at bat, a wooden bat
+## lying across the plate where the swing will pass, its sweet spot on the pointer and the
+## ball visible through it; pitching, a ball in the zone where the pitch is aimed. Both are
+## real size, in the plane of the plate's front edge.
+## The game's sound (MatchSound).
+var sound: MatchSound
+var aim_bat: MeshInstance3D
+var aim_ball: MeshInstance3D
+## From the knob to the sweet spot, and from there on to the end of the barrel (m).
+const BAT_KNOB_TO_SWEET := 0.68
+const BAT_TIP_BEYOND := 0.17
+## How solid the aiming bat is.
+const AIM_BAT_ALPHA := 0.78
+## The aiming ball is drawn this many times its size: from the pitching camera, far off in
+## centre field, a ball its real size is a dozen pixels and its stitches cannot be seen.
+const AIM_BALL_SCALE := 1.6
+## The batting camera is this far (m) above the middle of the strike zone.
+const BAT_CAMERA_ABOVE := 0.6
+
+
+func _build_aim_props() -> void:
+	aim_bat = MeshInstance3D.new()
+	aim_bat.mesh = BatWood.mesh()
+	aim_bat.material_override = BatWood.material(AIM_BAT_ALPHA)
+	aim_bat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	aim_bat.visible = false
+	add_child(aim_bat)
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.0366
+	sphere.height = 0.0732
+	sphere.radial_segments = 32
+	sphere.rings = 16
+	var cover := StandardMaterial3D.new()
+	cover.albedo_color = Color(0.97, 0.97, 0.94)
+	cover.roughness = 0.55
+	if ResourceLoader.exists(BallActor.COVER):
+		cover.albedo_color = Color.WHITE
+		cover.albedo_texture = load(BallActor.COVER) as Texture2D
+		# It sits in the catcher's shadow as often as not: lit a little from within, so that
+		# the leather and the stitches read wherever it is put.
+		cover.emission_enabled = true
+		cover.emission_texture = cover.albedo_texture
+		cover.emission_energy_multiplier = 0.35
+	aim_ball = MeshInstance3D.new()
+	aim_ball.mesh = sphere
+	aim_ball.material_override = cover
+	aim_ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	aim_ball.visible = false
+	add_child(aim_ball)
+
+
+## Where the aiming bat lies for an aim at `aim`: its knob and the end of its barrel, in field
+## coordinates. The knob is toward the batter and a little higher, more so for a low pitch.
+func aim_bat_ends(aim: Vector3) -> Array[Vector3]:
+	var handle_side := 1.0 if settings.bats_left else -1.0
+	var drop := clampf((0.95 - aim.z) * 0.55, -0.12, 0.35) + 0.08
+	var tip := aim + Vector3(-handle_side * BAT_TIP_BEYOND, 0.0, -drop * BAT_TIP_BEYOND / BAT_KNOB_TO_SWEET)
+	var knob := aim + Vector3(handle_side * BAT_KNOB_TO_SWEET, 0.0, drop)
+	return [knob, tip]
+
+
+func _show_aim_props() -> void:
+	if aim_bat == null:
+		return
+	var marks := plate_marks_visible() and duel != null
+	var batting := marks and human_bats() and aim_enabled and duel.swing == null \
+		and (state == State.PRE_PITCH or state == State.WINDUP or state == State.LIVE)
+	aim_bat.visible = batting
+	if batting:
+		var ends := aim_bat_ends(aim_point)
+		var knob := Field.to_world(ends[0])
+		var tip := Field.to_world(ends[1])
+		var along := (tip - knob).normalized()
+		# The mesh lies along its y axis, the knob at the bottom.
+		var side := along.cross(Vector3.BACK).normalized()
+		aim_bat.global_transform = Transform3D(Basis(side, along, side.cross(along)), (knob + tip) * 0.5)
+	var pitching := marks and human_pitches() and (state == State.PRE_PITCH or state == State.CHARGE)
+	aim_ball.visible = pitching
+	if pitching:
+		# The stitches toward the camera, a quarter turned.
+		aim_ball.global_transform = Transform3D((Basis(Vector3.UP, 0.6) * Basis(Vector3.RIGHT, 0.5)).scaled(Vector3.ONE * AIM_BALL_SCALE), Field.to_world(target))
+
+
 ## Updates everything that is only for show: poses, ball, camera, HUD.
 func refresh(delta: float) -> void:
 	_frame_time = delta
 	_update_pointer()
 	_update_preview()
-	_record_trail(delta)
+	_show_aim_props()
 	_pose_players()
 	_show_ball()
 	_move_camera(delta)
@@ -442,6 +553,7 @@ func _begin_windup() -> void:
 		decision.type = selected_type()
 		decision.target = target
 		decision.quality = accuracy
+		decision.by_hand = true
 		decision.effort = lerpf(0.93, 1.0, power)
 	_pitch_clock = 0.0
 	_enter(State.WINDUP)
@@ -552,9 +664,8 @@ func _finish_pitch() -> void:
 ## for one that moves.
 var preview := PackedVector3Array()
 var _preview_key := ""
-## The same for the last pitch thrown, recorded as it flew (drawn after it for a moment).
-var trail := PackedVector3Array()
-var _trail_clock := 0.0
+## (Nothing is drawn after the pitch: a tail left hanging behind a ball already caught looked
+## like a fault in the picture.)
 ## Seconds between the points of a tail, and how many of them: the last 0.17 s of flight,
 ## about six metres, which is where a breaking ball does what the batter sees.
 const PATH_STEP := 0.014
@@ -588,26 +699,6 @@ func _update_preview() -> void:
 		return
 	var whole := PitchModel.path(cfg, flight, PATH_STEP)
 	preview = whole.slice(maxi(whole.size() - TAIL_POINTS, 0))
-
-
-## Keeps the end of the pitch's path as it flies, for the tail drawn after it.
-func _record_trail(delta: float) -> void:
-	if duel == null or duel.pitch == null:
-		return
-	if state == State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT:
-		if trail.is_empty() or duel.time < 0.02:
-			trail.clear()
-			_trail_clock = 0.0
-		if duel.decision != null and goes_straight(duel.decision.type):
-			return
-		_trail_clock += delta
-		if _trail_clock >= PATH_STEP and duel.ball.pos.y > Field.PLATE_FRONT_Y - 0.5:
-			_trail_clock = 0.0
-			trail.append(duel.ball.pos)
-			if trail.size() > TAIL_POINTS:
-				trail.remove_at(0)
-	elif state == State.PRE_PITCH or state == State.WINDUP:
-		trail.clear()
 
 
 func _update_pointer() -> void:
@@ -688,7 +779,17 @@ func _show_ball() -> void:
 
 
 func _camera_preset() -> Array:
-	return PITCH_CAMERA if human_pitches() else BAT_CAMERA
+	return PITCH_CAMERA if human_pitches() else bat_camera()
+
+
+## The batting camera for the batter now up: straight behind the plate, a little above the
+## middle of his own strike zone and looking at it, so the zone is the middle of the screen.
+func bat_camera() -> Array:
+	var from: Vector3 = BAT_CAMERA[0]
+	var mid: Vector3 = duel.zone.center() if duel != null else BAT_CAMERA[1]
+	mid.y = Field.PLATE_FRONT_Y
+	# High enough that the pitcher stands above the zone, not behind it.
+	return [Vector3(0.0, from.y, mid.z + BAT_CAMERA_ABOVE), mid, BAT_CAMERA[2]]
 
 
 func _snap_camera() -> void:

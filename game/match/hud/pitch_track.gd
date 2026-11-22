@@ -20,13 +20,14 @@ func _draw() -> void:
 		return
 	begin()
 	var rect := Rect2(Vector2(view.x - SIZE.x - 16.0, view.y - BottomBar.HEIGHT - 26.0 - SIZE.y), SIZE)
-	panel(rect)
-	var title := "%s 코스 분포" % _pitcher_name() if show_spread else "이번 타석 투구"
-	text(rect.position + Vector2(14.0, 28.0), title, 17, UiTheme.GOLD)
-	text(rect.position + Vector2(rect.size.x - 70.0, 28.0), "C 전환", 13, UiTheme.DIM)
+	panel(rect, UiTheme.PANEL, 12.0)
+	var title := "%s 코스" % _pitcher_name() if show_spread else "이번 타석"
+	heading(rect.position + Vector2(16.0, 32.0), title, "", UiTheme.CYAN, 18)
+	keycap(rect.position + Vector2(rect.size.x - 86.0, 32.0), "C", "전환", 14)
+	draw_line(rect.position + Vector2(14.0, 46.0), rect.position + Vector2(rect.size.x - 14.0, 46.0), Color(1, 1, 1, 0.1), 1.0)
 	var zone := scene.duel.zone
 	# The zone takes the middle; a band around it shows pitches off the plate.
-	var area := Rect2(rect.position + Vector2(30.0, 46.0), Vector2(rect.size.x - 60.0, rect.size.y - 96.0))
+	var area := Rect2(rect.position + Vector2(30.0, 54.0), Vector2(rect.size.x - 60.0, rect.size.y - 104.0))
 	var zw := area.size.x * 0.56
 	var zh := area.size.y * 0.56
 	var zrect := Rect2(area.get_center() - Vector2(zw, zh) * 0.5, Vector2(zw, zh))

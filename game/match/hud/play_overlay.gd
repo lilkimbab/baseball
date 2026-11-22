@@ -1,10 +1,12 @@
 class_name PlayOverlay
 extends HudCanvas
 ## What the screen shows while a ball is in play (docs/13 S6-6, S6-7): the bases marked on
-## the field, where a fly ball will come down, the fielder going after it ("자동 이동" while
-## fielding is automatic), an edge that lights up toward a ball off the screen, the runners
-## on a small diamond, and the umpire's call on a close play. When the player's team is in
-## the field, the throw keys and the gauge; at bat, the running keys (S12).
+## the field, where a fly ball will come down, an edge that lights up toward a ball off the
+## screen, the runners on a small diamond, and the umpire's call on a close play. When the
+## player's team is in the field, a ring under the fielder going after the ball (gold while he
+## is the player's own to move), the throw keys and the gauge; at bat, the running keys (S12).
+## The other side's fielding is only watched: nothing is drawn on it. A slow-motion highlight
+## is a clean picture: only the call is drawn over it.
 
 ## Calls closer than this (seconds between ball and runner) are shown.
 const CLOSE := 0.25
@@ -19,6 +21,9 @@ func _draw() -> void:
 	begin()
 	var t := scene._play_time
 	var tl := scene._play.timeline
+	if scene.highlight() != null:
+		_call(t)
+		return
 	_base_markers()
 	_landing_spot(t)
 	_fielder_ring(tl, t)
@@ -55,7 +60,8 @@ func _base_markers() -> void:
 
 ## A ring where a ball in the air will first come down, until it does.
 func _landing_spot(t: float) -> void:
-	if not Settings.landing_spot or not scene.landing_known or t > scene.landing_time:
+	# (Always for a ball the player has to get under himself.)
+	if not (Settings.landing_spot or scene.manual_chasing()) or not scene.landing_known or t > scene.landing_time:
 		return
 	var at := scene.landing_point
 	if not _in_front(at):
@@ -68,22 +74,43 @@ func _landing_spot(t: float) -> void:
 	draw_arc(p, r * 0.45, 0.0, TAU, 24, Color(UiTheme.GOLD, pulse * 0.7), 2.0, true)
 
 
-## The fielder who plays the ball: a ring at his feet and "자동 이동" beside him.
+## The player's fielder who plays the ball: a ring at his feet, gold with a marker over his
+## head while he is the player's own to move.
 func _fielder_ring(tl: PlayTimeline, t: float) -> void:
-	var kind := scene.chasing_fielder()
+	if not scene._controls_fielding():
+		return
+	var own := scene.manual_fielder()
+	var kind := own.kind if own != null else scene.chasing_fielder()
 	if kind == Position.Kind.DH:
 		return
 	var key := "F:%s" % Position.code(kind)
-	if not tl.tracks.has(key):
+	if own == null and not tl.tracks.has(key):
 		return
-	var at := tl.position(key, t)
+	var at := Vector3(own.pos.x, own.pos.y, 0.0) if own != null else tl.position(key, t)
 	if not _in_front(at):
 		return
 	var p := _project(at)
 	var edge := _project(at + Vector3(0.8, 0.0, 0.0))
 	var r := maxf(p.distance_to(edge), 9.0)
-	draw_arc(p, r, 0.0, TAU, 32, UiTheme.BLUE, 3.0, true)
-	text(p + Vector2(r + 6.0, -18.0), "자동 이동", 15, UiTheme.BLUE)
+	if own == null:
+		draw_arc(p, r, 0.0, TAU, 32, UiTheme.BLUE, 3.0, true)
+		return
+	draw_arc(p, r, 0.0, TAU, 32, UiTheme.GOLD, 3.5, true)
+	if scene.manual_chasing():
+		var head := _project(at + Vector3(0.0, 0.0, 2.3))
+		var t_now := scene._play_time
+		if own.glove_up(t_now):
+			# The glove is up: a green ring round the marker while it stays up.
+			draw_arc(head + Vector2(0.0, -30.0), 20.0, 0.0, TAU, 28, UiTheme.GREEN, 4.0, true)
+		if own.catch_soon(t_now, scene.duel.path) and not own.glove_up(t_now):
+			# The ball is about to reach him: the catch key, pulsing, over his head.
+			var pulse := 0.6 + 0.4 * sin(Time.get_ticks_msec() / 70.0)
+			var cap := Rect2(head + Vector2(-20.0, -54.0), Vector2(40.0, 40.0))
+			draw_rect(cap, Color(1.0, 1.0, 1.0, 0.9 * pulse))
+			draw_rect(cap, Color(0.0, 0.0, 0.0, 0.6), false, 2.0)
+			figure(Vector2(cap.position.x, cap.end.y - 9.0), "C", 30, Color(0.05, 0.05, 0.08), HORIZONTAL_ALIGNMENT_CENTER, cap.size.x)
+		else:
+			draw_colored_polygon(PackedVector2Array([head + Vector2(-9.0, -16.0), head + Vector2(9.0, -16.0), head]), UiTheme.GOLD)
 
 
 ## When the ball is off the screen, the edge toward it lights up.
@@ -109,7 +136,7 @@ func _edge_glow(ball: Vector3) -> void:
 
 ## Top left: the diamond with the runners where they are now, numbered by batting order.
 func _mini_diamond(tl: PlayTimeline, t: float) -> void:
-	var box := Rect2(Vector2(16.0, 110.0), Vector2(190.0, 190.0))
+	var box := Rect2(Vector2(Scorebug.AT.x, Scorebug.BOTTOM + 12.0), Vector2(190.0, 190.0))
 	panel(box)
 	var centre := box.get_center() + Vector2(0.0, 48.0)
 	var scale := 2.5
@@ -146,7 +173,14 @@ func _controls() -> void:
 	if not scene.choice_open():
 		return
 	var chosen := scene.choice()
-	var box := Rect2(Vector2(view.x * 0.5 - 300.0, view.y - BottomBar.HEIGHT - 260.0), Vector2(600.0, 122.0))
+	if scene._controls_fielding() and scene.manual_chasing():
+		# Going after the ball himself: one slim line, low, out of the field's way. (The throw
+		# panel sat in the middle of the outfield he had to see.)
+		var line := Rect2(Vector2(view.x * 0.5 - 330.0, view.y - BottomBar.HEIGHT - 52.0), Vector2(660.0, 40.0))
+		panel(line)
+		keycaps(line.position + Vector2(0.0, 26.0), "WASD 야수 이동   C 잡기   Space 다이빙   ←↑→↓ 송구", line.size.x, 16)
+		return
+	var box := Rect2(Vector2(view.x * 0.5 - 300.0, view.y - BottomBar.HEIGHT - 134.0), Vector2(600.0, 122.0))
 	panel(box)
 	if scene._controls_fielding():
 		text(box.position + Vector2(20.0, 34.0), "송구", 20, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)

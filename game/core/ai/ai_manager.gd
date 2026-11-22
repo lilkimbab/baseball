@@ -84,8 +84,17 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionar
 	else:
 		chosen[Position.Kind.P] = team.player(starter_id)
 	t.dh_active = rules.designated_hitter
-	for kind: Position.Kind in _batting_order(chosen):
-		t.lineup.append(LineupSlot.make(chosen[kind].id, kind))
+	var planned := _planned_lineup(team, hitters, rest, rules)
+	if not planned.is_empty():
+		# The manager's own order and positions (a man resting or not with the first team
+		# gives way to the best one free for his place).
+		used.clear()
+		for slot: LineupSlot in planned:
+			t.lineup.append(slot)
+			used[slot.player_id] = true
+	else:
+		for kind: Position.Kind in _batting_order(chosen):
+			t.lineup.append(LineupSlot.make(chosen[kind].id, kind))
 	t.pitcher_id = starter_id
 	for p: Player in squad:
 		if used.has(p.id) or p.id == starter_id:
@@ -96,6 +105,71 @@ func make_lineup(team: Team, rules: RuleSet, starter_id: String, rest: Dictionar
 		else:
 			t.bench.append(p.id)
 	return t
+
+
+## The manager's batting order for today (Team.batting_plan), with anyone not available
+## (resting, not on the first team) replaced at his position by the best man free, or [] when
+## there is no plan, the game has no designated hitter, or the plan does not cover the field.
+func _planned_lineup(team: Team, hitters: Array[Player], rest: Dictionary[String, bool], rules: RuleSet) -> Array[LineupSlot]:
+	var out: Array[LineupSlot] = []
+	if team.batting_plan.size() != 9 or not rules.designated_hitter:
+		return out
+	var needed: Dictionary[Position.Kind, bool] = {Position.Kind.DH: true}
+	for kind: Position.Kind in Position.FIELD:
+		if kind != Position.Kind.P:
+			needed[kind] = true
+	var available: Dictionary[String, Player] = {}
+	for p: Player in hitters:
+		if not rest.has(p.id):
+			available[p.id] = p
+	var kinds: Array[Position.Kind] = []
+	var ids: Array[String] = []
+	var planned: Array[String] = []
+	for entry: Variant in team.batting_plan:
+		var pair: Array = entry
+		var kind := Position.from_code(str(pair[1]))
+		if not needed.has(kind):
+			return []
+		needed.erase(kind)
+		kinds.append(kind)
+		planned.append(str(pair[0]))
+		ids.append(str(pair[0]) if available.has(str(pair[0])) else "")
+	if not needed.is_empty():
+		return []
+	var used: Dictionary[String, bool] = {}
+	for id: String in ids:
+		if id != "":
+			used[id] = true
+	for i: int in 9:
+		if ids[i] != "":
+			continue
+		var best: Player = null
+		var best_value := -INF
+		for id: String in available:
+			var p := available[id]
+			if used.has(id) or (kinds[i] != Position.Kind.DH and p.aptitude(kinds[i]) <= 0.0):
+				continue
+			var v := overall.batter(p, kinds[i])
+			if v > best_value:
+				best_value = v
+				best = p
+		if best == null:
+			# Nobody free can play there: the man planned plays after all, if he is here (a
+			# day of rest is a wish; a catcher with no other catcher free still catches).
+			var here := false
+			for p: Player in hitters:
+				if p.id == planned[i] and not used.has(p.id):
+					here = true
+			if not here:
+				return []
+			ids[i] = planned[i]
+			used[planned[i]] = true
+			continue
+		ids[i] = best.id
+		used[best.id] = true
+	for i: int in 9:
+		out.append(LineupSlot.make(ids[i], kinds[i]))
+	return out
 
 
 ## Batting order: a high on-base hitter leads off, the best contact hitter second, the best
@@ -150,7 +224,11 @@ func _role_value(team: TeamInGame, id: String) -> float:
 
 
 ## The next substitution the managers want before the coming plate appearance, or null.
+## Each computer manager also tells his bullpen who should be throwing (plan_bullpen).
 func next_change(state: GameState) -> GameEvent:
+	for t: int in 2:
+		if t != manual_team:
+			plan_bullpen(state, t)
 	var defence := state.fielding()
 	var fix := _fill_positions(state, defence)
 	if fix != null:
@@ -222,14 +300,79 @@ func _pitching_change(state: GameState, t: int) -> GameEvent:
 	return GameEvent.substitution(t, GameEvent.Change.PITCHER, current, reliever, Position.Kind.P)
 
 
+# --- The bullpen (docs/08 R4) ---
+
+
+## Who team t's bullpen should have throwing now: the man who would come in if the pitcher
+## had to go (and one more in a long inning), once the pitcher is near his limit or in
+## trouble; the closer when a save could be on in the coming innings. Nobody otherwise.
+func plan_bullpen(state: GameState, t: int) -> void:
+	var team := state.teams[t]
+	var current := team.pitcher_id
+	var p := team.player(current)
+	if p == null or p.pitching == null or team.bullpen.is_empty():
+		state.set_warming(t, PackedStringArray())
+		return
+	var pitches: int = state.pitch_counts.get(current, 0)
+	var is_starter := current == team.starter_id
+	var limit := p.pitching.starter_limit() if is_starter else p.pitching.reliever_limit()
+	var runs_in_outing := state.score[1 - t] - int(_entry_runs.get(current, 0))
+	var hook := int(env.value("reliever_runs_hook", 3)) if not is_starter else int(env.value("starter_runs_early_hook", 5))
+	var trouble := runs_in_outing >= hook - 1 or (state.fielding() == t and state.runners_on() >= 2 and runs_in_outing >= hook - 2)
+	# A reliever works an inning or so: the next man starts throwing a few pitches into it.
+	var near := pitches >= limit * WARM_STARTER_AT if is_starter else pitches >= WARM_RELIEVER_AFTER
+	var ids := PackedStringArray()
+	var late := state.inning >= state.rules.innings - 1
+	var lead := state.lead_of(t)
+	if late and lead > 0 and lead <= int(env.value("save_lead", 3)) and _closer[t] != "" and team.bullpen.has(_closer[t]) and current != _closer[t]:
+		ids.append(_closer[t])
+	if near or trouble:
+		var next := _pick_reliever(state, t, false)
+		if next != "" and next != current:
+			ids.append(next)
+		if trouble and pitches >= 20:
+			for id: String in team.bullpen:
+				if ids.size() >= GameState.MAX_WARMING:
+					break
+				if not ids.has(id) and not team.removed.has(id) and id != _closer[t]:
+					ids.append(id)
+	state.set_warming(t, ids)
+
+
+## A starter's bullpen starts throwing at this share of his limit, a reliever's at this.
+const WARM_STARTER_AT := 0.6
+const WARM_RELIEVER_AFTER := 4
+## A reliever this warm is taken before a colder first choice (a save situation keeps the
+## closer).
+const READY := 0.8
+
+
 func _closer_wanted(state: GameState, t: int) -> bool:
 	var lead := state.lead_of(t)
 	return state.inning >= state.rules.innings and lead > 0 and lead <= int(env.value("save_lead", 3))
 
 
 ## Chooses who comes in: the closer for a save, set-up men late in close games, anyone else
-## otherwise (the freshest of the rest).
-func _pick_reliever(state: GameState, t: int) -> String:
+## otherwise (the freshest of the rest). With `prefer_warm`, a man who is ready in the
+## bullpen comes in before a first choice who is not.
+func _pick_reliever(state: GameState, t: int, prefer_warm: bool = true) -> String:
+	var choice := _first_choice(state, t)
+	if not prefer_warm or choice == "" or state.warmth_of(t, choice) >= READY or (_closer_wanted(state, t) and choice == _closer[t]):
+		return choice
+	var team := state.teams[t]
+	var best := choice
+	var warmest := state.warmth_of(t, choice)
+	for id: String in team.bullpen:
+		if team.removed.has(id) or id == team.pitcher_id:
+			continue
+		var w := state.warmth_of(t, id)
+		if w >= READY and w > warmest and not (id == _closer[t] and state.inning < state.rules.innings - 1):
+			best = id
+			warmest = w
+	return best
+
+
+func _first_choice(state: GameState, t: int) -> String:
 	var team := state.teams[t]
 	var lead := state.lead_of(t)
 	var available: Array[String] = []

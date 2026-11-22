@@ -29,7 +29,14 @@ void fragment() {
 	// From the ground up, and from one corner along, so floors sit level and whole.
 	vec2 uv = vec2(mix(local.x + box.x * 0.5, local.z + box.z * 0.5, side), -(local.y + box.y * 0.5)) / tile;
 	vec3 wall = texture(front, uv).rgb * COLOR.rgb * 1.5;
-	vec3 top = vec3(0.34, 0.35, 0.36) * COLOR.rgb;
+	// The roof seen from above: membrane sheets in 5 m runs with darker seams, some stained,
+	// lighter along the parapet.
+	vec2 roof_at = local.xz + box.xz * 0.5;
+	vec2 sheet = floor(roof_at / 5.0);
+	float stain = fract(sin(dot(sheet + floor(box.xz), vec2(12.9898, 78.233))) * 43758.5453);
+	float seam = max(step(0.94, fract(roof_at.x / 5.0)), step(0.94, fract(roof_at.y / 5.0)));
+	float rim = 1.0 - smoothstep(0.0, 1.2, min(min(roof_at.x, box.x - roof_at.x), min(roof_at.y, box.z - roof_at.y)));
+	vec3 top = vec3(0.34, 0.35, 0.36) * COLOR.rgb * (0.88 + 0.2 * stain) * (1.0 - 0.18 * seam) + vec3(0.08) * rim;
 	ALBEDO = mix(wall, top, roof) * mix(1.0, 0.1, dark);
 	ROUGHNESS = mix(0.55, 0.9, roof);
 	SPECULAR = 0.4;

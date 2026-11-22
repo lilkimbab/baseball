@@ -23,6 +23,9 @@ var forms: Dictionary[String, String] = {}
 ## &"" for a local player, &"foreign" for one of the club's foreign players, &"asia" for its
 ## Asia-quota player (docs/13 S7).
 var origin: StringName = &""
+## Room left to grow, in rating points on his main ratings (docs/08 R6, Development): hidden;
+## scouts see it as stars. Below zero: not yet given one (an old pack or save).
+var potential := -1.0
 
 
 func is_pitcher() -> bool:
@@ -109,6 +112,7 @@ func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	p.positions = positions.duplicate()
 	p.forms = forms.duplicate()
 	p.origin = origin
+	p.potential = potential
 	var s := func(v: float, key: String) -> float: return clampf(v * factor + float(deltas.get(key, 0.0)), 1.0, 99.0)
 	var b := BattingRatings.new()
 	b.contact_r = s.call(batting.contact_r, "contact")

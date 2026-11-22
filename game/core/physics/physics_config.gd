@@ -38,6 +38,11 @@ var _fallback_surface := SurfaceParams.new()
 ## The flight constants in the order the native physics takes them (NativePhysics), set by
 ## finalize().
 var native := PackedFloat64Array()
+## The wind over the field (m/s, field coordinates: x toward first base, y toward centre
+## field), the same everywhere and at every height (docs/04: v − v_wind in the air terms).
+## It carries batted balls; a pitch is aimed and thrown as if the air were still (over 18 m
+## the wind moves it a centimetre or two). Weather.physics sets it for a game.
+var wind := Vector3.ZERO
 
 
 ## A separate copy (for a different day's air, say).

@@ -55,8 +55,12 @@ var _lamp: StandardMaterial3D
 var _glass: StandardMaterial3D
 ## The world beyond the stands (null under a dome).
 var backdrop: Backdrop
+## Where the relievers throw (docs/08 R4): per bullpen mound, [side (-1 left field, 1 right
+## field), lane, centre (field x, y), facing (radians: the way he throws, field bearing)].
+var bullpen_spots: Array[Array] = []
 var _flags: ShaderMaterial
 var _flag_spots: Array[Vector3] = []
+var _flag_cloths: MultiMesh
 ## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
 ## the game on it, docs/13 S13-6).
 var scoreboard: SubViewport
@@ -528,6 +532,7 @@ func _build_bullpens() -> void:
 				centre = Vector2(p.x, p.y)
 				facing = deg_to_rad(az) + (PI * 0.5 if side < 0.0 else -PI * 0.5)
 			_build_mound(centre, -facing, dirt)
+			bullpen_spots.append([side, lane, centre, facing])
 			var forward := Vector2(sin(facing), cos(facing))
 			var plate := centre + forward * (Field.MOUND_CENTER_Y - 0.4)
 			_build_plate(plate, -facing + PI)
@@ -778,6 +783,7 @@ func _build_flags() -> void:
 	cloths.use_colors = true
 	cloths.mesh = cloth
 	cloths.instance_count = _flag_spots.size()
+	_flag_cloths = cloths
 	var colours: Array[Color] = [def.seat_color.lightened(0.15), Color(0.86, 0.14, 0.16), Color(0.1, 0.2, 0.5), Color(0.98, 0.78, 0.2), Color(0.1, 0.5, 0.3)]
 	# The wind comes in from left field: every flag flies the same way.
 	var blow := Basis(Vector3.UP, deg_to_rad(-35.0))
@@ -808,6 +814,23 @@ func set_wind(strength: float) -> void:
 		_flags.set_shader_parameter(&"wind", clampf(strength, 0.0, 2.0))
 
 
+## The day's wind on the flags (docs/08 R3): every flag flies the way it blows (field m/s:
+## x toward first base, y toward centre field), harder the stronger it is. The way the flags
+## fly is how the player sees the wind.
+func show_wind(wind: Vector3) -> void:
+	var speed := Vector2(wind.x, wind.y).length()
+	# About 4 m/s stands a flag straight out.
+	set_wind(clampf(speed / 4.0, 0.08, 2.0))
+	if _flag_cloths == null or speed < 0.05:
+		return
+	# The cloth lies along its own +x from the hoist: turn that the way the wind goes
+	# (the world's x is the field's, its z the field's -y).
+	var blow := Basis(Vector3.UP, atan2(wind.y, wind.x))
+	for i: int in _flag_cloths.instance_count:
+		var t := _flag_cloths.get_instance_transform(i)
+		_flag_cloths.set_instance_transform(i, Transform3D(blow, t.origin))
+
+
 # --- Around the park ---
 
 
@@ -836,7 +859,7 @@ func _build_landmark() -> void:
 	mesh.size = Vector3.ONE
 	blocks.mesh = mesh
 	blocks.instance_count = 1
-	blocks.set_instance_transform(0, Transform3D(Basis(Vector3.UP, atan2(along.y, along.x)).scaled(size), Field.to_world(middle + Vector3(0.0, 0.0, size.y * 0.5))))
+	blocks.set_instance_transform(0, Transform3D((Basis(Vector3.UP, atan2(along.y, along.x)) * Basis.from_scale(size)), Field.to_world(middle + Vector3(0.0, 0.0, size.y * 0.5))))
 	blocks.set_instance_color(0, Color(0.78, 0.7, 0.66))
 	blocks.set_instance_custom_data(0, Color(size.x, size.y, size.z, 0.0))
 	var material := ShaderMaterial.new()

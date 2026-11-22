@@ -83,6 +83,7 @@ static func player_from(entry: Dictionary) -> Player:
 	p.height_cm = entry.get("height_cm", 183.0)
 	p.weight_kg = entry.get("weight_kg", 88.0)
 	p.origin = StringName(str(entry.get("origin", "")))
+	p.potential = float(entry.get("potential", -1.0))
 	var positions: Dictionary = entry.get("positions", {})
 	for code: String in positions:
 		p.positions[code] = float(positions[code])
@@ -126,10 +127,13 @@ static func player_from(entry: Dictionary) -> Player:
 	return p
 
 
-## A player as a pack entry. `exact` keeps ratings to two decimals (save games, where growth
-## adds fractions) instead of whole numbers (roster packs).
+## A player as a pack entry. `exact` keeps ratings as they are (save games, where growth adds
+## fractions) instead of whole numbers (roster packs).
 static func player_to(p: Player, exact: bool = false) -> Dictionary:
-	var r := func(value: float) -> Variant: return snappedf(value, 0.01) if exact else _r(value)
+	# A save keeps a rating whole (to the 1e-6): rounded to the hundredth, a season loaded from
+	# a save played differently from the same season played on (a 43.8529 that came back
+	# 43.85 tipped a game three weeks later). A roster pack is written in whole numbers.
+	var r := func(value: float) -> Variant: return snappedf(value, 0.000001) if exact else _r(value)
 	var d := {
 		"id": p.id, "name": p.name, "number": p.number, "born": p.born,
 		"bats": String(p.bats), "throws": String(p.throws),
@@ -144,10 +148,12 @@ static func player_to(p: Player, exact: bool = false) -> Dictionary:
 	}
 	if p.origin != &"":
 		d["origin"] = String(p.origin)
+	if p.potential >= 0.0:
+		d["potential"] = snappedf(p.potential, 0.000001)
 	if p.pitching != null:
 		var arsenal: Array = []
 		for a: ArsenalPitch in p.pitching.arsenal:
-			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.01 if exact else 0.1), "velo_max": snappedf(a.velo_max, 0.01 if exact else 0.1), "movement": r.call(a.movement), "command": r.call(a.command), "usage": snappedf(a.usage, 0.001 if exact else 0.01)})
+			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.000001 if exact else 0.1), "velo_max": snappedf(a.velo_max, 0.000001 if exact else 0.1), "movement": r.call(a.movement), "command": r.call(a.command), "usage": snappedf(a.usage, 0.000001 if exact else 0.01)})
 		d["pitching"] = {"stamina": r.call(p.pitching.stamina), "control": r.call(p.pitching.control), "composure": r.call(p.pitching.composure), "hold": r.call(p.pitching.hold), "fielding": r.call(p.pitching.fielding), "arsenal": arsenal}
 	return d
 

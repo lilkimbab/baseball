@@ -91,11 +91,8 @@ func _script_player(scene: MatchScene, rng: Rng, swung: Array[bool]) -> void:
 					scene.target = duel.zone.point(rng.next_range(-0.1, 1.1), rng.next_range(-0.1, 1.1))
 					scene.press_pitch_button()
 			DuelScene.State.CHARGE:
-				if scene.power > 0.8:
+				if scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
 					scene.release_pitch_button()
-			DuelScene.State.ACCURACY:
-				if scene.ring >= DuelScene.ACCURACY_SWEET - 0.03:
-					scene.press_pitch_button()
 	if scene.human_bats() and scene.state == DuelScene.State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT and not swung[0]:
 		var at := duel.pitch.plate_pos
 		if duel.zone.contains(at.x, at.z) and duel.time >= duel.ideal_contact_time - SwingModel.swing_time(SwingAttempt.Kind.CONTACT):
@@ -370,3 +367,239 @@ func test_the_catcher_stays_put_while_the_pitcher_aims() -> void:
 		scene.pointer_override = scene.camera.unproject_position(Field.to_world(corner))
 		scene.refresh(DT)
 		assert_lt(scene.catcher.position.distance_to(middle), 0.001, "he does not move to the target")
+
+
+# --- The player's own fielding and the slow-motion moments (docs/05 2.3, 3.4) ---
+
+
+func _human(team: int, seed_value: int) -> MatchScene:
+	var scene := MATCH.instantiate() as MatchScene
+	scene.human_team = team
+	scene.innings = 3
+	scene.seed_value = seed_value
+	scene.use_motion = false
+	add_child_autofree(scene)
+	return scene
+
+
+## Runs the player's own fielder at where the ball is going.
+func _chase(scene: MatchScene) -> void:
+	scene.manual_push = Vector2.ZERO
+	if not scene.manual_chasing():
+		return
+	var own := scene.manual_fielder()
+	var t := scene._play_time
+	# The catch key when the prompt shows (C), as a player would.
+	if own.catch_soon(t, scene.duel.path) and not own.glove_up(t):
+		scene.manual_key(KEY_C, true)
+	var going := scene.duel.path.position_at(t + 0.35)
+	if scene.landing_known and t < scene.landing_time:
+		going = scene.landing_point
+	var to := Vector2(going.x, going.y) - own.pos
+	if to.length() > 0.3:
+		scene.manual_push = to.normalized()
+
+
+func test_the_player_fields_the_ball_himself_when_he_chooses_to() -> void:
+	var was := Settings.manual_fielding
+	Settings.manual_fielding = true
+	var scene := _human(1, 21)
+	var rng := Rng.new(3)
+	var swung: Array[bool] = [false]
+	var ticks := 0
+	var plays := 0
+	var fielded := 0
+	var seen: PlayResult = null
+	while not scene.game.over and ticks < 400000:
+		_script_player(scene, rng, swung)
+		_chase(scene)
+		var own := scene.manual_fielder()
+		var had := own != null and own.got
+		scene.step(DT)
+		ticks += 1
+		if scene._play != null and scene._play != seen and scene._play_time >= 0.0 and scene._controls_fielding() and scene.manual_fielder() != null:
+			if scene._play_time < 0.05:
+				plays += 1
+				assert_eq(scene.banner, "", "how it turns out is not told beforehand")
+				assert_true(scene.choice_open())
+			seen = scene._play
+		if own != null and own.got and not had:
+			fielded += 1
+			# The ball is in his glove until the play goes on from there.
+			scene.refresh(DT)
+			var glove := scene.shown_ball(scene._play_time)
+			assert_lt(Vector2(glove.x - own.pos.x, glove.y - own.pos.y).length(), 1.6)
+			var number := Position.scoring_number(own.kind)
+			while scene.manual_fielder() != null and scene._play_time >= 0.0:
+				scene.step(DT)
+			if scene._play != null:
+				assert_eq(scene._play.direction, number, "the play is his")
+				var he := scene._play.timeline.position("F:%s" % Position.code(own.kind), scene._play_time)
+				assert_lt(Vector2(he.x - own.pos.x, he.y - own.pos.y).length(), 1.0, "and he goes on from where he stood")
+	Settings.manual_fielding = was
+	assert_true(scene.game.over, "the game finished in %d ticks" % ticks)
+	assert_gt(plays, 5, "balls the player had to field")
+	assert_gt(fielded, plays / 2, "running at the ball, he gets most of them (%d of %d)" % [fielded, plays])
+	var book := scene.scorer.book
+	for t: int in 2:
+		assert_eq(book.team_batting(t).runs, scene.game.score[t])
+	assert_eq(book.team_pitching(1).outs, scene.game.line[0].size() * 3, "three outs in every top half")
+
+
+func test_a_ball_the_player_leaves_alone_is_backed_up_and_the_game_goes_on() -> void:
+	var was := Settings.manual_fielding
+	Settings.manual_fielding = true
+	var scene := _human(1, 22)
+	var rng := Rng.new(5)
+	var swung: Array[bool] = [false]
+	var ticks := 0
+	var left := 0
+	var was_his := false
+	while not scene.game.over and ticks < 400000:
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+		var his := scene.manual_fielder() != null
+		if his and not was_his:
+			left += 1
+		was_his = his
+	Settings.manual_fielding = was
+	assert_true(scene.game.over, "the game finished in %d ticks" % ticks)
+	assert_gt(left, 5, "balls he stood and watched")
+	for t: int in 2:
+		assert_eq(scene.scorer.book.team_batting(t).runs, scene.game.score[t])
+
+
+func test_fielding_is_automatic_unless_the_player_asks() -> void:
+	var was := Settings.manual_fielding
+	Settings.manual_fielding = false
+	var scene := _human(1, 21)
+	var rng := Rng.new(3)
+	var swung: Array[bool] = [false]
+	var ticks := 0
+	var plays := 0
+	while plays < 6 and ticks < 200000 and not scene.game.over:
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+		if scene._play_time >= 0.0 and scene._play_time < 0.02 and scene._controls_fielding():
+			plays += 1
+			assert_null(scene.manual_fielder())
+			assert_true(scene._highlights.is_empty(), "no slow motion on the player's own fielding")
+	Settings.manual_fielding = was
+	assert_eq(plays, 6)
+
+
+func test_a_highlight_slows_the_play_and_brings_the_camera_close() -> void:
+	var scene := _human(0, 23)
+	var rng := Rng.new(7)
+	var swung: Array[bool] = [false]
+	var ticks := 0
+	# The first ball the player puts in play that takes a while.
+	while ticks < 200000 and not (scene._play_time >= 0.0 and scene._play != null and not scene._play.foul \
+			and scene._controls_running() and scene._play.timeline.duration > 2.5 and scene.chasing_fielder() != Position.Kind.DH):
+		_script_player(scene, rng, swung)
+		scene.step(DT)
+		ticks += 1
+	assert_true(scene._play_time >= 0.0, "a ball in play")
+	if scene._play_time < 0.0:
+		return
+	scene._highlights.clear()
+	scene._freeze = 0.0
+	var key := "F:%s" % Position.code(scene.chasing_fielder())
+	var h := PlayHighlight.new()
+	h.kind = PlayHighlight.Kind.CHANCE
+	h.from = scene._play_time + 0.5
+	h.until = h.from + 0.5
+	h.pace = 0.2
+	h.key = key
+	h.at = scene._play.timeline.position(key, h.until)
+	scene._highlights = [h]
+	scene.refresh(DT)
+	assert_null(scene.highlight(), "not yet")
+	# At its own speed up to the highlight, then a fifth of it.
+	var before := scene._play_time
+	for i: int in 12:
+		scene.step(DT)
+	assert_almost_eq(scene._play_time - before, 12 * DT, 1e-6)
+	while scene._play_time < h.from + 0.1:
+		scene.step(DT)
+	before = scene._play_time
+	for i: int in 12:
+		scene.step(DT)
+	assert_almost_eq(scene._play_time - before, 12 * DT * 0.2, 1e-4, "slow")
+	assert_eq(scene.highlight(), h)
+	scene.refresh(DT)
+	var near := Field.to_field(scene.camera.position)
+	assert_lt(Vector2(near.x - h.at.x, near.y - h.at.y).length(), 11.0, "the camera stands by the fielder")
+	assert_lt(scene.camera.fov, 36.0, "a close lens")
+	assert_almost_eq(scene._frame_time, DT * 0.2, 1e-4, "and everyone moves as slowly")
+	# The picture stands still while a contact is held.
+	scene._freeze = 0.1
+	before = scene._play_time
+	for i: int in 6:
+		scene.step(DT)
+	assert_eq(scene._play_time, before)
+	# Afterwards the play is at its own speed and the camera is back where it was.
+	while scene.highlight() != null and scene._play_time >= 0.0:
+		scene.step(DT)
+	if scene._play_time >= 0.0:
+		before = scene._play_time
+		scene.step(DT)
+		assert_almost_eq(scene._play_time - before, DT, 1e-6)
+		scene.refresh(DT)
+		var back := Field.to_field(scene.camera.position)
+		assert_almost_eq(back.y, -14.0, 0.01, "cut back to the high camera behind the plate")
+		assert_almost_eq(back.z, 16.0, 0.01)
+		assert_almost_eq(scene.camera.fov, 48.0, 0.01)
+
+
+func test_the_game_is_played_in_its_weather() -> void:
+	# docs/08 R3: the air and the wind of the day are the ones the ball flies through, in the
+	# resolver and in the scene alike; the flags fly with the wind; the first line says it.
+	var scene := _start(31)
+	var w := scene.weather
+	assert_not_null(w)
+	var park := scene.stadium if scene.stadium != null else scene.park.def
+	assert_eq(scene.resolver.cfg.wind, w.wind_field(park.orientation_deg))
+	assert_eq(scene.cfg, scene.resolver.cfg, "the scene's physics are the resolver's")
+	assert_almost_eq(scene.resolver.cfg.air_density, Air.density(w.temp_c, 0.0, w.humidity), 1e-6)
+	assert_string_contains(scene.last_text, "날씨")
+	assert_almost_eq(scene.resolver.wind_out, w.wind_out(park.orientation_deg), 1e-6)
+	# Two games on different seeds are not all the same day.
+	var temps := {}
+	for s: int in [32, 33, 34, 35]:
+		var other := _start(s)
+		temps[roundi(other.weather.temp_c * 10.0)] = true
+	assert_gt(temps.size(), 1)
+
+
+func test_outfielders_play_deeper_with_the_wind_blowing_out() -> void:
+	var scene := _start(36)
+	var resolver := scene.resolver
+	var state := scene.game
+	while scene.duel == null:
+		scene.step(DT)
+	var duel := scene.duel
+	var orders: Tactics = resolver.tactics[state.fielding()]
+	var still := resolver.alignment.positions(state, resolver.fence, duel.settings.bats_left, false, orders)
+	resolver.wind_out = 4.0
+	duel.path = BallFlight.run(duel.ball.clone(), resolver.field)
+	var ctx_out := resolver.play_ball(state, duel)
+	var cf_out: Vector2 = resolver.last_context.fielders[Position.Kind.CF].pos
+	assert_gt(cf_out.length(), still[Position.Kind.CF].length() + 3.0, "deeper with the wind out")
+	assert_not_null(ctx_out)
+
+
+func test_the_hud_key_line_splits_into_keys_and_actions() -> void:
+	# docs/08 R5: the HUD shows its keys as caps, as the menus' bottom bar does.
+	var items := HudCanvas.key_items("Space 번트   F 작전·교체   Shift+→ 이닝 넘기기  1·2·4 속도")
+	assert_eq(items.size(), 4)
+	assert_eq(items[0], PackedStringArray(["Space", "번트"]))
+	assert_eq(items[1], PackedStringArray(["F", "작전·교체"]))
+	assert_eq(items[2], PackedStringArray(["Shift+→", "이닝 넘기기"]))
+	assert_eq(items[3], PackedStringArray(["1·2·4", "속도"]))
+	var plate := HudCanvas.plate_shape(Rect2(0.0, 0.0, 100.0, 40.0), 10.0)
+	assert_eq(plate.size(), 6, "two corners cut")
+	assert_eq(plate[0], Vector2(10.0, 0.0))
+	assert_eq(plate[3], Vector2(90.0, 40.0))

@@ -100,7 +100,7 @@ func board_note() -> String:
 
 
 func post_game_hint() -> String:
-	return "Enter · Esc 커리어로 돌아가기"
+	return "Enter 커리어로 돌아가기"
 
 
 ## His scene: he is at bat, or on the mound against a batter that matters.

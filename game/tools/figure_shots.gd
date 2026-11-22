@@ -5,7 +5,7 @@ extends SceneTree
 ##
 ##   ./dev tool-win figure_shots build/figure/now [--build standard] [--team 22] [--away]
 ##       [--headgear cap|helmet|none] [--height 1.83] [--views 0,35,90,180] [--pose standing|stance|ready]
-##       [--player 3] [--bare] [--veins 0..1] [--umpire plate|base] [--zoom head|top|arm|legs]
+##       [--player 3] [--bare] [--veins 0..1] [--umpire plate|base] [--sleeves] [--socks] [--guards] [--zoom head|top|arm|legs]
 ##
 ## --bare hides the cap and lettering details (the body and plain uniform alone).
 
@@ -92,6 +92,14 @@ func _build() -> void:
 		puppet.set_body(height, build)
 		puppet.set_hair(1 + absi(hash(player.id)) % 4, MatchScene.hair_color_of(player))
 		puppet.set_face(player.id)
+		# How he wears it, forced for the picture (otherwise as the player does).
+		if _args.has("sleeves") or _args.has("socks") or _args.has("guards"):
+			puppet.long_sleeves = _args.has("sleeves")
+			puppet.high_socks = _args.has("socks")
+			puppet.guards.clear()
+			if _args.has("guards"):
+				puppet.guards.assign(SkinnedPuppet.BATTER_GUARDS)
+			puppet.repaint()
 		if _args.has("veins"):
 			(puppet.find_child("Body", true, false) as MeshInstance3D).set_instance_shader_parameter(&"veins", float(str(_args["veins"])))
 		if not _args.has("bare"):

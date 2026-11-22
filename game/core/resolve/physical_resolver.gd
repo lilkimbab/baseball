@@ -35,6 +35,13 @@ var tactics: Array[Tactics] = [Tactics.new(), Tactics.new()]
 ## The last pitch and play, for the scene and the checks.
 var last_duel: PitchDuel
 var last_play: PlayResult
+## What the last ball in play was worked out from (the fielders where they stood).
+var last_context: PlayContext
+## How hard the wind blows out toward centre field (m/s; negative in), Weather.wind_out:
+## the outfielders play that much deeper (WIND_DEPTH m per m/s).
+var wind_out := 0.0
+const WIND_DEPTH := 1.3
+const WIND_DEPTH_MAX := 6.0
 ## Pitch-by-pitch counts for the calibration report (null: not kept).
 var tally: PitchTally
 ## The random state as the last ball in play began, and whether it was a bunt: replay_ball
@@ -417,6 +424,9 @@ func new_duel(state: GameState) -> PitchDuel:
 ## A tired pitcher also loses a little speed (about 2.5 km/h at the end of his limit).
 func tire(state: GameState, decision: PitchDecision) -> PitchDecision:
 	decision.effort *= 1.0 - 0.017 * _tiredness(state)
+	# Not yet warm: wilder (PitchDuel.COLD_SCATTER), and a little slower.
+	decision.cold = state.cold(state.pitcher_id())
+	decision.effort *= 1.0 - 0.02 * decision.cold
 	return decision
 
 
@@ -425,7 +435,8 @@ func _tiredness(state: GameState) -> float:
 	var pitcher := team.player(state.pitcher_id())
 	if pitcher == null or pitcher.pitching == null:
 		return 0.0
-	return StatResolver.fatigue(state, team, pitcher)
+	# (A cold reliever's wildness is in the pitch itself, PitchDecision.cold: not counted twice.)
+	return StatResolver.fatigue(state, team, pitcher, false)
 
 
 # --- After the pitch ---
@@ -507,6 +518,13 @@ func replay_ball(state: GameState, duel: PitchDuel, choice: PlayChoice) -> Array
 func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false, choice: PlayChoice = null) -> PlayResult:
 	var orders := tactics[state.fielding()]
 	var positions := alignment.positions(state, fence, duel.settings.bats_left, bunt, orders)
+	if wind_out != 0.0:
+		var deeper := clampf(wind_out * WIND_DEPTH, -WIND_DEPTH_MAX, WIND_DEPTH_MAX)
+		for kind: Position.Kind in Position.OUTFIELD:
+			if positions.has(kind):
+				var at: Vector2 = positions[kind]
+				var room := fence.distance_at(rad_to_deg(atan2(at.x, at.y))) - 8.0 if fence != null else INF
+				positions[kind] = at.normalized() * minf(at.length() + deeper, maxf(room, at.length()))
 	var ctx := PlayContext.from_state(state, duel.path, field, positions, motion, bunt)
 	if orders.defence != Tactics.Defence.AUTO:
 		ctx.infield_in = orders.defence == Tactics.Defence.INFIELD_IN and not state.base_empty(3)
@@ -516,6 +534,7 @@ func play_ball(state: GameState, duel: PitchDuel, bunt: bool = false, choice: Pl
 	ctx.stealing = human_steal
 	if choice != null:
 		choice.apply(ctx)
+	last_context = ctx
 	return PlaySim.run(ctx, rng)
 
 

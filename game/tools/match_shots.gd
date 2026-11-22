@@ -12,6 +12,9 @@ extends SceneTree
 ##          throw and slide in the plays (docs/13 S12)  --running: the same for steals and
 ##          pickoffs only, fast-forwarding to them  --fielding: the player's team in the
 ##          field (pitches scripted), the throw gauge held during a ball in play
+##          --manual: the player's own fielder run at the ball (docs/05 2.3)  --highlight:
+##          the player at bat (swings scripted), the slow-motion moments photographed; with
+##          --force every fly and every first catch is made one, to see the cameras
 
 var _scene: MatchScene
 var _prefix := "user://match"
@@ -27,9 +30,17 @@ var _manager := false
 var _moves := false
 var _running_only := false
 var _fielding := false
+var _manual := false
+var _highlight := false
+var _bullpen := false
+var _force := false
+var _swung := false
+var _play_seen: PlayResult
 var _rng := Rng.new(5)
 var _close: Camera3D
 var _shot_moves := {}
+var _broadcast := false
+var _segment_seen: Broadcast.Segment
 
 
 func _initialize() -> void:
@@ -50,7 +61,26 @@ func _initialize() -> void:
 		_close.fov = 38.0
 		root.add_child.call_deferred(_close)
 	_fielding = args.has("fielding")
-	_scene.human_team = 1 if _menus or _fielding else -1
+	_manual = args.has("manual")
+	_highlight = args.has("highlight")
+	_bullpen = args.has("bullpen")
+	if _bullpen:
+		Engine.time_scale = 1.0
+		_close = Camera3D.new()
+		_close.fov = 40.0
+		root.add_child.call_deferred(_close)
+	_force = args.has("force")
+	if _manual or _highlight:
+		Engine.time_scale = 1.0
+	Settings.manual_fielding = _manual
+	# --broadcast: the broadcast's moments (introduction, inning cards, batter cards, a pitching
+	# change, a replay); the other shots are taken without them.
+	_broadcast = args.has("broadcast")
+	Settings.ensure_loaded()
+	Settings.broadcast = _broadcast
+	if _broadcast:
+		Engine.time_scale = 1.0
+	_scene.human_team = 0 if _highlight else (1 if _menus or _fielding or _manual else -1)
 	_scene.innings = 3
 	_scene.seed_value = int(str(args.get("seed", "20261121")))
 	root.add_child(_scene)
@@ -61,13 +91,21 @@ func _process(_delta: float) -> bool:
 	for name: String in _due:
 		root.get_texture().get_image().save_png("%s_%s.png" % [_prefix, name])
 	_due.clear()
-	if _frames > (200000 if _to_end or _running_only else 20000):
+	if _frames > (200000 if _to_end or _running_only or _highlight else 20000):
 		print("match_shots: gave up after %d frames" % _frames)
 		return true
+	if _broadcast:
+		return _broadcast_shots()
 	if _menus:
 		return _menu_shots()
 	if _fielding:
 		return _fielding_shots()
+	if _manual:
+		return _manual_shots()
+	if _bullpen:
+		return _bullpen_shots()
+	if _highlight:
+		return _highlight_shots()
 	if _manager:
 		return _manager_shots()
 	if _to_end:
@@ -172,11 +210,8 @@ func _fielding_shots() -> bool:
 					_scene.target = _scene.duel.zone.point(_rng.next_range(-0.1, 1.1), _rng.next_range(-0.1, 1.1))
 					_scene.press_pitch_button()
 			DuelScene.State.CHARGE:
-				if _scene.power > 0.8:
+				if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
 					_scene.release_pitch_button()
-			DuelScene.State.ACCURACY:
-				if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.03:
-					_scene.press_pitch_button()
 	if _scene.choice_open() and _scene._controls_fielding():
 		if _scene.charge() < 0.0 and not _taken.has("gauge"):
 			_scene.choice_key(KEY_RIGHT, true)
@@ -194,7 +229,192 @@ func _fielding_shots() -> bool:
 	return _taken.has("after") and _due.is_empty()
 
 
+## --bullpen: two men warming on each side, photographed from beside each bullpen's mound.
+func _bullpen_shots() -> bool:
+	var g := _scene.game
+	if _frames == 30:
+		for t: int in 2:
+			var team := g.teams[t]
+			g.set_warming(t, PackedStringArray(team.bullpen.slice(0, 2)))
+	for side: int in [1, -1]:
+		var tag := "bullpen_%s" % ("right" if side == 1 else "left")
+		var at := 90 if side == 1 else 150
+		if _frames == at - 20:
+			for spot: Array in _scene.park.bullpen_spots:
+				if float(spot[0]) == float(side) and int(spot[1]) == 0:
+					var centre: Vector2 = spot[2]
+					var facing: float = spot[3]
+					var forward := Vector2(sin(facing), cos(facing))
+					var beside := Vector2(forward.y, -forward.x) * 7.0 * side
+					var eye := Field.to_world(Vector3(centre.x + beside.x + forward.x * 4.0, centre.y + beside.y + forward.y * 4.0, 2.4))
+					_close.look_at_from_position(eye, Field.to_world(Vector3(centre.x + forward.x * 1.5, centre.y + forward.y * 1.5, 1.2)))
+					_close.make_current()
+		if _frames == at:
+			_shoot(tag)
+	return _frames > 160 and _due.is_empty()
+
+
+func _pitch_for_the_player() -> void:
+	if not _scene.human_pitches():
+		return
+	match _scene.state:
+		DuelScene.State.PRE_PITCH:
+			if _scene.state_time > 0.3:
+				_scene.target = _scene.duel.zone.point(_rng.next_range(0.1, 0.9), _rng.next_range(0.1, 0.9))
+				_scene.press_pitch_button()
+		DuelScene.State.CHARGE:
+			if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
+				_scene.release_pitch_button()
+
+
+## The player's own fielder run at where the ball is going: photographed on the way, with the
+## ball in his glove, and when the throw is on its way.
+func _manual_shots() -> bool:
+	_pitch_for_the_player()
+	var playing := _scene._play_time >= 0.0 and _scene._play != null
+	Engine.time_scale = 1.0 if playing else 6.0
+	_scene.manual_push = Vector2.ZERO
+	var own := _scene.manual_fielder()
+	if own != null:
+		var t := _scene._play_time
+		if _scene.manual_chasing():
+			# The catch key when the prompt shows, as a player would.
+			if own.catch_soon(t, _scene.duel.path) and not own.glove_up(t):
+				if not _taken.has("%d_prompt" % _seen):
+					_shoot("%d_prompt" % _seen)
+				own.press_catch(t + 0.1)
+			var going := _scene.duel.path.position_at(t + 0.35)
+			if _scene.landing_known and t < _scene.landing_time:
+				going = _scene.landing_point
+			var to := Vector2(going.x, going.y) - own.pos
+			if to.length() > 0.3:
+				_scene.manual_push = to.normalized()
+		for at: float in [0.5, 1.2, 2.2]:
+			var tag := "%d_chase_%.1f" % [_seen, at]
+			if t >= at and not own.got and not _taken.has(tag):
+				_shoot(tag)
+		if own.got and not _taken.has("%d_got" % _seen):
+			_shoot("%d_got" % _seen)
+	elif playing and _taken.has("%d_got" % _seen) and not _taken.has("%d_thrown" % _seen):
+		for m: PlayMoves.Moment in _scene._moves.by_key.values().reduce(func(acc: Array, a: Array) -> Array: return acc + a, []):
+			if m.kind == PlayMoves.Kind.THROW and _scene._play_time > m.time + 0.25:
+				_shoot("%d_thrown" % _seen)
+				break
+	if _was_playing and not playing:
+		_seen += 1
+	_was_playing = playing
+	return _seen >= _plays and _due.is_empty()
+
+
+## The player at bat: every slow-motion moment photographed as it starts, in its middle and
+## as it ends.
+func _highlight_shots() -> bool:
+	_pitch_for_the_player()
+	# The bat aimed where the pitch arrives (the real pointer is wherever the mouse is).
+	if _scene.human_bats() and _scene.state == DuelScene.State.LIVE and _scene.duel.pitch != null:
+		_scene.pointer_override = _scene.camera.unproject_position(Field.to_world(_scene.duel.pitch.plate_pos))
+	if _scene.human_bats() and _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _swung:
+		var at := _scene.duel.pitch.plate_pos
+		if _scene.duel.zone.contains(at.x, at.z) and _scene.duel.time >= _scene.duel.ideal_contact_time - SwingModel.swing_time(SwingAttempt.Kind.POWER):
+			_scene.swing(SwingAttempt.Kind.POWER)
+			_swung = true
+	if _scene.state != DuelScene.State.LIVE:
+		_swung = false
+	var playing := _scene._play_time >= 0.0 and _scene._play != null and not _scene._play.foul
+	if playing and _scene._play != _play_seen:
+		_play_seen = _scene._play
+		if _force and _scene._highlights.is_empty() and _scene._controls_running():
+			_force_highlights()
+	var h := _scene.highlight()
+	# (At its own speed while a pitch is on its way, so that a play is seen from its first
+	# tick: the highlights are forced before anything of it is shown.)
+	Engine.time_scale = 1.0 if h != null or _scene.state == DuelScene.State.LIVE else 6.0
+	if h != null:
+		var kind: String = PlayHighlight.Kind.keys()[h.kind]
+		var t := _scene._play_time
+		var marks := {"a": h.from - 0.02, "b": lerpf(h.from, h.until, 0.45), "c": h.until - 0.02, "d": h.until + 0.12}
+		if h.kind == PlayHighlight.Kind.CONTACT:
+			marks = {"a": 0.0, "b": 0.03, "c": 0.09, "d": h.until}
+		for mark: String in marks:
+			var tag := "%d_%s_%s" % [_seen, kind, mark]
+			if t >= float(marks[mark]) and not _taken.has(tag):
+				_shoot(tag)
+				print("match_shots: %s at %.2f pace %.2f  eye %s target %s batter %s ball %s" % [tag, t, _scene._pace, Field.to_field(_scene.camera.global_position), _scene._follow_target, Field.to_field(_scene.batter.global_position), _scene.shown_ball(t)])
+				break
+	if _was_playing and not playing:
+		if not _taken.keys().filter(func(k: String) -> bool: return k.begins_with("%d_" % _seen)).is_empty():
+			_seen += 1
+	_was_playing = playing
+	return _seen >= _plays and _due.is_empty()
+
+
+func _force_highlights() -> void:
+	var play := _scene._play
+	var found: Array[PlayHighlight] = []
+	if _scene.duel.contact != null and _scene.duel.contact.launch_deg() > 15.0:
+		var c := PlayHighlight.new()
+		c.kind = PlayHighlight.Kind.CONTACT
+		c.until = PlayHighlight.CONTACT_SPAN
+		c.pace = PlayHighlight.CONTACT_PACE
+		c.freeze = PlayHighlight.CONTACT_FREEZE
+		found.append(c)
+		_scene._freeze = c.freeze
+	var kind := _scene.chasing_fielder()
+	var key := "F:%s" % Position.code(kind)
+	var when := play.hard_time if play.has_hard_chance() else -1.0
+	var where := play.hard_at
+	if play.has_hard_chance():
+		key = "F:%s" % Position.code(play.hard_fielder)
+	else:
+		for m: PlayMoves.Moment in _scene._moves.by_key.get(key, []):
+			if m.kind == PlayMoves.Kind.CATCH and when < 0.0:
+				when = m.time
+				where = m.at
+	if when > 1.0:
+		var h := PlayHighlight.new()
+		h.kind = PlayHighlight.Kind.CHANCE
+		h.from = when - PlayHighlight.CHANCE_BEFORE
+		h.until = when + PlayHighlight.CHANCE_AFTER
+		h.pace = PlayHighlight.CHANCE_PACE
+		h.at = where
+		h.key = key
+		found.append(h)
+	_scene._highlights = found
+
+
 func _shoot(tag: String) -> void:
 	_taken[tag] = true
 	_due.append(tag)
 	print("match_shots: %s  %s  %s" % [tag, _scene.banner, _scene.last_text])
+
+
+## Each kind of broadcast moment once, a moment into it; the game hurried between them.
+func _broadcast_shots() -> bool:
+	var b := _scene.broadcast
+	var c := b.current
+	if c != null:
+		Engine.time_scale = 1.0
+		var names := {Broadcast.Kind.PREGAME: "pregame", Broadcast.Kind.HALF: "half", Broadcast.Kind.BATTER: "batter", Broadcast.Kind.PITCHER_CHANGE: "pitcher", Broadcast.Kind.REPLAY: "replay", Broadcast.Kind.GAME_END: "end"}
+		var name: String = names[c.kind]
+		if c.kind == Broadcast.Kind.PREGAME:
+			for at: float in [2.5, 6.2, 9.4]:
+				var tag := "pregame_%.0f" % at
+				if b.time >= at and not _taken.has(tag):
+					_shoot(tag)
+		elif c.kind == Broadcast.Kind.REPLAY:
+			var tag := "replay_%s" % str(c.data.get("kind", "home_run"))
+			if b.time >= 1.6 and not _taken.has(tag):
+				_shoot(tag)
+		elif b.time >= minf(1.2, c.duration * 0.5) and not _taken.has(name):
+			_shoot(name)
+	else:
+		Engine.time_scale = 6.0
+	var done := 0
+	for n: String in ["pregame_9", "half", "batter", "replay_home_run", "end"]:
+		if _taken.has(n):
+			done += 1
+	if _scene.game.over and _scene.broadcast.current == null and _taken.has("end"):
+		if not _taken.has("postgame"):
+			_shoot("postgame")
+		return _due.is_empty()
+	return false

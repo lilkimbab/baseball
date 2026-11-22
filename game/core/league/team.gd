@@ -15,6 +15,11 @@ var steal_style := 1.0
 var bunt_style := 1.0
 ## Next starter in the rotation.
 var rotation_index := 0
+## The manager's own choices (docs/08 R5), empty for the computer's: the batting order as
+## [player id, position code] from the lead-off man down (with a designated hitter), and the
+## starters in the order they take their turns.
+var batting_plan: Array = []
+var rotation_plan := PackedStringArray()
 ## Ids of the players on the first team (1군 엔트리); the rest are in the second team (2군).
 ## Empty means everyone is registered (a pack without a second team).
 var registered := PackedStringArray()
@@ -32,13 +37,24 @@ func player(player_id: String) -> Player:
 	return null
 
 
-## Starting pitchers on the first team, in rotation order.
+## Starting pitchers on the first team, in rotation order: the manager's order where he has
+## set one (those he left out follow in the usual order).
 func rotation() -> Array[Player]:
 	var out: Array[Player] = []
 	for p: Player in players:
 		if p.role() == &"SP" and is_registered(p.id):
 			out.append(p)
-	return out
+	if rotation_plan.is_empty():
+		return out
+	var planned: Array[Player] = []
+	for id: String in rotation_plan:
+		for p: Player in out:
+			if p.id == id:
+				planned.append(p)
+	for p: Player in out:
+		if not planned.has(p):
+			planned.append(p)
+	return planned
 
 
 func is_registered(player_id: String) -> bool:

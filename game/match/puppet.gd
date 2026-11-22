@@ -101,6 +101,22 @@ func apply(pose: PuppetPose) -> void:
 	_show(pose.bat_dir)
 
 
+## Eases the next poses in from the one shown now over `seconds` (the player model; the
+## mannequin changes at once).
+func ease_from_shown(_seconds: float) -> void:
+	pass
+
+
+## Moves an easing begun by ease_from_shown on by a frame.
+func ease_step(_dt: float) -> void:
+	pass
+
+
+## How high the hips are as shown (m, in the puppet's space).
+func shown_hips_height() -> float:
+	return (joints.get(&"Hips", Vector3.ZERO) as Vector3).y
+
+
 ## Poses the figure from recorded joint positions (a JointClip frame, in the puppet's space).
 ## hands_offset moves both hands, for a swing that has to reach a pitch off the recorded path.
 ## The mannequin shows the recorded joints as they are; the player model fits them to itself.

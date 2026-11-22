@@ -30,6 +30,17 @@ var throw_wild := 1.0
 ## The base a runner is stealing from on this pitch (the player's steal): he broke with the
 ## pitcher's first move. 0 for none.
 var stealing := 0
+## The player's own fielding (docs/05 2.3): the fielder he moves himself, where that has taken
+## him ((time, x, y) samples), and when and where he got the ball. With `manual_time` below
+## zero he has not got it: the play is worked out as if he never does (the others back him
+## up). `manual_dive`: he got it diving. `manual_ready`: the earliest he can let a throw go
+## (he was still choosing where). Position.Kind.DH for none: everyone fields by himself.
+var manual_fielder: Position.Kind = Position.Kind.DH
+var manual_track := PackedVector3Array()
+var manual_time := -1.0
+var manual_at := Vector3.ZERO
+var manual_dive := false
+var manual_ready := 0.0
 
 
 ## A context for the batter now up in `state`, with the fielders at `positions`.

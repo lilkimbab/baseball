@@ -240,6 +240,11 @@ func zone_state(zone: int) -> int:
 	return int(_states[zone])
 
 
+## The cheering's beat clock (beats so far): the sound's drums keep to it (CheerSequencer).
+func beat() -> float:
+	return _beat
+
+
 ## Moves the cheering on by `delta` seconds.
 func tick(delta: float) -> void:
 	_beat += delta * BEATS_PER_SECOND

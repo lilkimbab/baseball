@@ -144,6 +144,34 @@ func _photographed_sky(env: Environment, sky: Sky) -> void:
 	env.ambient_light_sky_contribution = 0.75
 
 
+## The cloud over the park (Weather.Cover: 0 clear, 1 some cloud, 2 overcast): less sun and
+## softer shadows, more of the grey sky's even light, a duller, hazier picture. A dome is
+## always the same.
+func set_cover(cover: int) -> void:
+	if indoor() or cover <= 0:
+		return
+	var thick := 0.35 if cover == 1 else 1.0
+	if sun != null:
+		sun.light_energy *= lerpf(1.0, 0.38, thick)
+		sun.shadow_opacity = lerpf(1.0, 0.45, thick)
+		sun.shadow_blur = lerpf(sun.shadow_blur, 2.2, thick)
+	if bounce != null:
+		bounce.light_energy *= lerpf(1.0, 0.6, thick)
+	environment.ambient_light_energy *= lerpf(1.0, 1.25, thick)
+	environment.ambient_light_color = environment.ambient_light_color.lerp(Color(0.6, 0.62, 0.66), thick * 0.6)
+	environment.fog_density *= lerpf(1.0, 2.2, thick)
+	environment.fog_light_color = environment.fog_light_color.lerp(Color(0.66, 0.68, 0.71), thick)
+	environment.adjustment_saturation *= lerpf(1.0, 0.85, thick)
+	if environment.sky != null:
+		var panorama := environment.sky.sky_material as PanoramaSkyMaterial
+		if panorama != null:
+			panorama.energy_multiplier *= lerpf(1.0, 0.75, thick)
+		var procedural := environment.sky.sky_material as ProceduralSkyMaterial
+		if procedural != null:
+			procedural.sky_top_color = procedural.sky_top_color.lerp(Color(0.55, 0.58, 0.62), thick)
+			procedural.sky_horizon_color = procedural.sky_horizon_color.lerp(Color(0.68, 0.7, 0.72), thick)
+
+
 func _sun_colour() -> Color:
 	return Color(1.0, 0.94, 0.84) if time == &"day" else Color(1.0, 0.72, 0.5)
 

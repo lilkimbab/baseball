@@ -161,12 +161,19 @@ func _fatigue(state: GameState, team: TeamInGame, pitcher: Player) -> float:
 	return fatigue(state, team, pitcher)
 
 
-## 0 while fresh, 1 at the end of his limit, more beyond it.
-static func fatigue(state: GameState, team: TeamInGame, pitcher: Player) -> float:
+## 0 while fresh, 1 at the end of his limit, more beyond it. A reliever who came in before he
+## was ready pitches his first few batters as if tired (GameState.cold, COLD_FATIGUE).
+static func fatigue(state: GameState, team: TeamInGame, pitcher: Player, with_cold: bool = true) -> float:
 	var pitches: int = state.pitch_counts.get(pitcher.id, 0)
 	var limit := pitcher.pitching.starter_limit() if pitcher.id == team.starter_id else pitcher.pitching.reliever_limit()
 	var fresh := limit * 0.7
-	return clampf((pitches - fresh) / (limit - fresh), 0.0, 1.5)
+	var tired := clampf((pitches - fresh) / (limit - fresh), 0.0, 1.5)
+	return minf(tired + (COLD_FATIGUE * state.cold(pitcher.id) if with_cold else 0.0), 1.5)
+
+
+## How tired a cold reliever's first pitches are (in the units of fatigue: 1 is a pitcher at
+## the end of his limit).
+const COLD_FATIGUE := 1.1
 
 
 ## Average fielding of the eight fielders behind the pitcher, at their positions.

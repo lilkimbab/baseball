@@ -124,7 +124,7 @@ func own_team() -> int:
 
 func post_game_hint() -> String:
 	if league_game != null:
-		return "Enter · Esc 리그로 돌아가기"
+		return "Enter 리그로 돌아가기"
 	return super.post_game_hint()
 
 

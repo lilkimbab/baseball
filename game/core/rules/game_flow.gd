@@ -39,6 +39,7 @@ static func apply(state: GameState, event: GameEvent) -> FlowOutcome:
 static func _pitch(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 	var pitcher := state.pitcher_id()
 	state.pitch_counts[pitcher] = int(state.pitch_counts.get(pitcher, 0)) + 1
+	state.warm_up(1)
 	match event.call:
 		GameEvent.Call.BALL:
 			state.balls += 1
@@ -66,6 +67,7 @@ static func _substitute(state: GameState, event: GameEvent) -> void:
 			if mid_count and state.count_pitcher_id == "" and event.team == state.fielding():
 				state.count_pitcher_id = event.out_id
 				state.count_at_relief = Vector2i(state.balls, state.strikes)
+			state.enters(event.team, event.in_id)
 			team.change_pitcher(event.in_id)
 		GameEvent.Change.PINCH_HITTER:
 			if state.strikes == 2 and state.count_batter_id == "" and event.out_id == state.batter_id():
@@ -184,6 +186,7 @@ static func _play(state: GameState, event: GameEvent, out: FlowOutcome) -> void:
 		state.order[state.batting()] = (state.order[state.batting()] + 1) % state.batting_team().lineup.size()
 		state.batters_faced[pitcher] = int(state.batters_faced.get(pitcher, 0)) + 1
 		state.pitch_counts[pitcher] = int(state.pitch_counts.get(pitcher, 0)) + event.pitches
+		state.warm_up(event.pitches)
 
 	if _walk_off_now(state):
 		out.walk_off = true

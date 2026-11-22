@@ -50,11 +50,119 @@ func shout(at: Vector2, line: String, font_size: int, color: Color, align: Horiz
 	draw_string(f, at, line, align, width, font_size, color)
 
 
-func panel(rect: Rect2, color: Color = UiTheme.PANEL) -> void:
-	draw_rect(rect, color)
+## A plate of the menus (docs/05 section 5) drawn with plain draw calls (no shader, so a dozen
+## on screen cost nothing): graphite, lighter at the top, the top-left and bottom-right
+## corners cut on the slant, a hairline edge with a light line along the top, a soft shadow.
+func panel(rect: Rect2, color: Color = UiTheme.PANEL, cut: float = 10.0) -> void:
+	var shape := plate_shape(rect, cut)
+	var shadow := PackedVector2Array()
+	for p: Vector2 in shape:
+		shadow.append(p + Vector2(0.0, 5.0))
+	draw_colored_polygon(shadow, Color(0.0, 0.0, 0.0, 0.3 * color.a))
+	var top := Color(color.lightened(0.07), color.a)
+	var foot := Color(color.darkened(0.3), minf(color.a + 0.04, 1.0))
+	var shades := PackedColorArray()
+	for p: Vector2 in shape:
+		shades.append(top.lerp(foot, (p.y - rect.position.y) / maxf(rect.size.y, 1.0)))
+	draw_polygon(shape, shades)
+	var edge := shape.duplicate()
+	edge.append(shape[0])
+	draw_polyline(edge, Color(1.0, 1.0, 1.0, 0.12 * color.a), 1.2, true)
+	draw_line(shape[0] + Vector2(0.0, 1.5), Vector2(rect.end.x - 1.0, rect.position.y + 1.5), Color(1.0, 1.0, 1.0, 0.08 * color.a), 1.0)
+
+
+## The outline of a plate: a rectangle with its top-left and bottom-right corners cut off.
+static func plate_shape(rect: Rect2, cut: float) -> PackedVector2Array:
+	var c := minf(cut, minf(rect.size.x, rect.size.y) * 0.4)
+	var a := rect.position
+	var b := rect.end
+	return PackedVector2Array([Vector2(a.x + c, a.y), Vector2(b.x, a.y), Vector2(b.x, b.y - c), Vector2(b.x - c, b.y), Vector2(a.x, b.y), Vector2(a.x, a.y + c)])
+
+
+## A club's colour as the HUD shows it on graphite: its main colour, lifted when it is so
+## dark (a navy, a black) that it would vanish into the plate.
+static func club_colour(club: Team) -> Color:
+	if club == null:
+		return Color(0.4, 0.42, 0.48)
+	var c := club.primary
+	var light := c.get_luminance()
+	if light < 0.2:
+		c = c.lerp(Color.WHITE, clampf((0.2 - light) * 2.2, 0.0, 0.45))
+	return c
+
+
+## A band of a club's colour down the left edge of a plate; with `cut`, its top follows the
+## plate's cut corner.
+func club_band(rect: Rect2, colour: Color, cut: float = 0.0) -> void:
+	if cut <= rect.size.x:
+		draw_rect(rect, colour)
+		return
+	var a := rect.position
+	var w := rect.size.x
+	draw_colored_polygon(PackedVector2Array([Vector2(a.x, a.y + cut), Vector2(a.x + w, a.y + cut - w), Vector2(a.x + w, rect.end.y), Vector2(a.x, rect.end.y)]), colour)
+
+
+## A key as the menus' bottom bar shows it: a small light cap with the key's name, the action
+## after it in grey. Returns the width it took (with the gap before the next).
+func keycap(at: Vector2, key: String, label: String, font_size: int = 15) -> float:
+	var f := UiTheme.numeric(false, true)
+	var key_size := font_size + 1
+	var kw := maxf(f.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, key_size).x + 16.0, 26.0)
+	var cap := Rect2(at + Vector2(0.0, -font_size - 1.0), Vector2(kw, font_size + 8.0))
+	draw_rect(cap, Color(1.0, 1.0, 1.0, 0.13))
+	draw_rect(cap, Color(1.0, 1.0, 1.0, 0.42), false, 1.0)
+	draw_string(f, Vector2(cap.position.x, at.y + 1.0), key, HORIZONTAL_ALIGNMENT_CENTER, kw, key_size, Color.WHITE)
+	text(at + Vector2(kw + 8.0, 0.0), label, font_size, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
+	return kw + 8.0 + text_width(label, font_size, 500) + 22.0
+
+
+## A line of key hints ("Space 번트   F 작전·교체 …", items two or more spaces apart, the key
+## first) drawn as caps, centred in `width` from `at` (the baseline's left end); a smaller
+## size when the line would not fit.
+func keycaps(at: Vector2, line: String, width: float, font_size: int = 15) -> void:
+	var items := key_items(line)
+	var size := font_size
+	var total := _keycaps_width(items, size)
+	while total > width and size > 11:
+		size -= 1
+		total = _keycaps_width(items, size)
+	var x := at.x + maxf((width - total + 22.0) * 0.5, 0.0)
+	for item: PackedStringArray in items:
+		x += keycap(Vector2(x, at.y), item[0], item[1], size)
+
+
+func _keycaps_width(items: Array[PackedStringArray], font_size: int) -> float:
+	var f := UiTheme.numeric(false, true)
+	var total := 0.0
+	for item: PackedStringArray in items:
+		total += maxf(f.get_string_size(item[0], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size + 1).x + 16.0, 26.0) + 8.0 + text_width(item[1], font_size, 500) + 22.0
+	return total
+
+
+## "Space 번트   F 작전·교체" → [["Space", "번트"], ["F", "작전·교체"]].
+static func key_items(line: String) -> Array[PackedStringArray]:
+	var out: Array[PackedStringArray] = []
+	var gaps := RegEx.create_from_string("\\s{2,}")
+	for part: String in gaps.sub(line.strip_edges(), "\n", true).split("\n", false):
+		var space := part.find(" ")
+		if space < 0:
+			out.append(PackedStringArray([part, ""]))
+		else:
+			out.append(PackedStringArray([part.substr(0, space), part.substr(space + 1).strip_edges()]))
+	return out
+
+
+## A plate's title as the menus write it: a slanted stroke in the accent, the title in white,
+## a grey note after it.
+func heading(at: Vector2, title: String, note: String = "", accent: Color = UiTheme.ACCENT, font_size: int = 20) -> void:
+	var h := font_size * 0.95
+	draw_colored_polygon(PackedVector2Array([at + Vector2(5.0, -h), at + Vector2(10.0, -h), at + Vector2(5.0, 2.0), at + Vector2(0.0, 2.0)]), accent)
+	text(at + Vector2(18.0, 0.0), title, font_size, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+	if note != "":
+		text(at + Vector2(28.0 + text_width(title, font_size, 700), 0.0), note, font_size - 4, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
 
 
 ## A horizontal bar filled to `fraction`.
 func bar(rect: Rect2, fraction: float, color: Color) -> void:
-	draw_rect(rect, Color(1, 1, 1, 0.12))
+	draw_rect(rect, Color(1, 1, 1, 0.1))
 	draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(fraction, 0.0, 1.0), rect.size.y)), color)

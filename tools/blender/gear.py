@@ -402,16 +402,24 @@ def catcher_helmet(body, marks, rig):
     orient(shell_faces(bm, pts), lambda c: head.centre)
     shell = finish("CatcherHelmet", bm, rig, lambda co: [("head", 1.0)], ["Helmet", "HelmetPads"], thickness=0.007, rim_material="HelmetPads")
 
-    # The cage: bars 3 mm thick round a curve 4.5 cm clear of the face.
-    at = _cage_surface(head, brow - 0.004, chin.z - 0.03, math.radians(52), 0.045)
+    # The cage: bars 3 mm thick round a curve 4.5 cm clear of the face, the shape of a face
+    # (as wide as the helmet's opening at the eyes, narrowing to the chin; a box of bars to
+    # the same width top and bottom looked like a crate).
+    low = chin.z - 0.03
+    at = _cage_surface(head, brow - 0.004, low, math.radians(52), 0.045)
     bars = bmesh.new()
     eye_line = eye.z - 0.024
-    rows = [brow - 0.004, eye_line, eye.z - 0.058, marks["lips"].z, chin.z - 0.03]
-    for z in rows:
-        tube(bars, [at(math.radians(a), z) for a in range(-52, 53, 4)], 0.0032)
-    for a, top in ((0.0, brow - 0.004), (-13.0, eye_line), (13.0, eye_line), (-27.0, eye_line), (27.0, eye_line),
-                   (-41.0, brow - 0.004), (41.0, brow - 0.004), (-52.0, brow - 0.004), (52.0, brow - 0.004)):
-        zs = [top + (chin.z - 0.03 - top) * k / 10 for k in range(11)]
+    half = lambda z: math.radians(50.0 - 19.0 * smoothstep(eye.z - 0.05, low, z))
+    for z in (brow - 0.004, eye_line, eye.z - 0.058, marks["lips"].z, low):
+        a = half(z)
+        tube(bars, [at(-a + 2.0 * a * k / 26, z) for k in range(27)], 0.0032)
+    for sign in (-1.0, 1.0):
+        zs = [brow - 0.004 + (low - (brow - 0.004)) * k / 20 for k in range(21)]
+        tube(bars, [at(sign * half(z), z) for z in zs], 0.0036)
+    for a, top in ((0.0, brow - 0.004), (-12.0, eye_line), (12.0, eye_line), (-24.0, eye_line), (24.0, eye_line),
+                   (-38.0, brow - 0.004), (38.0, brow - 0.004)):
+        bottom = low if abs(a) < 26.0 else eye.z - 0.058
+        zs = [top + (bottom - top) * k / 10 for k in range(11)]
         tube(bars, [at(math.radians(a), z) for z in zs], 0.0032)
     cage = finish("CatcherCage", bars, rig, lambda co: [("head", 1.0)], ["Bars"], sharp_deg=80.0)
 
@@ -419,12 +427,12 @@ def catcher_helmet(body, marks, rig):
     guard = bmesh.new()
     rowsv = []
     for k in range(5):
-        z = chin.z - 0.03 - 0.016 * k
+        z = chin.z - 0.03 - 0.014 * k
         row = []
-        for a in range(-20, 21, 5):
+        for a in range(-16, 17, 4):
             p = at(math.radians(a), chin.z - 0.03)
             back = 0.012 * k
-            row.append(guard.verts.new(Vector((p.x * 0.8, p.y + back, z))))
+            row.append(guard.verts.new(Vector((p.x * (0.8 - 0.07 * k), p.y + back, z))))
         rowsv.append(row)
     faces = [guard.faces.new((rowsv[k][m], rowsv[k][m + 1], rowsv[k + 1][m + 1], rowsv[k + 1][m]))
              for k in range(4) for m in range(len(rowsv[k]) - 1)]
@@ -487,7 +495,8 @@ def _protector_span(deg, marks, neck):
 
 
 def _quilt(a, z, r, marks):
-    """The padded cells: each a low pillow (up to 5 mm), stitched down along the lines between
+    """The padded cells: each a pillow (up to 11 mm: at 5 the padding could not be seen from the
+    mound and the protector was one flat shape), stitched down along the lines between
     them. Columns: a middle one and two each side; rows of 7.5 cm (9 cm in the middle)."""
     across = a * r
     edges = [-0.25, -0.15, -0.055, 0.055, 0.15, 0.25]
@@ -496,7 +505,7 @@ def _quilt(a, z, r, marks):
     u = min(max((across - lo) / max(hi - lo, 1e-3), 0.0), 1.0)
     pitch = 0.09 if abs(across) < 0.055 else 0.075
     v = ((z - marks["belt"]) % pitch) / pitch
-    return 0.005 * math.sin(math.pi * u) ** 0.6 * math.sin(math.pi * v) ** 0.6
+    return 0.011 * math.sin(math.pi * u) ** 0.5 * math.sin(math.pi * v) ** 0.5
 
 
 def shin_guards(pants, body, rig):
@@ -576,3 +585,78 @@ def _instep_flap(bm, body_bvh, bones, side):
         verts.append(col)
     centre = ankle.lerp(toe, 0.3) + Vector((0.0, 0.0, -0.03))
     orient(grid_faces(bm, verts), lambda c: centre)
+
+
+# --- The batter's guards ---
+
+
+def _wrap_shell(bm, bvh, points, around, spans, lift, mat=0):
+    """A shell over part of a limb: for each of `points` (a place on the limb's axis with its
+    direction: (centre, axis, zero)) and each angle in `spans(i)` (lo, hi in rad from `zero`
+    round the axis), the limb's surface found by a ray from the axis and pushed out by `lift`."""
+    cols = []
+    for i, (centre, axis, zero) in enumerate(points):
+        side = axis.cross(zero).normalized()
+        lo, hi = spans(i)
+        col = []
+        for k in range(around + 1):
+            a = lo + (hi - lo) * k / around
+            d = (zero * math.cos(a) + side * math.sin(a)).normalized()
+            r = inside_hit(bvh, centre, d, 0.2)
+            col.append(bm.verts.new(centre + d * ((r if r is not None else 0.05) + lift)))
+        cols.append(col)
+    faces = grid_faces(bm, cols, material_of=lambda i, j: mat)
+    orient(faces, lambda c: min((p[0] for p in points), key=lambda q: (q - c).length))
+    return faces
+
+
+def elbow_guard(body, jersey, rig):
+    """The guard on the batter's front elbow ("ElbowGuard"; the model's left arm, which a
+    left-handed batter's mirrored model turns into his right): a hard cap over the point of
+    the elbow and the back of the arm either side of it, held by a strap."""
+    bones = rig.data.bones
+    shoulder, elbow, wrist = bones["upperarm_l"].head_local, bones["lowerarm_l"].head_local, bones["hand_l"].head_local
+    bvh = tree(body)
+    points = []
+    back = Vector((0.0, 1.0, 0.0))    # the back of the arm (it hangs out to the side in the model)
+    for k in range(13):
+        u = k / 12.0
+        if u < 0.5:
+            at = shoulder.lerp(elbow, 0.74 + 0.26 * (u / 0.5))
+            axis = (elbow - shoulder).normalized()
+        else:
+            at = elbow.lerp(wrist, 0.36 * ((u - 0.5) / 0.5))
+            axis = (wrist - elbow).normalized()
+        zero = (back - axis * back.dot(axis)).normalized()
+        points.append((at, axis, zero))
+    bm = bmesh.new()
+    # Widest at the elbow, a tongue up the arm and one down it.
+    spans = lambda i: (-math.radians(55.0 + 45.0 * math.sin(math.pi * i / 12.0)), math.radians(55.0 + 45.0 * math.sin(math.pi * i / 12.0)))
+    _wrap_shell(bm, bvh, points, 12, spans, 0.007)
+    # The strap round the forearm just below the elbow.
+    strap = [points[9], points[10]]
+    _wrap_shell(bm, bvh, strap, 24, lambda i: (-math.pi, math.pi), 0.004, mat=1)
+
+    def weigh(co):
+        w = smoothstep(-0.03, 0.03, (co - elbow).dot((wrist - elbow).normalized()))
+        return [("lowerarm_l", w), ("upperarm_l", 1.0 - w)] if 0.01 < w < 0.99 else [("lowerarm_l" if w >= 0.99 else "upperarm_l", 1.0)]
+
+    return finish("ElbowGuard", bm, rig, weigh, ["Helmet", "HelmetPads"], thickness=0.005, rim_material="HelmetPads", inner_rim=True)
+
+
+def leg_guard(pants, rig):
+    """The guard on the batter's front shin and instep ("LegGuard"; the model's left leg): a
+    hard plate down the front of the shin from under the knee to the ankle, two straps."""
+    bones = rig.data.bones
+    knee, ankle = bones["calf_l"].head_local, bones["foot_l"].head_local
+    bvh = tree(pants)
+    axis = (ankle - knee).normalized()
+    front = Vector((0.0, -1.0, 0.0))
+    zero = (front - axis * front.dot(axis)).normalized()
+    points = [(knee.lerp(ankle, 0.1 + 0.8 * k / 12.0), axis, zero) for k in range(13)]
+    bm = bmesh.new()
+    spans = lambda i: (-math.radians(78.0 - 14.0 * i / 12.0), math.radians(78.0 - 14.0 * i / 12.0))
+    _wrap_shell(bm, bvh, points, 12, spans, 0.007)
+    for k in (2, 9):
+        _wrap_shell(bm, bvh, [points[k], points[k + 1]], 24, lambda i: (-math.pi, math.pi), 0.004, mat=1)
+    return finish("LegGuard", bm, rig, lambda co: [("calf_l", 1.0)], ["Helmet", "HelmetPads"], thickness=0.005, rim_material="HelmetPads", inner_rim=True)

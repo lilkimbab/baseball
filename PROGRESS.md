@@ -8,8 +8,10 @@
 | | |
 |---|---|
 | 브랜치 | `overnight-2026-11-21` (main과 같은 커밋까지 푸시됨. 그 뒤 작업은 아래 5절, 아직 커밋 전) |
-| 테스트 | 467개 전부 통과 (`./dev test`, 2026-11-22 새벽) |
-| 성능 | 경기 장면 1080p 평균 72fps·하위 1% 64fps (Arc 140V, 관중 만원, 업스케일 품질 88%). 77%로 그리면 85fps, 원본 해상도는 62fps |
+| 테스트 | 544개 전부 통과 (`./dev test`, 2026-11-22 아침) |
+| 성능 | 경기 장면 1080p 평균 72fps·하위 1% 69~71fps (Arc 140V, 관중 만원, 업스케일 품질 88%, 새 HUD와 소리 포함). 77%로 그리면 85fps, 원본 해상도는 62fps |
+| 플레이 검사 | `tools/play_audit.gd` 컴퓨터 경기 150플레이 (2026-11-22 아침): 순간이동·순간 회전·자세 튐·공 튐·겹침·카메라·클로즈업 0건. 1루수가 송구를 받을 때 공과 글러브 0.8~1.6m 0.05건/플레이, 송구·공 놓침 각 0.01건 (4절) |
+| 리그 분포 | 물리 해석기 1600경기(시드 7): 2루타 비율과 가운데 방향 타구만 목표 밖(예전부터 알려진 것, 4절) |
 | 실행 | `./dev play` → 제목 → 홈(친선 경기·리그·커리어·연습·상점) |
 | 커밋 | 사용자가 직접 한다(7절의 명령) |
 
@@ -19,7 +21,8 @@
 |---|---|---|
 | **공 물리** | 구종 8종 + 진화 구종 4종, 실밥 효과(심 시프트 웨이크), 배트-공 충돌, 구장 충돌, 날씨·고도 공기 밀도 식. C++ 확장(없으면 GDScript)으로 경기 시뮬레이션 1.7배 | S2, 제안 1·5 |
 | **경기 엔진** | KBO 2026 규칙, 기록(자책점·세이브·홀드), 통계 해석기(1경기 10ms)와 물리 해석기(투구마다 물리), 수비·주루·감독 AI, Statcast식 포구 확률. 리그 지표가 KBO 2025와 맞음(타율 .259, 득점 4.6) | S4, S5 |
-| **조작** | 타격(배트 커서 조준, 컨택·강타·번트), 투구(구종·목표·게이지, 예상 궤적), 송구(방향 키 + 게이지), 주루(E/Q), 도루(Shift 타이밍) | S3, S5, S12 |
+| **조작** | 타격(나무 배트 조준, 도착 지점 원, 컨택·강타·번트), 투구(구종 고리·목표 공·누르고 떼는 타이밍 게이지, 예상 궤적), 직접 수비(WASD·다이빙) 또는 자동 수비, 송구(방향 키 + 게이지), 주루(E/Q), 도루(Shift 타이밍) | S3, S5, S12, R1b |
+| **연출** | 명장면 슬로모션(강한 타구의 맞는 순간, 아슬아슬한 포구), 타구 순간 카메라 전환 | R1b |
 | **경기 화면** | 점수 표시, 하단 바, 투구 기록 패널, 화면 속 화면, 낙하 지점·베이스 표식, 한 줄 중계, 투구 시간, 일시정지·교체, 경기 뒤 화면 | S6 |
 | **감독 리그** | 30구단 3부 리그, 일정·순위·포스트시즌·승강·시상, 1군/2군 엔트리와 외국인 규정, 감독 지휘 경기(상황판·작전·예약·개입), 구단 운영(코스트·컨디션·스카우트·훈련·특성·팀 컬러) | S7 |
 | **커리어** | 선수 생성, 2군 → 1군, 내 장면만 하는 경기(약 6분), 성장, 구종 진화, 평점·보상, 올스타전·홈런 더비 | S8 |
@@ -38,16 +41,17 @@
 
 | 순서 | 단계 | 요약 |
 |---|---|---|
-| 1 | **R1 선수 외형 마무리** | 이번 3차 결과를 경기 화면(투구·타격·수비 자세)에서 확인하고 다듬기, 타자 보호대, 하이삭스·긴팔 언더셔츠 |
-| 2 | **R2 구장 사실감 2차** | 배경 건물 디테일(옥상·도로·차·가로수), 지붕, 광고판 로고화, 17종 × 낮·밤·돔 점검 |
-| 3 | **R3 날씨와 바람** | 경기별 날씨·바람이 공 비행·깃발·하늘·전광판·감독 AI에 반영 |
-| 4 | **R4 불펜 몸풀기** | 구원 투수 준비도, 몸풀기 지시, 불펜에서 실제로 던지는 투수 |
-| 5 | **R5 경기 화면과 구단 관리 UI 완성** | 경기 화면(HUD)을 새 디자인으로, 라인업·로테이션 편집 |
-| 6 | **R6 2군(퓨처스)과 육성** | 2군 리그, 콜업·말소, 유망주 성장 (UI 완성 뒤) |
-| 7 | **R7 역사적 시즌 재현** | 과거 시즌 시나리오 모드 (UI 완성 뒤) |
-| 8 | **S15 소리와 음악** | 관중 음향, 응원, 효과음, 장내 방송, 음악 |
-| 9 | **S16 중계 연출** | 경기 전 연출, 리플레이, 득점·교체 연출 |
-| 10 | **S17 실제 로스터** | 기록 수집, 능력치 변환, 로스터 팩(로컬) |
+| 1 | ~~R1 선수 외형 마무리~~ | 끝(5절). 남은 것: 홈 화면 모드 카드 그림 다시 찍기 |
+| 1b | ~~R1b 경기 연출과 수비 조작~~ | 끝(5절). 사용자가 해 보고 속도·카메라 의견 |
+| 2 | ~~R2 구장 사실감 2차~~ | 끝(5절) |
+| 3 | ~~R3 날씨와 바람~~ | 끝(5절) |
+| 4 | ~~R4 불펜 몸풀기~~ | 끝(5절) |
+| 5 | ~~R5 경기 화면과 구단 관리 UI 완성~~ | 끝(5절). 사용자가 화면을 보고 디자인 의견 |
+| 6 | ~~R6 2군(퓨처스)과 육성~~ | 끝(5절) |
+| 7 | ~~R7 역사적 시즌 재현~~ | 끝(5절): 형식·모드·예시 팩. 실제 KBO 시즌 팩은 S17 수집기로 — **어느 시즌부터 할지 사용자가 정할 것** |
+| 8 | **S15 소리와 음악** | 1차 끝(5절): 모든 소리를 직접 합성해 넣음. **사용자가 들어 보고 음색·음량 의견**. 남은 것: 발소리·펜스·가까운 관중 목소리·파도타기 |
+| 9 | **S16 중계 연출** | 1차 끝(5절): 경기 전 소개, 이닝 카드, 타자·투수 교체 자막, 홈런·호수비 리플레이, 경기 끝 카드. 남은 것: 득점·이닝 끝 장면, 선수 반응 |
+| 10 | **S17 실제 로스터** | 변환기 끝(5절): 기록 CSV → 로스터 팩. **수집기는 막힘**: KBO 공식 기록실이 자동 수집을 금지(robots·안내문). **사용자가 기록 출처를 정할 것** |
 | 11 | **S18 실제 구장·유니폼·폼·얼굴** | 실제 구장, 실제 유니폼, 사진 기반 얼굴(로컬) |
 | 12 | **S19 대조 점검 → S20 마감** | 참고 영상과 나란히 점검, 밸런스·성능, Windows 빌드 |
 
@@ -56,38 +60,77 @@
 | 문제 | 계획 |
 |---|---|
 | 얼굴이 MakeHuman 기본 얼굴(창백하고 인형 같음) | 사진 기반 얼굴은 S18. 그 전에는 피부톤·수염·골격 변형까지 |
-| 포수 장비·미트가 뭉툭하고 질감이 없음(누빔·끈·로고) | R1 |
+| 포수 장비는 누빔·얼굴 모양 마스크·새 미트까지. 가까이서는 아직 질감이 단순함 | S18 무렵 |
+| 1루수가 베이스에서 송구를 받을 때 공과 글러브가 0.8~1.6m 떨어짐(150플레이에 4~7번) | 다음 동작 다듬기 때 |
 | 해가 타자 뒤에 있을 때(투수 시점) 선수 앞면의 명암이 밋밋함 | R1·R2에서 조명과 함께 |
 | 홈 화면 모드 카드의 그림이 예전 모델로 찍은 것 | `tools/ui/make_art.sh`로 다시 찍기(R1 끝에) |
-| 경기 화면(HUD)이 아직 예전 디자인 | R5 |
 | 배경 건물이 상자에 사진을 입힌 수준, 광고판이 글자뿐 | R2 |
 | 새 구장 모형 13종은 높은 시점 한 장면으로만 확인 | R2 |
 | 물리 해석기의 2루타 5.7%(목표 4.13%는 가정값) | 실제 기록을 받는 S17에서 |
 | 홈런 때 타자가 베이스를 다 돌 때까지 못 넘김 | S16(건너뛰기) |
 | 테스트 종료 때 Godot의 "ObjectDB 누수" 경고 | 테스트 도구의 정리 순서 문제, 결과에 영향 없음 |
 
-## 5. 이번 작업 (2026-11-21 밤 ~ 22 새벽): 선수 비율·유니폼·핏줄, 투구 조작, 서체, 심판, 정리
+## 5. 이번 작업 (2026-11-22): R1 마무리, R1b 연출·수비 조작, 사용자가 찾은 버그들, R2~R6
 
-사용자 요청: 지금까지 한 것과 앞으로 할 것 정리(불필요한 파일 정리), 머리·몸 비율, 짧은 목, 몸에 붙지 않는 유니폼, 인위적인 팔 핏줄, 실제 선수들이 쓰는 유니폼·등번호 서체. 이어서: 공 궤적 표시, 원형 구종 선택, 상황별 서체, 심판 디자인, 타석에 선 선수들의 모습.
+사용자 요청: ① 상대 수비 때 "자동 이동" 글자 없이 수비만, 아슬아슬한 포구는 슬로모션 클로즈업 ② 내 강한 타구는 맞는 순간 슬로모션 ③ 직접 수비(WASD)와 자동 수비 중 선택 — 단 ①②는 진짜 그럴 때만, 가끔. 이어서 직접 해 보고 지적한 것: 수비 동작이 이상하다, 던진 뒤 잔상, 제구가 안 된다, 게이지가 타이밍 놀이 같지 않다, 치기가 너무 어렵다, 배트 커서의 원, 타격 시점, 나무 배트·실제 공, 전체적으로 어설프다.
 
-| 요청 | 재 보니 | 고친 것 |
+| 요청·지적 | 재 보니 | 고친 것 |
 |---|---|---|
-| 머리·몸 비율 | 6.9등신(목표 7.5~8), 머리둘레 63cm. 허리 70cm·팔뚝 26cm·종아리 37cm로 몸은 가늘었다 | 7.7등신·58cm. 허리 86·팔뚝 31·손목 18·종아리 41cm. 체형 4종의 체중 80·89·96·106kg |
-| 목이 짧다 | 턱 끝~어깨 4.5cm(표준 약 8cm) | 8.3cm, 목둘레 41cm |
-| 옷이 뜨고 뒤가 튀어나옴 | 등 5.8cm, 가슴 5.1cm(1차 시도) | 옷이 걸리는 모양을 계산하는 재단으로 가슴·등 1.5cm. 소매는 팔 위에 얹힘, 바지는 곧게 |
-| 팔 핏줄 | 굵은 줄 한 가닥 + 오돌토돌한 피부. 팔 텍스처가 1텍셀 1.4mm | 셰이더가 화면 해상도로 그리는 정맥 7개 + 손등 정맥궁 + 힘줄. 선수마다 무늬·세기 다름 |
-| 유니폼·등번호 서체 | 시스템 고딕, 한글 구단명 | 풀 블록·터스칸·스크립트(꼬리) 서체, 영문 별칭/연고지, 번호 20.3·10.2cm, 테두리, 파이핑·소매 띠·패치·스폰서 |
-| (함께) | 수영모 같은 모자, 광대 신발, 삐죽한 머리카락, 붉은 눈, 톱니 모양 목둘레, 떠 있는 모자 글자 | 6쪽 모자, 스파이크, 두피에 그린 짧은 머리, 어두운 갈색 눈, 정확히 자른 목둘레와 옷깃 띠, 앞판 표면에 붙인 글자 |
-| 얼굴의 흰 점(눈물 자국처럼) | 피부의 코팅 반사층(클리어코트)이 한 픽셀짜리 반짝임으로 깨짐 | 피부에서 그 층을 뺌. 속눈썹·눈썹 무광 |
-| 공 궤적이 선수 목에서 나옴 | 예상 궤적을 손에서부터 그려서 투수 몸을 가림 | 포심은 존의 도착점만, 변화구는 마지막 약 6m가 휘어 들어가는 것만 |
-| 구종 선택을 2K14처럼 원형 6방향으로 | 숫자 키 목록뿐이었다 | 도넛 고리 6칸: 오른쪽 버튼을 누른 채 마우스를 구종 쪽으로 보내고 뗀다(숫자 키도 유지) |
-| 모든 곳의 폰트가 같다 | 메뉴 서체 하나로 HUD·전광판·광고판까지 그림 | 역할별 서체: 중계 그래픽 S-Core Dream, 콜·판정 Black Han Sans, 전광판 Galmuri(도트), 펜스 숫자 College Block, 광고판은 브랜드마다, 숫자는 Barlow Condensed |
-| 심판 디자인이 대충 | 선수 유니폼에 색만 바꾼 것 | 폴로 셔츠(깃·주머니·리그 배지·소매 번호), 차콜 바지, 검은 구두, 주심 마스크·짧은 챙 모자·공 주머니, 심판 체격 |
-| 타석의 선수가 울퉁불퉁·뚱뚱·흐릿 | 헐렁한 옷용 주름이 덩어리로 보임, 넓은 바지 통, 77% 해상도로 그려 키움 | 주름 얕게 다시 굽기, 옷을 몸에 더 붙임, 기본 해상도 배율 77 → 88%, 역광일 때 앞면을 비추는 반사광 추가. 옷과 화면은 나아졌지만 얼굴과 포수 장비는 아직 부족(4절) |
+| R1 마무리 | | 포수 프로텍터 누빔, 얼굴 모양 마스크, 새 미트, 타자 팔꿈치·정강이 보호대, 긴팔 언더셔츠, 무릎까지 걷은 바지와 하이삭스(선수마다 다름) |
+| "자동 이동" 글자 | 상대 수비 때도 떴다 | 상대 수비 때는 아무것도 그리지 않는다. 내 수비일 때만 발밑 원 |
+| 슬로모션 (가끔, 그럴 때만) | | 홈런·펜스 앞 강한 뜬공, 잡을 확률 55% 이하를 잡았거나 30% 이상을 놓친 포구만. 하나 뒤에는 타구 6개를 쉰다. 60경기 측정: 경기당 타격 1.25번·수비 0.72번. 설정에서 끈다 |
+| 직접 수비 | | 설정·일시정지 메뉴에서 자동/수동. 수동이면 공 쪽 야수를 WASD로(그 선수의 주력), 닿으면 잡고 Space로 다이빙, 못 잡으면 동료가 받친다. 카메라는 그 야수 뒤에서 낙하 지점과 함께 |
+| 수비 동작이 이상하다 | 검사 도구로 150플레이를 재 보니: 포구 직전 몸이 최대 3m 공중에 뜸(플레이당 1.1번), 한 프레임에 90~170° 홱 돎(1.5번), 다이빙·슬라이딩으로 한 프레임에 바뀜, 짧은 송구가 초속 80m, 공이 손이 아닌 허공에, 타자가 타석에서 홈플레이트 가운데로 순간이동 | 포구 IK가 몸을 옮기는 양을 전체 0.6m·위로 0.4m로 제한, 글러브는 공이 잡힐 자리에서 기다림, 돌 때 초당 22라디안까지, 하는 일이 바뀌면 0.16초 동안 이어 붙임, 송구는 실제 속도로, 공은 잡은 선수의 글러브와 던지는 손에, 타자는 타석에서 출발. 결과: 0건(남은 것 4절) |
+| 던진 뒤 잔상 | 변화구 꼬리선이 공이 잡힌 뒤 2초, 도루 장면에서는 끝까지 남음. 존·구속·타이밍 글자도 플레이 중에 남음 | 꼬리선 삭제, 플레이 중에는 존 표시들을 숨김 |
+| 제구가 안 된다 | 완벽히 맞춰도 평균 12cm, 0.05초 늦으면 22cm(컴퓨터 투수의 오차식을 그대로 씀). 구종 고리를 쓰면 목표도 같이 움직임 | 사람 투구는 타이밍 그대로: 완벽 3.5cm(전부 10cm 안), 0.05초 7.9cm, 0.1초 11.5cm. 고리를 닫으면 마우스가 제자리로 |
+| 게이지가 타이밍 놀이가 아니다 | 누르기 → 떼기 → 다시 클릭, 세 동작 | 누르고 있으면 고리가 초록 원으로 좁혀 오고, 겹칠 때 떼면 던진다 |
+| 치기가 어렵다 · 배트의 원 · 타격 시점 | 공이 어디로 올지 알 수 없음, 배트 커서에 원 둘, 존이 화면 오른쪽 아래 | 던지는 순간 도착 지점 원과 좁혀 오는 고리, 원 없는 배트, 존이 화면 정중앙인 카메라 |
+| 나무 배트·실제 공 | 배트가 단색, 목표가 그린 점 | 모든 배트(타자·바닥·대기 타석·조준용)를 나뭇결·도관·송진 셰이더로, 투구 목표는 실밥 텍스처의 3D 야구공 |
+| 클로즈업이 어설프다 | 타격 클로즈업은 끝에 하늘만, 수비 클로즈업은 공이 카메라를 뚫고 와 야수를 놓침(플레이당 1.2번) | 타격은 타자에 머묾, 수비는 공 길의 옆에서 야수와 그 자리를 함께. 0건 |
 
-- 측정 도구: `tools/blender/anthropometry.py`(빌드마다 표 출력, `player_<체형>_measure.json`), `tools/blender/try_shapes.py`(설정 시험 3초), 전신 캡처 `./dev tool-win figure_shots`
-- 정리: 진행 기록을 이 파일(현황)과 docs/14(기록 보관)로 나눔, 로드맵 12절 다시 작성, 안 쓰는 도구 2개(`career_shots`, `league_shots` → `menu_shots`가 대신함)와 Pretendard 서체 삭제, 오래된 캡처 폴더 정리(build 519MB → 240MB), 예전 얼굴 주름·핏줄 굽기 코드 삭제
-- 캡처: `build/figure/`(`before_after.png` 위가 고치기 전·아래가 지금, `final_away.png` 원정·헬멧·건장 체형, `final_arm.png` 팔, `umpire_top.png` 심판, `plate_before_after.png` 투수 시점 타석 전·후), `build/aim3/`(구종 고리·도착점 표시), `build/match2/`(경기 화면)
+- 검사 도구: `tools/play_audit.gd`(플레이 표시 결함 세기: `--bat --force` 클로즈업, `--field` 직접 수비), `tools/highlight_report.gd`(슬로모션 빈도), `tools/pitch_control_report.gd`(조준 대비 빗나감)
+- 캡처: `build/r1b/`(슬로모션 `hl_*`, 직접 수비 `man/`), `build/aim5/`(타격 화면·투구 게이지), `build/moves/`(포구·송구·슬라이딩 근접)
+
+### R2 구장 사실감 2차 · R3 날씨와 바람 · R4 불펜 몸풀기 (2026-11-22 밤, 사용자가 자는 동안 이어서)
+
+| 단계 | 만든 것 | 확인 |
+|---|---|---|
+| R2 | 배경 건물 지붕에 난간·계단실·실외기·물탱크·안테나, 지붕 방수 시트 무늬. 관중석 바깥 순환 도로와 도심·신도시·타워 언덕의 대로(바닷가는 홈 뒤쪽만), 차선, 차, 가로수. 거리 위 건물·나무는 빼고 지음. 그리고 예전부터 비스듬한 건물·시골집이 평행사변형으로 기울어 있던 것을 고침 | 17개 구장 × 낮·밤 × 타석·높은 시점 캡처(`build/parks/`), 도시를 내려다본 캡처(`build/r2town/`). 1080p 72fps(전과 같음) |
+| R3 | 경기마다 날씨(맑음·구름·흐림, 기온·습도, 바람 세기·방향; 돔은 무풍). 공기 밀도와 바람이 친 공에 들어감(투구는 그대로). 외야수가 바람 따라 깊게/얕게, 깃발이 바람 방향으로, 흐리면 빛이 약하고 하늘이 회색, 점수판 아래 날씨 칩(바람 화살표), 첫 중계 문구, 바람 탄 홈런 문구 | 바람 테스트 7개(초속 5m 뒷바람 +7~15m, 맞바람 −6~16m 등), 경기 장면 테스트 2개, 날씨 넣은 1600경기 리그 분포가 목표 범위 안(홈런 2.33%). 처음엔 계절풍이 거의 늘 외야로 불어 홈런 +42%였다 → 방향을 고르게 |
+
+| R4 | 구원 투수 준비도(몸 푸는 투수 두 명까지, 투구 15개에 준비, 멈추면 식음), 덜 푼 투수는 첫 12구 동안 제구가 흔들리고 조금 느림(두 해석기·사람 투구 모두). 감독 AI가 교체 전에 다음 투수·마무리를 미리 풀고, 풀린 투수를 먼저 올림. 교체 메뉴의 "불펜 몸풀기", 교체 문구, 불펜 마운드에서 실제로 던지는 투수 | 테스트 7개, 8000경기 리그: 구원 평균자책점 4.42 → 4.48, 덜 푼 등판 4.2%, 전체 평균자책점 목표 범위 안. 불펜 캡처 `build/r4/` |
+
+| R5 (1부) | 리그 화면 "라인업" 탭: 타순·수비 위치·후보 교체(두 줄을 차례로 누르기), 추천·자동, 볼 수 없는 자리 경고, 투수 로테이션 순서. 정한 라인업과 로테이션이 실제 경기에 쓰이고 저장됨 | 테스트 8개(규칙 7, 화면 1), 캡처 `build/r5/m_league.png` |
+| (함께 찾은 버그) | 리그를 저장했다 불러오면 몇 주 뒤 결과가 달라졌다: 능력치를 소수 둘째 자리로 반올림해 저장했고, 시즌이 투수 종합 능력치를 첫날 값으로 캐시했다. 둘 다 고침 | 저장 테스트 통과 |
+| R5 (2부) | 경기 화면을 메뉴와 같은 판으로: 좌상단 방송형 점수 표시(구단 색 띠·엠블럼·공격 팀 공·이닝 화살표·주자·B-S-O, 아래 줄에 투구 수와 날씨, 옆에 투구 시간), 하단 타자·투수 카드(엠블럼·OVR 칸), 키 모양 안내, 상세 카드·투구 기록·화면 속 화면 테두리, 경기 종료 화면. 일시정지·작전 교체·작전 지시 창은 메뉴 키트로(켜기/끄기 선택 버튼). 선수 비교(두 선수 3D·레이더 겹치기·능력치 9줄·시즌 기록, 나은 쪽 강조). 리그 화면 "기록실"(타자 9·투수 7부문 1~5위, 팀 기록 표, 부 전환, KBO 규정타석·이닝) | 테스트 3개(비교, 기록실, 키 안내), 캡처 `build/hud1/`(경기 화면·일시정지·교체·상세), `build/r5b/`(기록실·비교·경기 종료) |
+| S17 (변환기) | 기록에서 능력치로: 경기 엔진의 식을 거꾸로 풀어(삼진율→컨택, 볼넷율→선구안, 홈런율→파워, 3루타·도루→주력, 투수 탈삼진·피홈런→구위, 볼넷→제구, 선발 이닝→체력) 표본이 적으면 리그 평균 쪽으로. CSV 네 개(구단·선수·타격·투구)를 `tools/build_roster.gd`가 로스터 팩으로. KBO 공식 기록실은 자동 수집 금지라 수집기는 만들지 않음 | 테스트 2개, 왕복 검증(가상 리그 기록 → 변환 → 6시즌 다시): 타자 OPS 상관 0.854(목표 0.85), 팀 승률 0.871(목표 0.7) |
+| S16 (1차) | 중계 연출: 경기 전 10초(구장 공중 촬영과 두 구단 카드 → 홈 선발 투수 근접 → 원정 라인업), 이닝 시작 카드(직전 반 이닝 득점·안타·잔루), 타자 등장 하단 자막(오늘·시즌 기록, 타자 근접 카메라), 투수 교체 자막, 홈런 리플레이(0.7배속, 다른 각도)와 호수비 리플레이(야수 근접), 경기 끝 카드(승리 팀·점수). Space·Enter·클릭으로 건너뜀, 설정에서 끔 | 테스트 2개, 캡처 `build/s16/` |
+| S15 (1차) | 소리: 효과음 62·관중 21·응원 7·음악 14개를 모두 직접 합성(`./dev audio`, 3MB). 버스(음악·관중·효과음·음성·메뉴, 관중 잔향과 일시정지 때 먹먹함), 관중 흥분도(설계 식 그대로, 홈·원정 따로), 웅성임 3단계 섞기와 환호·탄식·박수·함성·상승음, 공격 팀 응원석의 북·막대풍선·구호 8박 패턴 12종(관중 박자에 맞춤), 타구 속도·타이밍별 타격음, 구속별 미트 소리, 포구·태그·슬라이딩·바운드, 메뉴 음악(화면이 바뀌어도 이어짐)·이닝 징글·오르간·홈런 팡파르·승패, 심판·장내 방송(Windows 한국어 음성이 있으면). 로컬 팩에 응원가·등장곡·메뉴 음악을 넣으면 그것을 재생. 설정에 볼륨 다섯 개 | 테스트 5개, 녹음 분석(평균 −21dBFS, 최대 −1.8dBFS), 1080p 72fps·하위 1% 69~71fps. 도구·측정은 스피커로 소리 안 냄 |
+| (플레이 검사로 찾은 버그) | ① 공을 떨어뜨린 야수가 0.6~1초 뒤 "원래 자리"에서 주워, 그 사이 외야로 굴러간 공이 손으로 되돌아옴(공 순간이동 0.05건/플레이) → 쓰러진 자리에서 일어난 뒤 공이 굴러간 곳에서 줍게. ② 공이 낮게 날아가는 직선타에서 "가슴 높이에서 잡는 모습" 규칙이 10m 앞 지점을 골라 1루수가 초속 29m로 미끄러짐(0.12건/플레이) → 그때 그 자리에 갈 수 있을 때만 | 둘 다 0건 |
+| (함께 찾은 버그) | 감독이 정한 타순에서 그날 쉬는 선수의 자리를 볼 사람이 없으면(예: 포수가 쉬는데 다른 포수 없음) 계획 전체를 버리고 컴퓨터 라인업으로 나갔다 → 그날은 쉬려던 선수가 그대로 나감 | 테스트 추가 |
+| R7 | 역사적 시즌: 시즌 팩 형식(그해 구단·규칙·일정·실제 순위·우승·타이틀·시나리오), 리그 화면의 "역사적 시즌"(시즌·시나리오 또는 구단 고르기), 그해 규칙으로 한 리그 시즌, 끝나면 실제와 비교(순위 차이·우승·타이틀, 시나리오 성공/실패). 예시 팩: 가상 1부 리그 72경기와 시나리오 3개. 실제 시즌은 `content-local/seasons/`에 넣으면 목록에 나옴 | 테스트 3개 |
+| R6 | 선수마다 숨은 성장 여지(잠재력), 나이와 출전에 따른 시즌 중 성장, 겨울의 노쇠·은퇴·신인 드래프트·1군 재편성. 2군 리그(날마다 1군 상대 구단 2군과, 통계 해석기, 순위·기록 따로). 컴퓨터 구단의 주간 콜업·말소(능력치와 최근 성적, 10일 규정·외국인 한도), 플레이어 구단은 추천과 "맞바꾸기". 리그 화면 "2군" 탭(나이·잠재력 별·2군 기록·올해 성장, 퓨처스 순위, 지난 겨울) | 테스트 11개. 10년 돌려도 1군 평균 ±1·타자/투수 균형 유지 |
+
+- 캡처: `build/r3/m_pitch.png`(날씨 칩과 흐린 하늘)
+- 광고판은 이미 브랜드마다 마크·서체가 있어 이번에 바꾸지 않았다
+
+### 전체 점검 (2026-11-22 밤, 사용자 요청 "지금까지 한 걸 전체적으로 제대로 테스트")
+
+| 점검 | 결과 | 고친 것 |
+|---|---|---|
+| 단위 테스트 | 493개 통과 | |
+| 리그 분포 (물리 800경기 + 1600경기) | 첫 시드에서 비자책점·폭투·홈 승률이 범위 밖 → 다른 시드 1600경기에서는 모두 범위 안(표본 흔들림). 2루타 5.5%(목표 4.1%)와 가운데 방향 38%(33~37%)는 예전부터 | 없음(판정의 확률 계산은 바뀌지 않음) |
+| 플레이 표시 (위 6개 검사) | 높은 뜬공을 땅 위 몇 cm에서 잡음, 공이 1.2m 떨어진 글러브로 순간이동, 1루수가 송구 전에 베이스로 순간이동, 홈 위에 겹쳐 선 득점 주자·1루수와 겹친 타자, 공에 맞는 순간 모두의 자세가 한 프레임에 바뀜, 달리며 잡을 때 엉덩이가 튐, 멀리서 오는 야수를 놓치는 클로즈업 | 기다리던 야수는 가슴 높이에서, 포구 순간은 판정이 정한 시각·야수로, 던지는 야수는 공을 놓을 때까지 제자리·다음 이동은 뛰는 시간만큼, 타자는 1루를 지나 달려갔다 돌아오고 득점 주자는 각자 다른 자리로 걸어 나감, 공에 맞는 순간과 같은 동작 안의 큰 튐도 이어 붙임, 클로즈업은 야수가 오는 거리만큼 물러섬, 공은 0.06초에 걸쳐 글러브로 |
+| 검사 도구 자체 | 엔진의 갱신이 섞여 실제 게임에 없는 튐을 세고 있었음 | 장면을 도구 혼자 1/60초씩 돌림 |
+| 투수 팔 각도 (사용자 지적) | 옮기는 과정은 원본과 같았음. 기본 폼(3037_2)이 22°로 사이드암에 가까웠고, 폼 20종 중 "스리쿼터" 대부분이 30~38°였다(녹화 투수 70명의 중앙값 약 35°, 프로 평균 약 45°) | 기본 폼 3055_3(41°), 폼 20종 다시 고름: 오버핸드 52~66° 3, 스리쿼터 39~49° 12, 사이드암 4~32° 5. 80개 동작 모두 동작 검사 통과. 배정 비율 20/65/15% |
+| 구종 고리 | 고리가 조준점 위에서 열려 목표의 구종 이름·원·궤적이 고리 칸 글자와 겹침 | 고리가 열린 동안 조준 표시를 숨김 |
+| 설정 화면 | "투구 도착 지점", "명장면 슬로모션", "수비 방식" 항목 확인 | |
+| 내 실수 | 수정 중에 판정 코드의 함수 3개를 지워 한동안 컴파일되지 않았다(그동안의 검사 결과는 버리고 다시 돌림) | 되살림 |
+
+- 직접 수비는 `C`로 잡는다(2026-11-22 사용자 요청): 누르면 글러브가 0.6초 올라가 있고, 공이 닿기 0.5초 전부터 야수 머리 위에 `C`가 깜박인다. 안 누르면 공이 지나가 동료가 받친다. `Space` 다이빙은 그 자체로 잡기 시도
+- 캡처: `build/forms/`(새 폼 20종, 뒤에서 본 레이백·릴리스), `build/arm/`(기본 폼 옆·뒤), `build/detail/`(설정 화면)
+
+이전 작업(2026-11-21 밤 ~ 22 새벽: 선수 비율·유니폼·핏줄, 투구 조작, 서체, 심판, 정리)은 [docs/14](docs/14-work-log.md)로 옮긴다.
 
 ## 6. 확인하는 법
 
@@ -99,6 +142,12 @@
 ./dev tool-win menu_shots build/menus/m --only hub,quick,league --league
 ./dev tool-win backdrop_shots build/backdrops/b                    # 배경 13종
 ./dev sim --physical --games 800 --jobs 8                          # 리그 분포 검사
+G=.tools/godot-4.7.2/Godot_v4.7.2-stable_linux.x86_64
+$G --headless --path game --script res://tools/play_audit.gd -- --plays 150          # 수비·카메라 결함
+$G --headless --path game --script res://tools/play_audit.gd -- --plays 80 --bat --force  # 클로즈업
+$G --headless --path game --script res://tools/highlight_report.gd -- --games 60     # 슬로모션 빈도
+./dev tool-win match_shots build/r1b/hl --highlight --force --plays 3                # 슬로모션 화면
+./dev tool-win match_shots build/r1b/man/m --manual --plays 3                        # 직접 수비 화면
 ```
 
 ## 7. 커밋 (사용자가 직접)
@@ -106,18 +155,41 @@
 ```bash
 cd /home/parkjune/baseball
 git add -A .gitignore README.md PROGRESS.md IDEAS.md dev docs/ game/ tools/
-git commit -m "Player figure to the tables (7.7 heads, neck, girths), fitted uniforms, cap, spikes, drawn veins; real uniform lettering; umpires' kit; pitch wheel; faces by role; tidy-up
+git commit -m "R1-R7, S15 and S16 first passes, S17 converter, catch key: player figure and kit, highlights and own fielding, full check fixes, town details, weather and wind, bullpen warm-ups, match HUD and club screens, farm league and development, seasons of the past, sound, broadcast moments
 
-- Body re-measured against ANSUR II (tools/blender/anthropometry.py) and reshaped; four builds by weight
-- Uniforms cut to hang (jersey, sleeves, trousers), exact neckline, collar trim, side piping, buckle
-- Six-panel cap, spikes, cropped hair on the scalp, umpire's mask, polo collar, ball bags, short-billed cap
-- Arm veins and tendons drawn by the skin shader from arm coordinates in the model; no clear coat on skin
-- Uniform lettering: block, Tuscan and script faces, English nicknames and towns, regulation number sizes, patches
-- Pitch preview shows the arrival only (the last bend for breaking balls); six-way pitch wheel on the right button
-- UiTheme.face: broadcast, impact, scoreboard, wall and sponsors' faces; sponsors' boards with marks
-- PROGRESS rewritten as a status page, work log moved to docs/14, roadmap section 12 re-planned
+- R1: body to ANSUR II tables, fitted uniforms, real lettering, umpires, catcher and batting gear
+- R1b: rare slow-motion highlights, manual fielding (WASD), one-hold pitch gauge, arrival circle, wooden aiming bat
+- Full check: tools/play_audit.gd; catch IK, snap turns, pose easing, throws, ball in hand, batter out of the box,
+  chest-high catches, fielded moments, thrower waits, overrun at first, scorers walk off, close-up framing
+- Pitching forms re-picked toward a professional arm-angle spread; default delivery 41 degrees
+- R2: roofs (parapets, plant rooms, units, tanks, masts), ring road and avenues with lane marks, cars, street trees;
+  turned boxes sized along their own sides
+- R3: Weather (sky, temperature, humidity, wind from any quarter), wind in batted-ball flight, outfield depth,
+  flags, overcast light, score bug weather chip, wind lines in the commentary
+- R4: bullpen readiness, cold relievers wild for their first pitches, AI warm-ups, warm-up menu, relievers throwing
+- R5: line-up tab (order, positions, bench, rotation) used in games and saved; match HUD on the menus' plates
+  (broadcast score bug, player cards with emblems, key caps, post-game), pause and order panels on the menu kit,
+  player comparison (radar, ratings, season), records room (leaders, club records, KBO qualifiers)
+- R6: hidden growth room, daily growth by age and playing time, winter decline, retirement and draft,
+  second teams' league (daily farm games, tables, numbers), weekly call-ups for computer clubs, farm tab
+- R7: season packs (clubs, that year's rules, real outcome, scenarios), history mode with then-and-now comparison,
+  an example pack made from the fictional top division
+- S15 first pass: every sound synthesised (tools/audio/make_sounds.py, ./dev audio): bat by exit speed and timing,
+  mitt by pitch speed, gloves, tags, slides, bounces; crowd beds mixed by an excitement model, reactions, the rise of
+  a big fly; cheering patterns on the crowd's beat; menu music, jingles, organ, fanfare; buses and volumes;
+  umpire and announcer by the system's Korean voice; local-pack chants and walk-up songs; tools run silent
+- S16 first pass: broadcast segments with their own shots and cards (introduction, inning card with the half just
+  over, batter and pitching-change lower thirds, home-run replay), skippable, a setting to turn them off
+- S17 converter: RosterBuilder runs the engine's rating formula backwards (with regression to the mean);
+  tools/build_roster.gd turns four CSV files into a roster pack; round-trip check on the fictional league.
+  No collector: the KBO site forbids automated collection
+- Manual fielding catches with C: the glove is up 0.6 s after the key, a C prompt over the fielder 0.5 s before the
+  ball reaches him; without it the ball goes by and a team-mate backs up
+- Fixes: saves keep ratings whole; season recomputes bullpen-role overalls daily; a planned line-up is kept when a
+  resting man has nobody to take his place; a fielder who drops the ball plays it from where he fell and where it
+  rolled (the ball flew back to him); the chest-high catch shown only where the fielder can be (line drives)
 
-Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>"
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push origin overnight-2026-11-21
 git fetch . overnight-2026-11-21:main
 git push origin main

@@ -14,7 +14,7 @@ var _view := 0
 var _root: Node3D
 var _camera: Camera3D
 var _time: StringName = &"day"
-const VIEWS := ["plate", "high"]
+const VIEWS := ["plate", "high", "town"]
 
 
 func _initialize() -> void:
@@ -69,9 +69,13 @@ func _process(_delta: float) -> bool:
 		if VIEWS[_view] == "plate":
 			_camera.fov = 52.0
 			_camera.look_at_from_position(Field.to_world(Vector3(1.5, -6.0, 3.2)), Field.to_world(Vector3(0.0, 130.0, 22.0)))
-		else:
+		elif VIEWS[_view] == "high":
 			_camera.fov = 62.0
 			_camera.look_at_from_position(Field.to_world(Vector3(0.0, -70.0, 85.0)), Field.to_world(Vector3(0.0, 160.0, 0.0)))
+		else:
+			# Over the outfield stands, down into the town beyond: its roofs, streets and cars.
+			_camera.fov = 50.0
+			_camera.look_at_from_position(Field.to_world(Vector3(-60.0, 150.0, 120.0)), Field.to_world(Vector3(40.0, 330.0, 0.0)))
 	if _frames < 26:
 		return false
 	var label := str(_items[_index][1]) if str(_items[_index][1]) != "" else str(_items[_index][0])

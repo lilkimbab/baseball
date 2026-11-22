@@ -1,5 +1,5 @@
 {
   "format": 1,
-  "note": "How forms are given out (docs/13 S10-5). The forms themselves come from the local content pack (content-local/forms/, ./dev mocap forms) because they are made from non-commercial motion capture. arm_slot_shares: the share of fictional pitchers given each arm slot (A: overhand 25%, three-quarter 60%, sidearm 12%, underhand 3% — the recordings have no underhand pitcher, so it goes to sidearm).",
-  "arm_slot_shares": {"overhand": 0.25, "three_quarter": 0.60, "sidearm": 0.15}
+  "note": "How forms are given out (docs/13 S10-5). The forms themselves come from the local content pack (content-local/forms/, ./dev mocap forms) because they are made from non-commercial motion capture. arm_slot_shares: the share of fictional pitchers given each arm slot, by the arm's angle at release (tools/mocap/forms.py): overhand 52 degrees and up, three-quarter 33-52, sidearm (with low three-quarter) under 33. A professional arm is about 45 degrees on average (Statcast arm angle, 2024), most of them 35-55; 2026-11-22: 20/65/15 (it was 25/60/15 with the three-quarter class running down to 30 degrees, and most pitchers looked sidearm).",
+  "arm_slot_shares": {"overhand": 0.20, "three_quarter": 0.65, "sidearm": 0.15}
 }

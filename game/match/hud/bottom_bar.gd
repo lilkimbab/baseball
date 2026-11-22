@@ -9,7 +9,9 @@ extends HudCanvas
 ## (.287), ERA to two (3.45), innings in thirds (5⅔).
 
 const HEIGHT := 92.0
-const CARD := 560.0
+const CARD := 540.0
+## The overall's block at a card's right end.
+const OVR_BLOCK := 92.0
 
 var scene: MatchScene
 ## Tab is held: show the detail cards.
@@ -24,62 +26,81 @@ func _draw() -> void:
 	if _ovr == null:
 		_ovr = LeagueEnvIO.load_overall()
 	var g := scene.game
-	var top := view.y - HEIGHT - 10.0
+	var top := view.y - HEIGHT - 14.0
 	var bat := g.batting_team()
 	var field := g.fielding_team()
 	var batter := bat.player(g.batter_id())
 	var pitcher := field.player(g.pitcher_id())
-	_batter_card(Rect2(Vector2(16.0, top), Vector2(CARD, HEIGHT)), bat, batter, g)
-	_pitcher_card(Rect2(Vector2(view.x - CARD - 16.0, top), Vector2(CARD, HEIGHT)), field, pitcher, g)
-	var keys := Rect2(Vector2(CARD + 28.0, top + HEIGHT - 34.0), Vector2(view.x - 2.0 * CARD - 56.0, 34.0))
-	panel(keys)
-	text(keys.position + Vector2(0.0, 23.0), scene.help_keys() + "   Tab 상세", 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, keys.size.x)
+	_batter_card(Rect2(Vector2(20.0, top), Vector2(CARD, HEIGHT)), bat, batter, g)
+	_pitcher_card(Rect2(Vector2(view.x - CARD - 20.0, top), Vector2(CARD, HEIGHT)), field, pitcher, g)
+	var middle_x := CARD + 36.0
+	var middle_w := view.x - 2.0 * CARD - 72.0
+	var keys := Rect2(Vector2(middle_x, top + HEIGHT - 34.0), Vector2(middle_w, 34.0))
+	panel(keys, UiTheme.PANEL_DARK, 0.0)
+	keycaps(Vector2(middle_x, keys.end.y - 10.0), scene.help_keys() + "   Tab 상세", middle_w, 15)
 	if scene.last_text != "" and Settings.commentary:
-		var line := Rect2(Vector2(CARD + 28.0, top), Vector2(view.x - 2.0 * CARD - 56.0, 48.0))
-		panel(line)
-		text(line.position + Vector2(0.0, 32.0), scene.last_text, 20, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, line.size.x)
+		var line := Rect2(Vector2(middle_x, top), Vector2(middle_w, 50.0))
+		panel(line, UiTheme.PANEL, 8.0)
+		text(line.position + Vector2(0.0, 34.0), scene.last_text, 20, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, line.size.x)
 	if detail:
-		_batter_detail(Rect2(Vector2(16.0, top - 250.0), Vector2(CARD, 238.0)), batter, g)
-		_pitcher_detail(Rect2(Vector2(view.x - CARD - 16.0, top - 250.0), Vector2(CARD, 238.0)), pitcher, g)
+		_batter_detail(Rect2(Vector2(20.0, top - 252.0), Vector2(CARD, 238.0)), batter, g)
+		_pitcher_detail(Rect2(Vector2(view.x - CARD - 20.0, top - 252.0), Vector2(CARD, 238.0)), pitcher, g)
+
+
+## A player's card: the plate, his club's colour down the edge, a grey line over his name, the
+## overall in a block of its own at the right (as the menus' player card has it).
+func _card(rect: Rect2, side: int, head: String, name: String, ovr: int) -> void:
+	panel(rect, UiTheme.PANEL, 12.0)
+	var club := scene.club(side)
+	var colour := HudCanvas.club_colour(club)
+	club_band(Rect2(rect.position, Vector2(7.0, rect.size.y)), colour, 12.0)
+	if club != null:
+		Emblem.draw_emblem(self, club, Rect2(rect.position + Vector2(20.0, 22.0), Vector2(46.0, 46.0)))
+	text(rect.position + Vector2(80.0, 32.0), head, 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
+	text(rect.position + Vector2(80.0, 70.0), name, 30, UiTheme.INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK, rect.position.y), Vector2(OVR_BLOCK, rect.size.y))
+	draw_line(block.position + Vector2(0.0, 14.0), Vector2(block.position.x, block.end.y - 14.0), Color(1, 1, 1, 0.12), 1.2)
+	figure(block.position + Vector2(0.0, 58.0), str(ovr), 44, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0, true)
+	figure(block.position + Vector2(0.0, 80.0), "OVR", 14, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0)
 
 
 func _batter_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> void:
-	panel(rect)
 	if p == null:
+		panel(rect, UiTheme.PANEL, 12.0)
 		return
 	var slot := team.slot_of(p.id)
 	var pos := team.lineup[slot].position if slot >= 0 else Position.Kind.DH
 	var throws := g.fielding_team().player(g.pitcher_id())
 	var side := p.batting_side(throws.throws if throws != null else &"R")
 	var head := "%d번 · %s · %s타" % [slot + 1, Position.name_of(pos), "좌" if side == &"L" else "우"]
-	text(rect.position + Vector2(18.0, 28.0), head, 17, UiTheme.DIM)
-	text(rect.position + Vector2(18.0, 66.0), p.name, 30, UiTheme.INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
-	text(rect.position + Vector2(rect.size.x - 120.0, 30.0), "OVR %d" % roundi(_ovr.batter(p, pos)), 18, UiTheme.GOLD)
-	text(rect.position + Vector2(rect.size.x - 260.0, 70.0), today_batting(scene.scorer.book.bat(p.id)), 18, UiTheme.INK, HORIZONTAL_ALIGNMENT_RIGHT, 240.0)
+	_card(rect, g.batting(), head, p.name, roundi(_ovr.batter(p, pos)))
+	# Today's line at the right of the grey line, the name below with the whole width.
+	text(Vector2(rect.end.x - OVR_BLOCK - 276.0, rect.position.y + 32.0), today_batting(scene.scorer.book.bat(p.id)), 16, UiTheme.INK, HORIZONTAL_ALIGNMENT_RIGHT, 260.0, 500)
 
 
 func _pitcher_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> void:
-	panel(rect)
 	if p == null or p.pitching == null:
+		panel(rect, UiTheme.PANEL, 12.0)
 		return
 	var starter := p.id == team.starter_id
 	var head := "%s · %s투" % ["선발" if starter else "구원", "좌" if p.throws == &"L" else "우"]
-	text(rect.position + Vector2(18.0, 28.0), head, 17, UiTheme.DIM)
-	text(rect.position + Vector2(18.0, 66.0), p.name, 30, UiTheme.INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
-	text(rect.position + Vector2(rect.size.x - 120.0, 30.0), "OVR %d" % roundi(Overall.pitcher(p, scene.catalog)), 18, UiTheme.GOLD)
+	_card(rect, g.fielding(), head, p.name, roundi(Overall.pitcher(p, scene.catalog)))
+	# The pitch count and what is left of him at the right of the grey line.
 	var pitches: int = g.pitch_counts.get(p.id, 0)
-	text(rect.position + Vector2(rect.size.x - 300.0, 70.0), "투구 %d" % pitches, 18, UiTheme.INK)
+	var x := rect.end.x - OVR_BLOCK - 206.0
+	text(Vector2(x, rect.position.y + 32.0), "투구", 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
+	figure(Vector2(x + 38.0, rect.position.y + 34.0), str(pitches), 22, Color.WHITE)
 	var left := stamina_left(p, pitches, starter)
-	bar(Rect2(rect.position + Vector2(rect.size.x - 190.0, 58.0), Vector2(160.0, 12.0)), left, UiTheme.GREEN if left > 0.35 else (UiTheme.ORANGE if left > 0.15 else UiTheme.RED))
+	bar(Rect2(Vector2(x + 82.0, rect.position.y + 22.0), Vector2(108.0, 8.0)), left, UiTheme.GREEN if left > 0.35 else (UiTheme.ORANGE if left > 0.15 else UiTheme.RED))
 
 
 func _batter_detail(rect: Rect2, p: Player, g: GameState) -> void:
-	panel(rect, UiTheme.PANEL_DARK)
+	panel(rect, UiTheme.PANEL_DARK, 12.0)
 	if p == null:
 		return
 	var throws := g.fielding_team().player(g.pitcher_id())
 	var hand: StringName = throws.throws if throws != null else &"R"
-	text(rect.position + Vector2(18.0, 32.0), "%s  능력치 (상대 %s투)" % [p.name, "좌" if hand == &"L" else "우"], 20, UiTheme.GOLD)
+	heading(rect.position + Vector2(20.0, 34.0), "%s  능력치" % p.name, "상대 %s투" % ("좌" if hand == &"L" else "우"))
 	var rows: Array = [["컨택", p.batting.contact_vs(hand)], ["파워", p.batting.power_vs(hand)], ["선구안", p.batting.eye], ["주력", p.batting.speed], ["수비", p.fielding.overall()]]
 	_rating_rows(rect.position + Vector2(18.0, 62.0), rows)
 	var line := scene.scorer.book.bat(p.id)
@@ -95,10 +116,10 @@ func _batter_detail(rect: Rect2, p: Player, g: GameState) -> void:
 
 
 func _pitcher_detail(rect: Rect2, p: Player, g: GameState) -> void:
-	panel(rect, UiTheme.PANEL_DARK)
+	panel(rect, UiTheme.PANEL_DARK, 12.0)
 	if p == null or p.pitching == null:
 		return
-	text(rect.position + Vector2(18.0, 32.0), "%s  능력치" % p.name, 20, UiTheme.GOLD)
+	heading(rect.position + Vector2(20.0, 34.0), "%s  능력치" % p.name)
 	var pitches: int = g.pitch_counts.get(p.id, 0)
 	var left := stamina_left(p, pitches, p.id == g.fielding_team().starter_id)
 	text(rect.position + Vector2(18.0, 64.0), "체력", 17, UiTheme.DIM)
@@ -130,8 +151,8 @@ func _rating_rows(at: Vector2, rows: Array) -> void:
 		var row: Array = rows[i]
 		var y := at.y + 30.0 * i
 		text(Vector2(at.x, y + 8.0), row[0], 17, UiTheme.DIM)
-		bar(Rect2(Vector2(at.x + 62.0, y - 4.0), Vector2(150.0, 10.0)), float(row[1]) / 99.0, UiTheme.GOLD)
-		text(Vector2(at.x + 220.0, y + 8.0), str(roundi(float(row[1]))), 17, UiTheme.INK)
+		bar(Rect2(Vector2(at.x + 62.0, y - 3.0), Vector2(150.0, 7.0)), float(row[1]) / 99.0, UiTheme.RATING)
+		figure(Vector2(at.x + 222.0, y + 9.0), str(roundi(float(row[1]))), 20, Color.WHITE)
 
 
 ## "2타수 1안타", with a home run or RBI if he has one.

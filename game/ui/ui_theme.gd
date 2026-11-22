@@ -7,8 +7,10 @@ extends RefCounted
 ## Fonts: Paperlogy (text and headings) and Barlow Condensed (numbers, Latin), both SIL Open
 ## Font License 1.1; licence texts in ui/fonts/.
 
-const PANEL := Color(0.05, 0.08, 0.16, 0.78)
-const PANEL_DARK := Color(0.02, 0.03, 0.07, 0.86)
+## The HUD's plates: the menus' graphite (docs/05 section 5), a little more see-through over
+## the field.
+const PANEL := Color(0.085, 0.09, 0.11, 0.88)
+const PANEL_DARK := Color(0.045, 0.048, 0.06, 0.92)
 const LINE := Color(1.0, 1.0, 1.0, 0.14)
 const INK := Color(1.0, 1.0, 1.0, 0.95)
 const DIM := Color(1.0, 1.0, 1.0, 0.6)
@@ -18,6 +20,8 @@ const BLUE := Color(0.45, 0.7, 1.0)
 const ORANGE := Color(1.0, 0.6, 0.25)
 const RED := Color(1.0, 0.35, 0.3)
 const SHADOW := Color(0.0, 0.0, 0.0, 0.6)
+## A rating's bar, as the menus' player panel draws it.
+const RATING := Color(0.72, 0.78, 0.9)
 ## Pitch types on the pitch track, by family.
 const FASTBALL := Color(1.0, 0.36, 0.32)
 const BREAKING := Color(0.4, 0.72, 1.0)

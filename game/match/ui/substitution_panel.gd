@@ -15,11 +15,12 @@ var _defence_slot: Position.Kind = Position.Kind.DH
 
 func _ready() -> void:
 	super._ready()
-	custom_minimum_size = Vector2(620, 560)
-	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(600, 540)
-	add_child(scroll)
-	_list = VBoxContainer.new()
+	custom_minimum_size = Vector2(680, 0)
+	build("작전 · 교체", "SUBSTITUTION", UiTheme.MODE_COLOURS["league"])
+	set_note("F · Esc 닫기")
+	var scroll := UiKit.scroll(600.0)
+	body.add_child(scroll)
+	_list = UiKit.vbox(6)
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list)
 	visible = false
@@ -45,14 +46,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _rebuild(message: String) -> void:
 	for child: Node in _list.get_children():
+		_list.remove_child(child)
 		child.queue_free()
 	var g := scene.game
-	_header("작전 · 교체   (F 또는 Esc로 닫기)")
 	if message != "":
-		var note := Label.new()
-		note.text = message
-		note.add_theme_color_override("font_color", Color(1.0, 0.6, 0.4))
-		_list.add_child(note)
+		_list.add_child(UiKit.label(message, 17, UiTheme.ORANGE, 600))
 	var mine := scene.human_team
 	if mine < 0:
 		_header("관전 중에는 교체할 수 없습니다")
@@ -62,7 +60,7 @@ func _rebuild(message: String) -> void:
 		_header("투수 교체 (현재 %s, 투구 %d)" % [_name(team, team.pitcher_id), int(g.pitch_counts.get(team.pitcher_id, 0))])
 		for id: String in SubstitutionOptions.relievers(team):
 			var p := team.player(id)
-			_button("%s  %s" % [p.name, _pitcher_note(p)], _apply.bind(SubstitutionOptions.pitcher_change(g, mine, id)))
+			_button("%s    %s  ·  %s" % [p.name, _pitcher_note(p), _warm_text(g.warmth_of(mine, id))], _apply.bind(SubstitutionOptions.pitcher_change(g, mine, id)))
 		_header("수비 교체: 바꿀 자리")
 		for kind: Position.Kind in Position.FIELD:
 			if kind == Position.Kind.P:
@@ -74,7 +72,8 @@ func _rebuild(message: String) -> void:
 			for id: String in SubstitutionOptions.bench(team):
 				var p := team.player(id)
 				_button("%s  (%s)" % [p.name, Position.name_of(p.primary_position())], _apply.bind(SubstitutionOptions.defensive_change(mine, team.fielder_at(_defence_slot), id, _defence_slot)))
-	else:
+	_bullpen(g, mine, team)
+	if g.fielding() != mine:
 		_header("대타 (지금 타자 %s)" % _name(team, g.batter_id()))
 		for id: String in SubstitutionOptions.bench(team):
 			var p := team.player(id)
@@ -88,8 +87,40 @@ func _rebuild(message: String) -> void:
 				_button("%s  주력 %d" % [p.name, roundi(p.batting.speed)], _apply.bind(SubstitutionOptions.pinch_runner(g, base, id)))
 
 
+## The bullpen (docs/08 R4): who is throwing out there, how ready each man is, and a button
+## to start or stop him. Two at a time.
+func _bullpen(g: GameState, mine: int, team: TeamInGame) -> void:
+	_header("불펜 몸풀기 (두 명까지 · 몸을 덜 푼 투수는 첫 타자에게 제구가 흔들립니다)")
+	for id: String in SubstitutionOptions.relievers(team):
+		var p := team.player(id)
+		var on := g.warming[mine].has(id)
+		_button("%s  %s  %s" % [p.name, _warm_text(g.warmth_of(mine, id)), "· 몸 푸는 중 (누르면 멈춤)" if on else "· 몸 풀기"], _toggle_warm.bind(id))
+
+
+func _toggle_warm(id: String) -> void:
+	var g := scene.game
+	var mine := scene.human_team
+	var ids := g.warming[mine].duplicate()
+	if ids.has(id):
+		ids.remove_at(ids.find(id))
+	else:
+		if ids.size() >= GameState.MAX_WARMING:
+			ids.remove_at(0)
+		ids.append(id)
+	g.set_warming(mine, ids)
+	_rebuild("")
+
+
+static func _warm_text(warmth: float) -> String:
+	if warmth >= 0.95:
+		return "준비 완료"
+	if warmth <= 0.02:
+		return "몸 안 풂"
+	return "몸 %d%%" % roundi(warmth * 100.0)
+
+
 func _pitcher_note(p: Player) -> String:
-	return "제구 %d 체력 %d" % [roundi(p.pitching.control), roundi(p.pitching.stamina)] if p.pitching != null else ""
+	return "제구 %d  체력 %d" % [roundi(p.pitching.control), roundi(p.pitching.stamina)] if p.pitching != null else ""
 
 
 func _name(team: TeamInGame, id: String) -> String:
@@ -98,18 +129,13 @@ func _name(team: TeamInGame, id: String) -> String:
 
 
 func _header(text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.25))
-	_list.add_child(label)
+	if _list.get_child_count() > 0:
+		_list.add_child(UiKit.spacer(0.0, 6.0))
+	_list.add_child(section(text))
 
 
 func _button(text: String, action: Callable) -> void:
-	var b := Button.new()
-	b.text = text
-	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.pressed.connect(action)
-	_list.add_child(b)
+	_list.add_child(row_button(text, action))
 
 
 func _choose_slot(kind: Position.Kind) -> void:

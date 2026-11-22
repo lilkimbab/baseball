@@ -4,18 +4,11 @@ extends HudCanvas
 ## scene's state; world positions are projected through the active camera.
 
 const INK := Color(1.0, 1.0, 1.0, 0.95)
-const PANEL := Color(0.05, 0.08, 0.16, 0.72)
 const GOLD := Color(1.0, 0.82, 0.25)
 const GREEN := Color(0.4, 0.9, 0.45)
 const BLUE := Color(0.45, 0.7, 1.0)
 const ORANGE := Color(1.0, 0.6, 0.25)
 const RED := Color(1.0, 0.35, 0.3)
-
-## The see-through bat: from its knob to the sweet spot, and on past it to the tip (m).
-const BAT_KNOB_TO_SWEET := 0.68
-const BAT_TIP_BEYOND := 0.17
-## Seconds a pitch's trail stays up after it.
-const TRAIL_TIME := 2.0
 
 const JUDGMENT_TEXT := {&"perfect": "완벽", &"good": "좋음", &"early": "빠름", &"late": "늦음", &"miss": "헛스윙"}
 const MODE_TEXT := {&"bat": "타격", &"pitch": "투구", &"watch": "관전"}
@@ -32,17 +25,19 @@ func _draw() -> void:
 	if scene == null or scene.duel == null:
 		return
 	begin()
-	_draw_zone()
+	var at_the_plate := scene.plate_marks_visible()
+	if at_the_plate:
+		_draw_zone()
 	if show_count:
 		_draw_count()
-	_draw_trail()
-	if scene.human_pitches():
+	if at_the_plate and scene.human_pitches():
 		_draw_preview()
 		_draw_pitch_list()
 		_draw_target_gauge()
-	if scene.human_bats() and scene.aim_enabled:
-		_draw_bat_cursor()
-	_draw_pitch_readout()
+	if at_the_plate and scene.human_bats():
+		_draw_arrival()
+	if at_the_plate:
+		_draw_pitch_readout()
 	_draw_swing_feedback()
 	_draw_banner()
 	if show_help:
@@ -80,7 +75,7 @@ func _draw_zone() -> void:
 
 func _draw_count() -> void:
 	var box := Rect2(Vector2(view.x * 0.5 - 150.0, 14.0), Vector2(300.0, 44.0))
-	draw_rect(box, PANEL)
+	panel(box, UiTheme.PANEL, 8.0)
 	_text(box.position + Vector2(16.0, 30.0), "B", 20, GREEN)
 	for i: int in 3:
 		draw_circle(box.position + Vector2(44.0 + i * 20.0, 23.0), 7.0, GREEN if i < scene.balls else Color(1, 1, 1, 0.18))
@@ -174,26 +169,39 @@ func _draw_target_gauge() -> void:
 	if state == DuelScene.State.WINDUP and scene.human_pitches():
 		_draw_pitch_grade()
 		return
-	if state != DuelScene.State.PRE_PITCH and state != DuelScene.State.CHARGE and state != DuelScene.State.ACCURACY:
+	if state != DuelScene.State.PRE_PITCH and state != DuelScene.State.CHARGE:
 		return
-	if not _visible(scene.target):
+	# The wheel opens where the pointer is, on the target: its name and circle under the wheel
+	# ran into the wheel's own labels.
+	if scene.wheel_open or not _visible(scene.target):
 		return
 	var centre := _screen(scene.target)
 	var per_metre := (_screen(scene.target + Vector3(0.1, 0.0, 0.0)) - centre).length() * 10.0
-	var base := maxf(per_metre * 0.11, 14.0)
-	draw_circle(centre, 4.0, GOLD)
-	draw_arc(centre, base, 0.0, TAU, 48, Color(1, 1, 1, 0.85), 2.0, true)
-	_text(centre + Vector2(-90.0, -base - 14.0), scene.selected_type().label, 18, GOLD, HORIZONTAL_ALIGNMENT_CENTER, 180.0)
-	if state == DuelScene.State.CHARGE:
-		draw_arc(centre, base + 7.0, -PI * 0.5, -PI * 0.5 + TAU * scene.power, 48, ORANGE, 6.0, true)
-	elif state == DuelScene.State.ACCURACY:
-		var sweep := lerpf(base * 3.2, base * 0.3, scene.ring)
-		var sweet := lerpf(base * 3.2, base * 0.3, DuelScene.ACCURACY_SWEET)
-		draw_arc(centre, sweet, 0.0, TAU, 48, Color(GREEN, 0.9), 5.0, true)
-		draw_arc(centre, sweep, 0.0, TAU, 48, INK, 3.0, true)
+	var base := maxf(per_metre * 0.11, 16.0)
+	_text(centre + Vector2(-90.0, -base * GAUGE_FROM - 12.0 if state == DuelScene.State.CHARGE else -base - 14.0), scene.selected_type().label, 18, GOLD, HORIZONTAL_ALIGNMENT_CENTER, 180.0)
+	if state != DuelScene.State.CHARGE:
+		draw_arc(centre, base, 0.0, TAU, 48, Color(1, 1, 1, 0.85), 2.0, true)
+		return
+	# The button is down: a ring closes on the target's circle. Let go when they meet. The
+	# circle is a green band as wide as a good pitch's window; the ring is green inside it,
+	# red once it has gone by.
+	var sweet := DuelScene.ACCURACY_SWEET
+	var at := scene.ring
+	var good := DuelScene.gauge_accuracy(at)
+	draw_arc(centre, base, 0.0, TAU, 64, Color(GREEN, 0.35), maxf(base * 0.42, 9.0), true)
+	draw_arc(centre, base, 0.0, TAU, 64, Color(GREEN, 0.95), 2.5, true)
+	var radius := base * (lerpf(GAUGE_FROM, 1.0, at / sweet) if at <= sweet else lerpf(1.0, 0.15, (at - sweet) / (1.0 - sweet)))
+	var colour := GOLD if good >= 0.85 else (GREEN if good >= 0.6 else (RED if at > sweet else INK))
+	draw_arc(centre, radius, 0.0, TAU, 64, Color(0.0, 0.0, 0.0, 0.55), 7.0, true)
+	draw_arc(centre, radius, 0.0, TAU, 64, colour, 4.0, true)
+	_text(centre + Vector2(-140.0, base * GAUGE_FROM + 26.0), "원이 겹칠 때 버튼을 떼세요", 16, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER, 280.0)
 
 
-## How well the accuracy click landed, inside the ring while the pitcher winds up.
+## How many target circles wide the closing ring starts.
+const GAUGE_FROM := 3.4
+
+
+## How well the pitch was let go, inside the ring while the pitcher winds up.
 func _draw_pitch_grade() -> void:
 	if not _visible(scene.target):
 		return
@@ -204,68 +212,41 @@ func _draw_pitch_grade() -> void:
 	shout(centre + Vector2(-80.0, 9.0), grade, 26, color, HORIZONTAL_ALIGNMENT_CENTER, 160.0)
 
 
-## The batter's aim: a see-through bat lying where the swing will meet the ball, its sweet
-## spot on the pointer. Its barrel reaches across the plate from the batter's side, dipping
-## for a low pitch. The bright ring is the sweet spot (a miss this small is forgiven,
-## SwingModel.FORGIVEN_ERROR); the faint one, beyond which he is fooled.
-func _draw_bat_cursor() -> void:
-	if scene.duel.swing != null or not (scene.state == DuelScene.State.PRE_PITCH or scene.state == DuelScene.State.WINDUP or scene.state == DuelScene.State.LIVE):
+## For the batter, from the moment the pitch leaves the hand: a circle on the plane of the
+## plate where it is going to cross, and a ring closing on it that meets it as the ball gets
+## there (where to swing, and when).
+func _draw_arrival() -> void:
+	var duel := scene.duel
+	if not Settings.pitch_marker or duel.pitch == null or scene.state != DuelScene.State.LIVE or duel.phase != PitchDuel.Phase.FLIGHT:
 		return
-	var aim := scene.aim_point
-	if not _visible(aim):
+	if duel.time > duel.pitch.flight_time + 0.05:
 		return
-	var handle_side := 1.0 if scene.settings.bats_left else -1.0
-	# Knob toward the batter, a little higher than the barrel, more so for a low pitch.
-	var drop := clampf((0.95 - aim.z) * 0.55, -0.12, 0.35) + 0.08
-	var tip := aim + Vector3(-handle_side * BAT_TIP_BEYOND, 0.0, -drop * BAT_TIP_BEYOND / BAT_KNOB_TO_SWEET)
-	var knob := aim + Vector3(handle_side * BAT_KNOB_TO_SWEET, 0.0, drop)
-	var axis := (tip - knob).normalized()
-	var across := Vector3(-axis.z, 0.0, axis.x)
-	var left := PackedVector2Array()
-	var right := PackedVector2Array()
-	const STEPS := 14
-	for i: int in STEPS + 1:
-		var f := float(i) / STEPS
-		var p := knob.lerp(tip, f)
-		# Knob, thin handle, taper, barrel (radius in metres).
-		var r := 0.017 if f < 0.04 else (0.013 if f < 0.4 else lerpf(0.013, 0.033, smoothstep(0.4, 0.72, f)))
-		left.append(_screen(p + across * r))
-		right.append(_screen(p - across * r))
-	right.reverse()
-	var outline := left + right
-	draw_colored_polygon(outline, Color(1.0, 1.0, 1.0, 0.22))
-	outline.append(outline[0])
-	draw_polyline(outline, Color(1.0, 1.0, 1.0, 0.75), 1.5, true)
-	var centre := _screen(aim)
-	var per_metre := (_screen(aim + Vector3(0.1, 0.0, 0.0)) - centre).length() * 10.0
-	draw_arc(centre, maxf(per_metre * SwingModel.FORGIVEN_ERROR, 6.0), 0.0, TAU, 32, Color(GOLD, 0.9), 2.5, true)
-	draw_arc(centre, maxf(per_metre * SwingModel.FOOLED_ERROR, 14.0), 0.0, TAU, 48, Color(1, 1, 1, 0.25), 1.2, true)
-	draw_circle(centre, 3.0, GOLD)
-
-
-## A ball of the path, drawn its size at its distance, at least a few pixels across.
-func _ghost_ball(at: Vector3, alpha: float, colour: Color = Color.WHITE) -> void:
-	if not _visible(at):
+	var spot := Vector3(duel.pitch.plate_pos.x, Field.PLATE_FRONT_Y, duel.pitch.plate_pos.z)
+	if not _visible(spot):
 		return
-	var p := _screen(at)
-	var r := maxf((_screen(at + Vector3(0.1, 0.0, 0.0)) - p).length() * 10.0 * 0.0366 * 1.25, 3.5)
-	draw_circle(p, r, Color(colour, alpha))
-	draw_arc(p, r, 0.0, TAU, 16, Color(0.15, 0.15, 0.18, alpha * 0.8), 1.2, true)
+	var p := _screen(spot)
+	var r := maxf((_screen(spot + Vector3(0.1, 0.0, 0.0)) - p).length() * 10.0 * 0.0366 * 1.5, 9.0)
+	var inside := duel.zone.contains(spot.x, spot.z)
+	var colour := GOLD if inside else Color(0.75, 0.82, 0.95)
+	draw_circle(p, r, Color(colour, 0.22))
+	draw_arc(p, r, 0.0, TAU, 40, Color(0.0, 0.0, 0.0, 0.5), 5.0, true)
+	draw_arc(p, r, 0.0, TAU, 40, colour, 2.5, true)
+	var left := clampf(1.0 - duel.time / maxf(duel.pitch.flight_time, 0.05), 0.0, 1.0)
+	draw_arc(p, r * (1.0 + 2.6 * left), 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.25 + 0.5 * (1.0 - left)), 2.0, true)
 
 
 ## Before the pitch: where the chosen pitch will arrive. A straight fastball is a mark in the
 ## zone and nothing more; a pitch that moves has the last of its path bending into the mark.
 func _draw_preview() -> void:
 	var path := scene.preview
-	if path.is_empty():
+	if path.is_empty() or scene.wheel_open:
 		return
+	# (The ball itself is in the scene, where the pitch is aimed: DuelScene.aim_ball.)
 	_tail(path, 1.0, Color(1.0, 0.85, 0.35))
-	var end := path[path.size() - 1]
-	_ghost_ball(end, 0.9, Color(1.0, 0.95, 0.8))
 
 
-## The last of a pitch's path as a line that thickens and brightens toward where it arrives,
-## with the head of an arrow there: which way it is moving as it comes in.
+## The last of a pitch's path as a line that thickens and brightens toward where it arrives:
+## which way it is moving as it comes in. It stops short of the ball that marks the spot.
 func _tail(path: PackedVector3Array, strength: float, colour: Color) -> void:
 	var points := PackedVector2Array()
 	for p: Vector3 in path:
@@ -274,35 +255,17 @@ func _tail(path: PackedVector3Array, strength: float, colour: Color) -> void:
 	if points.size() < 3:
 		return
 	var last := points.size() - 1
+	var end := points[last]
+	var room := maxf((_screen(path[path.size() - 1] + Vector3(0.1, 0.0, 0.0)) - end).length() * 10.0 * 0.0366 * DuelScene.AIM_BALL_SCALE + 3.0, 6.0)
 	for i: int in last:
 		var f := float(i + 1) / last
-		draw_line(points[i], points[i + 1], Color(colour, strength * (0.18 + 0.75 * f * f)), 2.0 + 3.5 * f, true)
-	var dir := points[last] - points[maxi(last - 3, 0)]
-	if dir.length() > 2.0:
-		dir = dir.normalized()
-		var side := Vector2(-dir.y, dir.x)
-		var tip := points[last] - dir * 6.0
-		draw_colored_polygon(PackedVector2Array([tip, tip - dir * 11.0 + side * 6.5, tip - dir * 11.0 - side * 6.5]), Color(colour, strength * 0.9))
-
-
-## After a pitch that moved and nobody hit: the last of the path it took, for a moment.
-func _draw_trail() -> void:
-	var path := scene.trail
-	if path.size() < 3:
-		return
-	var duel := scene.duel
-	if duel.pitch == null:
-		return
-	var hit := duel.contact != null and duel.contact.made_contact
-	var passed := duel.phase != PitchDuel.Phase.FLIGHT or duel.time >= duel.pitch.flight_time
-	if hit or not passed:
-		return
-	var fade := 1.0
-	if scene.state == DuelScene.State.RESULT:
-		fade = 1.0 - smoothstep(TRAIL_TIME - 0.5, TRAIL_TIME, scene.state_time)
-	if fade <= 0.0:
-		return
-	_tail(path, fade, Color(1.0, 1.0, 1.0))
+		var a := points[i]
+		var b := points[i + 1]
+		if a.distance_to(end) <= room:
+			break
+		if b.distance_to(end) < room:
+			b = end + (a - end).normalized() * room
+		draw_line(a, b, Color(colour, strength * (0.18 + 0.75 * f * f)), 2.0 + 3.5 * f, true)
 
 
 ## Speed and pitch type where the ball crossed the plate.
@@ -341,11 +304,12 @@ func _draw_swing_feedback() -> void:
 			color = ORANGE
 		&"miss":
 			color = RED
-	shout(Vector2(0.0, view.y * 0.62), label, 36, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
+	if scene.plate_marks_visible():
+		shout(Vector2(0.0, view.y * 0.62), label, 36, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
 	if Settings.hit_info and duel.contact != null and duel.contact.made_contact:
 		var info := "타구 속도 %d km/h   발사각 %d°   방향 %d°" % [roundi(duel.contact.exit_speed_kmh()), roundi(duel.contact.launch_deg()), roundi(duel.contact.spray_deg())]
 		var box := Rect2(Vector2(view.x * 0.5 - 260.0, view.y - 110.0 - bottom_reserved), Vector2(520.0, 42.0))
-		draw_rect(box, PANEL)
+		panel(box, UiTheme.PANEL, 8.0)
 		_text(box.position + Vector2(0.0, 25.0), info, 18, INK, HORIZONTAL_ALIGNMENT_CENTER, box.size.x)
 
 
@@ -359,8 +323,8 @@ func _draw_banner() -> void:
 func _draw_help() -> void:
 	var line := scene.help_keys()
 	if scene.human_bats():
-		line = "왼쪽 클릭 컨택 스윙   오른쪽 클릭 파워 스윙   V 조준 %s      %s" % ["끄기" if scene.aim_enabled else "켜기", line]
+		line = "좌클릭 컨택 스윙   우클릭 파워 스윙   V 조준 %s   %s" % ["끄기" if scene.aim_enabled else "켜기", line]
 	elif scene.human_pitches():
-		line = "오른쪽 버튼을 누른 채 구종 쪽으로(또는 1~%d)   마우스 코스   왼쪽 버튼 누르고 있기 → 떼기 → 고리가 맞을 때 클릭      %s" % [mini(scene.pitch_ids.size(), DuelScene.WHEEL_SLOTS), line]
-	draw_rect(Rect2(Vector2(0.0, view.y - 34.0), Vector2(view.x, 34.0)), PANEL)
-	_text(Vector2(16.0, view.y - 11.0), line, 15, Color(1, 1, 1, 0.85))
+		line = "우클릭+이동 구종(또는 1~%d)   마우스 코스   좌클릭 누르고 원이 겹칠 때 떼기   %s" % [mini(scene.pitch_ids.size(), DuelScene.WHEEL_SLOTS), line]
+	panel(Rect2(Vector2(0.0, view.y - 40.0), Vector2(view.x, 40.0)), UiTheme.PANEL_DARK, 0.0)
+	keycaps(Vector2(0.0, view.y - 13.0), line, view.x, 15)

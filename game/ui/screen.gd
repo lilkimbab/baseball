@@ -68,6 +68,7 @@ func _ready() -> void:
 	add_to_group(&"menu")
 	Settings.ensure_loaded()
 	Profile.ensure_loaded()
+	MenuMusic.play(get_tree())
 	setup()
 	tint = UiTheme.MODE_COLOURS.get(dock_id, UiTheme.BRAND)
 	MenuBackdrop.show_for(self, vantage)

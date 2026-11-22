@@ -1,30 +1,110 @@
 {
-  "note": "One-line play-by-play (docs/13 S6-7). Scorebook terms first; several lines per situation so the same play does not always read the same. Placeholders: {name} batter, {runner} runner, {play} the scorebook text ('유격수 땅볼', '좌전 안타'), {fielders} the fielders ('6-4-3'), {runs} runs scored, {base} base number.",
-  "strikeout_swinging": ["{name}, 헛스윙 삼진", "{name}, 방망이가 헛돌며 삼진", "{name} 헛스윙 삼진으로 물러납니다"],
-  "strikeout_looking": ["{name}, 루킹 삼진", "{name}, 서서 삼진을 당합니다", "{name} 루킹 삼진"],
-  "strikeout_foul_tip": ["{name}, 파울 팁 삼진"],
-  "dropped_third_strike": ["{name}, 스트라이크 아웃 낫아웃으로 1루에 나갑니다"],
-  "walk": ["{name}, 볼넷", "{name} 볼넷으로 걸어 나갑니다"],
-  "intentional_walk": ["{name}, 고의사구"],
-  "hit_by_pitch": ["{name}, 몸에 맞는 공", "{name}, 몸에 맞는 공으로 1루에"],
-  "single": ["{name}, {play}", "{name} {play}!"],
-  "double": ["{name}, {play}", "{name}의 {play}!"],
-  "triple": ["{name}, {play}!", "{name}, 펜스까지 굴러가는 {play}!"],
-  "home_run": ["{name}, {play}!", "{name}, 담장을 넘깁니다! {play}", "넘어갔습니다! {name}의 {play}"],
-  "ground_out": ["{name}, {play}", "{name} {play}로 물러납니다"],
-  "fly_out": ["{name}, {play}", "{name} {play}로 물러납니다"],
-  "line_out": ["{name}, {play}", "{name}, 잘 맞았지만 {play}"],
-  "pop_out": ["{name}, {play}"],
-  "double_play": ["{name}, {fielders} 병살", "{name}, {play}"],
-  "triple_play": ["{name}, 삼중살! {fielders}"],
-  "sac_fly": ["{name}, {play}", "{name}, {play}로 점수를 냅니다"],
-  "sac_bunt": ["{name}, 희생 번트 성공"],
-  "fielders_choice": ["{name}, {play}"],
-  "reached_on_error": ["{name}, {play}"],
-  "runs": [", {runs}점", " ({runs}점)"],
-  "steal": ["{runner}, {base}루 도루 성공", "{runner}, {base}루를 훔칩니다"],
-  "caught_stealing": ["{runner}, {base}루 도루 실패"],
-  "pickoff": ["{runner}, 견제사"],
-  "wild_pitch": ["폭투, 주자 진루"],
-  "passed_ball": ["포일, 주자 진루"]
+ "note": "One-line play-by-play (docs/13 S6-7). Scorebook terms first; several lines per situation so the same play does not always read the same. Placeholders: {name} batter, {runner} runner, {play} the scorebook text ('유격수 땅볼', '좌전 안타'), {fielders} the fielders ('6-4-3'), {runs} runs scored, {base} base number.",
+ "strikeout_swinging": [
+  "{name}, 헛스윙 삼진",
+  "{name}, 방망이가 헛돌며 삼진",
+  "{name} 헛스윙 삼진으로 물러납니다"
+ ],
+ "strikeout_looking": [
+  "{name}, 루킹 삼진",
+  "{name}, 서서 삼진을 당합니다",
+  "{name} 루킹 삼진"
+ ],
+ "strikeout_foul_tip": [
+  "{name}, 파울 팁 삼진"
+ ],
+ "dropped_third_strike": [
+  "{name}, 스트라이크 아웃 낫아웃으로 1루에 나갑니다"
+ ],
+ "walk": [
+  "{name}, 볼넷",
+  "{name} 볼넷으로 걸어 나갑니다"
+ ],
+ "intentional_walk": [
+  "{name}, 고의사구"
+ ],
+ "hit_by_pitch": [
+  "{name}, 몸에 맞는 공",
+  "{name}, 몸에 맞는 공으로 1루에"
+ ],
+ "single": [
+  "{name}, {play}",
+  "{name} {play}!"
+ ],
+ "double": [
+  "{name}, {play}",
+  "{name}의 {play}!"
+ ],
+ "triple": [
+  "{name}, {play}!",
+  "{name}, 펜스까지 굴러가는 {play}!"
+ ],
+ "home_run": [
+  "{name}, {play}!",
+  "{name}, 담장을 넘깁니다! {play}",
+  "넘어갔습니다! {name}의 {play}"
+ ],
+ "ground_out": [
+  "{name}, {play}",
+  "{name} {play}로 물러납니다"
+ ],
+ "fly_out": [
+  "{name}, {play}",
+  "{name} {play}로 물러납니다"
+ ],
+ "line_out": [
+  "{name}, {play}",
+  "{name}, 잘 맞았지만 {play}"
+ ],
+ "pop_out": [
+  "{name}, {play}"
+ ],
+ "double_play": [
+  "{name}, {fielders} 병살",
+  "{name}, {play}"
+ ],
+ "triple_play": [
+  "{name}, 삼중살! {fielders}"
+ ],
+ "sac_fly": [
+  "{name}, {play}",
+  "{name}, {play}로 점수를 냅니다"
+ ],
+ "sac_bunt": [
+  "{name}, 희생 번트 성공"
+ ],
+ "fielders_choice": [
+  "{name}, {play}"
+ ],
+ "reached_on_error": [
+  "{name}, {play}"
+ ],
+ "runs": [
+  ", {runs}점",
+  " ({runs}점)"
+ ],
+ "steal": [
+  "{runner}, {base}루 도루 성공",
+  "{runner}, {base}루를 훔칩니다"
+ ],
+ "caught_stealing": [
+  "{runner}, {base}루 도루 실패"
+ ],
+ "pickoff": [
+  "{runner}, 견제사"
+ ],
+ "wild_pitch": [
+  "폭투, 주자 진루"
+ ],
+ "passed_ball": [
+  "포일, 주자 진루"
+ ],
+ "home_run_wind": [
+  "{name}, 바람을 타고 담장을 넘깁니다! {play}",
+  "외야로 부는 바람에 실려 넘어갑니다! {name}의 {play}"
+ ],
+ "fly_out_wind": [
+  "{name}의 큰 타구, 맞바람에 막혀 잡힙니다. {play}",
+  "{name}, 잘 맞았지만 바람이 잡아 둡니다. {play}"
+ ]
 }

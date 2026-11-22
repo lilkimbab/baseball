@@ -34,7 +34,7 @@ uniform bool has_limbs = false;
 uniform float relief_strength : hint_range(0.0, 2.0) = 0.45;
 uniform float pore_tiling = 70.0;
 uniform float pore_strength : hint_range(0.0, 1.0) = 0.05;
-uniform float occlusion : hint_range(0.0, 1.0) = 0.8;
+uniform float occlusion : hint_range(0.0, 1.0) = 0.95;
 uniform float scatter : hint_range(0.0, 1.0) = 0.22;
 
 // Per player (SkinnedPuppet.set_face): complexion (a multiplier on the painted skin: sun,
@@ -46,6 +46,9 @@ instance uniform float sweat = 0.3;
 instance uniform float veins = 0.5;
 instance uniform float vein_seed = 0.0;
 instance uniform vec3 hair_tint : source_color = vec3(0.05, 0.045, 0.04);
+// A long-sleeved undershirt: 1 covers the arms to the wrists in its colour.
+instance uniform float sleeve = 0.0;
+instance uniform vec3 sleeve_tint : source_color = vec3(0.08, 0.1, 0.2);
 
 const int ARM_VEINS = 7;
 const int HAND_VEINS = 5;
@@ -161,8 +164,15 @@ void fragment() {
 	base *= mix(vec3(0.82, 0.74, 0.72), vec3(1.0), ao);
 	// The veins and tendons under the skin: a little blue-grey where a vein is, and the
 	// surface tilted by their height (fading out where a pixel covers more than they are wide).
+	// The undershirt's sleeve over the arm, down to a cuff at the wrist: cloth, not skin.
+	float cloth = 0.0;
+	if (has_limbs && sleeve > 0.5) {
+		float along = limb.r * 3.0 - 1.0;
+		cloth = smoothstep(0.02, 0.2, limb.a) * (1.0 - smoothstep(0.915, 0.925, along));
+	}
 	float blue = 0.0;
-	float raised = has_limbs ? under_skin(blue) : 0.0;
+	float raised = has_limbs ? under_skin(blue) * (1.0 - cloth) : 0.0;
+	blue *= 1.0 - cloth;
 	vec3 across_x = dFdx(VERTEX);
 	vec3 across_y = dFdy(VERTEX);
 	float sharp = 1.0 - smoothstep(0.0012, 0.004, max(length(across_x), length(across_y)));
@@ -188,9 +198,10 @@ void fragment() {
 	float edge = scalp + (hash(floor(UV * 1400.0)) - 0.5) * 0.3 * (1.0 - clamp(length(fwidth(UV * 1400.0)) - 0.5, 0.0, 1.0));
 	float hair = smoothstep(0.3, 0.62, edge) * (0.72 + 0.28 * strands);
 	base = mix(base, hair_tint, hair);
+	base = mix(base, sleeve_tint * (0.92 + 0.08 * ao), cloth);
 	ALBEDO = base;
 	AO = ao;
-	AO_LIGHT_AFFECT = 0.35;
+	AO_LIGHT_AFFECT = 0.5;
 
 	vec3 relief = has_relief ? texture(relief_texture, UV).xyz : vec3(0.5, 0.5, 1.0);
 	vec3 pores = texture(pore_texture, UV * pore_tiling).xyz * 2.0 - 1.0;
@@ -206,7 +217,9 @@ void fragment() {
 	// No second (clear coat) highlight for sweat: the engine draws that layer mirror-sharp
 	// whatever its roughness, and on skin it broke up into single white pixels under the eyes
 	// and down the cheeks, like tears. Sweat is the lower roughness above.
-	SSS_STRENGTH = scatter * (1.0 - hair);
+	ROUGHNESS = mix(ROUGHNESS, 0.82, cloth);
+	SPECULAR = mix(SPECULAR, 0.3, cloth);
+	SSS_STRENGTH = scatter * (1.0 - hair) * (1.0 - cloth);
 	RIM = 0.18 * (1.0 - hair);
 	RIM_TINT = 0.7;
 }

@@ -206,6 +206,17 @@ static func ground_catch(side: float = 0.0) -> PuppetPose:
 ## The catch for a ball at `local` (in the fielder's own space, as PuppetPose.at gives it)
 ## and `height` above the ground: a dive for one well wide of him and low enough, a ground
 ## ball, chest-high, or overhead.
+## Which of those catch_for gives: &"dive", &"ground", &"chest" or &"overhead".
+static func catch_kind(local: Vector3, height: float) -> StringName:
+	if absf(local.x) > DIVE_WIDTH and height < 1.3:
+		return &"dive"
+	if height < 0.5:
+		return &"ground"
+	if height < 1.7:
+		return &"chest"
+	return &"overhead"
+
+
 static func catch_for(local: Vector3, height: float) -> PuppetPose:
 	if absf(local.x) > DIVE_WIDTH and height < 1.3:
 		return dive(signf(local.x))

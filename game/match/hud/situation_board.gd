@@ -34,8 +34,8 @@ func _card(lines: PackedStringArray) -> void:
 	if lines.is_empty():
 		return
 	var rect := Rect2(Vector2(view.x * 0.5 - 360.0, 360.0), Vector2(720.0, 70.0 + 46.0 * (lines.size() - 1)))
-	panel(rect, Color(0.08, 0.1, 0.2, 0.97))
-	draw_rect(Rect2(rect.position, Vector2(rect.size.x, 4.0)), UiTheme.GOLD)
+	panel(rect, Color(UiTheme.PANEL, 0.97), 14.0)
+	draw_rect(Rect2(rect.position + Vector2(14.0, 0.0), Vector2(rect.size.x - 14.0, 4.0)), UiTheme.ACCENT)
 	text(rect.position + Vector2(0.0, 48.0), lines[0], 30, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 700)
 	for i: int in range(1, lines.size()):
 		var last := i == lines.size() - 1

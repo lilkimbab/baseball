@@ -25,6 +25,8 @@ static func create(spec: Spec, rules: CareerRules, catalog: Dictionary[StringNam
 	p.name = spec.name
 	p.number = spec.number
 	p.born = 2026 - 20
+	# He grows by his own points (CareerRules), not by the league's development.
+	p.potential = 0.0
 	p.bats = spec.bats
 	p.throws = spec.throws
 	var body := rules.body_by_id(spec.body_id)

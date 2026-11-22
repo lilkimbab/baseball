@@ -51,29 +51,68 @@ func test_pitching_mode_waits_for_the_player_then_runs_the_gauge() -> void:
 	scene.selected_pitch = 2
 	scene.press_pitch_button()
 	assert_eq(scene.state, DuelScene.State.CHARGE)
-	_advance(scene, 60)
-	assert_between(scene.power, 0.4, 0.7, "power builds while the button is held")
+	_advance(scene, 50)
+	assert_between(scene.power, 0.3, 0.7, "he winds up to his full speed while the button is held")
+	assert_eq(scene.state, DuelScene.State.CHARGE, "and nothing is thrown until it is let go")
+	_advance(scene, roundi(DuelScene.GAUGE_TIME * DuelScene.ACCURACY_SWEET * 120.0) - 50)
 	scene.release_pitch_button()
-	assert_eq(scene.state, DuelScene.State.ACCURACY)
-	_advance(scene, roundi(DuelScene.ACCURACY_TIME * DuelScene.ACCURACY_SWEET * 120.0))
-	scene.press_pitch_button()
-	assert_eq(scene.state, DuelScene.State.WINDUP)
-	assert_gt(scene.accuracy, 0.8, "clicking on the sweet spot is accurate")
+	assert_eq(scene.state, DuelScene.State.WINDUP, "letting go is the pitch")
+	assert_gt(scene.accuracy, 0.9, "let go as the ring meets the circle, it is accurate")
+	assert_almost_eq(scene.power, 1.0, 0.02, "and at his full speed")
+	assert_true(scene.decision.by_hand)
 	assert_eq(scene.decision.type.id, &"slider")
 	_advance(scene, roundi(PuppetClips.PITCH_RELEASE * 120.0) + 20)
 	assert_eq(scene.state, DuelScene.State.LIVE, "the ball is released at the end of the delivery")
 	assert_almost_eq(scene.duel.pitch.release_speed_kmh(), 132.0 * lerpf(0.93, 1.0, scene.power), 1.0)
 
 
-func test_missing_the_accuracy_click_still_throws_but_badly() -> void:
+func test_holding_the_button_too_long_still_throws_but_badly() -> void:
 	var scene := _start(&"pitch")
 	_advance(scene, 10)
 	scene.press_pitch_button()
-	_advance(scene, 20)
-	scene.release_pitch_button()
-	_advance(scene, roundi(DuelScene.ACCURACY_TIME * 120.0) + 10)
+	_advance(scene, roundi(DuelScene.GAUGE_TIME * 120.0) + 10)
 	assert_eq(scene.state, DuelScene.State.WINDUP)
 	assert_eq(scene.accuracy, 0.0)
+	# And one let go at once is as bad, and slow.
+	var quick := _start(&"pitch")
+	_advance(quick, 10)
+	quick.press_pitch_button()
+	_advance(quick, 6)
+	quick.release_pitch_button()
+	assert_eq(quick.state, DuelScene.State.WINDUP)
+	assert_eq(quick.accuracy, 0.0)
+	assert_lt(quick.power, 0.1)
+
+
+func test_the_player_s_pitch_goes_where_he_aimed_when_he_times_it() -> void:
+	# docs/04 5.2: the miss follows his timing far more closely than a computer pitcher's draw.
+	assert_almost_eq(PitchDuel.player_scatter(1.0), PitchDuel.PLAYER_BEST, 1e-6)
+	assert_almost_eq(PitchDuel.player_scatter(0.0), PitchDuel.PLAYER_WORST, 1e-6)
+	assert_lt(PitchDuel.player_scatter(0.75), 0.5, "a twentieth of a second off, half his usual miss")
+	assert_gt(PitchDuel.player_scatter(0.4), 0.85, "well off, about his usual miss")
+	var scene := _start(&"pitch")
+	var worst := 0.0
+	var total := 0.0
+	var thrown := 0
+	while thrown < 12:
+		while scene.state != DuelScene.State.PRE_PITCH:
+			_advance(scene, 1)
+		_advance(scene, 5)
+		scene.target = scene.duel.zone.point(0.15 + 0.07 * (thrown % 10), 0.85 - 0.07 * (thrown % 10))
+		var aimed := scene.target
+		scene.selected_pitch = thrown % scene.pitch_ids.size()
+		scene.press_pitch_button()
+		_advance(scene, roundi(DuelScene.GAUGE_TIME * DuelScene.ACCURACY_SWEET * 120.0))
+		scene.release_pitch_button()
+		while scene.state == DuelScene.State.WINDUP:
+			_advance(scene, 1)
+		var at := scene.duel.pitch.plate_pos
+		var miss := Vector2(at.x - aimed.x, at.z - aimed.z).length()
+		worst = maxf(worst, miss)
+		total += miss
+		thrown += 1
+	assert_lt(total / thrown, 0.05, "on average within a ball's width of the spot")
+	assert_lt(worst, 0.12, "and never far from it")
 
 
 func test_ball_leaves_from_the_pitchers_hand() -> void:
