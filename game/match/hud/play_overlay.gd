@@ -180,7 +180,9 @@ func _controls() -> void:
 		panel(line)
 		keycaps(line.position + Vector2(0.0, 26.0), "WASD 야수 이동   C 잡기   Space 다이빙   ←↑→↓ 송구", line.size.x, 16)
 		return
-	var box := Rect2(Vector2(view.x * 0.5 - 300.0, view.y - BottomBar.HEIGHT - 134.0), Vector2(600.0, 122.0))
+	# Throw: the bases and the gauge; running: the two keys (nothing explained in small print).
+	var tall := 96.0 if scene._controls_fielding() else 56.0
+	var box := Rect2(Vector2(view.x * 0.5 - 300.0, view.y - BottomBar.HEIGHT - 12.0 - tall), Vector2(600.0, tall))
 	panel(box)
 	if scene._controls_fielding():
 		text(box.position + Vector2(20.0, 34.0), "송구", 20, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
@@ -197,11 +199,9 @@ func _controls() -> void:
 		var level := scene.charge() if scene.charge() >= 0.0 else (chosen.gauge if chosen.throw_to > 0 else 0.0)
 		var hot := level > PlayChoice.GREEN.y
 		draw_rect(Rect2(gauge.position, Vector2(level * per, gauge.size.y)), UiTheme.RED if hot else UiTheme.GOLD)
-		text(box.position + Vector2(20.0, 108.0), "방향 키를 누르고 초록에서 떼기 · 안 누르면 자동", 15, Color(1, 1, 1, 0.6))
 	elif scene._controls_running():
 		text(box.position + Vector2(20.0, 34.0), "주루", 20, UiTheme.GOLD, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
 		var go := chosen.running == 1
 		var back := chosen.running == -1
 		text(box.position + Vector2(100.0, 34.0), "E  모두 진루", 20, UiTheme.INK if go else Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700 if go else 500)
 		text(box.position + Vector2(300.0, 34.0), "Q  모두 귀루", 20, UiTheme.INK if back else Color(1, 1, 1, 0.55), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700 if back else 500)
-		text(box.position + Vector2(20.0, 80.0), "누르지 않으면 주자가 스스로 판단", 15, Color(1, 1, 1, 0.6))

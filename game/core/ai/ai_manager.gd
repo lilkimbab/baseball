@@ -202,6 +202,20 @@ func _batting_order(chosen: Dictionary[Position.Kind, Player]) -> Array[Position
 	return out
 
 
+## The manager's own bullpen roles for a club (Team.bullpen_plan): his closer and set-up men
+## rank above everyone else when start_game hands out the roles.
+func use_bullpen_plan(team: Team) -> void:
+	if team == null or team.bullpen_plan.is_empty():
+		return
+	var closer := str(team.bullpen_plan.get("closer", ""))
+	if closer != "":
+		role_overall[closer] = 10000.0
+	var setup: Array = team.bullpen_plan.get("setup", [])
+	for i: int in setup.size():
+		if str(setup[i]) != "":
+			role_overall[str(setup[i])] = 9000.0 - i
+
+
 ## Notes the bullpen roles once the line-ups are set.
 func start_game(state: GameState) -> void:
 	for t: int in 2:

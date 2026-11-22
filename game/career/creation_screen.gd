@@ -16,7 +16,6 @@ var _start: GameButton
 func setup() -> void:
 	heading = "선수 생성"
 	heading_latin = "CREATE PLAYER"
-	subheading = "커리어 모드의 주인공을 만듭니다 · 2군에서 출발합니다"
 	vantage = &"field"
 	dock_id = "career"
 

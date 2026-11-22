@@ -82,16 +82,114 @@ func test_the_ladder_seeds_fourth_against_third_and_climbs() -> void:
 	assert_eq(Postseason.rules(RuleSet.kbo_2026()).extra_inning_limit, 15)
 
 
+func _table(wins: Dictionary) -> Standings:
+	var ids := PackedStringArray()
+	for id: String in wins:
+		ids.append(id)
+	var table := Standings.of(ids)
+	for id: String in wins:
+		for i: int in 10:
+			table.record(_game(0, id, "zz", 1, 0) if i < int(wins[id]) else _game(0, id, "zz", 0, 1))
+	return table
+
+
+func test_the_kbo_format_is_five_clubs_from_the_wild_card_to_the_korean_series() -> void:
+	var table := _table({"a": 9, "b": 8, "c": 6, "d": 4, "e": 3, "f": 1})
+	var p := Postseason.from_standings(table, 10, Postseason.kbo())
+	assert_eq(p.seeds, PackedStringArray(["a", "b", "c", "d", "e"]))
+	assert_eq(p.round_name(), "와일드카드 결정전")
+	var wild := p.series()
+	assert_eq([wild.high, wild.low], ["d", "e"])
+	assert_eq(wild.length(), 2, "two games at most")
+	assert_eq(wild.high_won(), 0, "the head start is not a game won")
+	# The fifth wins the first: a second game, at the fourth's park again.
+	var g := p.game_on(10)
+	assert_eq(g.home, "d")
+	g.finish(4, 2)
+	p.record(g, 10)
+	assert_eq(p.current, 0, "the fifth needs two")
+	g = p.game_on(11)
+	assert_eq(g.home, "d")
+	g.finish(3, 1)
+	p.record(g, 11)
+	assert_eq(p.round_name(), "준플레이오프")
+	assert_eq([p.series().high, p.series().low], ["c", "e"])
+	assert_eq(p.series().length(), 5)
+	# The fifth goes on: three more to the 플레이오프 against the second.
+	var day := 13
+	for n: int in 3:
+		g = p.game_on(day)
+		g.finish(1, 0) if g.away == "e" else g.finish(0, 1)
+		p.record(g, day)
+		day += 1
+	assert_eq(p.round_name(), "플레이오프")
+	assert_eq([p.series().high, p.series().low], ["b", "e"])
+	day += 1
+	for n: int in 3:
+		g = p.game_on(day)
+		g.finish(1, 0) if g.away == "b" else g.finish(0, 1)
+		p.record(g, day)
+		day += 1
+	assert_eq(p.round_name(), "한국시리즈")
+	assert_eq([p.series().high, p.series().low], ["a", "b"])
+	assert_eq(p.series().length(), 7)
+	assert_false(p.finished())
+	day += 1
+	for n: int in 4:
+		g = p.game_on(day)
+		g.finish(1, 0) if g.away == "a" else g.finish(0, 1)
+		p.record(g, day)
+		day += 1
+	assert_true(p.finished())
+	assert_eq(p.champion(), "a")
+	assert_eq(p.runner_up(), "b")
+	assert_null(p.game_on(day))
+
+
+func test_the_fourth_goes_through_the_wild_card_on_one_win_or_a_tie() -> void:
+	for score: Array in [[1, 3], [2, 2]]:
+		var p := Postseason.from_standings(_table({"a": 9, "b": 8, "c": 6, "d": 4, "e": 3}), 0, Postseason.kbo())
+		var g := p.game_on(0)
+		g.finish(int(score[0]), int(score[1]))
+		p.record(g, 0)
+		assert_eq(p.current, 1, "one game is enough for the fourth (%d-%d)" % score)
+		assert_eq(p.rounds[0].winner(), "d")
+		assert_eq(p.series().low, "d")
+
+
+func test_a_small_league_plays_the_last_rounds_of_the_format() -> void:
+	var p := Postseason.from_standings(_table({"a": 9, "b": 8, "c": 6, "d": 4}), 0, Postseason.kbo())
+	assert_eq(p.seeds.size(), 4)
+	assert_eq(p.round_name(), "준플레이오프")
+	assert_eq(p.format.size(), 3)
+	var two := Postseason.from_standings(_table({"a": 9, "b": 8}), 0, Postseason.kbo())
+	assert_eq(two.round_name(), "한국시리즈")
+	assert_eq([two.series().high, two.series().low], ["a", "b"])
+
+
+func test_a_pack_gives_its_years_rounds() -> void:
+	var rounds := Postseason.format_from([{"name": "준플레이오프", "wins": 2}, {"name": "플레이오프", "wins": 4}, {"name": "한국시리즈", "wins": 4}])
+	assert_eq(rounds.size(), 3)
+	assert_eq(rounds[1].wins, 4)
+	assert_eq(rounds[0].head_start, 0)
+	var back := Postseason.format_from(Postseason.format_to(Postseason.kbo()))
+	assert_eq(back[0].head_start, 1)
+	assert_eq(back[3].name, "한국시리즈")
+
+
 func test_a_season_runs_to_its_champions_and_the_movements_add_up() -> void:
 	var s := _played()
 	assert_true(s.finished())
+	assert_eq(s.postseasons[0].seeds.size(), 5, "the top division plays the KBO's five")
+	assert_eq(s.postseasons[0].round_name(3), "한국시리즈")
+	assert_eq(s.postseasons[1].seeds.size(), 4, "the division under it the ladder of four")
 	for p: Postseason in s.postseasons:
 		assert_true(p.finished())
-		assert_eq(p.rounds.size(), 3)
+		assert_eq(p.rounds.size(), p.format.size())
 		assert_ne(p.champion(), "")
 		assert_ne(p.champion(), p.runner_up())
 		for r: PlayoffSeries in p.rounds:
-			assert_between(r.games.size(), r.wins_needed, r.length() + 3)
+			assert_between(r.games.size(), r.wins_needed - r.head_start, r.length() + 3)
 	var moves := s.movements()
 	assert_eq((moves[0][0] as PackedStringArray).size(), 0, "nobody goes up from the top")
 	assert_eq((moves[0][1] as PackedStringArray).size(), 2)

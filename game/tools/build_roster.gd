@@ -13,7 +13,7 @@ extends SceneTree
 ## The records are the user's to gather (the KBO's site does not allow automatic collection);
 ## they and the pack stay in the local content pack, out of git.
 ##
-##   godot --headless --path game --script res://tools/build_roster.gd -- --in ../content-local/raw/2025 --out ../content-local/rosters/kbo-2025.json --id kbo-2025 --name "KBO 2025" --season 2025
+##   godot --headless --path game --script res://tools/build_roster.gd -- --in ../content-local/raw/2025 --out ../content-local/rosters/kbo-2025.json --id kbo-2025 --name "KBO 2025" --season 2025 [--league-prior] [--contact-from-k 0.8]
 
 
 func _init() -> void:
@@ -32,6 +32,9 @@ func _init() -> void:
 			quit(1)
 			return
 		tables.append(rows)
+	# Variants to try against a real season (tools/season_check.gd --roster).
+	RosterBuilder.by_playing_time = not args.has("league-prior")
+	RosterBuilder.contact_from_k = float(str(args.get("contact-from-k", RosterBuilder.CONTACT_FROM_K)))
 	var teams := RosterBuilder.build(tables[0], tables[1], tables[2], tables[3], LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), RosterIO.load_names())
 	DirAccess.make_dir_recursive_absolute(out.get_base_dir())
 	var err := RosterIO.save_pack(out, str(args.get("id", out.get_file().get_basename())), str(args.get("name", "")), int(str(args.get("season", "2025"))), teams)

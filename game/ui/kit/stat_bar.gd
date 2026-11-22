@@ -45,13 +45,13 @@ func _draw() -> void:
 	_bar(Rect2(left, top, width, height), value)
 	if second >= 0.0:
 		_bar(Rect2(left, mid + 1.0, width, height), second)
-	var text := "%d" % roundi(value)
+	var text := UiTheme.shown_text(value)
 	var at := Vector2(left + width + 10.0, mid + 7.0)
 	draw_string(bold, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, UiTheme.rating_color(value))
 	var used := bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20).x
 	if second >= 0.0:
-		draw_string(font, at + Vector2(used + 4.0, 0.0), "/%d" % roundi(second), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, UiTheme.rating_color(second))
-		used += font.get_string_size("/%d" % roundi(second), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16).x + 4.0
+		draw_string(font, at + Vector2(used + 4.0, 0.0), "/" + UiTheme.shown_text(second), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, UiTheme.rating_color(second))
+		used += font.get_string_size("/" + UiTheme.shown_text(second), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16).x + 4.0
 	if delta != 0.0:
 		var word := ("+%d" if delta > 0.0 else "%d") % roundi(delta)
 		draw_string(font, at + Vector2(used + 6.0, 0.0), word, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, UiTheme.GREEN if delta > 0.0 else UiTheme.RED)
@@ -61,7 +61,7 @@ func _bar(rect: Rect2, amount: float) -> void:
 	var radius := rect.size.y * 0.5
 	_round_rect(rect, Color(1.0, 1.0, 1.0, 0.09), radius)
 	var fill := rect
-	fill.size.x = maxf(rect.size.x * clampf(amount / max_value, 0.0, 1.0), rect.size.y)
+	fill.size.x = maxf(rect.size.x * clampf(UiTheme.shown(amount) / max_value, 0.0, 1.0), rect.size.y)
 	var colour := UiTheme.rating_color(amount)
 	_round_rect(fill, colour.darkened(0.25), radius)
 	# A lighter band along the top half: the bar reads as lit from above.

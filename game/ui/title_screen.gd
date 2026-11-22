@@ -12,6 +12,8 @@ func setup() -> void:
 
 
 func _ready() -> void:
+	# Saves and settings from before the game was called Moneyball.
+	UserData.carry_over()
 	Settings.ensure_loaded()
 	Settings.apply(get_tree())
 	super._ready()
@@ -28,8 +30,7 @@ func build() -> void:
 	mark.add_child(UiKit.slash(UiTheme.BRAND, 40.0))
 	mark.add_child(UiKit.latin("PRO BASEBALL", 40, Color.WHITE, true))
 	column.add_child(mark)
-	column.add_child(UiKit.latin("DUGOUT", 210, Color.WHITE, true))
-	column.add_child(UiKit.heading("더그아웃  ·  리그 · 커리어 · 풀 액션", 26, Color(1.0, 1.0, 1.0, 0.8)))
+	column.add_child(UiKit.latin("MONEYBALL", 190, Color.WHITE, true))
 	column.add_child(UiKit.spacer(0.0, 40.0))
 	var start_button := UiKit.button("게임 시작", func() -> void: go(HUB), "play", "primary", 440.0)
 	start_button.add_theme_font_size_override("font_size", 30)

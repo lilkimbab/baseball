@@ -182,6 +182,98 @@ static func club_side(team: Team, tag: String, side: float = 96.0, name_size: in
 	return box
 
 
+## A band in a club's colour, fading to nothing toward the right (the top of a club's page,
+## as real games head a team screen); add the content to band.get_child(1).
+static func band(colour: Color, height: float) -> MarginContainer:
+	var hero := MarginContainer.new()
+	hero.custom_minimum_size.y = height
+	var fill := TextureRect.new()
+	var grad := Gradient.new()
+	grad.set_color(0, Color(colour.lerp(Color.BLACK, 0.1), 0.95))
+	grad.set_color(1, Color(colour, 0.0))
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.fill_from = Vector2(0.0, 0.5)
+	tex.fill_to = Vector2(1.0, 0.5)
+	fill.texture = tex
+	fill.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	fill.stretch_mode = TextureRect.STRETCH_SCALE
+	hero.add_child(fill)
+	var inner := MarginContainer.new()
+	for side: String in ["left", "right", "top", "bottom"]:
+		inner.add_theme_constant_override("margin_" + side, 16)
+	hero.add_child(inner)
+	return hero
+
+
+## A big figure in an inset box, a name under it (a tile of a team's season).
+static func tile(value: String, name: String, width: float = 130.0, number_size: int = 26) -> PanelContainer:
+	var w := well(9.0)
+	w.custom_minimum_size.x = width
+	w.add_child(figure(value, name, Color.WHITE, number_size))
+	return w
+
+
+## A setting as games show one: its name, then ◀ the value ▶ (one step at a time, round the
+## ends), instead of a row of buttons for every value.
+static func selector(name: String, ids: Array, labels: Array, current: String, pick: Callable) -> HBoxContainer:
+	var row := hbox(10)
+	var title := label(name, 19, UiTheme.DIM, 600)
+	title.custom_minimum_size.x = 110.0
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(title)
+	var at := maxi(ids.find(current), 0)
+	var step := func(d: int) -> void:
+		if not ids.is_empty():
+			pick.call(str(ids[(at + d + ids.size()) % ids.size()]))
+	var back := GameButton.make("", func() -> void: step.call(-1), "caret-left", "segment")
+	back.custom_minimum_size = Vector2(44.0, 40.0)
+	row.add_child(back)
+	var box := well(6.0)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var value := label(str(labels[at]) if not labels.is_empty() else "", 20, Color.WHITE, 700)
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(value)
+	row.add_child(box)
+	var on := GameButton.make("", func() -> void: step.call(1), "caret-right", "segment")
+	on.custom_minimum_size = Vector2(44.0, 40.0)
+	row.add_child(on)
+	return row
+
+
+## Clubs to pick from as a grid of their emblems (a team-select screen), the one chosen lit.
+static func emblem_grid(teams: Array[Team], current: int, pick: Callable, columns: int = 6, side: float = 50.0) -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = columns
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
+	for i: int in teams.size():
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(side + 16.0, side + 12.0)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.focus_mode = Control.FOCUS_NONE
+		b.tooltip_text = teams[i].name
+		for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			var box := StyleBoxFlat.new()
+			box.bg_color = Color(UiTheme.BRAND, 0.6) if i == current else Color(1.0, 1.0, 1.0, 0.1 if state == "hover" else 0.04)
+			if state == "focus":
+				box.bg_color = Color(0, 0, 0, 0)
+			box.set_corner_radius_all(4)
+			if i == current:
+				box.set_border_width_all(2)
+				box.border_color = Color(1.0, 1.0, 1.0, 0.85)
+			b.add_theme_stylebox_override(state, box)
+		var centre := CenterContainer.new()
+		centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+		centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		centre.add_child(club_mark(teams[i], side))
+		b.add_child(centre)
+		var index := i
+		b.pressed.connect(func() -> void: pick.call(index))
+		grid.add_child(b)
+	return grid
+
+
 ## A dark inset area inside a panel (a row of a list, a group of figures).
 static func well(margin: float = 12.0) -> PanelContainer:
 	var p := PanelContainer.new()

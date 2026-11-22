@@ -80,7 +80,6 @@ func _draw_spread(zrect: Rect2) -> void:
 		var share := float(cells[cell]) / maxf(total, 1.0)
 		draw_rect(r.grow(-2.0), Color(1.0, 0.45, 0.2, clampf(share * 2.5, 0.0, 0.85)))
 		text(r.position + Vector2(0.0, r.size.y * 0.5 + 7.0), str(cells[cell]), 18, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
-	text(zrect.position + Vector2(0.0, zrect.size.y + 48.0), "존 밖 %d / 전체 %d" % [cells[9], total], 14, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, zrect.size.x)
 
 
 func _legend(at: Vector2) -> void:

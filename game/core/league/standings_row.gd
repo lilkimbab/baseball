@@ -16,15 +16,17 @@ var streak := 0
 var last_ten := PackedInt32Array()
 ## Against each opponent: wins, losses, ties.
 var head_to_head: Dictionary[String, Vector3i] = {}
+## A tie counts as a loss in the percentage (RuleSet.ties_as_losses).
+var ties_as_losses := false
 
 
 func games() -> int:
 	return wins + losses + ties
 
 
-## KBO winning percentage: ties do not count.
+## KBO winning percentage: ties do not count (or, some years, count as losses).
 func pct() -> float:
-	var decided := wins + losses
+	var decided := wins + losses + (ties if ties_as_losses else 0)
 	return float(wins) / decided if decided > 0 else 0.0
 
 

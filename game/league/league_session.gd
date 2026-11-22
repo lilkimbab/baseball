@@ -36,6 +36,10 @@ static func start(team_id: String, games: int, seed_value: int, teams: Array[Tea
 ## comparison to what really happened; there is no next season.
 static func start_history(pack: SeasonPack, scenario_id: String, team_id: String, seed_value: int) -> Season:
 	var clubs := pack.clubs()
+	# The ratings are that year's own: nobody grows during a season played again.
+	for t: Team in clubs:
+		for p: Player in t.players:
+			p.potential = 0.0
 	season = Season.create(clubs, clubs.size(), pack.games, seed_value, pack.rule_set(), LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), LeagueEnvIO.load_overall(), ClubIO.load_default())
 	season.season_year = pack.year
 	season.history = pack

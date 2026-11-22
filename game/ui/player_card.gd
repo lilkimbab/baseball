@@ -104,7 +104,7 @@ func show_player(p: Player, season: Season) -> void:
 	columns.add_child(middle)
 	var top := UiKit.hbox(30)
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
-	top.add_child(UiKit.figure("%d" % roundi(ovr), "종합", UiTheme.rating_color(ovr), 64))
+	top.add_child(UiKit.figure(UiTheme.shown_text(ovr), "종합", UiTheme.rating_color(ovr), 64))
 	top.add_child(UiKit.figure(grade, "등급", UiTheme.ACCENT, 64))
 	middle.add_child(top)
 	var radar: RadarChart

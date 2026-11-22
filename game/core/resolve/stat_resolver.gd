@@ -10,6 +10,10 @@ var rng: Rng
 
 ## The running play before this plate appearance has been considered.
 var _running_checked := false
+## The park's effect on this game (docs/13 S17): outcome key ("HR", "1B", "2B", "3B") →
+## multiplier, the same for both clubs; empty for a neutral park. A real season's parks give it
+## (SeasonPack.parks: 잠실 home runs ×0.78, 대구의 새 구장 ×1.40).
+var park: Dictionary = {}
 var _stuff: Dictionary[String, float] = {}
 
 
@@ -145,6 +149,8 @@ func outcome_probabilities(state: GameState) -> PackedFloat64Array:
 			x *= exp(pressure * 0.5)
 		if state.batting() == GameState.HOME and o >= LeagueEnv.Outcome.SINGLE:
 			x *= env.home_hits
+		if not park.is_empty():
+			x *= float(park.get(key, 1.0))
 		out[o] = x
 		total += x
 	out[LeagueEnv.Outcome.OUT] = maxf(1.0 - total, 0.2)

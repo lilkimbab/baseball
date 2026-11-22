@@ -9,12 +9,17 @@ extends RefCounted
 ##    "roster": path of a roster pack (RosterIO; relative to the season file or res://),
 ##    "teams": [club ids, in the order of the league],
 ##    "rules": {"games", "extra_innings", "foreign_players", "asia_quota", "registered_roster",
-##              "designated_hitter", "pitch_clock"},
+##              "designated_hitter", "pitch_clock", "ties_as_losses"},
 ##    "schedule": [[day, away, home], ...]   (optional; made from the rules when missing),
+##    "postseason": [{"name", "wins", "head_start"}, ...]   (optional; today's KBO when missing),
 ##    "actual": {"standings": [[id, wins, losses, ties], ...], "champion": id,
 ##               "leaders": [[category, name, value], ...]},
-##    "scenarios": [{"id", "title", "team", "text", "goal": {"kind": "champion" | "rank" |
-##                   "wins", "at_most" | "at_least": n}}]}
+##    "scenarios": [{"id", "title", "team", "text", "tagline", "path", "stars": [[name, line]],
+##                   "goal": {"kind": "double" | "champion" | "rank" | "wins",
+##                   "at_most" | "at_least": n}}]}
+##
+## A scenario is a club that made history that season (2016 두림 그리즐리스, 93 wins): the player
+## takes it through the season, the league around it as it was.
 ##
 ## The game's own example (fictional clubs) is in data/seasons/; real seasons go in the local
 ## content pack, content-local/seasons/ (S17's collector makes them; never in git).
@@ -36,6 +41,7 @@ var asia_quota := 1
 var registered_roster := 29
 var designated_hitter := true
 var pitch_clock := true
+var ties_as_losses := false
 ## [day, away, home] of each game, or empty.
 var schedule: Array = []
 ## [id, wins, losses, ties], best first.
@@ -43,7 +49,15 @@ var standings: Array = []
 var champion := ""
 ## [category, name, value].
 var leaders: Array = []
+## That year's postseason rounds ({"name", "wins", "head_start"}); empty: the KBO's of today.
+var postseason: Array = []
 var scenarios: Array[Scenario] = []
+## How each club looked that year (name, short name, colours), for screens that need no players.
+var looks: Dictionary = {}
+## Each club's home park that year and its effect: club id → {"park": name, "HR": ×, "H": ×}
+## (H for singles, doubles and triples); runs and home runs at a park against away from it,
+## as the record sites keep them. Empty: every park neutral.
+var parks: Dictionary = {}
 
 
 class Scenario:
@@ -51,7 +65,17 @@ class Scenario:
 	var title := ""
 	var team := ""
 	var text := ""
-	## "champion", "rank" (finish at_most), "wins" (at_least).
+	## One line under the title ("93승, 판타스틱 4"), and what the club really did ("정규 시즌
+	## 1위 93승 1무 50패 · 한국시리즈 4승 0패").
+	var tagline := ""
+	var path := ""
+	## Its leading men that year: [name, role, [[label, value], ...]] ("권도연", "3루수",
+	## [["타율", ".347"], ["홈런", "38"], ["도루", "40"]]).
+	var stars: Array = []
+	## The last series it won: [wins, losses, against] ([4, 0, "NC"]), or empty.
+	var final: Array = []
+	## "double" (first in the table and champion), "champion", "rank" (finish at_most), "wins"
+	## (at_least).
 	var kind := "champion"
 	var amount := 0
 
@@ -105,17 +129,25 @@ static func load_file(file: String) -> SeasonPack:
 	p.registered_roster = int(r.get("registered_roster", 29))
 	p.designated_hitter = bool(r.get("designated_hitter", true))
 	p.pitch_clock = bool(r.get("pitch_clock", true))
+	p.ties_as_losses = bool(r.get("ties_as_losses", false))
 	p.schedule = (d.get("schedule", []) as Array).duplicate(true)
+	p.postseason = (d.get("postseason", []) as Array).duplicate(true)
 	var actual: Dictionary = d.get("actual", {})
 	p.standings = (actual.get("standings", []) as Array).duplicate(true)
 	p.champion = str(actual.get("champion", ""))
 	p.leaders = (actual.get("leaders", []) as Array).duplicate(true)
+	p.looks = (d.get("clubs", {}) as Dictionary).duplicate(true)
+	p.parks = (d.get("parks", {}) as Dictionary).duplicate(true)
 	for entry: Dictionary in d.get("scenarios", []):
 		var s := Scenario.new()
 		s.id = str(entry.get("id", ""))
 		s.title = str(entry.get("title", ""))
 		s.team = str(entry.get("team", ""))
 		s.text = str(entry.get("text", ""))
+		s.tagline = str(entry.get("tagline", ""))
+		s.path = str(entry.get("path", ""))
+		s.stars = (entry.get("stars", []) as Array).duplicate(true)
+		s.final = (entry.get("final", []) as Array).duplicate(true)
 		var goal: Dictionary = entry.get("goal", {})
 		s.kind = str(goal.get("kind", "champion"))
 		s.amount = int(goal.get("at_most", goal.get("at_least", 0)))
@@ -139,7 +171,41 @@ func rule_set() -> RuleSet:
 	r.registered_roster = registered_roster
 	r.active_roster = registered_roster - 1
 	r.designated_hitter = designated_hitter
+	r.ties_as_losses = ties_as_losses
 	return r
+
+
+## A home club's park as the resolver takes it: outcome key → multiplier.
+func park_of(home: String) -> Dictionary:
+	if not parks.has(home):
+		return {}
+	var p: Dictionary = parks[home]
+	var hits := float(p.get("H", 1.0))
+	return {"HR": float(p.get("HR", 1.0)), "1B": hits, "2B": hits, "3B": hits}
+
+
+## That year's postseason (Postseason.Round list).
+func postseason_format() -> Array[Postseason.Round]:
+	return Postseason.format_from(postseason) if not postseason.is_empty() else Postseason.kbo()
+
+
+## A club as it looked that year, without its players (an emblem, a name); from the roster
+## pack when the season pack does not say.
+func look(team_id: String) -> Team:
+	var t := Team.new()
+	t.id = team_id
+	if looks.has(team_id):
+		var l: Dictionary = looks[team_id]
+		t.name = str(l.get("name", team_id))
+		t.short_name = str(l.get("short", t.name))
+		t.primary = Color.from_string(str(l.get("primary", "")), t.primary)
+		t.secondary = Color.from_string(str(l.get("secondary", "")), t.secondary)
+		t.accent = Color.from_string(str(l.get("accent", "")), t.accent)
+		return t
+	for c: Team in clubs():
+		if c.id == team_id:
+			return c
+	return t
 
 
 ## The clubs as they were, in the league's order.
@@ -183,6 +249,8 @@ static func goal_met(s: Scenario, season: Season) -> bool:
 	if d < 0:
 		return false
 	match s.kind:
+		"double":
+			return season.champion_of(d) == s.team and season.standings[d].rank_of(s.team) == 1
 		"champion":
 			return season.champion_of(d) == s.team
 		"rank":
@@ -194,6 +262,8 @@ static func goal_met(s: Scenario, season: Season) -> bool:
 
 static func goal_text(s: Scenario) -> String:
 	match s.kind:
+		"double":
+			return "통합 우승"
 		"champion":
 			return "우승"
 		"rank":

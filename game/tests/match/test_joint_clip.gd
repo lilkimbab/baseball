@@ -83,8 +83,37 @@ func test_a_batter_waits_in_the_first_part_of_the_clip() -> void:
 		latest = maxf(latest, motion.clip_time())
 	assert_eq(motion.phase, SwingMotion.Phase.IDLE)
 	assert_lt(latest, motion.stride, "the waiting motion stops short of the stride")
-	assert_gt(latest, motion.stride * 0.5, "but does move")
+	assert_gt(latest, motion.stride * 0.5, "in the stance just before it")
 	assert_almost_eq(motion.reach_weight(), 0.0, 1e-6)
+
+
+func test_a_batter_who_rocked_in_the_recording_stands_still_in_the_box() -> void:
+	# A recording whose stretch before the stride rocks the chest 15 cm and waves the bat 40 cm
+	# (as some of the real forms do), still for a moment in the middle of it.
+	var frames: Array[Dictionary] = []
+	for i: int in 97:
+		var t := i / 60.0
+		var frame := SyntheticMotion.stance()
+		# Still from 0.1 to 0.3 s, rocking more and more either side of it.
+		var rock := sin(t * TAU * 1.3) * clampf(absf(t - 0.2) / 0.05 - 2.0, 0.0, 1.0)
+		if t < 0.4:
+			for joint: StringName in [&"ThoraxTop", &"BatGrip", &"BatSweetSpot"]:
+				if frame.has(joint):
+					frame[joint] += Vector3(0.15 if joint == &"ThoraxTop" else 0.4, 0.0, 0.0) * rock
+		frames.append(frame)
+	var clip := JointClip.from_frames(frames, 60.0, {&"stride": 0.4, &"launch": 0.8, &"contact": 0.95, &"finish": 1.3})
+	var motion := SwingMotion.new(clip)
+	assert_between(motion.set_time, 0.13, 0.27, "the still moment")
+	var stance := clip.sample(motion.set_time)
+	var worst_chest := 0.0
+	var worst_bat := 0.0
+	for i: int in 2400:
+		motion.advance(DT)
+		var pose := motion.frame()
+		worst_chest = maxf(worst_chest, (pose[&"ThoraxTop"] as Vector3).distance_to(stance[&"ThoraxTop"]))
+		worst_bat = maxf(worst_bat, (pose[&"BatSweetSpot"] as Vector3).distance_to(stance[&"BatSweetSpot"]))
+	assert_lte(worst_chest, SwingMotion.IDLE_CHEST + 0.002, "the chest hardly moves")
+	assert_lte(worst_bat, SwingMotion.IDLE_BAT + 0.005, "nor the bat")
 
 
 func test_the_load_runs_to_the_launch_position_and_waits_there() -> void:

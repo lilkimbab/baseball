@@ -35,7 +35,7 @@ func build() -> void:
 	var cs := CareerSession.career_season
 	if cs == null:
 		var p := panel("커리어 모드", "user-circle", null, 0.0, "CAREER")
-		p.body.add_child(UiKit.label("진행 중인 커리어가 없습니다. 선수를 만들어 2군에서 출발하세요.", 20, UiTheme.DIM, 500))
+		p.body.add_child(UiKit.label("진행 중인 커리어가 없습니다.", 20, UiTheme.DIM, 500))
 		p.body.add_child(UiKit.button("선수 생성", func() -> void: go(CareerSession.CREATE), "plus", "primary", 320.0))
 		return
 	var c := cs.career
@@ -148,6 +148,39 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 	p.body.add_child(actions)
 	if message != "":
 		p.body.add_child(UiKit.label(message, 17, UiTheme.ACCENT, 600))
+	_build_schedule(p, cs, team)
+
+
+## The club's next games as a row of cards (the reference's schedule strip): the other club's
+## emblem, home or away, the day.
+func _build_schedule(p: GlassPanel, cs: CareerSeason, team: Team) -> void:
+	var s := cs.season
+	var ahead: Array[ScheduledGame] = []
+	for sched: Schedule in s.schedules:
+		for g: ScheduledGame in sched.games:
+			if not g.played and g.involves(team.id) and g.day > s.day:
+				ahead.append(g)
+	ahead.sort_custom(func(x: ScheduledGame, y: ScheduledGame) -> bool: return x.day < y.day)
+	if ahead.is_empty():
+		return
+	p.body.add_child(UiKit.rule())
+	var row := UiKit.hbox(8)
+	p.body.add_child(row)
+	for g: ScheduledGame in ahead.slice(0, 5):
+		var other: Team = s.teams[g.opponent_of(team.id)]
+		var cell := UiKit.well(8.0)
+		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(cell)
+		var box := UiKit.vbox(2)
+		cell.add_child(box)
+		var mark := UiKit.club_mark(other, 44.0)
+		box.add_child(mark)
+		var where := UiKit.label("%s %s" % ["vs" if g.home == team.id else "@", other.short_name], 15, Color.WHITE, 600)
+		where.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(where)
+		var day := UiKit.latin("DAY %d" % (g.day + 1), 14, UiTheme.DIM, true)
+		day.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(day)
 
 
 ## The last game: his line, the goal, the rating and medal, what he earned.
@@ -205,8 +238,9 @@ func _build_numbers(parent: Control, cs: CareerSeason) -> void:
 	avg = avg / c.ratings.size() if not c.ratings.is_empty() else 0.0
 	var figures := UiKit.hbox(0)
 	p.body.add_child(figures)
+	figures.add_theme_constant_override("separation", 8)
 	for pair: Array in [["%d" % roundi(c.popularity), "인기도"], ["%d" % c.points, "포인트"], ["%.1f" % avg if avg > 0.0 else "-", "평균 평점"]]:
-		var f := UiKit.figure(str(pair[0]), str(pair[1]), UiTheme.INK, 32)
+		var f := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 30)
 		f.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		figures.add_child(f)
 	p.body.add_child(UiKit.rule())
@@ -224,24 +258,32 @@ func _build_numbers(parent: Control, cs: CareerSeason) -> void:
 		_tab = "growth"
 		refresh(), "chart-line-up"))
 	p.body.add_child(UiKit.rule())
-	for pair: Array in [["1군 기록", cs.season.book], ["2군 기록", cs.futures_book]]:
-		p.body.add_child(UiKit.caption(str(pair[0])))
-		var well := UiKit.well(10.0)
-		p.body.add_child(well)
-		var line := UiKit.label(_lines(pair[1], c.player.id), 16, UiTheme.INK, 500)
-		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		well.add_child(line)
+	# His season where he plays now, in big figures.
+	var book: StatBook = cs.season.book if c.first_team else cs.futures_book
+	p.body.add_child(CenteredPanel.section("%s 시즌 기록" % ("1군" if c.first_team else "2군")))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	p.body.add_child(grid)
+	for pair: Array in _season_figures(book, c.player.id, c.is_pitcher()):
+		var t := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 28)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(t)
 
 
-func _lines(book: StatBook, id: String) -> String:
-	var parts := PackedStringArray()
+## His season in six figures: a hitter's games, average, home runs, runs batted in, steals, OPS;
+## a pitcher's games, wins, losses, saves, innings, earned-run average.
+static func _season_figures(book: StatBook, id: String, pitcher: bool) -> Array:
+	if pitcher:
+		var q: PitchingLine = book.pitching.get(id)
+		if q == null or q.outs == 0:
+			return [["0", "경기"], ["-", "승"], ["-", "패"], ["-", "세이브"], ["-", "이닝"], ["-", "평균자책점"]]
+		return [["%d" % q.games, "경기"], ["%d" % q.wins, "승"], ["%d" % q.losses, "패"], ["%d" % q.saves, "세이브"], [q.innings_text(), "이닝"], ["%.2f" % q.era(), "평균자책점"]]
 	var b: BattingLine = book.batting.get(id)
-	if b != null and b.pa > 0:
-		parts.append("%d경기 · 타율 %s · %d홈런 · %d타점 · OPS %s" % [b.games, BattingLine.rate_text(b.average()), b.home_runs, b.rbi, BattingLine.rate_text(b.ops())])
-	var p: PitchingLine = book.pitching.get(id)
-	if p != null and p.outs > 0:
-		parts.append("%d경기 · %s이닝 · %d승 %d패 %d세이브 · 평균자책점 %.2f" % [p.games, p.innings_text(), p.wins, p.losses, p.saves, p.era()])
-	return "\n".join(parts) if not parts.is_empty() else "기록 없음"
+	if b == null or b.pa == 0:
+		return [["0", "경기"], ["-", "타율"], ["-", "홈런"], ["-", "타점"], ["-", "도루"], ["-", "OPS"]]
+	return [["%d" % b.games, "경기"], [BattingLine.rate_text(b.average()), "타율"], ["%d" % b.home_runs, "홈런"], ["%d" % b.rbi, "타점"], ["%d" % b.stolen_bases, "도루"], [BattingLine.rate_text(b.ops()), "OPS"]]
 
 
 # --- Growth ---
@@ -249,7 +291,6 @@ func _lines(book: StatBook, id: String) -> String:
 
 func _build_growth(cs: CareerSeason) -> void:
 	var c := cs.career
-	content.add_child(UiKit.label("각 분야의 성장 포인트는 그 분야의 능력치에만 사용할 수 있습니다. 능력치가 높을수록 비용이 늘고, 유형의 강점은 20% 저렴합니다.", 16, UiTheme.DIM, 500))
 	var columns := UiKit.hbox(20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
@@ -293,7 +334,6 @@ func _build_pitches(parent: Control, cs: CareerSeason) -> void:
 	var catalog := cs.season.catalog
 	var p := panel("구종", "baseball", parent, 0.0, "PITCHES")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.body.add_child(UiKit.label("많이 던지고 능력치가 오르면 구종이 진화합니다.", 15, UiTheme.DIM, 500))
 	for a: ArsenalPitch in c.player.pitching.arsenal:
 		var t: PitchType = catalog.get(a.type)
 		var well := UiKit.well(10.0)

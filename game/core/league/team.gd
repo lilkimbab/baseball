@@ -20,6 +20,9 @@ var rotation_index := 0
 ## starters in the order they take their turns.
 var batting_plan: Array = []
 var rotation_plan := PackedStringArray()
+## The manager's bullpen: {"closer": id, "setup": [id, id]} (empty: the computer's choice by
+## overall). AiManager.use_bullpen_plan gives them their roles in a game.
+var bullpen_plan: Dictionary = {}
 ## Ids of the players on the first team (1군 엔트리); the rest are in the second team (2군).
 ## Empty means everyone is registered (a pack without a second team).
 var registered := PackedStringArray()

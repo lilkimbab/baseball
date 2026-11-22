@@ -3,8 +3,9 @@ extends HudCanvas
 ## The situation board of the manager mode (docs/05 section 3.5, docs/13 S7-6): over the
 ## darkened field, the line score at the top, both batting orders at the sides with the man
 ## at bat marked, the diamond with the count and outs in the middle and the plate
-## appearances so far below it, and at the bottom the win chance, the leverage and the orders
-## in force. Shown while plate appearances go by in summary; hidden for a live moment.
+## appearances so far below it, and at the bottom a key moment marked, the orders in force and
+## the speed (no win chance or leverage figures: the user, "useless"). Shown while plate
+## appearances go by in summary; hidden for a live moment.
 
 const LOG_LINES := 9
 
@@ -129,14 +130,9 @@ func _middle(rect: Rect2, g: GameState) -> void:
 		text(Vector2(rect.position.x + 24.0, y), lines[i], 17, UiTheme.INK if i == lines.size() - 1 else UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 48.0)
 
 
-func _footer(rect: Rect2, g: GameState) -> void:
+func _footer(rect: Rect2, _g: GameState) -> void:
 	panel(rect, UiTheme.PANEL_DARK)
-	var home := scene.win_chance
-	var mine := home if scene.my_team == 1 else 1.0 - home
-	if Settings.win_chance:
-		text(rect.position + Vector2(20.0, 40.0), "승리 확률  %s %d%%" % [g.teams[scene.my_team].short_name, roundi(mine * 100.0)], 20, UiTheme.INK)
-		bar(Rect2(rect.position + Vector2(250.0, 28.0), Vector2(160.0, 12.0)), mine, UiTheme.BLUE)
-	var key := scene.leverage >= WinExpectancy.HIGH
-	text(rect.position + Vector2(440.0, 40.0), "레버리지 %.1f%s" % [scene.leverage, "  승부처" if key else ""], 20, UiTheme.RED if key else UiTheme.DIM)
+	if scene.leverage >= WinExpectancy.HIGH:
+		text(rect.position + Vector2(20.0, 40.0), "승부처", 20, UiTheme.RED, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
 	text(rect.position + Vector2(660.0, 40.0), scene.board_note(), 20, UiTheme.GOLD)
 	text(rect.position + Vector2(840.0, 40.0), "×%d" % roundi(scene.speed), 20, UiTheme.DIM)

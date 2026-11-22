@@ -14,9 +14,21 @@ const NOMINAL_FLIGHT := 0.44
 const LOAD_BLEND := 0.25
 const RETURN_BLEND := 0.7
 const FINISH_HOLD := 0.35
-## The waiting motion is the start of the clip played forward and back; it slows to a stop
-## over this many seconds at each end so the turn-round is not a jerk.
-const IDLE_RAMP := 0.3
+## The waiting motion. The recorded swings start well before the stride, and that stretch is
+## not a stance: in many of them the hitter is still settling, rocking, waving the bat or
+## lifting the front foot (up to 21 cm of chest, 45 cm of bat and 16 cm of front foot in the
+## 20 forms). Played forward and back it made the batter rock and wave without end (the user:
+## "the batter shakes far too much in the box before the pitch, and the stance looks odd").
+## So the stance is the stillest moment of that stretch, held, with only as much of the
+## recording around it as keeps the chest within IDLE_CHEST, the bat's end within IDLE_BAT and
+## the feet within IDLE_FEET of it — breathing and a small waggle — swayed through slowly.
+const IDLE_CHEST := 0.025
+const IDLE_BAT := 0.06
+const IDLE_FEET := 0.01
+const IDLE_MOST := 0.4
+const IDLE_PERIOD := 2.6
+## Joints watched for stillness.
+const STILL_JOINTS: Array[StringName] = [&"ThoraxTop", &"BatGrip", &"BatSweetSpot", &"LeftFoot", &"RightFoot"]
 
 var clip: JointClip
 ## The same batter's swings at a high and a low pitch, if there are any (docs/13 S10-3): the
@@ -31,6 +43,9 @@ var finish := 0.0
 
 var _idle_length := 0.0
 var _idle_clock := 0.0
+## The stance: its moment in the clip and how far either side of it the waiting motion goes.
+var set_time := 0.0
+var idle_reach := 0.0
 ## Position in the clip while loading, swinging and finishing.
 var _time := 0.0
 var _rate := 1.0
@@ -50,6 +65,65 @@ func _init(source: JointClip) -> void:
 	stride = clip.event(&"stride", maxf(launch - 0.8, 0.0))
 	finish = clip.event(&"finish", clip.duration)
 	_idle_length = maxf(stride - 0.05, 0.05)
+	_find_stance()
+
+
+## The stillest moment before the stride (joint movement summed over a fifth of a second,
+## the later of two equally still moments preferred: less to do when the load starts), and
+## the reach of the recording around it that stays within the limits.
+func _find_stance() -> void:
+	var step := 1.0 / 30.0
+	var times: Array[float] = []
+	var t := 0.0
+	while t <= _idle_length:
+		times.append(t)
+		t += step
+	if times.size() < 3:
+		set_time = _idle_length
+		idle_reach = 0.0
+		return
+	var poses: Array = []
+	for at: float in times:
+		poses.append(clip.sample(at))
+	var speed: Array[float] = []
+	for i: int in times.size():
+		var j := mini(i + 1, times.size() - 1)
+		var k := maxi(i - 1, 0)
+		var moved := 0.0
+		for joint: StringName in STILL_JOINTS:
+			if (poses[j] as Dictionary).has(joint):
+				moved += ((poses[j] as Dictionary)[joint] as Vector3).distance_to((poses[k] as Dictionary)[joint])
+		speed.append(moved)
+	var best := times.size() - 1
+	var best_score := INF
+	for i: int in times.size():
+		var sum := 0.0
+		for d: int in range(-3, 4):
+			sum += speed[clampi(i + d, 0, times.size() - 1)]
+		var score := sum + 0.02 * (_idle_length - times[i])
+		if score < best_score:
+			best_score = score
+			best = i
+	set_time = times[best]
+	var still: Dictionary = poses[best]
+	var reach := 0
+	while reach * step < IDLE_MOST:
+		var lo := best - reach - 1
+		var hi := best + reach + 1
+		if lo < 0 or hi >= times.size():
+			break
+		if not _close(poses[lo], still) or not _close(poses[hi], still):
+			break
+		reach += 1
+	idle_reach = reach * step
+
+
+static func _close(pose: Dictionary, still: Dictionary) -> bool:
+	var limits := {&"ThoraxTop": IDLE_CHEST, &"BatSweetSpot": IDLE_BAT, &"BatGrip": IDLE_BAT, &"LeftFoot": IDLE_FEET, &"RightFoot": IDLE_FEET}
+	for joint: StringName in limits:
+		if pose.has(joint) and still.has(joint) and (pose[joint] as Vector3).distance_to(still[joint]) > float(limits[joint]):
+			return false
+	return true
 
 
 ## Picks the high or low swing for a ball met at `height` metres: none at the main swing's own
@@ -178,11 +252,4 @@ func _start_blend(seconds: float) -> void:
 
 
 func _idle_time() -> float:
-	var ramp := minf(IDLE_RAMP, _idle_length)
-	var half := _idle_length + ramp
-	var u := pingpong(_idle_clock, half)
-	if u < ramp:
-		return u * u / (2.0 * ramp)
-	if u > half - ramp:
-		return _idle_length - (half - u) * (half - u) / (2.0 * ramp)
-	return u - ramp * 0.5
+	return set_time + idle_reach * sin(TAU * _idle_clock / IDLE_PERIOD)

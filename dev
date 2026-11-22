@@ -164,6 +164,33 @@ case "$cmd" in
     "$GODOT" --headless --path "$GAME" --import >/dev/null 2>&1 || true
     ls -la "$GAME/native/bin"
     ;;
+  kbo)
+    # ./dev kbo [season ...|all]   Real KBO seasons into the local content pack (docs/13 S17): the
+    # Kaggle dataset "KBO Player Stats 1982-2026" (CC BY-NC-SA 4.0, needs ~/.kaggle/access_token)
+    # -> content-local/raw/kbo-<season>/ tables -> content-local/rosters/kbo-<season>.json roster
+    # pack and content-local/seasons/kbo-<season>.json season pack (R7), then the pack is brought
+    # level with the real season (the league's rates and each club's strength: calibrate_roster).
+    # No argument or "all": every season chosen in content-local/kbo/history.json (its clubs'
+    # names that year, the real table and postseason, the rules and the scenarios).
+    data="$ROOT/content-local/raw/kaggle-kbo-stats"
+    if [ ! -f "$data/kbo_batting_stats_season_1982-2026.csv" ]; then
+      mkdir -p "$data"
+      "$ROOT/.tools/pyenv/bin/kaggle" datasets download netsong/kbo-player-stats-19822025 -p "$data" --unzip
+    fi
+    seasons="$*"
+    if [ -z "$seasons" ] || [ "$seasons" = "all" ]; then
+      seasons="$(python3 -I "$ROOT/tools/kbo/kaggle_to_tables.py" --list)"
+    fi
+    for season in $seasons; do
+      python3 -I "$ROOT/tools/kbo/kaggle_to_tables.py" "$season" | tail -1
+      "$GODOT" --headless --path "$GAME" --script res://tools/build_roster.gd -- --in "../content-local/raw/kbo-$season" \
+        --out "../content-local/rosters/kbo-$season.json" --id "kbo-$season" --name "$season 시즌" --season "$season" 2>&1 | grep -E "build_roster|ERROR" || true
+      pack="--season kbo-$season"
+      [ -f "$ROOT/content-local/raw/kbo-$season/season.json" ] && pack="--pack-file ../content-local/raw/kbo-$season/season.json"
+      "$GODOT" --headless --path "$GAME" --script res://tools/calibrate_roster.gd -- $pack \
+        --raw "../content-local/raw/kbo-$season" 2>&1 | grep -E "calibrate: (final|clubs|wrote|no such)|ERROR" || true
+    done
+    ;;
   audio)
     # ./dev audio [sfx,crowd,cheer,music]   Makes the game's own sounds (tools/audio/make_sounds.py)
     # into game/audio/ with Blender's Python (numpy) and ffmpeg (Vorbis).

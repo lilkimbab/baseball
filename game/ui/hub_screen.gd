@@ -30,16 +30,16 @@ func build() -> void:
 	cards.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(cards)
 	var colours := UiTheme.MODE_COLOURS
-	var league := ModeTile.make("리그 모드", "3부 리그에서 정상까지", "trophy", func() -> void: go(dock_path("league")), colours["league"], "LEAGUE", "league")
+	var league := ModeTile.make("리그 모드", "", "trophy", func() -> void: go(dock_path("league")), colours["league"], "LEAGUE", "league")
 	if LeagueSession.season != null:
 		league.status = "진행 중"
-	var career := ModeTile.make("커리어 모드", "신인에서 프랜차이즈 스타로", "user-circle", func() -> void: go(dock_path("career")), colours["career"], "CAREER", "career")
+	var career := ModeTile.make("커리어 모드", "", "user-circle", func() -> void: go(dock_path("career")), colours["career"], "CAREER", "career")
 	if CareerSession.career_season != null:
 		career.status = "진행 중"
-	cards.add_child(ModeTile.make("친선 경기", "두 팀을 골라 바로 플레이", "baseball", func() -> void: go(QUICK), colours["quick"], "EXHIBITION", "exhibition"))
+	cards.add_child(ModeTile.make("친선 경기", "", "baseball", func() -> void: go(QUICK), colours["quick"], "EXHIBITION", "exhibition"))
 	cards.add_child(league)
 	cards.add_child(career)
-	cards.add_child(ModeTile.make("연습 모드", "타격 · 투구 자유 연습", "target", func() -> void: go(PRACTICE), colours["practice"], "PRACTICE", "practice"))
+	cards.add_child(ModeTile.make("연습 모드", "", "target", func() -> void: go(PRACTICE), colours["practice"], "PRACTICE", "practice"))
 
 
 ## The club (the one managed, the career's, or the first of the league's) and its best hitter.
@@ -103,7 +103,7 @@ func _build_star(parent: Control) -> void:
 	words.add_child(UiKit.label("%s  ·  %s  ·  No.%d" % [team.name, Position.name_of(player.primary_position()), player.number], 17, UiTheme.DIM, 500))
 	row.add_child(words)
 	var ovr := ClubRules.player_ovr(player, season.ovr, season.catalog) if season != null else (player.batting.contact() + player.batting.power() + player.batting.eye + player.fielding.overall()) / 4.0
-	row.add_child(UiKit.figure("%d" % roundi(ovr), "OVR", UiTheme.rating_color(ovr), 52))
+	row.add_child(UiKit.figure(UiTheme.shown_text(ovr), "OVR", UiTheme.rating_color(ovr), 52))
 	var card := UiKit.button("선수 카드", func() -> void: PlayerCard.open_for(self, player, season), "identification-card")
 	card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(card)
@@ -117,7 +117,7 @@ func _build_next(parent: Control) -> void:
 	var title_text := "친선 경기"
 	var caption := "EXHIBITION"
 	var colour: Color = UiTheme.MODE_COLOURS["quick"]
-	var line := "%d이닝 · 구장과 시간은 경기 설정에서" % Settings.innings
+	var line := "%d이닝" % Settings.innings
 	var action := func() -> void: go(QUICK)
 	var word := "경기 설정"
 	if s != null:
@@ -187,6 +187,9 @@ static func load_slot(from: Node, slot: String, mode: String) -> bool:
 	var s := SaveIO.load_league(slot)
 	if s == null:
 		return false
+	# A league saved before the second teams had their own league gets one from here on.
+	if s.farm == null and s.history == null and s.phase == Season.Phase.REGULAR:
+		s.farm = FarmLeague.for_season(s)
 	LeagueSession.season = s
 	LeagueSession.slot = slot
 	if from.is_inside_tree():

@@ -1,13 +1,16 @@
 class_name PlayoffSeries
 extends RefCounted
 ## One round of the postseason: first to `wins_needed` wins. A tie (the game reached the
-## extra-inning limit level) does not count, and the series goes on.
+## extra-inning limit level) does not count, and the series goes on — except in a round the
+## higher seed starts a win up (the KBO's wild card): there a tie is the higher seed's.
 
 var high := ""
 var low := ""
 var wins_needed := 2
 var high_wins := 0
 var low_wins := 0
+## Wins the higher seed was given before the first game.
+var head_start := 0
 var games: Array[ScheduledGame] = []
 
 
@@ -19,9 +22,9 @@ static func make(higher_seed: String, lower_seed: String, need: int) -> PlayoffS
 	return s
 
 
-## Best of 2n − 1.
+## Best of 2n − 1 (fewer by the higher seed's head start: the wild card is two games at most).
 func length() -> int:
-	return wins_needed * 2 - 1
+	return wins_needed * 2 - 1 - head_start
 
 
 func finished() -> bool:
@@ -79,7 +82,7 @@ func next_game(day: int, series_index: int) -> ScheduledGame:
 
 func record(game: ScheduledGame) -> void:
 	var w := game.winner()
-	if w == high:
+	if w == high or (w == "" and head_start > 0):
 		high_wins += 1
 	elif w == low:
 		low_wins += 1
@@ -88,3 +91,8 @@ func record(game: ScheduledGame) -> void:
 ## "3승 1패" from the higher seed's side, for the bracket.
 func score_text() -> String:
 	return "%d - %d" % [high_wins, low_wins]
+
+
+## Games really won by the higher seed (without its head start).
+func high_won() -> int:
+	return high_wins - head_start

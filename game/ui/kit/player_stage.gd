@@ -4,8 +4,9 @@ extends SubViewportContainer
 ## own figure — his height and build, his face, his club's uniform and number — lit as in a
 ## studio, turning slowly, on a clear background so the ballpark shows behind him.
 
-## How the camera frames him: the whole figure, or head and chest.
-enum Framing { FULL, BUST }
+## How the camera frames him: the whole figure, head and chest, or a headshot (head and the
+## top of the shoulders, as the reference games' lists show a player).
+enum Framing { FULL, BUST, HEAD }
 
 var framing: Framing = Framing.FULL
 var turning := true
@@ -100,7 +101,10 @@ func _show() -> void:
 
 
 func _frame(height: float) -> void:
-	if framing == Framing.BUST:
+	if framing == Framing.HEAD:
+		_camera.fov = 16.0
+		_camera.look_at_from_position(Vector3(0.0, height - 0.1, 1.45), Vector3(0.0, height - 0.15, 0.0))
+	elif framing == Framing.BUST:
 		_camera.fov = 20.0
 		_camera.look_at_from_position(Vector3(0.0, height - 0.16, 2.3), Vector3(0.0, height - 0.2, 0.0))
 	else:

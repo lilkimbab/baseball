@@ -102,6 +102,9 @@ const SHUFFLE := 0.55
 const SHUFFLES := 2
 const SHUFFLE_TIME := 0.3
 const ROSTER_PACK := "res://data/rosters/fiction-2026.json"
+## The pack this game's two clubs come from (a quick game may pick a real season's from the
+## local content pack; `-- --pack <path>` on the command line).
+var roster_pack := ROSTER_PACK
 
 @export var innings := 3
 ## Which team the player controls: 0 away, 1 home, -1 watch.
@@ -306,6 +309,7 @@ func _read_arguments() -> void:
 		human_team = QuickMatchScreen.side_index()
 		away_index = QuickMatchScreen.away_index
 		home_index = QuickMatchScreen.home_index
+		roster_pack = QuickMatchScreen.roster_path()
 		stadium_id = QuickMatchScreen.park
 		time_of_day = StringName(QuickMatchScreen.time)
 		return
@@ -320,13 +324,19 @@ func _read_arguments() -> void:
 		stadium_id = str(args["park"])
 	if args.has("time"):
 		time_of_day = StringName(str(args["time"]))
+	if args.has("pack"):
+		roster_pack = str(args["pack"])
+	if args.has("away"):
+		away_index = int(str(args["away"]))
+	if args.has("home"):
+		home_index = int(str(args["home"]))
 
 
 func _start_game() -> void:
 	var catalog_all := PitchCatalogIO.load_default()
 	var env := LeagueEnvIO.load_default()
 	var ovr := LeagueEnvIO.load_overall()
-	_clubs = RosterIO.load_pack(ROSTER_PACK)
+	_clubs = RosterIO.load_pack(roster_pack)
 	_club_cache = []
 	var away :=_clubs[clampi(away_index, 0, _clubs.size() - 1)]
 	var home := _clubs[clampi(home_index, 0, _clubs.size() - 1)]
@@ -336,6 +346,8 @@ func _start_game() -> void:
 		# ends when its innings do, tied or not.
 		rules.extra_inning_limit = innings
 	manager = AiManager.new(env, catalog_all, ovr)
+	manager.use_bullpen_plan(away)
+	manager.use_bullpen_plan(home)
 	game = GameState.new()
 	game.rules = rules
 	game.teams = [manager.make_lineup(away, rules, away.next_starter().id), manager.make_lineup(home, rules, home.next_starter().id)]
@@ -535,11 +547,7 @@ func selected_type() -> PitchType:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	var click := event as InputEventMouseButton
-	# A broadcast moment that holds the game is skipped with Space, Enter or a click.
-	if broadcast.holding() and not pause_menu.visible and not menu.visible and ((key != null and key.pressed and not key.echo and key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]) or (click != null and click.pressed)):
-		broadcast.skip()
-		get_viewport().set_input_as_handled()
+	if skip_broadcast(event):
 		return
 	if key != null and key.pressed and not key.echo and (key.keycode == KEY_ESCAPE or key.keycode == KEY_ENTER):
 		_menu_key(key.keycode)
@@ -1346,7 +1354,7 @@ func _end_play() -> void:
 	if _play != null and not _play.foul:
 		banner = last_text
 		banner_time = 2.6
-	if _play != null and broadcast.enabled:
+	if _play != null and broadcast.enabled and _replay_wanted():
 		if _play.result == PaResult.Kind.HOME_RUN:
 			_push_replay(_play, &"home_run")
 		elif _play.hard_made and _play.hard_odds <= PlayHighlight.DOUBTFUL_CATCH:
@@ -1435,7 +1443,7 @@ func _after_result() -> void:
 	if new_half:
 		_half_key = half
 		_dress_for_half()
-		if broadcast.enabled:
+		if _broadcast_between():
 			_push_half()
 		else:
 			banner = half
@@ -2564,6 +2572,32 @@ func _camera_preset() -> Array:
 # --- The broadcast's moments (docs/11 section 6, docs/13 S16) ---
 
 
+## A broadcast moment that holds the game is skipped with Space, Enter or a click (before the
+## keys mean anything else: in the manager's game Space pauses and Enter takes the at-bat).
+## True when the event was used for that.
+func skip_broadcast(event: InputEvent) -> bool:
+	if not broadcast.holding() or pause_menu.visible or menu.visible:
+		return false
+	var key := event as InputEventKey
+	var click := event as InputEventMouseButton
+	if (key != null and key.pressed and not key.echo and key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER]) or (click != null and click.pressed):
+		broadcast.skip()
+		get_viewport().set_input_as_handled()
+		return true
+	return false
+
+
+## The cards between plays (the inning, the batter, a new pitcher) are shown: not in the
+## manager's quick game, whose board says all of it.
+func _broadcast_between() -> bool:
+	return broadcast.enabled
+
+
+## A replay is shown after this play.
+func _replay_wanted() -> bool:
+	return true
+
+
 ## The batting side's runs, hits and men left on base so far.
 func _half_numbers() -> Vector3i:
 	var t := game.batting()
@@ -2630,18 +2664,17 @@ func _push_half() -> void:
 
 
 ## The batter coming up and a new pitcher: their cards (a close-up that holds the game unless
-## the player is the one batting; none in the manager's quick games).
+## the player is the one batting). Not in the manager's quick games (_broadcast_between).
 func _push_people(new_half: bool) -> void:
-	if not broadcast.enabled:
+	if not _broadcast_between():
 		return
-	var quick := self is ManagerMatch
 	var f := game.fielding()
 	if game.teams[f].pitcher_id != _seen_pitcher[f] and _seen_pitcher[f] != "" and not new_half:
 		var seg := Broadcast.segment(Broadcast.Kind.PITCHER_CHANGE, {"id": game.teams[f].pitcher_id})
 		seg.shots = [Broadcast.Shot.make(0.0, Vector3(4.0, 12.5, 2.0), Vector3(0.0, Field.RUBBER_Y, 1.6), 28.0, Vector3(3.4, 13.2, 1.9), Vector3(0.0, Field.RUBBER_Y, 1.6), 24.0)]
 		broadcast.push(seg)
 	_seen_pitcher[f] = game.teams[f].pitcher_id
-	if game.batter_id() != _seen_batter and not quick:
+	if game.batter_id() != _seen_batter:
 		var holds := not human_bats()
 		if holds:
 			banner_time = 0.0

@@ -7,7 +7,6 @@ func setup() -> void:
 	heading = "불러오기"
 	heading_latin = "LOAD GAME"
 	heading_icon = "floppy-disk"
-	subheading = "리그 모드와 커리어 모드는 자동 저장됩니다"
 	vantage = &"stands"
 	dock_id = "load"
 

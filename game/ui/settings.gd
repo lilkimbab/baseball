@@ -40,8 +40,6 @@ static var voice_volume := 0.9
 static var voices := true
 ## What the match screen shows.
 static var landing_spot := true
-static var hit_info := true
-static var win_chance := true
 static var commentary := true
 ## The broadcast's moments between pitches (introduction, inning cards, batter cards, replays).
 static var broadcast := true
@@ -49,6 +47,8 @@ static var broadcast := true
 static var pitch_marker := true
 ## Slow-motion close-ups of a crushed ball and of a catch in doubt (PlayHighlight).
 static var highlights := true
+## The menus' font family (UiTheme.MENU_FAMILIES).
+static var menu_font := "football"
 static var _loaded := false
 
 
@@ -86,10 +86,10 @@ static func load_file() -> void:
 	voices = bool(s.get("voices", voices))
 	broadcast = bool(s.get("broadcast", broadcast))
 	landing_spot = bool(s.get("landing_spot", landing_spot))
-	hit_info = bool(s.get("hit_info", hit_info))
-	win_chance = bool(s.get("win_chance", win_chance))
 	commentary = bool(s.get("commentary", commentary))
 	pitch_marker = bool(s.get("pitch_marker", pitch_marker))
+	menu_font = str(s.get("menu_font", menu_font))
+	UiTheme.set_menu_family(menu_font)
 
 
 static func save_file() -> Error:
@@ -99,7 +99,8 @@ static func save_file() -> Error:
 		"highlights": highlights, "fullscreen": fullscreen,
 		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,
 		"music_volume": music_volume, "crowd_volume": crowd_volume, "sfx_volume": sfx_volume, "voice_volume": voice_volume, "voices": voices, "broadcast": broadcast,
-		"landing_spot": landing_spot, "hit_info": hit_info, "win_chance": win_chance, "commentary": commentary, "pitch_marker": pitch_marker,
+		"landing_spot": landing_spot, "commentary": commentary, "pitch_marker": pitch_marker,
+		"menu_font": menu_font,
 	}
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:

@@ -194,7 +194,6 @@ func _draw_target_gauge() -> void:
 	var colour := GOLD if good >= 0.85 else (GREEN if good >= 0.6 else (RED if at > sweet else INK))
 	draw_arc(centre, radius, 0.0, TAU, 64, Color(0.0, 0.0, 0.0, 0.55), 7.0, true)
 	draw_arc(centre, radius, 0.0, TAU, 64, colour, 4.0, true)
-	_text(centre + Vector2(-140.0, base * GAUGE_FROM + 26.0), "원이 겹칠 때 버튼을 떼세요", 16, Color(1, 1, 1, 0.85), HORIZONTAL_ALIGNMENT_CENTER, 280.0)
 
 
 ## How many target circles wide the closing ring starts.
@@ -306,11 +305,6 @@ func _draw_swing_feedback() -> void:
 			color = RED
 	if scene.plate_marks_visible():
 		shout(Vector2(0.0, view.y * 0.62), label, 36, color, HORIZONTAL_ALIGNMENT_CENTER, view.x)
-	if Settings.hit_info and duel.contact != null and duel.contact.made_contact:
-		var info := "타구 속도 %d km/h   발사각 %d°   방향 %d°" % [roundi(duel.contact.exit_speed_kmh()), roundi(duel.contact.launch_deg()), roundi(duel.contact.spray_deg())]
-		var box := Rect2(Vector2(view.x * 0.5 - 260.0, view.y - 110.0 - bottom_reserved), Vector2(520.0, 42.0))
-		panel(box, UiTheme.PANEL, 8.0)
-		_text(box.position + Vector2(0.0, 25.0), info, 18, INK, HORIZONTAL_ALIGNMENT_CENTER, box.size.x)
 
 
 func _draw_banner() -> void:

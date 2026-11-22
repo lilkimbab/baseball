@@ -54,7 +54,7 @@ func _draw() -> void:
 		var out := _point(centre, radius + 20.0, i, max_value)
 		var text := axes[i]
 		var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15).x
-		var number := "%d" % roundi(values[i]) if show_numbers and i < values.size() else ""
+		var number := UiTheme.shown_text(values[i]) if show_numbers and i < values.size() else ""
 		var nw := bold.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17).x
 		var total := w + (nw + 5.0 if number != "" else 0.0)
 		var at := Vector2(out.x - total * 0.5, out.y + 6.0)
@@ -70,7 +70,7 @@ func _shape(centre: Vector2, radius: float, amounts: PackedFloat32Array, tint: C
 		return
 	var points := PackedVector2Array()
 	for i: int in n:
-		points.append(_point(centre, radius, i, maxf(amounts[i], 4.0)))
+		points.append(_point(centre, radius, i, maxf(UiTheme.shown(amounts[i]), 4.0)))
 	draw_colored_polygon(points, Color(tint.r, tint.g, tint.b, fill))
 	points.append(points[0])
 	draw_polyline(points, tint, 2.0, true)

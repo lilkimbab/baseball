@@ -104,7 +104,7 @@ func _report(season: Season, d: int, brief: bool) -> void:
 		print("\npostseason seeds: %s" % ", ".join(Array(p.seeds).map(func(id: String) -> String: return season.teams[id].short_name)))
 		for r: int in p.rounds.size():
 			var sr := p.rounds[r]
-			print("  %s: %s %d - %d %s (%d games)" % [Postseason.ROUND_NAMES[r], season.teams[sr.high].short_name, sr.high_wins, sr.low_wins, season.teams[sr.low].short_name, sr.games.size()])
+			print("  %s: %s %d - %d %s (%d games)" % [p.round_name(r), season.teams[sr.high].short_name, sr.high_wins, sr.low_wins, season.teams[sr.low].short_name, sr.games.size()])
 		print("  champion %s, runner-up %s" % [season.teams[p.champion()].name, season.teams[p.runner_up()].name])
 	var moves := season.movements()
 	print("up: %s   down: %s" % [", ".join(Array(moves[d][0]).map(func(id: String) -> String: return season.teams[id].short_name)), ", ".join(Array(moves[d][1]).map(func(id: String) -> String: return season.teams[id].short_name))])

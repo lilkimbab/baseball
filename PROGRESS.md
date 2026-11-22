@@ -7,12 +7,12 @@
 
 | | |
 |---|---|
-| 브랜치 | `overnight-2026-11-21` (main과 같은 커밋까지 푸시됨. 그 뒤 작업은 아래 5절, 아직 커밋 전) |
-| 테스트 | 544개 전부 통과 (`./dev test`, 2026-11-22 아침) |
+| 브랜치 | `overnight-2026-11-21` (마지막 커밋 f35b2d4. 그 뒤 작업은 아래 5절의 마지막 두 부분, 아직 커밋 전) |
+| 테스트 | 558개 전부 통과 (`./dev test`, 2026-11-22 저녁) |
 | 성능 | 경기 장면 1080p 평균 72fps·하위 1% 69~71fps (Arc 140V, 관중 만원, 업스케일 품질 88%, 새 HUD와 소리 포함). 77%로 그리면 85fps, 원본 해상도는 62fps |
 | 플레이 검사 | `tools/play_audit.gd` 컴퓨터 경기 150플레이 (2026-11-22 아침): 순간이동·순간 회전·자세 튐·공 튐·겹침·카메라·클로즈업 0건. 1루수가 송구를 받을 때 공과 글러브 0.8~1.6m 0.05건/플레이, 송구·공 놓침 각 0.01건 (4절) |
 | 리그 분포 | 물리 해석기 1600경기(시드 7): 2루타 비율과 가운데 방향 타구만 목표 밖(예전부터 알려진 것, 4절) |
-| 실행 | `./dev play` → 제목 → 홈(친선 경기·리그·커리어·연습·상점) |
+| 실행 | `./dev play` → 제목(**Moneyball**) → 홈(친선 경기·리그·커리어·연습·상점) |
 | 커밋 | 사용자가 직접 한다(7절의 명령) |
 
 ## 2. 지금까지 만든 것
@@ -24,7 +24,7 @@
 | **조작** | 타격(나무 배트 조준, 도착 지점 원, 컨택·강타·번트), 투구(구종 고리·목표 공·누르고 떼는 타이밍 게이지, 예상 궤적), 직접 수비(WASD·다이빙) 또는 자동 수비, 송구(방향 키 + 게이지), 주루(E/Q), 도루(Shift 타이밍) | S3, S5, S12, R1b |
 | **연출** | 명장면 슬로모션(강한 타구의 맞는 순간, 아슬아슬한 포구), 타구 순간 카메라 전환 | R1b |
 | **경기 화면** | 점수 표시, 하단 바, 투구 기록 패널, 화면 속 화면, 낙하 지점·베이스 표식, 한 줄 중계, 투구 시간, 일시정지·교체, 경기 뒤 화면 | S6 |
-| **감독 리그** | 30구단 3부 리그, 일정·순위·포스트시즌·승강·시상, 1군/2군 엔트리와 외국인 규정, 감독 지휘 경기(상황판·작전·예약·개입), 구단 운영(코스트·컨디션·스카우트·훈련·특성·팀 컬러) | S7 |
+| **감독 리그** | 30구단 3부 리그, 일정·순위·포스트시즌(1부는 KBO 방식: 와일드카드 결정전 → 준플레이오프 → 플레이오프 → 한국시리즈)·승강·시상, 1군/2군 엔트리와 외국인 규정, 감독 지휘 경기(상황판·작전·예약·개입), 구단 운영(코스트·컨디션·스카우트·훈련·특성·팀 컬러) | S7 |
 | **커리어** | 선수 생성, 2군 → 1군, 내 장면만 하는 경기(약 6분), 성장, 구종 진화, 평점·보상, 올스타전·홈런 더비 | S8 |
 | **메뉴** | 새 디자인(그래파이트 + 모드별 색, Paperlogy·Barlow Condensed, 실시간 야구장 배경): 제목, 홈, 친선 경기, 리그·커리어 내부 화면, 연습 모드, 상점, 설정, 불러오기, 선수 카드, 로딩 화면. 저장·자동 저장 | S9 + 재작업 |
 | **동작** | 모션캡처 투구 폼 20·타격 폼 20(선수별 배정), 수비·주루 동작(포구 IK, 송구 4종, 슬라이딩, 태그, 포수·심판), 달리기 모션 매칭(CMU 40클립), 도루·견제·폭투 장면 | S10, S12, 제안 3·4 |
@@ -48,12 +48,13 @@
 | 4 | ~~R4 불펜 몸풀기~~ | 끝(5절) |
 | 5 | ~~R5 경기 화면과 구단 관리 UI 완성~~ | 끝(5절). 사용자가 화면을 보고 디자인 의견 |
 | 6 | ~~R6 2군(퓨처스)과 육성~~ | 끝(5절) |
-| 7 | ~~R7 역사적 시즌 재현~~ | 끝(5절): 형식·모드·예시 팩. 실제 KBO 시즌 팩은 S17 수집기로 — **어느 시즌부터 할지 사용자가 정할 것** |
+| 7 | ~~R7 역사적 시즌 재현~~ | 끝(5절): **역사를 쓴 구단 9개**(2009·2016·2018·2019·2020·2021·2022·2023·2024, 로컬 팩, 실제와 비슷한 이름), 그해 포스트시즌 방식·구장 효과 |
 | 8 | **S15 소리와 음악** | 1차 끝(5절): 모든 소리를 직접 합성해 넣음. **사용자가 들어 보고 음색·음량 의견**. 남은 것: 발소리·펜스·가까운 관중 목소리·파도타기 |
 | 9 | **S16 중계 연출** | 1차 끝(5절): 경기 전 소개, 이닝 카드, 타자·투수 교체 자막, 홈런·호수비 리플레이, 경기 끝 카드. 남은 것: 득점·이닝 끝 장면, 선수 반응 |
-| 10 | **S17 실제 로스터** | 변환기 끝(5절): 기록 CSV → 로스터 팩. **수집기는 막힘**: KBO 공식 기록실이 자동 수집을 금지(robots·안내문). **사용자가 기록 출처를 정할 것** |
+| 10 | **S17 실제 로스터** | 거의 끝(5절): Kaggle 데이터셋(KBO 기록실 값, CC BY-NC-SA)으로 `./dev kbo` → 시즌 팩(로컬), 구장 효과, 리그·구단 보정, 실제와 비슷한 선수·구단 이름. 남은 것: 좌우 상대 기록·구종별 구속(데이터셋에 없음) |
 | 11 | **S18 실제 구장·유니폼·폼·얼굴** | 실제 구장, 실제 유니폼, 사진 기반 얼굴(로컬) |
 | 12 | **S19 대조 점검 → S20 마감** | 참고 영상과 나란히 점검, 밸런스·성능, Windows 빌드 |
+| 13 | **R8 리그 구조 개편** (사용자 결정, **맨 마지막에**) | 리그 모드는 실제와 비슷한 10개 구단의 1군만. 커리어는 고교(3군) → KBO식 드래프트 화면 → 1군 구단(그전엔 잠김), 못하면 퓨처스(2군)로. 커리어 선수의 연봉과 상점. [docs/08의 13절](docs/08-roadmap.md#13-r8-리그-구조-개편-퓨처스고교리그드래프트연봉-설계-초안) |
 
 ## 4. 알려진 문제
 
@@ -64,11 +65,15 @@
 | 1루수가 베이스에서 송구를 받을 때 공과 글러브가 0.8~1.6m 떨어짐(150플레이에 4~7번) | 다음 동작 다듬기 때 |
 | 해가 타자 뒤에 있을 때(투수 시점) 선수 앞면의 명암이 밋밋함 | R1·R2에서 조명과 함께 |
 | 홈 화면 모드 카드의 그림이 예전 모델로 찍은 것 | `tools/ui/make_art.sh`로 다시 찍기(R1 끝에) |
+| 타석의 타자 흔들림을 고친 것(가장 가만히 있는 순간을 기본 자세로)을 실제 경기 화면 캡처로는 아직 못 봄 | 다음 경기 화면 작업 때 `match_shots`로 |
+| 스카우트·특성·불러오기·선수 만들기 화면은 새 디자인을 덜 받음 | 다음 화면 작업 |
 | 배경 건물이 상자에 사진을 입힌 수준, 광고판이 글자뿐 | R2 |
 | 새 구장 모형 13종은 높은 시점 한 장면으로만 확인 | R2 |
 | 물리 해석기의 2루타 5.7%(목표 4.13%는 가정값) | 실제 기록을 받는 S17에서 |
 | 홈런 때 타자가 베이스를 다 돌 때까지 못 넘김 | S16(건너뛰기) |
 | 테스트 종료 때 Godot의 "ObjectDB 누수" 경고 | 테스트 도구의 정리 순서 문제, 결과에 영향 없음 |
+| 실제 시즌 팩의 선수별 OPS 상관 0.71~0.84(평균 0.78, 목표 0.85; 방법의 한계가 0.85 근처). 구단 승률은 0.88~0.99로 맞음 | 인플레이 안타율 능력을 더 넣을지 S17 다시 볼 때 |
+| 2015 kt처럼 외국인 4명을 쓴 신생 구단도 3명만 1군 | 필요하면 시즌 자료에 구단별 예외 |
 
 ## 5. 이번 작업 (2026-11-22): R1 마무리, R1b 연출·수비 조작, 사용자가 찾은 버그들, R2~R6
 
@@ -130,6 +135,55 @@
 - 직접 수비는 `C`로 잡는다(2026-11-22 사용자 요청): 누르면 글러브가 0.6초 올라가 있고, 공이 닿기 0.5초 전부터 야수 머리 위에 `C`가 깜박인다. 안 누르면 공이 지나가 동료가 받친다. `Space` 다이빙은 그 자체로 잡기 시도
 - 캡처: `build/forms/`(새 폼 20종, 뒤에서 본 레이백·릴리스), `build/arm/`(기본 폼 옆·뒤), `build/detail/`(설정 화면)
 
+### 실제 시즌·KBO 포스트시즌·검토 (2026-11-22 오후, 커밋 f35b2d4 뒤)
+
+사용자 요청: ① "또 할 게 더 있어? 제대로 검토해봐" ② "역사적 시즌은 진짜 의미가 있는 시즌만 … 플레이오프·준플·한국시리즈 이런 거 다 있지?" ③ "인터넷에서 찾아", "너무 옛날 시즌까지 갈 필요는 없어" ④ 2군은 퓨처스리그, 3군은 고교리그 + 드래프트, 커리어에 돈과 상점.
+
+| 요청·지적 | 재 보니 | 고친 것 |
+|---|---|---|
+| 검토: 감독 지휘 경기 | 경기 전 중계 연출이 끝나지 않고, Space가 연출 건너뛰기에 먹혀 감독 경기가 멈춤 | 감독 경기는 연출이 경기를 붙잡는 동안 진행을 멈추고, 키는 먼저 연출 건너뛰기에. 이닝 사이 연출은 감독 경기에서 끔. 테스트 |
+| 검토: 친선 경기 | 실제 로스터 팩을 고를 수 없었음 | 친선 경기에 "로스터" 항목(가상 리그 / 로컬 팩의 실제 시즌) |
+| 검토: 옛 리그 저장 | 2군 리그가 생기기 전 저장은 2군이 없음 | 불러올 때 만들어 줌 |
+| 포스트시즌 | 4팀 계단식(준PO 3전·PO 5전·"결승" 7전)뿐, 와일드카드도 한국시리즈라는 이름도 없었음 | 단계를 자료로: 1부와 실제 시즌은 **와일드카드 결정전(4위 1승 어드밴티지, 최대 2경기) → 준플레이오프(5전) → 플레이오프(5전) → 한국시리즈(7전)**, 2부 이하는 4팀 계단식, 역사적 시즌은 그해 방식(2020 준PO 3전). 저장에 단계와 어드밴티지, 옛 저장은 4팀식. 순위표의 진출 표시, 화면 문구, 경기 제목("한국시리즈 3차전"). 테스트 6개 |
+| 의미 있는 시즌만 | 인터넷(위키백과의 그해 KBO 리그·포스트시즌 문서, 기사)으로 확인해 10구단 체제에서 7개: **2015**(10구단·와일드카드 첫해, 3위 두산 우승, 테임즈 40-40), **2019**(두산 9경기 차 역전 1위), **2020**(NC 첫 통합 우승), **2023**(LG 29년 만), **2024**(첫 천만 관중, 김도영, 첫 5위 결정전), **2025**(LG·한화), **2026**(삼성 우승, 아시아쿼터 첫해) | 시즌마다 그해 구단 이름(SK 와이번스, 넥센 히어로즈)·실제 최종 순위·우승·포스트시즌 방식·규칙(1군 27/28/29명, 연장 12/11회, 피치 클록)·시나리오 4개를 `content-local/kbo/history.json`에(로컬, 손으로 정리하고 출처 기록). 저장소의 스크립트에서 실제 구단 이름·색을 뺌. `./dev kbo`가 7개를 모두 만듦 |
+| 실제 시즌과 덜 맞음 | 2025 구단 승률 상관 0.64(SSG가 너무 약하고 키움이 너무 강함) | ① 표본이 적은 선수를 리그 평균이 아니라 **비슷하게 뛴 선수들의 평균** 쪽으로 당김(백업이 너무 좋아지던 것) ② 컨택의 40%를 단타율에서(홍창기·손아섭처럼 인플레이 안타율이 꾸준히 높은 타자) ③ **구단 보정**: 구단별 득점·실점이 실제(피타고라스로 실제 승패에 맞춘 값)와 같아지도록 그 구단 타자·투수 전원을 같은 양만큼. 아래 표 |
+| 아시아쿼터 | 2026 팩에 아시아쿼터 선수가 외국인으로 섞임 | 데이터셋의 "아시아쿼터" 지명으로 가려 구단당 1명 |
+| 드래프트·고교리그·연봉 | | 설계 초안만: [docs/08의 13절](docs/08-roadmap.md#13-r8-리그-구조-개편-퓨처스고교리그드래프트연봉-설계-초안). 실제 KBO 드래프트(전면, 11라운드, 직전 순위 역순, 계약금 순번별), 최저 연봉 3,000만 원, FA 고졸 8·대졸 7시즌을 확인해 적음. 사용자 결정 4가지(13.5) 뒤에 만든다 |
+
+실제와 비교(`tools/season_check.gd`, 보정과 다른 시드로 시즌 6번):
+
+| 시즌 | 규정타석 타자 OPS 상관 (목표 0.85) | 구단 승률 상관 (목표 0.7) | 리그 타율 실제 / 시뮬 | 홈런/타석 실제 / 시뮬 |
+|---|---|---|---|---|
+| 2015 | 0.843 | 0.908 | .280 / .282 | .0266 / .0271 |
+| 2019 | 0.792 | 0.981 | .267 / .267 | .0182 / .0176 |
+| 2020 | 0.820 | 0.968 | .273 / .283 | .0240 / .0236 |
+| 2023 | **0.601** | 0.816 | .263 / .262 | .0164 / .0162 |
+| 2024 | 0.822 | 0.945 | .277 / .277 | .0251 / .0263 |
+| 2025 | 0.813 | 0.934 | .262 / .262 | .0213 / .0196 |
+| 2026 | 0.776 | 0.967 | .268 / .276 | .0241 / .0248 |
+
+구단 순위는 실제와 잘 맞게 됐고, 선수 한 명 한 명의 OPS는 아직 목표에 못 미친다(특히 2023: 보정 전 0.79가 구단 보정 뒤 0.60). 짐작되는 원인: 구장 효과가 없어 잠실 같은 투수 구장의 낮은 득점을 타자 능력으로 돌림, 인플레이 안타율 능력이 반쯤만 들어감. 다음에 S17을 다시 볼 때 구장 효과부터.
+
+### Moneyball: 화면 다시 짓기, 역사를 쓴 구단, 저작권, 구장 효과, 상점, 라인업 보드 (2026-11-22 저녁)
+
+사용자 요청(순서대로): 역사적 시즌은 "역사를 쓴 구단" 하나를 하는 것으로, 쓸데없는 작은 글씨(승리 확률·레버리지 등) 모두 빼기, 타석에서 타자가 너무 흔들림, 게임다운 글꼴, 실제 게임(2K14·더 쇼)처럼 모든 화면 다시 디자인, 이름은 Moneyball, GitHub 저작권 때문에 구단·엠블럼·선수 이름·사진은 "야구 팬이 아니면 알아보기 어렵게" 바꾸기, 구장 효과(잠실 등), 상점은 실제 3D 상품과 가격별 등급, OVR이 너무 낮음, 표의 빈 공간, 그리고 **야구장 위에 선수를 끌어다 놓는 라인업 + 선발 로테이션·셋업·마무리, 타순, 추천 선수 유지**.
+
+| 요청·지적 | 재 보니 | 고친 것 |
+|---|---|---|
+| 역사적 시즌 = 역사를 쓴 구단 | 시즌 전체를 고르는 방식이었음 | 인터넷으로 확인해 9개 구단: 2009 KIO 벵갈스(V10), 2016 두림 그리즐리스(93승), 2018 SKN 드래곤즈(14.5경기 차 뒤집은 가을), 2019 두림(9경기 차 역전), 2020 NE 랩터스(첫 통합 우승), 2021 KC 소서러스(1위 결정전), 2022 SGC 마리너스(개막부터 끝까지 1위), 2023 LN 제미니스(29년 만), 2024 KIO(V12). 고르는 화면은 구단 줄 + 큰 카드(이야기·그해 길·주역 선수 얼굴) |
+| 저작권 | 실제 구단 이름·로고·선수 이름이 팩과 화면에 | 기업명과 별칭을 둘 다 비슷하게(두림 그리즐리스, LN 제미니스 …), 선수 이름도 같은 규칙으로(성·끝 글자를 가까운 소리로, 외국인은 첫·끝 자음) — `tools/kbo/names.py`, 이미 만든 팩은 `rename_packs.py`. 실제 로고는 지우고 엠블럼은 무료 그림(game-icons.net, CC BY 3.0)의 마스코트를 구단 색 방패에. 저장소의 코드·주석에서도 실제 이름을 뺌 |
+| 구장 효과 | 잠실 같은 투수 구장의 낮은 득점이 타자 능력으로 들어감 | 시즌 팩에 그해 홈구장별 홈런·안타 계수(잠실 홈런 ×0.78, 라이온즈파크 ×1.40, 사직은 2022년 담장 높인 뒤 ×0.75 …). 로스터를 만들 때 기록을 반은 홈·반은 원정으로 보고 중립화하고, 경기에서는 홈 구장 계수를 씀. 2023 OPS 상관 0.60 → 0.71, 전체 0.71~0.84 |
+| 쓸데없는 글씨 | 승리 확률·레버리지·게이지 설명·타구 정보·설정 설명 줄 | 모두 뺌(설정에서도 항목 삭제). 승부처 표시만 남김 |
+| 타자 흔들림 | 대기 자세가 흔들리는 녹화 구간의 한 점이었음 | 디딤 전 가장 가만히 있는 순간을 찾아 기본 자세로, 아주 작은 숨쉬기만. 테스트로 고정 |
+| 글꼴 | Paperlogy 굵은 글씨가 작위적 | 여러 글꼴을 같은 화면에 넣어 비교 → **넥슨 풋볼고딕**(사용자 선택). 설정에서 바꿀 수 있음 |
+| 화면 디자인 | 여백이 많고 글이 한곳에 몰림, 글 위주 | 2K14·더 쇼의 구성을 참고해 리그 홈(오늘 경기·선발 맞대결 얼굴·최근 10경기·팀 리더), 역사적 시즌, 친선 경기 팀 고르기(◀ ▶ 선택기·엠블럼 격자), 커리어, 연습, 기록실을 다시. 선수 목록마다 **3D 얼굴 사진**(메뉴의 3D 선수를 얼굴만 찍어 디스크에 저장), 표는 화면 폭에 맞게 늘어남 |
+| 상점 | 상품 카드뿐 | 상품마다 **돌아가는 3D 모형**(배트·글러브·미트·스파이크·보호대·헬멧·송진·덤벨·코인) 받침대와 조명. 스탠다드·프로·엘리트 세 등급: 값이 다르고 효과도 1·2·3배, 비싼 것일수록 마감이 고급(배트 광택·글러브 가죽색·금색 링 등, 요란하지 않게) |
+| OVR이 낮음 | 엔진 척도(평균 50)를 그대로 보여 줌 | 보이는 값만 바꿈: 65까지는 +18, 그 위는 83~99로 눌러 담음(평균 선수 68, 최고 99). 엔진과 색 기준은 그대로 |
+| 라인업 (이번 마지막) | 표 두 개와 빈 공간 | **야구장 보드**: 큰 구장 그림(잔디 줄무늬·워닝 트랙·펜스·폴) 위에 9명의 카드(얼굴·타순·포지션·OVR·타율), 지명타자는 더그아웃 쪽, 아래에 후보. 카드를 끌어다 놓으면 후보 → 그 자리에 들어감, 야수끼리 → 수비 위치 맞바꿈. 오른쪽에 작은 **타순** 표(끌어서 순서 바꾸기)와 **투수진**: 선발 1~5, 셋업 2, 마무리, 나머지 불펜·대기 선발. 컴퓨터가 다르게 골랐을 자리에는 작게 "추천 ○○○", 추천 선수 칩에 "추천", "추천대로"·"매 경기 자동" 버튼. 클릭 두 번으로도 같은 일. 정한 셋업·마무리는 실제 경기의 감독 AI가 씀(리그 경기와 감독 지휘 경기), 저장됨 |
+
+- 테스트: 558개 통과(새로: 라인업 보드 끌어 놓기·투수진, 포스트시즌 형식, 대기 자세, 시즌 팩, 구장 효과, 사용자 데이터 옮기기)
+- 캡처: `build/design/lineup5_league.png`(라인업 보드), 그 밖의 화면은 `build/design/`
+
 이전 작업(2026-11-21 밤 ~ 22 새벽: 선수 비율·유니폼·핏줄, 투구 조작, 서체, 심판, 정리)은 [docs/14](docs/14-work-log.md)로 옮긴다.
 
 ## 6. 확인하는 법
@@ -148,46 +202,30 @@ $G --headless --path game --script res://tools/play_audit.gd -- --plays 80 --bat
 $G --headless --path game --script res://tools/highlight_report.gd -- --games 60     # 슬로모션 빈도
 ./dev tool-win match_shots build/r1b/hl --highlight --force --plays 3                # 슬로모션 화면
 ./dev tool-win match_shots build/r1b/man/m --manual --plays 3                        # 직접 수비 화면
+./dev kbo                      # 실제 시즌 7개 만들기·보정 (Kaggle 토큰 필요, 결과는 content-local/)
+$G --headless --path game --script res://tools/season_check.gd -- --season kbo-2025 --raw ../content-local/raw/kbo-2025   # 실제와 비교
+./dev tool-win menu_shots build/r7/post --only league --history kbo-2023 --post 7 --team nc --tab ladder   # 포스트시즌 화면
 ```
 
 ## 7. 커밋 (사용자가 직접)
 
 ```bash
 cd /home/parkjune/baseball
-git add -A .gitignore README.md PROGRESS.md IDEAS.md dev docs/ game/ tools/
-git commit -m "R1-R7, S15 and S16 first passes, S17 converter, catch key: player figure and kit, highlights and own fielding, full check fixes, town details, weather and wind, bullpen warm-ups, match HUD and club screens, farm league and development, seasons of the past, sound, broadcast moments
+git add -A PROGRESS.md README.md dev docs/ game/ tools/
+git commit -m "Moneyball: KBO postseason, clubs that made history, real-like names, park effects, new screens, 3D shop, line-up board
 
-- R1: body to ANSUR II tables, fitted uniforms, real lettering, umpires, catcher and batting gear
-- R1b: rare slow-motion highlights, manual fielding (WASD), one-hold pitch gauge, arrival circle, wooden aiming bat
-- Full check: tools/play_audit.gd; catch IK, snap turns, pose easing, throws, ball in hand, batter out of the box,
-  chest-high catches, fielded moments, thrower waits, overrun at first, scorers walk off, close-up framing
-- Pitching forms re-picked toward a professional arm-angle spread; default delivery 41 degrees
-- R2: roofs (parapets, plant rooms, units, tanks, masts), ring road and avenues with lane marks, cars, street trees;
-  turned boxes sized along their own sides
-- R3: Weather (sky, temperature, humidity, wind from any quarter), wind in batted-ball flight, outfield depth,
-  flags, overcast light, score bug weather chip, wind lines in the commentary
-- R4: bullpen readiness, cold relievers wild for their first pitches, AI warm-ups, warm-up menu, relievers throwing
-- R5: line-up tab (order, positions, bench, rotation) used in games and saved; match HUD on the menus' plates
-  (broadcast score bug, player cards with emblems, key caps, post-game), pause and order panels on the menu kit,
-  player comparison (radar, ratings, season), records room (leaders, club records, KBO qualifiers)
-- R6: hidden growth room, daily growth by age and playing time, winter decline, retirement and draft,
-  second teams' league (daily farm games, tables, numbers), weekly call-ups for computer clubs, farm tab
-- R7: season packs (clubs, that year's rules, real outcome, scenarios), history mode with then-and-now comparison,
-  an example pack made from the fictional top division
-- S15 first pass: every sound synthesised (tools/audio/make_sounds.py, ./dev audio): bat by exit speed and timing,
-  mitt by pitch speed, gloves, tags, slides, bounces; crowd beds mixed by an excitement model, reactions, the rise of
-  a big fly; cheering patterns on the crowd's beat; menu music, jingles, organ, fanfare; buses and volumes;
-  umpire and announcer by the system's Korean voice; local-pack chants and walk-up songs; tools run silent
-- S16 first pass: broadcast segments with their own shots and cards (introduction, inning card with the half just
-  over, batter and pitching-change lower thirds, home-run replay), skippable, a setting to turn them off
-- S17 converter: RosterBuilder runs the engine's rating formula backwards (with regression to the mean);
-  tools/build_roster.gd turns four CSV files into a roster pack; round-trip check on the fictional league.
-  No collector: the KBO site forbids automated collection
-- Manual fielding catches with C: the glove is up 0.6 s after the key, a C prompt over the fielder 0.5 s before the
-  ball reaches him; without it the ball goes by and a team-mate backs up
-- Fixes: saves keep ratings whole; season recomputes bullpen-role overalls daily; a planned line-up is kept when a
-  resting man has nobody to take his place; a fielder who drops the ball plays it from where he fell and where it
-  rolled (the ball flew back to him); the chest-high catch shown only where the fielder can be (line drives)
+- Postseason rounds as data (wild card, semi-playoff, playoff, Korean Series); a season pack
+  can give that year's rounds, rules and parks
+- Historic mode is a club that made history (nine, 2009-2024), read from the local pack;
+  real clubs, players and logos replaced by real-like names and drawn mascots (game-icons.net)
+- Park effects: records neutralised by home park when rosters are built, the home park's
+  factors in each game; roster builder tiers and club calibration
+- Clutter removed from the match HUD and settings; batter's stance at the stillest moment
+- NEXON Football Gothic; screens redesigned (league home, history, exhibition, career,
+  practice, records) with 3D headshots in lists; ratings shown on a 2K-like scale
+- Shop with turning 3D products in three grades
+- Line-up board: players dragged onto a ballpark, batting order, rotation, set-up men and
+  closer with the computer's choices as recommendations; the AI uses the chosen bullpen
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push origin overnight-2026-11-21

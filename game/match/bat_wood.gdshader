@@ -11,6 +11,13 @@ uniform vec3 late : source_color = vec3(0.52, 0.35, 0.19);
 uniform vec3 tar : source_color = vec3(0.16, 0.10, 0.06);
 uniform float length_m = 0.851;
 uniform float alpha = 1.0;
+// A finished bat (the shop's better ones): the barrel stained from `barrel_from` (share of the
+// length from the knob; above 1 none) in `barrel` over the grain, and a glossier lacquer
+// (`gloss` 0 satin .. 1 mirror).
+uniform vec3 barrel : source_color = vec3(0.05, 0.04, 0.04);
+uniform float barrel_from = 2.0;
+uniform float barrel_cover = 0.9;
+uniform float gloss = 0.0;
 
 varying vec3 local;
 
@@ -48,8 +55,12 @@ void fragment() {
 	// Pine tar: dark and sticky from a hand's width above the knob up toward the label.
 	float smear = smoothstep(0.24, 0.34, along) * (1.0 - smoothstep(0.42, 0.56, along + (streak - 0.5) * 0.08));
 	smear *= 0.45 + 0.4 * noise(vec2(atan(local.z, local.x) * 5.0, along * 30.0));
-	ALBEDO = mix(wood, tar, smear * 0.75);
-	ROUGHNESS = mix(0.36 + 0.1 * line, 0.75, smear);
+	vec3 colour = mix(wood, tar, smear * 0.75);
+	float stained = smoothstep(barrel_from - 0.015, barrel_from + 0.015, along / length_m) * barrel_cover;
+	// The stain lets a little of the grain through.
+	colour = mix(colour, barrel * (0.75 + 0.5 * wood / max(pale, vec3(0.01))), stained);
+	ALBEDO = colour;
+	ROUGHNESS = mix(mix(0.36 + 0.1 * line, 0.75, smear), 0.08, gloss);
 	SPECULAR = 0.5;
 #ifdef SEE_THROUGH
 	ALPHA = alpha;

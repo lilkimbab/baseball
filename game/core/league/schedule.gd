@@ -4,7 +4,9 @@ extends RefCounted
 ## same number of times, half at home and half away, in series of three games (two where the
 ## numbers do not divide by three), six game days a week with Monday off, as in the KBO.
 ##
-## Season lengths are 36, 72 and 144 games (4, 8 and 16 meetings per pair). With 8 meetings at
+## Season lengths are 36, 72 and 144 games (4, 8 and 16 meetings per pair); a season of the
+## past may have an odd number of meetings (eight clubs, 133 games: 19), the last one a single
+## game. With 8 meetings at
 ## each park the series are 3, 3 and 2 games; with 4 or 2, two-game series. The KBO also plays
 ## its two-game series late in the season, so they come last here too.
 ##
@@ -60,6 +62,16 @@ static func make(ids: PackedStringArray, games_per_team: int, rng: Rng) -> Sched
 				series_index += 1
 			game_day += length
 			last_round = r
+	# An odd number of meetings (19 in a 133-game season of eight clubs): one more game for
+	# each pair, at one park or the other in turn.
+	if meetings % 2 == 1:
+		for r: int in rounds.size():
+			for i: int in rounds[r].size():
+				var pair: PackedStringArray = rounds[r][i]
+				var at_first := (r + i) % 2 == 0
+				s.games.append(ScheduledGame.make(calendar_day(game_day), pair[0] if not at_first else pair[1], pair[1] if not at_first else pair[0], series_index, 1))
+				series_index += 1
+			game_day += 1
 	s.games.sort_custom(func(x: ScheduledGame, y: ScheduledGame) -> bool: return x.day < y.day or (x.day == y.day and x.series < y.series))
 	s.days = calendar_day(game_day - 1) + 1
 	return s

@@ -122,8 +122,8 @@ func test_the_manager_sets_the_order_and_the_rotation_on_the_line_up_tab() -> vo
 	screen.refresh()
 	assert_true(team.batting_plan.is_empty(), "the computer's until something is changed")
 	var before := LineupPlan.current(team, AiManager.new(s.env, s.catalog, s.ovr), s.rules)
-	screen._lineup_pressed("L0", s, team)
-	screen._lineup_pressed("L3", s, team)
+	screen._lineup_pressed("O0", s, team)
+	screen._lineup_pressed("O3", s, team)
 	assert_eq(team.batting_plan.size(), 9)
 	assert_eq(str(team.batting_plan[0][0]), str(before[3][0]), "the fourth batter leads off")
 	assert_eq(str(team.batting_plan[3][0]), str(before[0][0]))
@@ -146,6 +146,61 @@ func test_the_manager_sets_the_order_and_the_rotation_on_the_line_up_tab() -> vo
 		if not rest.has(planned):
 			assert_eq(lineup.lineup[i].player_id, planned, "slot %d as planned" % (i + 1))
 		assert_eq(Position.code(lineup.lineup[i].position), str(team.batting_plan[i][1]), "at the planned position")
+
+
+func test_cards_dragged_on_the_diamond_and_the_staff() -> void:
+	# The user: players dragged onto their positions on the ballpark; the rotation, the set-up
+	# men and the closer set by hand, the computer's choices kept as recommendations.
+	var screen := _screen()
+	var clubs := RosterIO.load_pack(LeagueSession.PACK)
+	screen.begin(clubs[2].id, 36)
+	var s := LeagueSession.season
+	var team: Team = s.teams[s.my_team]
+	screen._tab = "lineup"
+	screen.refresh()
+	var before := LineupPlan.current(team, AiManager.new(s.env, s.catalog, s.ovr), s.rules)
+	# Two fielders dropped on each other trade positions, not places in the order.
+	screen._lineup_drop("L1", "L2", s, team)
+	assert_eq(str(team.batting_plan[1][0]), str(before[1][0]))
+	assert_eq(str(team.batting_plan[1][1]), str(before[2][1]))
+	assert_eq(str(team.batting_plan[2][1]), str(before[1][1]))
+	# A bench man dropped on the fifth batter's card takes his place.
+	var bench := LineupPlan.bench(team.batting_plan, team)
+	screen._lineup_drop("B" + bench[0].id, "L4", s, team)
+	assert_eq(str(team.batting_plan[4][0]), bench[0].id)
+	# The recommended bullpen: the best reliever closes, the next two set up.
+	var rec := screen._recommended_bullpen(s, team)
+	assert_ne(str(rec["closer"]), "")
+	assert_eq((rec["setup"] as Array).size(), 2)
+	# Another reliever dropped on the closer's place closes; the old closer goes back.
+	var other := ""
+	for man: Player in team.first_team():
+		if man.is_pitcher() and man.role() != &"SP" and man.id != str(rec["closer"]) and not (rec["setup"] as Array).has(man.id):
+			other = man.id
+			break
+	screen._lineup_drop("P" + other, "CL", s, team)
+	assert_eq(str(team.bullpen_plan["closer"]), other)
+	assert_eq(team.bullpen_plan["setup"], rec["setup"], "the set-up men kept")
+	# The closer and a set-up man trade places.
+	screen._lineup_drop("SU0", "CL", s, team)
+	assert_eq(str(team.bullpen_plan["closer"]), str((rec["setup"] as Array)[0]))
+	assert_eq(str((team.bullpen_plan["setup"] as Array)[0]), other)
+	# A starter does not close; a starter beyond the five takes a place in the rotation.
+	var starters := team.rotation()
+	screen._lineup_drop("R0", "CL", s, team)
+	assert_eq(str((team.bullpen_plan["setup"] as Array)[0]), other, "nothing changed")
+	if starters.size() > 5:
+		screen._lineup_drop("P" + starters[5].id, "R1", s, team)
+		assert_eq(team.rotation()[1].id, starters[5].id)
+		assert_eq(team.rotation()[5].id, starters[1].id, "the man he replaced waits")
+	screen.refresh()
+	# The computer's manager uses the closer that was chosen.
+	var manager := AiManager.new(s.env, s.catalog, s.ovr)
+	manager.use_bullpen_plan(team)
+	assert_eq(manager.role_overall[str(team.bullpen_plan["closer"])], 10000.0)
+	# 추천대로 brings the computer's choices back.
+	team.bullpen_plan = screen._recommended_bullpen(s, team)
+	assert_eq(str(team.bullpen_plan["closer"]), str(rec["closer"]))
 
 
 func test_two_men_are_compared_from_the_picked_panel() -> void:

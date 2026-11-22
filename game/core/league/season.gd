@@ -111,6 +111,7 @@ static func create(clubs: Array[Team], per_division: int, games: int, seed_value
 		s.divisions.append(ids)
 		s.schedules.append(Schedule.make(ids, games, s.rng.fork(1000 + d)))
 		s.standings.append(Standings.of(ids))
+		s.standings[-1].count_ties_as_losses(rule_set.ties_as_losses)
 	return s
 
 
@@ -191,10 +192,14 @@ func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 					best_relief = maxf(best_relief, manager.role_overall[p.id])
 		if featured != "" and manager.role_overall.has(featured):
 			manager.role_overall[featured] = best_relief + (1.0 if featured_role == "CL" else -0.01)
+		manager.use_bullpen_plan(teams[side])
 	var game_rules := rules_for(game)
 	var a := lineup_for(game.away, game.day, manager, game_rules)
 	var h := lineup_for(game.home, game.day, manager, game_rules)
-	return GameSim.with_lineups(a, h, game_rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
+	var sim := GameSim.with_lineups(a, h, game_rules, env, catalog, manager, rng.fork(hash("%d:%s" % [game.day, game.home])), physical)
+	if sim.resolver is StatResolver and history != null:
+		(sim.resolver as StatResolver).park = history.park_of(game.home)
+	return sim
 
 
 ## Pitchers' overalls for the bullpen roles, worked out once a day (play_day empties it):
@@ -493,7 +498,7 @@ func advance() -> void:
 		phase = Phase.POSTSEASON
 		postseasons.clear()
 		for d: int in divisions.size():
-			postseasons.append(Postseason.from_standings(standings[d], day + Postseason.REST_BETWEEN))
+			postseasons.append(Postseason.from_standings(standings[d], day + Postseason.REST_BETWEEN, postseason_format(d)))
 	elif phase == Phase.POSTSEASON:
 		var done := true
 		for p: Postseason in postseasons:
@@ -520,6 +525,14 @@ func play_regular_season() -> void:
 
 
 # --- After the season ---
+
+
+## A division's postseason: a season of the past as that year had it; the top division the
+## KBO's five clubs from the wild card to the 한국시리즈; the divisions under it a ladder of four.
+func postseason_format(d: int) -> Array[Postseason.Round]:
+	if history != null:
+		return history.postseason_format()
+	return Postseason.kbo() if d == 0 else Postseason.ladder()
 
 
 ## A division's postseason champion ("" until it is decided).

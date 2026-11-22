@@ -27,6 +27,9 @@ var registered_roster := 29
 ## Foreign players a club may register, and Asia-quota players besides them (KBO 2026).
 var foreign_players := 3
 var asia_quota := 1
+## The table's percentage counts a tie as a loss (wins over games: the KBO of 2009) instead of
+## leaving ties out (wins over wins and losses).
+var ties_as_losses := false
 
 
 static func kbo_2026() -> RuleSet:

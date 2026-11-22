@@ -169,7 +169,7 @@ func _build_top() -> void:
 	bar.offset_right = -UiTheme.MARGIN
 	top.add_child(bar)
 	bar.add_child(UiKit.icon("baseball", 30.0, Color.WHITE))
-	var mark := UiKit.latin("DUGOUT", 36, Color.WHITE, true)
+	var mark := UiKit.latin("MONEYBALL", 36, Color.WHITE, true)
 	mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.add_child(mark)
 	bar.add_child(UiKit.spacer(28.0))
@@ -247,7 +247,7 @@ func _build_foot() -> void:
 		row.add_child(UiKit.label(str(hint[1]), 16, UiTheme.DIM, 500))
 		row.add_child(UiKit.spacer(14.0))
 	row.add_child(UiKit.spacer(0.0, 0.0, true))
-	var where := UiKit.latin(heading_latin if heading_latin != "" else "PRO BASEBALL DUGOUT", 17, Color(1.0, 1.0, 1.0, 0.35), true)
+	var where := UiKit.latin(heading_latin if heading_latin != "" else "PRO BASEBALL MONEYBALL", 17, Color(1.0, 1.0, 1.0, 0.35), true)
 	where.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(where)
 

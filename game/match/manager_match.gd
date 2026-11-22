@@ -190,7 +190,17 @@ func board_note() -> String:
 
 
 func board_visible() -> bool:
-	return not live() and (_play_time < 0.0 or _skip > 0) and not game.over
+	return not live() and (_play_time < 0.0 or _skip > 0) and not game.over and not broadcast.holding()
+
+
+## The board says who is up and what the inning is: no cards for those here.
+func _broadcast_between() -> bool:
+	return false
+
+
+## No replays while skipping ahead.
+func _replay_wanted() -> bool:
+	return _skip == 0
 
 
 # --- Each frame ---
@@ -201,6 +211,10 @@ func step(delta: float) -> void:
 		return
 	if game.over or menu.visible or pause_menu.visible:
 		super.step(delta)
+		return
+	# The broadcast's own moments (the introduction, a replay) hold this game too.
+	if broadcast.holding():
+		broadcast.step(delta)
 		return
 	_note_plate_appearance()
 	if paused:
@@ -417,6 +431,8 @@ func open_orders() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if skip_broadcast(event):
+		return
 	var key := event as InputEventKey
 	if key != null and key.pressed and not key.echo and not game.over:
 		if orders.visible:

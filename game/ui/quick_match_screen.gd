@@ -15,6 +15,9 @@ static var park := ""
 static var time := "day"
 ## The game the match screens read when they start from here; cleared when read.
 static var pending := false
+## The roster pack the two clubs come from: "" the game's own fictional league, or the path of
+## one in the local content pack (a real season, RosterIO.local_packs).
+static var roster := ""
 
 var _clubs: Array[Team] = []
 var _strengths: Dictionary[String, Array] = {}
@@ -24,7 +27,6 @@ func setup() -> void:
 	heading = "친선 경기"
 	heading_latin = "EXHIBITION"
 	heading_icon = "baseball"
-	subheading = "두 팀을 선택하고 경기 조건을 정하세요"
 	vantage = &"outfield"
 	dock_id = "quick"
 
@@ -32,7 +34,11 @@ func setup() -> void:
 func build() -> void:
 	Settings.ensure_loaded()
 	if _clubs.is_empty():
-		_clubs = RosterIO.load_pack(LeagueSession.PACK)
+		if roster != "" and not FileAccess.file_exists(roster):
+			roster = ""
+		_clubs = RosterIO.load_pack(roster_path())
+		away_index = clampi(away_index, 0, _clubs.size() - 1)
+		home_index = clampi(home_index, 0, _clubs.size() - 1)
 	var columns := UiKit.hbox(20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
@@ -41,92 +47,119 @@ func build() -> void:
 	_club_panel(columns, "홈", home_index, func(i: int) -> void: home_index = i)
 
 
+## The middle: the match-up, and the game's settings as selectors (◀ value ▶), as a game's
+## exhibition screen sets them up.
 func _build_options(parent: Control) -> void:
-	var p := panel("경기 설정", "sliders-horizontal", parent, 620.0, "MATCH SETUP")
-	var versus := UiKit.hbox(18)
+	var p := panel("경기 설정", "sliders-horizontal", parent, 560.0, "MATCH SETUP")
+	var versus := UiKit.hbox(14)
 	versus.alignment = BoxContainer.ALIGNMENT_CENTER
-	versus.add_child(UiKit.club_mark(_clubs[away_index], 84.0))
-	versus.add_child(UiKit.heading(_clubs[away_index].short_name, 28))
-	versus.add_child(UiKit.number("VS", 52, Color(1.0, 1.0, 1.0, 0.9)))
-	versus.add_child(UiKit.heading(_clubs[home_index].short_name, 28))
-	versus.add_child(UiKit.club_mark(_clubs[home_index], 84.0))
+	versus.add_child(UiKit.club_mark(_clubs[away_index], 96.0))
+	versus.add_child(UiKit.number("VS", 60, Color(1.0, 1.0, 1.0, 0.92)))
+	versus.add_child(UiKit.club_mark(_clubs[home_index], 96.0))
 	p.body.add_child(versus)
+	var names := UiKit.hbox(0)
+	p.body.add_child(names)
+	for t: Team in [_clubs[away_index], _clubs[home_index]]:
+		var n := UiKit.heading(t.name, 22)
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		n.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		names.add_child(n)
 	p.body.add_child(UiKit.rule())
-	_option(p, "이닝", ["1", "3", "6", "9"], ["1", "3", "6", "9"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
-	if Settings.innings == 1:
-		p.body.add_child(UiKit.label("1이닝 경기: 원정 팀으로 하면 공격과 수비를 한 번씩 합니다", 15, UiTheme.DIM, 500))
-	_option(p, "플레이", ["away", "home", "watch"], ["원정 팀", "홈 팀", "관전"], side, func(v: String) -> void: side = v)
-	_option(p, "방식", ["action", "manager"], ["풀 액션", "감독 지휘"], style, func(v: String) -> void: style = v)
-	p.body.add_child(UiKit.label("풀 액션: 타격과 투구를 직접 조작 · 감독 지휘: 작전 지시와 승부처 개입", 15, UiTheme.DIM, 500))
+	# A real season's clubs, when the local content pack has one.
+	var packs := RosterIO.local_packs()
+	if not packs.is_empty():
+		var ids: Array = [""]
+		var labels: Array = ["가상 리그"]
+		for pair: Array in packs:
+			ids.append(str(pair[0]))
+			labels.append(str(pair[1]))
+		p.body.add_child(UiKit.selector("로스터", ids, labels, roster, func(v: String) -> void:
+			roster = v
+			_clubs = []
+			_strengths.clear()
+			away_index = 0
+			home_index = 1
+			refresh()))
+	p.body.add_child(UiKit.selector("이닝", ["1", "3", "6", "9"], ["1이닝", "3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void:
+		Settings.innings = int(v)
+		refresh()))
+	p.body.add_child(UiKit.selector("플레이", ["away", "home", "watch"], ["원정 팀", "홈 팀", "관전"], side, func(v: String) -> void:
+		side = v
+		refresh()))
+	p.body.add_child(UiKit.selector("방식", ["action", "manager"], ["풀 액션", "감독 지휘"], style, func(v: String) -> void:
+		style = v
+		refresh()))
 	var park_ids: Array = [""]
-	var park_names: Array = ["홈 구장"]
+	var park_names: Array = ["홈 구장 (%s)" % MatchScene.home_def(_clubs[home_index]).name]
 	for id: String in StadiumIO.ids():
 		park_ids.append(id)
 		park_names.append(StadiumIO.load_park(id).name)
-	_option(p, "구장", park_ids, park_names, park, func(v: String) -> void: park = v)
-	_option(p, "시간", ["day", "dusk", "night"], ["주간", "석양", "야간"], time, func(v: String) -> void: time = v)
+	p.body.add_child(UiKit.selector("구장", park_ids, park_names, park, func(v: String) -> void:
+		park = v
+		refresh()))
+	p.body.add_child(UiKit.selector("시간", ["day", "dusk", "night"], ["주간", "석양", "야간"], time, func(v: String) -> void:
+		time = v
+		refresh()))
 	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
-	var start_button := UiKit.button("경기 시작", start, "play", "PrimaryButton")
-	start_button.add_theme_font_size_override("font_size", 26)
+	var start_button := UiKit.button("경기 시작", start, "play", "primary")
+	start_button.add_theme_font_size_override("font_size", 28)
 	start_button.disabled = away_index == home_index
 	p.body.add_child(start_button)
-	if away_index == home_index:
-		p.body.add_child(UiKit.label("서로 다른 두 팀을 선택하세요", 15, UiTheme.RED, 500))
 
 
-func _option(p: GlassPanel, label: String, ids: Array, labels: Array, current: String, pick: Callable) -> void:
-	var r := UiKit.hbox(12)
-	p.body.add_child(r)
-	var l := UiKit.label(label, 18, UiTheme.DIM, 600)
-	l.custom_minimum_size.x = 90.0
-	r.add_child(l)
-	var grid := HFlowContainer.new()
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	r.add_child(grid)
-	var group := ButtonGroup.new()
-	for i: int in ids.size():
-		var id := str(ids[i])
-		var b := GameButton.make(str(labels[i]), func() -> void:
-			pick.call(id)
-			refresh(), "", "segment")
-		b.toggle_mode = true
-		b.button_group = group
-		b.button_pressed = id == current
-		grid.add_child(b)
-
-
-## One side: the club chosen (emblem, name, strengths) over the list of all the clubs.
+## One side: a band in the club's colours with its emblem, name and strength, its best hitter
+## standing in the uniform; its strengths as bars; the clubs to switch to as a grid of emblems.
 func _club_panel(parent: Control, label: String, current: int, pick: Callable) -> void:
 	var team := _clubs[current]
-	var p := GlassPanel.make(label, "users-three", 0.0, team.primary.lightened(0.25), "AWAY" if label == "원정" else "HOME")
+	var p := GlassPanel.make("", "", 0.0, team.primary.lightened(0.25), "")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(p)
-	var top := UiKit.hbox(16)
-	p.body.add_child(top)
-	top.add_child(UiKit.club_mark(team, 104.0))
+	var band := UiKit.band(team.primary, 236.0)
+	p.body.add_child(band)
+	var row := UiKit.hbox(10)
+	band.get_child(1).add_child(row)
 	var words := UiKit.vbox(2)
 	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	words.add_child(UiKit.heading(team.name, 30))
+	row.add_child(words)
+	var top := UiKit.hbox(12)
+	words.add_child(top)
+	top.add_child(UiKit.club_mark(team, 104.0))
 	var s := strengths(team)
-	words.add_child(UiKit.label("%d부 리그 · 종합 전력 %d" % [current / 10 + 1, roundi((float(s[0]) + float(s[1]) + float(s[2]) + float(s[3])) / 4.0)], 17, UiTheme.DIM, 500))
-	top.add_child(words)
+	var overall := roundi((float(s[0]) + float(s[1]) + float(s[2]) + float(s[3])) / 4.0)
+	var power := UiKit.tile(UiTheme.shown_text(overall), "전력", 92.0, 34)
+	power.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(power)
+	words.add_child(UiKit.latin("AWAY" if label == "원정" else "HOME", 18, UiTheme.ACCENT, true))
+	words.add_child(UiKit.heading(team.name, 30))
+	var star := _star(team)
+	if star != null:
+		var stage := PlayerStage.make(150.0, 220.0)
+		stage.show_player(star, team, label == "홈")
+		row.add_child(stage)
+	var bars := UiKit.vbox(2)
+	p.body.add_child(bars)
 	for i: int in 4:
-		p.body.add_child(StatBar.make(["컨택트", "파워", "투수력", "수비력"][i], float(s[i]), -1.0, 70.0))
+		var bar := StatBar.make(["컨택트", "파워", "투수력", "수비력"][i], float(s[i]), -1.0, 64.0)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bars.add_child(bar)
 	p.body.add_child(UiKit.rule())
-	var table := DataTable.new()
-	table.row_height = 34.0
-	table.set_columns([["팀", 300.0, 0], ["리그", 60.0, 1], ["전력", 60.0, 2]])
-	for i: int in _clubs.size():
-		var c := strengths(_clubs[i])
-		var overall := (float(c[0]) + float(c[1]) + float(c[2]) + float(c[3])) / 4.0
-		table.add_row([_clubs[i].name, "%d부" % (i / 10 + 1), "%d" % roundi(overall)], i, {2: UiTheme.rating_color(overall)})
-	table.selected = current
-	table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
-		pick.call(int(tag))
-		refresh())
-	p.body.add_child(table)
+	var scroll := UiKit.scroll()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	p.body.add_child(scroll)
+	scroll.add_child(UiKit.emblem_grid(_clubs, current, func(i: int) -> void:
+		pick.call(i)
+		refresh(), 5, 46.0))
+
+
+## A club's best hitter (contact and power), to stand for it.
+func _star(team: Team) -> Player:
+	var best: Player = null
+	var best_score := -1.0
+	for p: Player in team.first_team():
+		if not p.is_pitcher() and p.batting.contact() + p.batting.power() > best_score:
+			best = p
+			best_score = p.batting.contact() + p.batting.power()
+	return best
 
 
 ## A club's strengths from its first team: contact, power, pitching, fielding (0..99).
@@ -166,3 +199,8 @@ func start() -> void:
 ## The match screens' side for the player: 0 away, 1 home, −1 watching.
 static func side_index() -> int:
 	return {"away": 0, "home": 1, "watch": -1}.get(side, 1)
+
+
+## The pack the clubs are read from.
+static func roster_path() -> String:
+	return roster if roster != "" else LeagueSession.PACK

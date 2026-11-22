@@ -32,18 +32,47 @@ const REFERENCE_HEIGHT := 1080.0
 static var _fonts: Dictionary[int, Font] = {}
 static var _icons: Dictionary[String, Texture2D] = {}
 static var _theme: Theme
+## The menus' family (Settings.menu_font): Paperlogy, or one of the DOS-era bitmap faces the
+## user suggested (github.com/hurss/fonts, MIT; cut to Korean and Latin in ui/fonts/dos/).
+## Each: [text at 500, 600, 700], heading.
+const MENU_FAMILIES := {
+	"paperlogy": [["Paperlogy-Medium.woff2", "Paperlogy-SemiBold.woff2", "Paperlogy-Bold.woff2"], "Paperlogy-ExtraBold.woff2"],
+	# NEXON Football Gothic: drawn for a football game (FIFA Online 4); free to bundle unmodified.
+	"football": [["football/NEXONFootballGothic-L.otf", "football/NEXONFootballGothic-B.otf", "football/NEXONFootballGothic-B.otf"], "football/NEXONFootballGothic-B.otf"],
+	# NanumSquare Neo (Naver, OFL): a plain, sturdy screen gothic.
+	"nanum_neo": [["nanum/NanumSquareNeo-Regular.woff2", "nanum/NanumSquareNeo-Bold.woff2", "nanum/NanumSquareNeo-Bold.woff2"], "nanum/NanumSquareNeo-ExtraBold.woff2"],
+	# S-Core Dream (OFL), the broadcast graphics' face, for the menus too.
+	"score": [["SCoreDream-Medium.woff", "SCoreDream-Bold.woff", "SCoreDream-Bold.woff"], "SCoreDream-Heavy.woff"],
+	"dos_gothic": [["dos/DOSGothic.ttf", "dos/DOSGothic.ttf", "dos/DOSIyagiBoldface.ttf"], "dos/DOSIyagiBoldface.ttf"],
+	"dos_saemmul": [["dos/DOSSaemmul.ttf", "dos/DOSSaemmul.ttf", "dos/DOSIyagiBoldface.ttf"], "dos/DOSIyagiBoldface.ttf"],
+	"sam3": [["dos/Sam3KRFont.ttf", "dos/Sam3KRFont.ttf", "dos/Sam3KRFont.ttf"], "dos/Sam3KRFont.ttf"],
+}
+static var menu_family := "football"
 
 
-## The text face at a weight: Paperlogy 500 medium, 600 semibold, 700 bold (a system face if
-## the files are missing). One family for everything Korean, heavier for what matters more.
+## Changes the menus' family; screens built after this use it.
+static func set_menu_family(id: String) -> void:
+	var pick := id if MENU_FAMILIES.has(id) else "paperlogy"
+	if pick == menu_family:
+		return
+	menu_family = pick
+	_fonts.clear()
+	_faces.clear()
+	_theme = null
+
+
+## The text face at a weight: Paperlogy 500 medium, 600 semibold, 700 bold, or the family
+## chosen (a system face if the files are missing). One family for everything Korean, heavier
+## for what matters more.
 static func font(weight: int = 600) -> Font:
 	if _fonts.has(weight):
 		return _fonts[weight]
-	var file := "Paperlogy-SemiBold.woff2"
+	var files: Array = MENU_FAMILIES[menu_family][0]
+	var file: String = files[1]
 	if weight <= 500:
-		file = "Paperlogy-Medium.woff2"
+		file = files[0]
 	elif weight >= 700:
-		file = "Paperlogy-Bold.woff2"
+		file = files[2]
 	var loaded := load("res://ui/fonts/" + file) as Font if ResourceLoader.exists("res://ui/fonts/" + file) else null
 	if loaded == null:
 		var system := SystemFont.new()
@@ -174,6 +203,21 @@ const PLATES := {
 
 
 ## A rating's colour, by tier: below 50 plain, 50 green, 65 blue, 80 gold, 90 red.
+## A rating as the screens show it (the user: "OVR is too low on average; compare with 2K14,
+## but not the same"). The engine's ratings run 20..99 with the league's average at 50; shown,
+## the average player reads 68, a good one in the 70s and low 80s, a star the high 80s and
+## 90s: one for one up to 65 (so a point of growth is a point on screen), squeezed above it
+## so that 99 stays 99. The engine never sees these numbers.
+static func shown(value: float) -> float:
+	if value <= 65.0:
+		return maxf(value + 18.0, 1.0)
+	return minf(83.0 + (value - 65.0) * 16.0 / 34.0, 99.0)
+
+
+static func shown_text(value: float) -> String:
+	return "%d" % roundi(shown(value))
+
+
 static func rating_color(value: float) -> Color:
 	if value >= 90.0:
 		return Color(1.0, 0.42, 0.4)
@@ -189,7 +233,7 @@ static func rating_color(value: float) -> Color:
 ## The heading face: Paperlogy ExtraBold (titles, buttons, names).
 static func display(_weight: int = 700) -> Font:
 	if not _fonts.has(1000):
-		var path := "res://ui/fonts/Paperlogy-ExtraBold.woff2"
+		var path := "res://ui/fonts/" + str(MENU_FAMILIES[menu_family][1])
 		var loaded := load(path) as Font if ResourceLoader.exists(path) else null
 		_fonts[1000] = loaded if loaded != null else font(700)
 	return _fonts[1000]

@@ -60,7 +60,7 @@ func _card(rect: Rect2, side: int, head: String, name: String, ovr: int) -> void
 	text(rect.position + Vector2(80.0, 70.0), name, 30, UiTheme.INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
 	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK, rect.position.y), Vector2(OVR_BLOCK, rect.size.y))
 	draw_line(block.position + Vector2(0.0, 14.0), Vector2(block.position.x, block.end.y - 14.0), Color(1, 1, 1, 0.12), 1.2)
-	figure(block.position + Vector2(0.0, 58.0), str(ovr), 44, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0, true)
+	figure(block.position + Vector2(0.0, 58.0), UiTheme.shown_text(ovr), 44, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0, true)
 	figure(block.position + Vector2(0.0, 80.0), "OVR", 14, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0)
 
 

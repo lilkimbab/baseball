@@ -67,6 +67,38 @@ func test_a_league_saved_mid_season_goes_on_the_same_after_loading() -> void:
 	assert_true(metas.any(func(m: Dictionary) -> bool: return m["slot"] == SLOT and m["mode"] == "league"))
 
 
+func test_a_postseason_saved_in_the_wild_card_keeps_its_format_and_the_head_start() -> void:
+	var a := _league(53)
+	var guard := 0
+	while a.phase == Season.Phase.REGULAR and guard < 200:
+		a.play_day(true)
+		a.advance()
+		guard += 1
+	assert_eq(a.phase, Season.Phase.POSTSEASON)
+	SaveIO.save_league(SLOT, a, 1.0)
+	var b := SaveIO.load_league(SLOT)
+	var pa := a.postseasons[0]
+	var pb := b.postseasons[0]
+	assert_eq(pb.format.size(), 4)
+	assert_eq(pb.round_name(0), "와일드카드 결정전")
+	assert_eq(pb.round_name(3), "한국시리즈")
+	assert_eq(pb.seeds, pa.seeds)
+	assert_eq(pb.rounds[0].head_start, 1)
+	assert_eq(pb.rounds[0].high_wins, pa.rounds[0].high_wins)
+	assert_eq(b.postseasons[1].format.size(), 3, "the second division's ladder of four")
+	# A day into the wild card, saved again: the wins are counted once.
+	_days(a, 2)
+	SaveIO.save_league(SLOT, a, 1.0)
+	b = SaveIO.load_league(SLOT)
+	for r: int in a.postseasons[0].rounds.size():
+		assert_eq(b.postseasons[0].rounds[r].high_wins, a.postseasons[0].rounds[r].high_wins)
+		assert_eq(b.postseasons[0].rounds[r].low_wins, a.postseasons[0].rounds[r].low_wins)
+	a.play_to_end()
+	b.play_to_end()
+	assert_eq(b.postseasons[0].champion(), a.postseasons[0].champion())
+	assert_eq(b.postseasons[0].rounds.size(), 4)
+
+
 func test_ratings_keep_their_fractions() -> void:
 	var a := _league(52)
 	var p := (a.teams[a.my_team] as Team).first_team()[0]

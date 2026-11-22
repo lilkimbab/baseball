@@ -168,5 +168,4 @@ func _clock(r: Rect2) -> void:
 	panel(r, UiTheme.PANEL, 10.0)
 	if urgent:
 		draw_rect(Rect2(r.position + Vector2(0.0, r.size.y - 4.0), Vector2(r.size.x - 4.0, 4.0)), UiTheme.RED)
-	text(r.position + Vector2(0.0, 24.0), "투구 시간", 13, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 500)
 	figure(r.position + Vector2(0.0, 66.0), str(ceili(scene.pitch_clock)), 40, UiTheme.RED if urgent else Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)

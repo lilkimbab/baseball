@@ -191,7 +191,7 @@ func _side(p: Player, colour: Color, season: Season) -> VBoxContainer:
 		var ovr := ClubRules.player_ovr(p, season.ovr, season.catalog)
 		var figures := UiKit.hbox(20)
 		figures.alignment = BoxContainer.ALIGNMENT_CENTER
-		figures.add_child(UiKit.figure("%d" % roundi(ovr), "OVR", colour, 48))
+		figures.add_child(UiKit.figure(UiTheme.shown_text(ovr), "OVR", colour, 48))
 		figures.add_child(UiKit.figure(season.club_rules.grade_of(ovr).name, "등급", UiTheme.INK, 48))
 		side.add_child(figures)
 	# A line in his colour under him, as on the radar.

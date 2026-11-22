@@ -138,7 +138,7 @@ static func season_to(s: Season) -> Dictionary:
 			"colors": ["#" + t.primary.to_html(false), "#" + t.secondary.to_html(false), "#" + t.accent.to_html(false)],
 			"styles": [t.steal_style, t.bunt_style], "players": ids, "registered": Array(t.registered),
 			"removed_on": t.removed_on.duplicate(), "rotation_index": t.rotation_index,
-			"batting_plan": t.batting_plan.duplicate(true), "rotation_plan": Array(t.rotation_plan),
+			"batting_plan": t.batting_plan.duplicate(true), "rotation_plan": Array(t.rotation_plan), "bullpen_plan": t.bullpen_plan.duplicate(true),
 		})
 	var schedules: Array = []
 	for sched: Schedule in s.schedules:
@@ -153,8 +153,8 @@ static func season_to(s: Season) -> Dictionary:
 			var games: Array = []
 			for g: ScheduledGame in r.games:
 				games.append(_game_to(g))
-			rounds.append({"high": r.high, "low": r.low, "need": r.wins_needed, "games": games})
-		postseasons.append({"seeds": Array(p.seeds), "current": p.current, "ready_day": p.ready_day, "rounds": rounds})
+			rounds.append({"high": r.high, "low": r.low, "need": r.wins_needed, "start": r.head_start, "games": games})
+		postseasons.append({"seeds": Array(p.seeds), "current": p.current, "ready_day": p.ready_day, "rounds": rounds, "format": Postseason.format_to(p.format)})
 	var usage := {}
 	for id: String in s.usage.outings:
 		var list: Array = []
@@ -263,6 +263,7 @@ static func season_from(d: Dictionary) -> Season:
 		t.rotation_index = int(entry.get("rotation_index", 0))
 		t.batting_plan = (entry.get("batting_plan", []) as Array).duplicate(true)
 		t.rotation_plan = PackedStringArray(entry.get("rotation_plan", []) as Array)
+		t.bullpen_plan = (entry.get("bullpen_plan", {}) as Dictionary).duplicate(true)
 		s.teams[t.id] = t
 	for ids: Array in d.get("divisions", []):
 		s.divisions.append(PackedStringArray(ids))
@@ -282,8 +283,12 @@ static func season_from(d: Dictionary) -> Season:
 		p.seeds = PackedStringArray(entry.get("seeds", []) as Array)
 		p.current = int(entry.get("current", 0))
 		p.ready_day = int(entry.get("ready_day", 0))
+		# A save from before the format was kept: the ladder of four it was then.
+		p.format = Postseason.format_from(entry.get("format", []) as Array) if entry.has("format") else Postseason.ladder("결승")
 		for r: Dictionary in entry.get("rounds", []):
 			var series := PlayoffSeries.make(str(r["high"]), str(r["low"]), int(r["need"]))
+			series.head_start = int(r.get("start", 0))
+			series.high_wins = series.head_start
 			for g: Array in r.get("games", []):
 				var game := _game_from(g)
 				series.games.append(game)
@@ -335,6 +340,8 @@ static func season_from(d: Dictionary) -> Season:
 		s.history = SeasonPack.by_id(str(history.get("pack", "")))
 		s.scenario_id = str(history.get("scenario", ""))
 		s.rules = s.history.rule_set() if s.history != null else s.rules
+		for table: Standings in s.standings:
+			table.count_ties_as_losses(s.rules.ties_as_losses)
 	return s
 
 

@@ -29,6 +29,18 @@ func _initialize() -> void:
 	_args = CmdArgs.parse(OS.get_cmdline_user_args())
 	_prefix = str(_args.get("out", _prefix))
 	_names = PackedStringArray(str(_args["only"]).split(","))
+	# --roster <path>: the quick game with a roster pack of the local content pack.
+	if _args.has("roster"):
+		QuickMatchScreen.roster = str(_args["roster"])
+	# --menu-font <id>: the menus in another family (UiTheme.MENU_FAMILIES).
+	if _args.has("menu-font"):
+		Settings.ensure_loaded()
+		Settings.menu_font = str(_args["menu-font"])
+		UiTheme.set_menu_family(Settings.menu_font)
+	# --pick <base id> [--grade n]: the shop with that product picked, in that grade.
+	if _args.has("pick") and not _args.has("tab"):
+		ShopScreen.picked = str(_args["pick"])
+		ShopScreen.picked_grade = int(str(_args.get("grade", "0")))
 	# --group <game|screen|sound|show>: the settings screen opens on that group.
 	if _args.has("group"):
 		SettingsScreen.group = str(_args["group"])
@@ -46,6 +58,15 @@ func _initialize() -> void:
 		LeagueSession.start_history(pack, str(_args.get("scenario", "")), str(pack.team_ids[0]), 3)
 		LeagueSession.slot = "menu_shots"
 		LeagueSession.season.play_to_end()
+	# --history <pack id> --post <days> [--team <id>]: that season played into its postseason.
+	if _args.has("history") and _args.has("post"):
+		var pack := SeasonPack.by_id(str(_args["history"]))
+		LeagueSession.start_history(pack, "", str(_args.get("team", pack.team_ids[0])), 3)
+		LeagueSession.slot = "menu_shots"
+		LeagueSession.season.play_regular_season()
+		for i: int in int(str(_args["post"])):
+			LeagueSession.season.play_day(true)
+			LeagueSession.season.advance()
 	if _args.has("career") or _names.has("career"):
 		var rules := CareerIO.load_default()
 		var spec := PlayerCreator.Spec.new()
@@ -84,7 +105,7 @@ func _next() -> void:
 	root.add_child(_scene)
 	current_scene = _scene
 	var league := _scene as LeagueScreen
-	if league != null and _args.has("history") and not _args.has("ended"):
+	if league != null and _args.has("history") and not _args.has("ended") and not _args.has("post"):
 		league.set("_setup_mode", "history")
 		league.set("_pack_id", str(_args["history"]))
 		league.set("_scenario_id", str(_args.get("scenario", "")))

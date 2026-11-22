@@ -2,8 +2,9 @@ class_name Emblem
 extends Control
 ## A club's emblem (docs/13 S11-9; the clubs are fictional, so are their marks): a shield, a
 ## roundel or a pennant diamond in the club's colours — which one, and the device on it (a
-## star, stitches, a stripe), from the club's id — with the first letter of its name. Drawn,
-## not painted: any size, any club.
+## star, stitches, a stripe), from the club's id — with its mascot (the animal or thing its
+## nickname names, a game-icons.net drawing: 그리즐리스 a bear's head, 호크스 a hawk's) or, for
+## a nickname without one, the first letter of its name. Drawn, not painted: any size.
 
 var team: Team
 
@@ -25,13 +26,43 @@ func _draw() -> void:
 	draw_emblem(self, team, Rect2(Vector2.ZERO, size))
 
 
-## Draws a club's emblem into a rectangle of any canvas item.
+## The mascot drawings by nickname (art/emblems/index.json), read once.
+static var _mascots: Dictionary = {}
+static var _mascot_index: Dictionary = {}
+const MASCOT_DIR := "res://ui/art/emblems"
+
+
+static func mascot(club: Team) -> Texture2D:
+	if club == null or club.name == "":
+		return null
+	if _mascot_index.is_empty():
+		_mascot_index = JsonIO.read_object(MASCOT_DIR.path_join("index.json"))
+		if _mascot_index.is_empty():
+			_mascot_index = {"": ""}
+	var words := club.name.split(" ")
+	var nick := words[words.size() - 1]
+	if _mascots.has(nick):
+		return _mascots[nick]
+	var tex: Texture2D = null
+	if _mascot_index.has(nick):
+		var path := MASCOT_DIR.path_join("%s.svg" % str(_mascot_index[nick]))
+		if ResourceLoader.exists(path):
+			tex = load(path) as Texture2D
+	_mascots[nick] = tex
+	return tex
+
+
+## Draws a club's emblem, from its colours, into a rectangle of any canvas item.
 static func draw_emblem(on: CanvasItem, club: Team, rect: Rect2) -> void:
 	var primary := club.primary if club != null else Color(0.25, 0.3, 0.4)
 	var accent := club.accent if club != null else Color(0.9, 0.9, 0.9)
 	var id := club.id if club != null else "none"
 	var kind := absi(hash(id + ":emblem")) % 3
 	var device := absi(hash(id + ":device")) % 3
+	var figure := mascot(club)
+	if figure != null and device == 2:
+		# The star would sit on the mascot's head.
+		device = 0
 	var c := rect.get_center()
 	var r := minf(rect.size.x, rect.size.y) * 0.5
 	var outline := _outline(kind, c, r)
@@ -65,6 +96,14 @@ static func draw_emblem(on: CanvasItem, club: Team, rect: Rect2) -> void:
 				var a := -PI * 0.5 + TAU * i / 10.0
 				star.append(c + Vector2(0.0, -r * 0.5) + Vector2(cos(a), sin(a)) * r * (0.16 if i % 2 == 0 else 0.07))
 			on.draw_colored_polygon(star, accent)
+	var ink_on := Color.WHITE if primary.get_luminance() < 0.62 else Color(0.08, 0.1, 0.16)
+	if figure != null:
+		# The mascot, in white (dark on a light colour), with a soft shadow to lift it.
+		var side := r * 1.18
+		var box := Rect2(c - Vector2(side, side) * 0.5 + Vector2(0.0, -r * 0.04), Vector2(side, side))
+		on.draw_texture_rect(figure, Rect2(box.position + Vector2(r * 0.04, r * 0.05), box.size), false, Color(0.0, 0.0, 0.0, 0.45))
+		on.draw_texture_rect(figure, box, false, ink_on)
+		return
 	var letter := club.short_name.substr(0, 1) if club != null and club.short_name != "" else "?"
 	var font := UiTheme.display(700)
 	var px := maxi(roundi(r * 0.92), 8)

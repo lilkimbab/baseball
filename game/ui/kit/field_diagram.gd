@@ -30,11 +30,14 @@ func _draw() -> void:
 		var a := deg_to_rad(-135.0 + 90.0 * i / 24.0)
 		grass.append(home + Vector2(cos(a), sin(a)) * reach)
 	draw_colored_polygon(grass, Color(0.16, 0.42, 0.2, 0.95))
-	var warning := PackedVector2Array()
-	for i: int in 25:
-		var a := deg_to_rad(-135.0 + 90.0 * i / 24.0)
-		warning.append(home + Vector2(cos(a), sin(a)) * reach)
-	draw_polyline(warning, Color(0.62, 0.42, 0.26), 5.0, true)
+	if size.y >= 300.0:
+		_draw_park(home, reach)
+	else:
+		var warning := PackedVector2Array()
+		for i: int in 25:
+			var a := deg_to_rad(-135.0 + 90.0 * i / 24.0)
+			warning.append(home + Vector2(cos(a), sin(a)) * reach)
+		draw_polyline(warning, Color(0.62, 0.42, 0.26), 5.0, true)
 	# The infield dirt and the grass diamond inside it.
 	var dirt := PackedVector2Array([home])
 	for i: int in 17:
@@ -56,6 +59,11 @@ func _draw() -> void:
 	for bag: Vector2 in [first, second, third]:
 		draw_rect(Rect2(bag - Vector2(4.0, 4.0), Vector2(8.0, 8.0)), Color.WHITE)
 	draw_circle(home.lerp(second, 0.5), 7.0, Color(0.6, 0.41, 0.25))
+	if size.y >= 300.0:
+		# The rubber, the plate and the circle round it.
+		draw_rect(Rect2(home.lerp(second, 0.5) - Vector2(5.0, 1.0), Vector2(10.0, 2.0)), Color.WHITE)
+		draw_circle(home, 13.0, Color(0.6, 0.41, 0.25))
+		draw_colored_polygon(PackedVector2Array([home + Vector2(-4.5, -4.0), home + Vector2(4.5, -4.0), home + Vector2(4.5, 0.0), home + Vector2(0.0, 4.0), home + Vector2(-4.5, 0.0)]), Color.WHITE)
 	var font := UiTheme.font(700)
 	for kind: int in marks:
 		if not SPOTS.has(kind):
@@ -71,3 +79,39 @@ func _draw() -> void:
 		plate.anti_aliasing = true
 		draw_style_box(plate, box)
 		draw_string(font, Vector2(at.x - w * 0.5, at.y + 5.0), text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, Color(0.08, 0.06, 0.02) if on else UiTheme.INK)
+
+
+## The big board's park: mowing stripes across the outfield, the warning track and the wall
+## with its padding, the dark stands behind.
+func _draw_park(home: Vector2, reach: float) -> void:
+	var stripes := 9
+	for k: int in stripes:
+		if k % 2 == 1:
+			continue
+		var band := PackedVector2Array()
+		var r0 := reach * (0.52 + 0.42 * k / float(stripes))
+		var r1 := reach * (0.52 + 0.42 * (k + 1) / float(stripes))
+		for i: int in 33:
+			var a := deg_to_rad(-135.0 + 90.0 * i / 32.0)
+			band.append(home + Vector2(cos(a), sin(a)) * r0)
+		for i: int in 33:
+			var a := deg_to_rad(-45.0 - 90.0 * i / 32.0)
+			band.append(home + Vector2(cos(a), sin(a)) * r1)
+		draw_colored_polygon(band, Color(1.0, 1.0, 1.0, 0.045))
+	var track := PackedVector2Array()
+	for i: int in 33:
+		var a := deg_to_rad(-135.0 + 90.0 * i / 32.0)
+		track.append(home + Vector2(cos(a), sin(a)) * reach * 0.95)
+	for i: int in 33:
+		var a := deg_to_rad(-45.0 - 90.0 * i / 32.0)
+		track.append(home + Vector2(cos(a), sin(a)) * reach)
+	draw_colored_polygon(track, Color(0.55, 0.38, 0.24))
+	var wall := PackedVector2Array()
+	for i: int in 33:
+		var a := deg_to_rad(-135.0 + 90.0 * i / 32.0)
+		wall.append(home + Vector2(cos(a), sin(a)) * (reach + 3.0))
+	draw_polyline(wall, Color(0.07, 0.2, 0.32), 6.0, true)
+	for pole: float in [-135.0, -45.0]:
+		var a := deg_to_rad(pole)
+		var foot := home + Vector2(cos(a), sin(a)) * (reach + 3.0)
+		draw_line(foot, foot + Vector2(0.0, -16.0), Color(1.0, 0.85, 0.2), 2.5, true)

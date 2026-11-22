@@ -72,6 +72,26 @@ static func save_pack(path: String, pack_id: String, pack_name: String, season: 
 	return OK
 
 
+## The roster packs in the local content pack (content-local/rosters/: real seasons built by
+## ./dev kbo, never in git), as [path, name] pairs, newest season first.
+static func local_packs() -> Array:
+	var dir := ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("content-local").path_join("rosters")
+	var out: Array = []
+	var d := DirAccess.open(dir)
+	if d == null:
+		return out
+	var names := d.get_files()
+	names.sort()
+	names.reverse()
+	for file: String in names:
+		if not file.ends_with(".json"):
+			continue
+		var head := JsonIO.read_object(dir.path_join(file))
+		if int(head.get("format", 0)) == 1 and head.has("teams"):
+			out.append([dir.path_join(file), str(head.get("name", file.get_basename()))])
+	return out
+
+
 static func player_from(entry: Dictionary) -> Player:
 	var p := Player.new()
 	p.id = str(entry.get("id", ""))

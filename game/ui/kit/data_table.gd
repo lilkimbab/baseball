@@ -15,6 +15,8 @@ signal row_hovered(index: int, tag: Variant)
 const HEADER_HEIGHT := 34.0
 
 var row_height := 38.0
+## The column a row's portrait sits in (the player's name, as a rule).
+var portrait_column := 0
 var selected := -1
 ## Rows drawn dim (a player who cannot be picked, say).
 var dim_rows: Dictionary[int, bool] = {}
@@ -124,14 +126,24 @@ func _on_input(event: InputEvent) -> void:
 		press_row(int(click.position.y / row_height))
 
 
+## How much wider than their set widths the columns are drawn: a table always fills its panel
+## (the user: "half of it is empty space"), the columns keeping their proportions.
+func _stretch() -> float:
+	var total := 0.0
+	for c: Array in _columns:
+		total += float(c[1])
+	return maxf((_header.size.x - 20.0) / maxf(total, 1.0), 1.0)
+
+
 func _draw_header() -> void:
 	var font := UiTheme.font(600)
 	_header.draw_rect(Rect2(Vector2.ZERO, _header.size), Color(1.0, 1.0, 1.0, 0.06))
 	_header.draw_line(Vector2(0.0, _header.size.y - 1.0), Vector2(_header.size.x, _header.size.y - 1.0), Color(1.0, 1.0, 1.0, 0.28), 1.0)
+	var k := _stretch()
 	var x := 10.0
 	for c: Array in _columns:
-		_text(_header, font, str(c[0]), x, float(c[1]), int(c[2]), HEADER_HEIGHT * 0.5 + 5.0, 15, UiTheme.DIM)
-		x += float(c[1])
+		_text(_header, font, str(c[0]), x, float(c[1]) * k, int(c[2]), HEADER_HEIGHT * 0.5 + 5.0, 15, UiTheme.DIM)
+		x += float(c[1]) * k
 
 
 func _draw_rows() -> void:
@@ -139,6 +151,7 @@ func _draw_rows() -> void:
 	# Only the rows in view are drawn (a second team is fifty rows long).
 	var first := maxi(int(_scroll.scroll_vertical / row_height) - 1, 0)
 	var last := mini(first + int(_scroll.size.y / row_height) + 3, _rows.size())
+	var k := _stretch()
 	for i: int in range(first, last):
 		var y := i * row_height
 		var rect := Rect2(0.0, y, _body.size.x, row_height)
@@ -155,9 +168,9 @@ func _draw_rows() -> void:
 		var faded := bool(dim_rows.get(i, false))
 		var x := 10.0
 		for c: int in _columns.size():
-			var width := float(_columns[c][1])
+			var width := float(_columns[c][1]) * k
 			var left := x
-			if c == 0 and row["portrait"] != null:
+			if c == portrait_column and row["portrait"] != null:
 				var side := row_height - 6.0
 				_body.draw_texture_rect(row["portrait"] as Texture2D, Rect2(x, y + 3.0, side, side), false)
 				left += side + 8.0
@@ -167,7 +180,7 @@ func _draw_rows() -> void:
 				colour.a *= 0.4
 			if c < cells.size():
 				_text(_body, font, str(cells[c]), left, width, int(_columns[c][2]), y + row_height * 0.5 + 6.0, 17, colour)
-			x += float(_columns[c][1])
+			x += float(_columns[c][1]) * k
 
 
 static func _text(on: Control, font: Font, text: String, x: float, width: float, align: int, baseline: float, font_size: int, colour: Color) -> void:

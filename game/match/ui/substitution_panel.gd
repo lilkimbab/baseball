@@ -94,7 +94,7 @@ func _bullpen(g: GameState, mine: int, team: TeamInGame) -> void:
 	for id: String in SubstitutionOptions.relievers(team):
 		var p := team.player(id)
 		var on := g.warming[mine].has(id)
-		_button("%s  %s  %s" % [p.name, _warm_text(g.warmth_of(mine, id)), "· 몸 푸는 중 (누르면 멈춤)" if on else "· 몸 풀기"], _toggle_warm.bind(id))
+		_button("%s  %s  %s" % [p.name, _warm_text(g.warmth_of(mine, id)), "· 몸 푸는 중" if on else "· 몸 풀기"], _toggle_warm.bind(id))
 
 
 func _toggle_warm(id: String) -> void:

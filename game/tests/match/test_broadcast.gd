@@ -73,3 +73,43 @@ func test_a_game_waits_for_its_introduction_then_shows_halves_and_batters() -> v
 	assert_gte(halves, 4, "a card for each half after the first (the last bottom half may not be played)")
 	assert_eq(summaries, halves, "each with the half just over")
 	assert_gt(batters, 15, "batters introduced")
+
+
+func test_the_manager_s_game_waits_for_the_introduction_and_goes_on() -> void:
+	# The manager's game runs its own loop (plate appearances in summary): the introduction
+	# holds it too, hides the board while it shows, ends by itself, and Space skips it instead
+	# of pausing the game. (It used to stay on the screen for good.)
+	var scene := (load("res://match/manager_match.tscn") as PackedScene).instantiate() as ManagerMatch
+	scene.innings = 3
+	scene.seed_value = 5
+	scene.use_motion = false
+	add_child_autofree(scene)
+	scene.broadcast.enabled = true
+	scene._push_pregame()
+	assert_true(scene.broadcast.holding())
+	assert_false(scene.board_visible(), "the board gives way to the introduction")
+	var pa := scene.game.batter_id()
+	for i: int in roundi(3.0 / DT):
+		scene.step(DT)
+	assert_eq(scene.game.batter_id(), pa, "nothing happens meanwhile")
+	assert_eq(scene.game.outs + scene.game.score[0] + scene.game.score[1], 0)
+	# Space skips the introduction; it does not pause the game.
+	var space := InputEventKey.new()
+	space.keycode = KEY_SPACE
+	space.pressed = true
+	scene._unhandled_input(space)
+	assert_null(scene.broadcast.current, "skipped")
+	assert_false(scene.paused, "and not paused")
+	# Left alone, it ends by itself and the game is played out, with no cards for halves or
+	# batters (the board says those).
+	scene._push_pregame()
+	var between := 0
+	var ticks := 0
+	while not scene.game.over and ticks < 400000:
+		scene.step(DT)
+		ticks += 1
+		var c := scene.broadcast.current
+		if c != null and c.kind in [Broadcast.Kind.HALF, Broadcast.Kind.BATTER, Broadcast.Kind.PITCHER_CHANGE]:
+			between += 1
+	assert_true(scene.game.over, "the game goes on to its end")
+	assert_eq(between, 0)

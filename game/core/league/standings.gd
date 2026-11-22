@@ -16,6 +16,12 @@ static func of(team_ids: PackedStringArray) -> Standings:
 	return s
 
 
+## Ties as losses in every row's percentage (RuleSet.ties_as_losses).
+func count_ties_as_losses(on: bool) -> void:
+	for r: StandingsRow in rows.values():
+		r.ties_as_losses = on
+
+
 func row(team_id: String) -> StandingsRow:
 	return rows.get(team_id)
 
