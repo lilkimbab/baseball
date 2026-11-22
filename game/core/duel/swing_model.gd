@@ -50,7 +50,7 @@ static func timing_window(settings: DuelSettings, kind: SwingAttempt.Kind) -> fl
 			by_kind = 0.8
 		SwingAttempt.Kind.BUNT:
 			by_kind = 3.0
-	return settings.timing_window * by_kind * lerpf(0.85, 1.15, clampf(settings.contact / 100.0, 0.0, 1.0))
+	return settings.timing_window * settings.timing_scale * by_kind * lerpf(0.85, 1.15, clampf(settings.contact / 100.0, 0.0, 1.0))
 
 
 static func judge(tau: float) -> StringName:
@@ -100,7 +100,7 @@ static func barrel_sigma(settings: DuelSettings, kind: SwingAttempt.Kind) -> flo
 			by_kind = 1.2
 		SwingAttempt.Kind.BUNT:
 			by_kind = 0.6
-	return lerpf(0.016, 0.006, clampf(settings.contact / 100.0, 0.0, 1.0)) * by_kind
+	return lerpf(0.016, 0.006, clampf(settings.contact / 100.0, 0.0, 1.0)) * by_kind * settings.barrel_scale
 
 
 ## How well the batter reads where the pitch will end up (metres, one standard deviation).
@@ -122,5 +122,5 @@ const FOOLED_ERROR := 0.26
 
 ## Share of an aiming error that turns into bat-ball offset. Small errors are scaled down to
 ## aim_scale so play is not pixel-precise; large ones are real misses.
-static func error_scale(error: float, aim_scale: float) -> float:
-	return aim_scale + (1.0 - aim_scale) * smoothstep(FORGIVEN_ERROR, FOOLED_ERROR, absf(error))
+static func error_scale(error: float, aim_scale: float, forgiven: float = FORGIVEN_ERROR) -> float:
+	return aim_scale + (1.0 - aim_scale) * smoothstep(forgiven, FOOLED_ERROR, absf(error))

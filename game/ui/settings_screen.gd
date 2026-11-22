@@ -39,6 +39,10 @@ func build() -> void:
 	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	match group:
 		"game":
+			var levels: Array = []
+			for id: String in Difficulty.IDS:
+				levels.append(id)
+			_pick(main, "난이도", "", levels, Difficulty.NAMES, Settings.difficulty, func(v: String) -> void: Settings.difficulty = v)
 			_pick(main, "기본 이닝", "", ["3", "6", "9"], ["3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
 			_switch(main, "피치 클락", "", Settings.pitch_clock, func(on: bool) -> void: Settings.pitch_clock = on)
 			_switch(main, "선수 교체 보조", "", Settings.auto_changes, func(on: bool) -> void: Settings.auto_changes = on)

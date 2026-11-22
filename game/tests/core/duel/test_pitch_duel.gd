@@ -320,3 +320,24 @@ func test_width_is_judged_only_at_the_middle_of_the_plate() -> void:
 	assert_false(zone.is_strike(running_out))
 	assert_almost_eq(zone.top / 1.82, 0.5575, 1e-6, "top at 55.75% of height")
 	assert_almost_eq(zone.bottom / 1.82, 0.2704, 1e-6, "bottom at 27.04%")
+
+
+func test_a_perfect_release_still_misses_by_the_pitcher_s_control() -> void:
+	# The user: a perfect release goes where aimed, but the pitcher's control still moves it a
+	# little. An ace's perfect pitches cluster on the spot, a wild arm's spread about a ball.
+	var spread := func(command: float) -> float:
+		var total := 0.0
+		for i: int in 200:
+			var duel := _duel(100 + i)
+			duel.settings.command = command
+			var d := _pitch(&"four_seam", Vector3(0.0, Field.PLATE_FRONT_Y, 0.75))
+			d.by_hand = true
+			d.quality = 1.0
+			duel.throw_pitch(d)
+			total += Vector2(duel.pitch.plate_pos.x, duel.pitch.plate_pos.z - 0.75).length()
+		return total / 200.0
+	var ace: float = spread.call(90.0)
+	var wild: float = spread.call(25.0)
+	assert_lt(ace, 0.03, "an ace within a few centimetres")
+	assert_gt(wild, 0.05, "a wild arm about a ball's width off")
+	assert_gt(wild, ace * 2.5)

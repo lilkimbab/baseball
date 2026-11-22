@@ -9,7 +9,7 @@ const SCREENS := {
 	"title": "res://ui/title_screen.tscn", "hub": "res://ui/hub_screen.tscn", "quick": "res://ui/quick_match_screen.tscn",
 	"settings": "res://ui/settings_screen.tscn", "practice": "res://ui/practice_screen.tscn", "load": "res://ui/load_screen.tscn",
 	"shop": "res://ui/shop_screen.tscn", "league": "res://league/league_screen.tscn", "career": "res://career/career_screen.tscn",
-	"create": "res://career/creation_screen.tscn",
+	"create": "res://career/creation_screen.tscn", "achievements": "res://ui/achievements_screen.tscn",
 }
 
 var _prefix := "user://menu"
@@ -53,6 +53,19 @@ func _initialize() -> void:
 			LeagueSession.season.advance()
 	# --history <pack id> [--scenario <id>] [--ended]: the history mode's choice, or (with
 	# --ended) a season of it played to the end.
+	# --traits: a club with a few traits held and worn, to see the badge case filled.
+	if _args.has("traits") and LeagueSession.season != null:
+		var s := LeagueSession.season
+		var team: Team = s.teams[s.my_team]
+		for item: Vector2i in [Vector2i(0, 0), Vector2i(0, 0), Vector2i(1, 1), Vector2i(8, 0), Vector2i(11, 2), Vector2i(13, 0), Vector2i(3, 0)]:
+			s.club.bag.append(item)
+		var men := team.first_team()
+		var hitter: Player = null
+		for man: Player in men:
+			if not man.is_pitcher() and hitter == null:
+				hitter = man
+		s.club.equip(hitter, s.club.bag.find(Vector2i(1, 1)), s.club_rules)
+		s.club.points = 260
 	if _args.has("history") and _args.has("ended"):
 		var pack := SeasonPack.by_id(str(_args["history"]))
 		LeagueSession.start_history(pack, str(_args.get("scenario", "")), str(pack.team_ids[0]), 3)
@@ -104,6 +117,12 @@ func _next() -> void:
 	_scene = (load(SCREENS[name]) as PackedScene).instantiate()
 	root.add_child(_scene)
 	current_scene = _scene
+	# --career-tab <home|growth|table>: the career hub's tab.
+	var career := _scene as CareerScreen
+	if career != null and _args.has("career-tab"):
+		career.set("_tab", str(_args["career-tab"]))
+		if career.is_node_ready():
+			career.refresh()
 	var league := _scene as LeagueScreen
 	if league != null and _args.has("history") and not _args.has("ended") and not _args.has("post"):
 		league.set("_setup_mode", "history")

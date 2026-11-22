@@ -167,7 +167,8 @@ const ROW_SELECTED := Color(0.88, 0.13, 0.17, 0.3)
 ## playing now, gold for the league, blue for the career, green for practice, violet for the shop.
 const MODE_COLOURS := {
 	"hub": Color(0.93, 0.2, 0.22), "quick": Color(1.0, 0.42, 0.26), "league": Color(1.0, 0.76, 0.24), "career": Color(0.3, 0.64, 1.0),
-	"practice": Color(0.36, 0.84, 0.52), "shop": Color(0.68, 0.52, 1.0), "load": Color(0.62, 0.7, 0.82), "settings": Color(0.62, 0.7, 0.82),
+	"practice": Color(0.36, 0.84, 0.52), "shop": Color(0.68, 0.52, 1.0), "achievements": Color(0.3, 0.82, 0.78),
+	"load": Color(0.62, 0.7, 0.82), "settings": Color(0.62, 0.7, 0.82),
 }
 ## Sizes of the shell (1080-line units).
 const TOP_BAR := 72.0

@@ -54,6 +54,9 @@ func test_the_break_comes_at_mid_season_with_picks_teams_and_a_derby() -> void:
 func test_the_all_star_game_counts_for_nothing_in_the_season() -> void:
 	var cs := _career_season("SS", "contact", 42)
 	cs.career.popularity = 500.0
+	# Up from the start (a 36-game season reaches the break before a rookie's twenty games
+	# in the second team).
+	cs.call_up()
 	var guard := 0
 	while not cs.all_star_done and guard < 200:
 		if cs.has_game():

@@ -1031,11 +1031,37 @@ func _pay_profile() -> void:
 		return
 	_profile_paid = true
 	var mine := own_team()
-	if mine < 0 or DisplayServer.get_name() == "headless":
+	if mine < 0 or DisplayServer.get_name() == "headless" or Profile.tool_run():
 		return
 	var bat := scorer.book.team_batting(mine)
 	var pit := scorer.book.team_pitching(mine)
-	profile_lines = Profile.record_game(game.winner == mine, {"hits": bat.hits, "home_runs": bat.home_runs, "runs": game.score[mine], "strikeouts": pit.strikeouts})
+	profile_lines = Profile.record_game(game.winner == mine, {"hits": bat.hits, "home_runs": bat.home_runs, "runs": game.score[mine], "strikeouts": pit.strikeouts}, profile_share(), played_level())
+	profile_lines.append_array(Achievements.note_game(feats, game, scorer.book, played_level(), stadium.id if stadium != null else ""))
+
+
+## What the achievements count of this game (GameFeats), from its first event.
+var feats: GameFeats
+## The easiest difficulty the person played a pitch at in this game (−1: none yet).
+var _person_level := -1
+
+
+## Whose lines count for the achievements ("" his whole side; a career, the player's own).
+func feats_player() -> String:
+	return ""
+
+
+## The difficulty this game pays at: the easiest he played a pitch at; a game he only watched
+## or managed without stepping in pays 프로's at most (Difficulty.reward).
+func played_level() -> int:
+	if _person_level >= 0:
+		return _person_level
+	return mini(Difficulty.by_id(Settings.difficulty), Difficulty.Level.PRO)
+
+
+## How much of a full game's points this one pays: the share of nine innings played (a
+## three-inning game paid as much as nine, and was the quickest way to the shop).
+func profile_share() -> float:
+	return clampf(float(game.rules.innings) / 9.0, 0.3, 1.0) if game != null else 1.0
 
 
 ## The player's club (0 away, 1 home), or −1 when he only watches.
@@ -1072,6 +1098,7 @@ func _new_duel() -> void:
 		pa_pitches.clear()
 		_clear_track = false
 	var release_point := settings.release_point
+	_person_flags()
 	duel = resolver.new_duel(game)
 	duel.settings.release_point = release_point
 	settings = duel.settings
@@ -1368,6 +1395,10 @@ func _apply(e: GameEvent) -> void:
 	var batter := game.batter_id()
 	var out := GameFlow.apply(game, e)
 	last_outcome = out
+	if feats == null and own_team() >= 0:
+		feats = GameFeats.for_side(own_team(), feats_player())
+	if feats != null:
+		feats.note(game, e, out)
 	scorer.record(game, e, out)
 	manager.note_change(game, e)
 	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
@@ -1431,6 +1462,49 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 ## The duel HUD's mode follows the player's role this half-inning.
 func _sync_mode() -> void:
 	mode = &"bat" if human_bats() else (&"pitch" if human_pitches() else &"watch")
+	# Taken over in the middle of a plate appearance (an intervention): this pitch is his too.
+	if duel != null and duel.phase == PitchDuel.Phase.READY:
+		if human_bats() and resolver.person_bats != game.batting():
+			duel.settings.dodge = 0.0
+			Difficulty.for_batter(duel.settings, resolver.difficulty)
+		if human_pitches() and resolver.person_pitches != game.fielding():
+			Difficulty.for_pitcher(duel.settings, resolver.difficulty)
+	_person_flags()
+
+
+## A tired arm's ring closes quicker, and a cold reliever's (DuelScene._roll_gauge): up to a
+## quarter at the end of his limit. With a runner in scoring position the pressure tells too,
+## the more the less composed he is (위기관리, PitchingRatings.composure): up to an eighth quicker.
+func gauge_pace() -> float:
+	if game == null:
+		return 1.0
+	var team := game.fielding_team()
+	var pitcher := team.player(game.pitcher_id())
+	if pitcher == null or pitcher.pitching == null:
+		return 1.0
+	var pace := 1.0 + 0.25 * clampf(StatResolver.fatigue(game, team, pitcher, true), 0.0, 1.0)
+	if game.runner_on(2) != null or game.runner_on(3) != null:
+		pace += 0.125 * (1.0 - clampf(pitcher.pitching.composure / 99.0, 0.0, 1.0))
+	return pace
+
+
+## The command of the pitch picked on the wheel (each pitch of his arsenal has its own).
+func pitch_command() -> float:
+	if selected_pitch >= 0 and selected_pitch < _arsenal.size():
+		return _arsenal[selected_pitch].command
+	return settings.command
+
+
+## Tells the resolver which of the coming duel the person makes (his swing, his pitch), and
+## at what difficulty (Difficulty, from the settings).
+func _person_flags() -> void:
+	if resolver == null or game == null:
+		return
+	resolver.difficulty = Difficulty.by_id(Settings.difficulty)
+	resolver.person_bats = game.batting() if human_bats() else -1
+	resolver.person_pitches = game.fielding() if human_pitches() else -1
+	if human_bats() or human_pitches():
+		_person_level = resolver.difficulty if _person_level < 0 else mini(_person_level, resolver.difficulty)
 
 
 func _after_result() -> void:

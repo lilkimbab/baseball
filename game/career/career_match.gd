@@ -249,7 +249,7 @@ func _record_result() -> void:
 	if _recorded or game == null or not game.over or CareerSession.career_season == null:
 		return
 	_recorded = true
-	report = CareerSession.career_season.finish(game, scorer.book, chances, errors, scene_gp, clutch_wins, pitches_seen)
+	report = CareerSession.career_season.finish(game, scorer.book, chances, errors, scene_gp, clutch_wins, pitches_seen, played_level())
 	CareerSession.last_report = report
 
 
@@ -259,3 +259,15 @@ func _menu_key(code: Key) -> void:
 		Loading.go(get_tree(), CareerSession.HUB, {"title": "커리어로 이동 중"})
 		return
 	super._menu_key(code)
+
+
+## A career game is his scenes only (about six minutes): a third of a full game's points (it
+## paid a whole game's, six times what playing nine innings earned in the same time). His
+## reward boxes add their own (CareerSession.settle_points).
+func profile_share() -> float:
+	return 0.35
+
+
+## His own lines count for the achievements, not the side's.
+func feats_player() -> String:
+	return me

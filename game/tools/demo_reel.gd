@@ -60,7 +60,7 @@ func _process(delta: float) -> bool:
 				_scene.press_pitch_button()
 		elif state == DuelScene.State.CHARGE and _scene.power > 0.92:
 			_scene.release_pitch_button()
-		elif state == DuelScene.State.ACCURACY and _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
+		elif state == DuelScene.State.ACCURACY and _scene.ring >= _scene.sweet - 0.02:
 			_scene.press_pitch_button()
 	return false
 

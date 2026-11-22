@@ -16,6 +16,7 @@ const LOAD := "res://ui/load_screen.tscn"
 const SETTINGS := "res://ui/settings_screen.tscn"
 const PRACTICE := "res://ui/practice_screen.tscn"
 const SHOP := "res://ui/shop_screen.tscn"
+const ACHIEVEMENTS := "res://ui/achievements_screen.tscn"
 
 ## The parts of the game: id, word, icon, and the screen it opens ("" where it depends on what
 ## is saved). The first TABS of them are tabs in the top bar; the rest small buttons.
@@ -26,10 +27,11 @@ const DOCK: Array[Array] = [
 	["career", "커리어", "user-circle", ""],
 	["practice", "연습", "target", PRACTICE],
 	["shop", "상점", "storefront", SHOP],
+	["achievements", "업적", "medal", ACHIEVEMENTS],
 	["load", "불러오기", "floppy-disk", LOAD],
 	["settings", "환경 설정", "gear-six", SETTINGS],
 ]
-const TABS := 6
+const TABS := 7
 
 ## The screen's name, its Latin caption and a line beside it.
 var heading := ""
@@ -303,6 +305,37 @@ func refresh() -> void:
 	if _points_label != null:
 		_points_label.text = _points_text()
 	build()
+	_show_toasts()
+
+
+## Achievements unlocked since the last screen (Achievements.toasts): a card for each at the
+## top right, gone after a few seconds.
+func _show_toasts() -> void:
+	if Achievements.toasts.is_empty() or not is_inside_tree():
+		return
+	var stack := UiKit.vbox(8)
+	stack.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	stack.offset_left = -560.0
+	stack.offset_right = -UiTheme.MARGIN
+	stack.offset_top = UiTheme.TOP_BAR + 16.0
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(stack)
+	for line: String in Achievements.toasts.slice(0, 4):
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", UiTheme.flat(Color(0.06, 0.07, 0.09, 0.95), 8, Color(1.0, 0.84, 0.36, 0.8), 2, 12.0))
+		var row := UiKit.hbox(10)
+		card.add_child(row)
+		row.add_child(TraitBadge.make(2, "medal", 40.0))
+		var words := UiKit.label(line, 17, Color.WHITE, 700)
+		words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(words)
+		stack.add_child(card)
+	Achievements.toasts.clear()
+	var tween := create_tween()
+	tween.tween_interval(4.5)
+	tween.tween_property(stack, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(stack.queue_free)
 
 
 ## What the screen shows; screens fill this in.

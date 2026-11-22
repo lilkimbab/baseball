@@ -63,7 +63,8 @@ static func _hitter(p: Player, spec: Spec, v: Callable) -> void:
 	p.batting.power_l = power
 	p.batting.eye = v.call("eye")
 	p.batting.speed = v.call("speed")
-	p.batting.baserunning = v.call("baserunning")
+	# One running rating for the person (주력): his base-running sense goes with his speed.
+	p.batting.baserunning = v.call("speed")
 	p.batting.bunt = contact - 5.0
 	p.batting.clutch = 50.0
 	p.fielding.range = v.call("range")
@@ -85,7 +86,8 @@ static func _pitcher(p: Player, spec: Spec, type: CareerRules.PlayerType, v: Cal
 	var movement: float = v.call("movement")
 	if type.strengths.has("stuff"):
 		movement += 6.0
-	var command: float = v.call("command")
+	# One control rating for the person (제구): his pitches' command goes with it.
+	var command: float = v.call("control")
 	var fastball_speed := type.velocity
 	for i: int in type.pitches.size():
 		var id := type.pitches[i]

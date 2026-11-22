@@ -49,6 +49,8 @@ static var pitch_marker := true
 static var highlights := true
 ## The menus' font family (UiTheme.MENU_FAMILIES).
 static var menu_font := "football"
+## How hard batting and pitching are for the person (Difficulty.IDS).
+static var difficulty := "pro"
 static var _loaded := false
 
 
@@ -89,6 +91,7 @@ static func load_file() -> void:
 	commentary = bool(s.get("commentary", commentary))
 	pitch_marker = bool(s.get("pitch_marker", pitch_marker))
 	menu_font = str(s.get("menu_font", menu_font))
+	difficulty = str(s.get("difficulty", difficulty))
 	UiTheme.set_menu_family(menu_font)
 
 
@@ -100,7 +103,7 @@ static func save_file() -> Error:
 		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,
 		"music_volume": music_volume, "crowd_volume": crowd_volume, "sfx_volume": sfx_volume, "voice_volume": voice_volume, "voices": voices, "broadcast": broadcast,
 		"landing_spot": landing_spot, "commentary": commentary, "pitch_marker": pitch_marker,
-		"menu_font": menu_font,
+		"menu_font": menu_font, "difficulty": difficulty,
 	}
 	var f := FileAccess.open(PATH, FileAccess.WRITE)
 	if f == null:

@@ -278,7 +278,7 @@ func _play_for_the_player() -> void:
 					_scene.target = duel.zone.point(_rng.next_range(0.1, 0.9), _rng.next_range(0.1, 0.9))
 					_scene.press_pitch_button()
 			DuelScene.State.CHARGE:
-				if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
+				if _scene.ring >= _scene.sweet - 0.02:
 					_scene.release_pitch_button()
 	if _scene.human_bats() and _scene.state == DuelScene.State.LIVE and duel.phase == PitchDuel.Phase.FLIGHT and not _swung:
 		var at := duel.pitch.plate_pos

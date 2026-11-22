@@ -8,16 +8,16 @@
   "batter_types": [
     {"id": "contact", "name": "정교형", "strengths": ["contact", "eye"], "weak": ["power"]},
     {"id": "power", "name": "거포형", "strengths": ["power"], "weak": ["speed", "contact"]},
-    {"id": "speed", "name": "쌕쌕이형", "strengths": ["speed", "baserunning"], "weak": ["power"]},
+    {"id": "speed", "name": "쌕쌕이형", "strengths": ["speed"], "weak": ["power"]},
     {"id": "defence", "name": "수비형", "strengths": ["range", "hands", "arm"], "weak": ["power"]},
     {"id": "all_round", "name": "만능형", "strengths": [], "weak": [], "all": 5}
   ],
   "pitcher_types": [
     {"id": "power_arm", "name": "강속구형", "strengths": ["velocity", "stuff"], "weak": ["control"], "pitches": ["four_seam", "slider"], "velocity": 148},
-    {"id": "control", "name": "제구형", "strengths": ["control", "command"], "weak": ["velocity"], "pitches": ["four_seam", "changeup", "curve"], "velocity": 140},
+    {"id": "control", "name": "제구형", "strengths": ["control"], "weak": ["velocity"], "pitches": ["four_seam", "changeup", "curve"], "velocity": 140},
     {"id": "finesse", "name": "기교형", "strengths": ["movement"], "weak": ["velocity"], "pitches": ["four_seam", "slider", "curve", "changeup"], "velocity": 139},
     {"id": "ground_ball", "name": "땅볼형", "strengths": ["movement", "control"], "weak": ["stamina"], "pitches": ["two_seam", "changeup", "slider"], "velocity": 142},
-    {"id": "fly_ball", "name": "뜬공형", "strengths": ["velocity", "command"], "weak": ["movement"], "pitches": ["four_seam", "curve", "splitter"], "velocity": 145}
+    {"id": "fly_ball", "name": "뜬공형", "strengths": ["velocity", "control"], "weak": ["movement"], "pitches": ["four_seam", "curve", "splitter"], "velocity": 145}
   ],
   "bodies": [
     {"id": "lean", "name": "날렵", "height": 180, "weight": 78},
@@ -31,19 +31,19 @@
   "gp": {
     "batting": {"single": 6, "double": 9, "triple": 12, "home_run": 15, "walk": 3, "rbi": 4, "plate_appearance": 1},
     "running": {"stolen_base": 6, "run": 3, "times_on_base": 1},
-    "fielding": {"chance": 4, "error": 1},
+    "fielding": {"chance": 2, "error": 1, "max_per_game": 10},
     "pitching": {"out": 2, "strikeout": 3, "scoreless_inning": 5, "win": 10, "save": 10, "hold": 6},
     "scene_goal": 10,
     "game_goal": 25,
     "clutch": 1.5,
-    "cost_base": 10,
+    "cost_base": 17,
     "type_discount": 0.2
   },
   "ratings": {
     "batting": ["contact", "power", "eye"],
-    "running": ["speed", "baserunning"],
+    "running": ["speed"],
     "fielding": ["range", "hands", "arm", "accuracy"],
-    "pitching": ["control", "stamina", "velocity", "movement", "command"]
+    "pitching": ["velocity", "movement", "control", "stamina"]
   },
   "evolutions": [
     {"from": "four_seam", "to": "rising_fastball", "uses": 400, "rating": "velocity", "at_least": 149},
@@ -72,12 +72,12 @@
       {"name": "스파이크", "rating": "speed", "amount": 1},
       {"name": "보호대", "rating": "eye", "amount": 1},
       {"name": "투수 글러브", "rating": "control", "amount": 1},
-      {"name": "로진백", "rating": "command", "amount": 1}
+      {"name": "로진백", "rating": "movement", "amount": 1}
     ]
   },
   "all_star": {"at_share": 0.5, "players": 22, "derby": 8, "derby_outs": 10, "derby_speed": 112},
   "game_goals": {
-    "contact": ["hits", 2], "power": ["extra_bases", 1], "speed": ["runs_or_steals", 2], "defence": ["times_on_base", 1], "all_round": ["times_on_base", 2],
+    "contact": ["hits", 2], "power": ["extra_bases", 1], "speed": ["runs_or_steals", 2], "defence": ["times_on_base", 2], "all_round": ["times_on_base", 2],
     "SP": ["quality_start", 1], "RP": ["scoreless", 1], "CL": ["scoreless", 1]
   }
 }

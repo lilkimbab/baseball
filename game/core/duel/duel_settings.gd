@@ -23,8 +23,16 @@ var aim_forgiving := true
 ## point along the bat (the computer batter's misread puts balls off the end or the handle).
 var aim_across := 1.0
 ## Random spread of the bat's angle at contact (degrees, one sd): the computer batter's
-## natural variation. A person's spray comes from his own timing.
+## natural variation; a person's, by his difficulty (Difficulty).
 var yaw_spread := 0.0
+## A person's aiming error smaller than this (m) is mostly forgiven (SwingModel.error_scale).
+var aim_forgiven := 0.06
+## The timing window and the spread of the barrel on the ball, as shares of the usual, and the
+## miss of a pitch let go by hand, as a share of PitchDuel.player_scatter: the person's
+## difficulty (Difficulty).
+var timing_scale := 1.0
+var barrel_scale := 1.0
+var hand_scatter := 1.0
 ## The pitcher's feel for the seam-shifted wake: how much of a pitch type's push his sinker,
 ## changeup or splitter gets (PitchType.ssw_accel), from his movement rating.
 var ssw_scale := 1.0

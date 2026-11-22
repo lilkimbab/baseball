@@ -89,9 +89,27 @@ static func delete_slot(slot: String) -> void:
 # --- League and career ---
 
 
+## What the load screen shows of a save beside its name: the club (its name, id and colours,
+## for its emblem) and its record so far.
+static func _meta_club(meta: Dictionary, season: Season, club_id: String) -> void:
+	var team: Team = season.teams.get(club_id)
+	if team == null:
+		return
+	meta["club"] = team.name
+	meta["club_id"] = team.id
+	meta["primary"] = team.primary.to_html(false)
+	meta["accent"] = team.accent.to_html(false)
+	var d := season.division_of(club_id)
+	var table: Standings = season.standings[d] if d >= 0 and d < season.standings.size() else null
+	var row: StandingsRow = table.row(club_id) if table != null else null
+	if row != null:
+		meta["record"] = [row.wins, row.losses, row.ties]
+
+
 static func save_league(slot: String, season: Season, saved_at: float) -> Error:
 	var team: Team = season.teams.get(season.my_team)
 	var meta := {"format": FORMAT, "mode": "league", "saved": saved_at, "team": team.name if team != null else "", "year": season.season_year, "day": season.day + 1}
+	_meta_club(meta, season, season.my_team)
 	var err := write(slot_path(slot) + "/meta.json", meta)
 	if err != OK:
 		return err
@@ -107,6 +125,8 @@ static func load_league(slot: String) -> Season:
 
 static func save_career(slot: String, cs: CareerSeason, saved_at: float) -> Error:
 	var meta := {"format": FORMAT, "mode": "career", "saved": saved_at, "team": cs.career.player.name, "year": cs.season.season_year, "day": cs.season.day + 1}
+	_meta_club(meta, cs.season, cs.career.team_id)
+	meta["first_team"] = cs.career.first_team
 	var err := write(slot_path(slot) + "/meta.json", meta)
 	if err != OK:
 		return err
@@ -183,6 +203,7 @@ static func season_to(s: Season) -> Dictionary:
 		"grown": s.grown.duplicate(), "played_today": s.played_today.keys(),
 		"last_winter": _winter_to(s.last_winter) if s.last_winter != null else {},
 		"history": {"pack": s.history.id, "scenario": s.scenario_id} if s.history != null else {},
+		"level_games": Array(s.level_games), "difficulty": s.difficulty,
 	}
 
 
@@ -333,6 +354,10 @@ static func season_from(d: Dictionary) -> Season:
 	var winter: Dictionary = d.get("last_winter", {})
 	if not winter.is_empty():
 		s.last_winter = _winter_from(winter)
+	s.difficulty = int(d.get("difficulty", Difficulty.Level.PRO))
+	var levels: Array = d.get("level_games", [])
+	if levels.size() == 4:
+		s.level_games = PackedInt32Array(levels)
 	# A save from before players had room to grow.
 	Development.give_rooms(s.teams.values(), s.season_year)
 	var history: Dictionary = d.get("history", {})

@@ -124,7 +124,7 @@ func _pitcher_detail(rect: Rect2, p: Player, g: GameState) -> void:
 	var left := stamina_left(p, pitches, p.id == g.fielding_team().starter_id)
 	text(rect.position + Vector2(18.0, 64.0), "체력", 17, UiTheme.DIM)
 	bar(Rect2(rect.position + Vector2(80.0, 53.0), Vector2(170.0, 12.0)), left, UiTheme.GREEN)
-	text(rect.position + Vector2(18.0, 90.0), "평정", 17, UiTheme.DIM)
+	text(rect.position + Vector2(18.0, 90.0), "위기관리", 17, UiTheme.DIM)
 	bar(Rect2(rect.position + Vector2(80.0, 79.0), Vector2(170.0, 12.0)), p.pitching.composure / 99.0, UiTheme.BLUE)
 	var rows: Array = [["제구", p.pitching.control], ["구위", p.pitching.stuff(scene.catalog)], ["견제", p.pitching.hold]]
 	_rating_rows(rect.position + Vector2(18.0, 120.0), rows)

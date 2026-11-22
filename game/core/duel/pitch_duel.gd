@@ -62,7 +62,11 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 	var actual := choice.target
 	if not exact:
 		var quality := clampf(choice.quality, 0.0, 1.0)
-		var sigma := PitchModel.command_sigma(settings.command) * (player_scatter(quality) if choice.by_hand else lerpf(2.0, 0.5, quality))
+		# By hand: let go at the right moment, the pitch goes where it was aimed, as near as the
+		# pitcher's control allows (perfect_share: an ace on the spot, a wild arm a ball's width
+		# off); the difficulty (hand_scatter) grows only what the timing was off.
+		var by_hand := perfect_share(settings.command) + (player_scatter(quality) - PLAYER_BEST) * settings.hand_scatter
+		var sigma := PitchModel.command_sigma(settings.command) * (by_hand if choice.by_hand else lerpf(2.0, 0.5, quality))
 		sigma *= 1.0 + COLD_SCATTER * choice.cold
 		actual = PitchModel.apply_execution_error(choice.target, sigma, _rng)
 	var type := choice.type
@@ -95,6 +99,17 @@ const PLAYER_BEST := 0.15
 ## A reliever not yet ready misses this much more (times how cold he is).
 const COLD_SCATTER := 0.9
 const PLAYER_WORST := 2.0
+
+
+## The share of his usual miss a pitch let go at exactly the right moment still has, by his
+## control (the user: "even a perfect release should move a little by the pitcher's control —
+## other games do too"): per side, about 1 cm at command 95, 3 at 55, 6 at 30.
+const PERFECT_WILD := 0.36
+const PERFECT_ACE := 0.06
+
+
+static func perfect_share(command: float) -> float:
+	return lerpf(PERFECT_WILD, PERFECT_ACE, clampf(command / 100.0, 0.0, 1.0))
 
 
 static func player_scatter(quality: float) -> float:
@@ -225,8 +240,8 @@ func _resolve_swing() -> void:
 
 	# Swinging above the ball tops it (negative offset), below it lifts it.
 	var error := aim - ball_at
-	var scale_y := SwingModel.error_scale(error.y, settings.aim_scale) if settings.aim_forgiving else settings.aim_scale
-	var scale_x := SwingModel.error_scale(error.x, settings.aim_scale) if settings.aim_forgiving else settings.aim_across
+	var scale_y := SwingModel.error_scale(error.y, settings.aim_scale, settings.aim_forgiven) if settings.aim_forgiving else settings.aim_scale
+	var scale_x := SwingModel.error_scale(error.x, settings.aim_scale, settings.aim_forgiven) if settings.aim_forgiving else settings.aim_across
 	# Reaching for a pitch off the plate costs precision.
 	var reach_spread := zone.distance_outside(ball_at.x, ball_at.y) * SwingModel.OUTSIDE_SPREAD
 	var offset_up := SwingModel.intended_offset(swing.kind) - error.y * scale_y + swing.offset_bias \

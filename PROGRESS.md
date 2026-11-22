@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | 브랜치 | `overnight-2026-11-21` (마지막 커밋 f35b2d4. 그 뒤 작업은 아래 5절의 마지막 두 부분, 아직 커밋 전) |
-| 테스트 | 558개 전부 통과 (`./dev test`, 2026-11-22 저녁) |
+| 테스트 | (아래 5절 마지막 실행 참고) |
 | 성능 | 경기 장면 1080p 평균 72fps·하위 1% 69~71fps (Arc 140V, 관중 만원, 업스케일 품질 88%, 새 HUD와 소리 포함). 77%로 그리면 85fps, 원본 해상도는 62fps |
 | 플레이 검사 | `tools/play_audit.gd` 컴퓨터 경기 150플레이 (2026-11-22 아침): 순간이동·순간 회전·자세 튐·공 튐·겹침·카메라·클로즈업 0건. 1루수가 송구를 받을 때 공과 글러브 0.8~1.6m 0.05건/플레이, 송구·공 놓침 각 0.01건 (4절) |
 | 리그 분포 | 물리 해석기 1600경기(시드 7): 2루타 비율과 가운데 방향 타구만 목표 밖(예전부터 알려진 것, 4절) |
@@ -65,8 +65,7 @@
 | 1루수가 베이스에서 송구를 받을 때 공과 글러브가 0.8~1.6m 떨어짐(150플레이에 4~7번) | 다음 동작 다듬기 때 |
 | 해가 타자 뒤에 있을 때(투수 시점) 선수 앞면의 명암이 밋밋함 | R1·R2에서 조명과 함께 |
 | 홈 화면 모드 카드의 그림이 예전 모델로 찍은 것 | `tools/ui/make_art.sh`로 다시 찍기(R1 끝에) |
-| 타석의 타자 흔들림을 고친 것(가장 가만히 있는 순간을 기본 자세로)을 실제 경기 화면 캡처로는 아직 못 봄 | 다음 경기 화면 작업 때 `match_shots`로 |
-| 스카우트·특성·불러오기·선수 만들기 화면은 새 디자인을 덜 받음 | 다음 화면 작업 |
+| 연습 화면 오른쪽 패널 아래가 비어 있음, 선수 만들기 화면은 새 디자인을 덜 받음 | 다음 화면 작업 |
 | 배경 건물이 상자에 사진을 입힌 수준, 광고판이 글자뿐 | R2 |
 | 새 구장 모형 13종은 높은 시점 한 장면으로만 확인 | R2 |
 | 물리 해석기의 2루타 5.7%(목표 4.13%는 가정값) | 실제 기록을 받는 S17에서 |
@@ -184,6 +183,31 @@
 - 테스트: 558개 통과(새로: 라인업 보드 끌어 놓기·투수진, 포스트시즌 형식, 대기 자세, 시즌 팩, 구장 효과, 사용자 데이터 옮기기)
 - 캡처: `build/design/lineup5_league.png`(라인업 보드), 그 밖의 화면은 `build/design/`
 
+### 밸런스 점검(사용자 입장) · 난이도 · 업적 · 남은 화면 (2026-11-22 밤)
+
+사용자 요청: "능력치 올리기, 재화 획득, 경기 난이도가 적절한지 사용자 입장에서 평가", "업적을 연구해서 넣기", "리그·마이플레이어는 난이도에 따라 보상·업적·특별 상품 차등", "리그는 난이도가 오를수록 상대 리그 OVR도 높게(좋은 선수단이 아니면 프로부터 이기기 어렵게)", "빈 공간을 창의적으로", "다른 게임은 참고만".
+
+측정 도구 두 개를 새로 만들었다: `tools/difficulty_report.gd`(사람의 타이밍·조준 오차를 흉내 낸 타자·투수로 물리 해석기 경기 16경기씩, 실력 초보 ±60ms·±8cm / 보통 ±40ms·±5cm / 숙련 ±25ms·±3cm), `tools/balance_report.gd`(커리어 유형별 144경기 시즌, 리그 구단 포인트·승률).
+
+| 본 것 | 재 보니 (고치기 전) | 고친 것 | 고친 뒤 |
+|---|---|---|---|
+| 경기 난이도 | 보통 실력이 .362/.409/.721·경기당 홈런 2.7·16전 전승, 사람 투수는 경기당 2.8실점. 초보도 홈런이 실제의 2.4배. 원인: 조준 오차 6cm까지 5%만 반영, 타구 방향 흔들림 없음. **실제 경기 장면은 사람 타석에 컴퓨터 타자용 판정값을 넣고 있었음** | 난이도 4단계(루키·프로·올스타·레전드, 설정 → 게임): 사람의 타이밍 판정 폭·조준 보정·방향 흔들림·배트 중심 산포·투구 산포. 사람이 직접 하는 타석·투구에만, 개입한 순간부터. 연습에도 적용 | 프로: 보통 실력 .250/.327/.459·경기당 5.1득점 4.2실점·10승 5패. 루키: 초보 .312. 레전드: 숙련자 .317 승률 7할, 보통 .161 |
+| 리그 상대 전력 | 난이도와 무관 | 난이도에 따라 다른 구단 선수 능력치 ×(0.97 / 1.025 / 1.08 / 1.12), 시뮬레이션 경기에도 | 중위권 구단 / 리그 최강 구단 승률: 루키 .51/.71, 프로 .41/.61, 올스타 .29/.46, 레전드 .22/.42 |
+| 커리어 2군 | 4일 만에 1군(2군 무의미) | 2군 최소 20경기, 성적 콜업은 60타석 OPS .850·평균자책점 3.00 | 17~22일째(타격이 약한 유형은 더 늦게) |
+| 커리어 성장 | 한 시즌에 신인 +17~26(MVP급), 1루수 수비 성장 포인트가 다른 포지션의 3배 | 능력치 비용 ×1.7, 수비 포인트 처리당 4→2·경기당 최대 10, 수비형의 경기 목표를 다른 유형만큼 | +12~18 |
+| 포수 커리어 | **2군 경기에 한 번도 못 나감**(2군 보충 포수가 더 좋아 감독이 안 씀) | 2군 경기에도 내 선수 선발 고정 | 매 경기 출전 |
+| 상점 포인트 | 3이닝 경기도 9이닝과 같은 보상, 커리어 6분 경기가 9이닝 경기의 6배 효율. 레벨은 보상 없음. 커리어 보상 상자 포인트는 쓸 곳 없이 쌓임 | 경기 포인트를 이닝 비율로(감독 경기 0.6, 커리어 0.35), 레벨 업마다 100×레벨 P, 보상 상자 포인트는 상점 지갑으로 | |
+| 리그 구단 포인트 | 시즌 2,700점, 쓸 곳은 특성 뽑기(80)뿐 | 특성 100, 스카우트 레벨 업 600·1200(더 좋은 후보·정확한 잠재력), 하루 한 번 새 후보 60 | |
+| 난이도별 보상 | 없음 | 직접 한 경기: 포인트·경험치 ×0.8/1/1.3/1.7, 커리어 성장 ×1/1/1.15/1.3, 감독 경기 구단 포인트 ×1/1/1.2/1.4. 시뮬레이션·직접 안 한 경기는 프로 이하 | 레전드에서 보통 실력은 덜 이기지만 경기당 수입이 조금 많게 |
+| 업적 | 없음 | 52개(경기·타격·투구·리그·커리어·수집, 브론즈 100P·실버 250·골드 600·플래티넘 3000). 누적은 단계로, 운이나 "못한 것" 업적 없음. 올스타·레전드 전용 업적 10개, 그중 8개가 **시그니처 장비(+4, 보라색 마감) 또는 구단 자금 시그니처**를 줌(상점에서 잠김 → 받기). 업적 탭, 달성 알림, 경기 뒤 줄 | |
+| 투구 제구 (사용자 지적 2개) | 완벽하게 놓으면 제구력과 거의 상관없이 2~3cm. 게이지가 매번 같아 리듬만 외우면 늘 완벽 | 완벽한 투구도 제구력만큼 빗나감(평균 약 1cm·제구 95 ~ 4cm·55 ~ 7cm·30), 난이도는 타이밍이 어긋난 만큼에만. 게이지는 투구마다 고리 시작 크기(목표 원의 2.4~3.6배)·닫히는 속도가 다름 → 완벽한 순간이 0.6~1.3초 사이 어디든. 투수마다: 판정 폭 = 그 구종의 커맨드(×0.8~1.25), 속도 = 피로·몸풀기(최대 +25%)와 득점권 위기 때 평정(최대 +12.5%), 변화구는 조금 느리게 | 테스트 3개 |
+| 능력치가 너무 많음 (사용자 지적) | 커리어 성장 14개, 제구·로케이션·커맨드가 같은 뜻인데 따로, 주력·주루도 따로, 이름이 화면마다 다름(송구/송구 파워, 구위·변화/무브먼트, 평정, 클러치). 투수 수비 능력치는 경기 계산에 안 쓰임(화면에도 없음) | 사람이 보고 키우는 능력치만 줄임(엔진 값은 그대로): 제구 하나(올리면 모든 구종의 커맨드도), 주력 하나(올리면 주루 센스도). 이름 통일: 위기관리·득점권·구위·송구 파워. 로진백은 구위 장비로. 특성 효과도 같은 이름은 한 줄 | 커리어 성장 타자 8·투수 4, 선수 카드 타자 10줄 |
+| 남은 화면 | 특성 탭 빈 표, 스카우트 빈 열, 불러오기 한 줄, 연습 빈 패널 | 특성: 배지 도감(단계 금속색, 합성 경로, 장착 후보 눌러 장착). 스카우트: 리포트 카드(얼굴·OVR·잠재력·능력 막대) + 레벨 업·새 후보. 불러오기: 모드 그림 카드 6칸(빈 슬롯 포함, 삭제 두 번 확인) | |
+
+- 타석 대기 자세: 0.5초 간격 캡처 5장에서 거의 움직이지 않음 확인(`build/stance/`)
+- 캡처: `build/design/tr3_league.png`(특성), `ld3_load.png`(불러오기), `ach_achievements.png`·`ach_shop.png`(업적·시그니처)
+- 업적의 경기 판정은 사람이 플레이한 경기만(관전·시뮬레이션 제외). 감독 경기에서 직접 개입하지 않으면 프로 이하로 계산
+
 이전 작업(2026-11-21 밤 ~ 22 새벽: 선수 비율·유니폼·핏줄, 투구 조작, 서체, 심판, 정리)은 [docs/14](docs/14-work-log.md)로 옮긴다.
 
 ## 6. 확인하는 법
@@ -212,7 +236,7 @@ $G --headless --path game --script res://tools/season_check.gd -- --season kbo-2
 ```bash
 cd /home/parkjune/baseball
 git add -A PROGRESS.md README.md dev docs/ game/ tools/
-git commit -m "Moneyball: KBO postseason, clubs that made history, real-like names, park effects, new screens, 3D shop, line-up board
+git commit -m "Moneyball: real-like league and names, new screens, 3D shop, line-up board, difficulty, achievements, balance
 
 - Postseason rounds as data (wild card, semi-playoff, playoff, Korean Series); a season pack
   can give that year's rounds, rules and parks
@@ -222,10 +246,23 @@ git commit -m "Moneyball: KBO postseason, clubs that made history, real-like nam
   factors in each game; roster builder tiers and club calibration
 - Clutter removed from the match HUD and settings; batter's stance at the stillest moment
 - NEXON Football Gothic; screens redesigned (league home, history, exhibition, career,
-  practice, records) with 3D headshots in lists; ratings shown on a 2K-like scale
-- Shop with turning 3D products in three grades
+  practice, records, traits as a badge case, scouting reports, save cards) with 3D headshots
+- Shop with turning 3D products in three grades, and signature gear earned by achievements
 - Line-up board: players dragged onto a ballpark, batting order, rotation, set-up men and
   closer with the computer's choices as recommendations; the AI uses the chosen bullpen
+- Balance measured from the player's side (tools/difficulty_report.gd, balance_report.gd):
+  difficulty levels for the person's own swings and pitches (the match scene had been giving
+  him the computer batter's settings), the league's other clubs stronger with difficulty,
+  rewards by difficulty, slower career growth and a real second-team stretch, the rookie
+  catcher who never played, points scaled by innings, level-up rewards, career box points into
+  the shop's wallet, club points for scouting upgrades and reports, unique scouting ids
+- 52 achievements in tiers, harder ones at 올스타/레전드 paying signature items; achievements tab
+  and toasts; practice records; tools leave the person's profile alone
+- Pitching: a perfect release misses by the pitcher's control; the gauge differs every pitch
+  (ring size and pace; window by the pitch's command, pace by fatigue and, with runners in
+  scoring position, composure) so its rhythm cannot be learned
+- Fewer ratings for the person: one 제구 (with each pitch's command), one 주력 (with base-running),
+  one name for each across the screens
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push origin overnight-2026-11-21

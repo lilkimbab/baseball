@@ -51,10 +51,11 @@ func test_pitching_mode_waits_for_the_player_then_runs_the_gauge() -> void:
 	scene.selected_pitch = 2
 	scene.press_pitch_button()
 	assert_eq(scene.state, DuelScene.State.CHARGE)
-	_advance(scene, 50)
-	assert_between(scene.power, 0.3, 0.7, "he winds up to his full speed while the button is held")
+	var half := roundi(scene.gauge_time * scene.sweet * 60.0)
+	_advance(scene, half)
+	assert_between(scene.power, 0.4, 0.6, "he winds up to his full speed while the button is held")
 	assert_eq(scene.state, DuelScene.State.CHARGE, "and nothing is thrown until it is let go")
-	_advance(scene, roundi(DuelScene.GAUGE_TIME * DuelScene.ACCURACY_SWEET * 120.0) - 50)
+	_advance(scene, roundi(scene.gauge_time * scene.sweet * 120.0) - half)
 	scene.release_pitch_button()
 	assert_eq(scene.state, DuelScene.State.WINDUP, "letting go is the pitch")
 	assert_gt(scene.accuracy, 0.9, "let go as the ring meets the circle, it is accurate")
@@ -70,7 +71,7 @@ func test_holding_the_button_too_long_still_throws_but_badly() -> void:
 	var scene := _start(&"pitch")
 	_advance(scene, 10)
 	scene.press_pitch_button()
-	_advance(scene, roundi(DuelScene.GAUGE_TIME * 120.0) + 10)
+	_advance(scene, roundi(scene.gauge_time * 120.0) + 10)
 	assert_eq(scene.state, DuelScene.State.WINDUP)
 	assert_eq(scene.accuracy, 0.0)
 	# And one let go at once is as bad, and slow.
@@ -102,7 +103,7 @@ func test_the_player_s_pitch_goes_where_he_aimed_when_he_times_it() -> void:
 		var aimed := scene.target
 		scene.selected_pitch = thrown % scene.pitch_ids.size()
 		scene.press_pitch_button()
-		_advance(scene, roundi(DuelScene.GAUGE_TIME * DuelScene.ACCURACY_SWEET * 120.0))
+		_advance(scene, roundi(scene.gauge_time * scene.sweet * 120.0))
 		scene.release_pitch_button()
 		while scene.state == DuelScene.State.WINDUP:
 			_advance(scene, 1)
@@ -403,3 +404,45 @@ func test_the_batter_aims_with_the_pointer_by_default() -> void:
 	scene.pointer_override = scene.camera.unproject_position(Field.to_world(spot))
 	scene.refresh(DT)
 	assert_lt(Vector2(scene.aim_point.x, scene.aim_point.z).distance_to(Vector2(spot.x, spot.z)), 0.02, "the cursor is where the pointer is")
+
+
+func test_the_gauge_is_not_the_same_twice() -> void:
+	# The user: random ring sizes so the rhythm cannot be learned. Each pitch's ring starts at
+	# its own size and meets the circle at its own moment, between about 0.6 and 1.3 s.
+	var scene := _start(&"pitch")
+	var moments: Array[float] = []
+	for i: int in 8:
+		while scene.state != DuelScene.State.PRE_PITCH:
+			_advance(scene, 1)
+		_advance(scene, 5)
+		scene.press_pitch_button()
+		moments.append(scene.gauge_time * scene.sweet)
+		assert_between(scene.gauge_from, DuelScene.GAUGE_FROM_MIN, DuelScene.GAUGE_FROM_MAX)
+		_advance(scene, roundi(scene.gauge_time * scene.sweet * 120.0))
+		assert_gt(scene.ring_accuracy(), 0.9, "on the circle at this pitch's own moment")
+		scene.release_pitch_button()
+	moments.sort()
+	assert_gt(moments[moments.size() - 1] - moments[0], 0.2, "moments %s apart" % str(moments))
+	for m: float in moments:
+		assert_between(m, 0.5, 1.4)
+
+
+func test_a_pitch_s_command_sets_how_forgiving_the_moment_is() -> void:
+	# The user asked what decides it pitcher by pitcher: each pitch's command (its window),
+	# his control (DuelSettings.command: how near a perfect pitch goes), fatigue and, with a
+	# runner in scoring position, composure (the ring's pace).
+	assert_gt(DuelScene.window_share(90.0), DuelScene.window_share(30.0))
+	assert_almost_eq(DuelScene.window_share(0.0), 0.8, 1e-6)
+	assert_almost_eq(DuelScene.window_share(100.0), 1.25, 1e-6)
+	var scene := _start(&"pitch")
+	_advance(scene, 10)
+	scene.settings.command = 90.0
+	scene.press_pitch_button()
+	var wide := scene.tolerance
+	scene.release_pitch_button()
+	while scene.state != DuelScene.State.PRE_PITCH:
+		_advance(scene, 1)
+	_advance(scene, 5)
+	scene.settings.command = 30.0
+	scene.press_pitch_button()
+	assert_lt(scene.tolerance, wide, "a pitch he commands less is less forgiving")

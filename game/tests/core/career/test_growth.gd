@@ -60,7 +60,7 @@ func test_points_come_from_the_game_in_their_own_fields() -> void:
 	bat.runs = 1
 	var gp := Growth.from_game(bat, null, 3, 0, _r())
 	assert_eq(gp["batting"], 6.0 + 15.0 + 2 * 4.0 + 4 * 1.0, "a single, a homer, two RBI, four trips")
-	assert_eq(gp["fielding"], 3 * 4.0)
+	assert_eq(gp["fielding"], 3 * 2.0, "two a chance (four made a first baseman grow three times as fast)")
 	assert_eq(gp["pitching"], 0.0, "a hitter earns nothing on the mound")
 	var pitch := PitchingLine.new()
 	pitch.outs = 18

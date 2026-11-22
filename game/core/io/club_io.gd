@@ -44,7 +44,10 @@ static func load_rules(path: String) -> ClubRules:
 		r.focus[key] = PackedStringArray(focus[key] as Array)
 	var points: Dictionary = root.get("points", {})
 	for key: String in points:
-		r.points[key] = int(points[key])
+		if points[key] is Array:
+			r.scout_upgrade = PackedInt32Array(points[key] as Array)
+		else:
+			r.points[key] = int(points[key])
 	r.trait_tiers = PackedFloat64Array(root.get("trait_tiers", r.trait_tiers) as Array)
 	var traits: Array = root.get("traits", [])
 	for entry: Dictionary in traits:

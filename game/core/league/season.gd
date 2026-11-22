@@ -83,6 +83,13 @@ var history: SeasonPack
 var scenario_id := ""
 ## A player who plays whenever he is on the first team (the career player): he starts at his
 ## position, a starter takes his turn, a closer closes and a reliever sets up.
+## The difficulty of the game about to be recorded when the person played it on screen (−1:
+## simulated); set by the scene, used once (Season.record).
+var played_level := -1
+## Games the manager played on screen, by difficulty (Difficulty.Level).
+var level_games := PackedInt32Array([0, 0, 0, 0])
+## The difficulty the league is played at: how strong the other clubs are (Difficulty.league_form).
+var difficulty: int = Difficulty.Level.PRO
 var featured := ""
 var featured_role := ""
 ## Decided once per game and club: "day:team" → starter id, and who has the day off.
@@ -263,6 +270,9 @@ func squad_for(team: Team, on_day: int, starter_id: String) -> Team:
 						continue
 					factor = PitcherUsage.TIRED_FORM
 		factor += condition_effect(p.id)
+		# The league's strength by the difficulty, for every club but the manager's.
+		if my_team != "" and team.id != my_team:
+			factor += Difficulty.league_form(difficulty)
 		var deltas: Dictionary[String, float] = {}
 		if managed != null:
 			deltas = managed.trait_deltas(p, club_rules)
@@ -334,14 +344,22 @@ func _develop_day() -> void:
 
 
 ## Today's scouting candidates for the player's club.
-func refresh_candidates() -> void:
+func refresh_candidates(report: int = 0) -> void:
 	if club == null or club_rules == null:
 		return
 	if _names == null:
 		_names = RosterIO.load_names()
-	var gen := LeagueGenerator.new(_names, catalog, hash("scout:%d:%d" % [season_year, day]))
+	var key := "scout:%d:%d" % [season_year, day] + (":%d" % report if report > 0 else "")
+	var gen := LeagueGenerator.new(_names, catalog, hash(key))
 	club.candidates = Scouting.candidates(gen, division_of(club.team_id), club.scout_level, club_rules)
-	club.signed_today = false
+	# Every day's generator numbers its men from one: tell the days (and reports) apart, or
+	# two men signed on different days would share an id.
+	for p: Player in club.candidates:
+		p.id = "s%d_%d_%d_%s" % [season_year, day, report, p.id.trim_prefix("s")]
+	# A second report the same day is new names, not a second signing.
+	if report == 0:
+		club.signed_today = false
+		club.reported_today = false
 
 
 ## The player takes charge of a club: its management starts.
@@ -432,7 +450,12 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 			if not p.is_pitcher():
 				streak[p.id] = int(streak.get(p.id, 0)) + 1 if played.has(p.id) else 0
 	if club != null and game.involves(club.team_id):
-		club.earn(signi(game.runs_of(club.team_id) - game.runs_against(club.team_id)), playoff != null, club_rules)
+		# A game the manager played on screen pays by its difficulty (Difficulty.REWARDS).
+		var share := Difficulty.reward(played_level, "club") if played_level >= 0 else 1.0
+		club.earn(signi(game.runs_of(club.team_id) - game.runs_against(club.team_id)), playoff != null, club_rules, share)
+		if played_level >= 0:
+			level_games[clampi(played_level, 0, 3)] += 1
+		played_level = -1
 	for id: String in game_book.pitching:
 		var line: PitchingLine = game_book.pitching[id]
 		target.pitch(id).add(line)
@@ -533,6 +556,24 @@ func postseason_format(d: int) -> Array[Postseason.Round]:
 	if history != null:
 		return history.postseason_format()
 	return Postseason.kbo() if d == 0 else Postseason.ladder()
+
+
+## The difficulty the season was managed at, for what asks for a harder game (an achievement
+## for a title won at 올스타 or harder): the hardest level at which, or harder, seven in ten of
+## at least ten games played on screen were played. 0 (any) otherwise.
+func managed_level() -> int:
+	var total := 0
+	for n: int in level_games:
+		total += n
+	if total < 10:
+		return 0
+	for level: int in [3, 2, 1]:
+		var at_least := 0
+		for l: int in range(level, 4):
+			at_least += level_games[l]
+		if float(at_least) >= 0.7 * total:
+			return level
+	return 0
 
 
 ## A division's postseason champion ("" until it is decided).

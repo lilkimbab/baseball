@@ -13,15 +13,17 @@ const FILLER_ROLES: Array[String] = ["SP", "SP", "SP", "RP", "RP", "RP", "C", "1
 ## Second-team talent below the division's first teams (as LeagueGenerator.FARM_GAP).
 const FARM_GAP := 13.0
 ## Call-up: a hitter with this OPS over this many second-team plate appearances; a pitcher with
-## this ERA over this many outs (starter, reliever); or anyone within this many overall points of
-## the weakest first-teamer in his place after a few games.
-const CALL_UP_OPS := 0.78
-const CALL_UP_PA := 30
-const CALL_UP_ERA := 3.6
-const CALL_UP_OUTS_SP := 30
-const CALL_UP_OUTS_RP := 15
-const CALL_UP_GAP := 2.0
-const CALL_UP_MIN_GAMES := 5
+## this ERA over this many outs (starter, reliever); or anyone at least as good as the weakest
+## first-teamer in his place after this many games. (Measured with tools/balance_report.gd: at
+## 30 PA, .780 and five games a rookie was up on the fourth day, and the second team meant
+## nothing; now a month or so, sooner for a hot start.)
+const CALL_UP_OPS := 0.85
+const CALL_UP_PA := 60
+const CALL_UP_ERA := 3.0
+const CALL_UP_OUTS_SP := 45
+const CALL_UP_OUTS_RP := 24
+const CALL_UP_GAP := 0.0
+const CALL_UP_MIN_GAMES := 20
 ## Sent down: OPS under this over this many first-team plate appearances, or ERA over this
 ## over this many outs.
 const DOWN_OPS := 0.45
@@ -195,7 +197,21 @@ func prepare(physical: bool) -> GameSim:
 	var away := _futures_team(g.away)
 	var home := _futures_team(g.home)
 	var r := RuleSet.kbo_2026()
-	return GameSim.create(away, home, r, season.env, season.catalog, season.ovr, season.rng.fork(hash("f%d:%s" % [season.day, g.home])), null, null, physical)
+	# He plays: a second team's manager has filler players who may be better than a rookie
+	# (a catcher's career never got a game); his career is about him playing.
+	var manager := AiManager.new(season.env, season.catalog, season.ovr)
+	var must: Dictionary[String, bool] = {}
+	var none: Dictionary[String, bool] = {}
+	if not career.is_pitcher():
+		must[career.player.id] = true
+	var lineups: Array[TeamInGame] = []
+	for side: Team in [away, home]:
+		var his := side.player(career.player.id) != null
+		var starter := side.next_starter()
+		if career.position == "SP" and his and futures_games % 5 == 0:
+			starter = career.player
+		lineups.append(manager.make_lineup(side, r, starter.id, none, must if his else none))
+	return GameSim.with_lineups(lineups[0], lineups[1], r, season.env, season.catalog, manager, season.rng.fork(hash("f%d:%s" % [season.day, g.home])), physical)
 
 
 func _futures_team(team_id: String) -> Team:
@@ -265,7 +281,7 @@ func fielding_credit(e: GameEvent) -> Vector2i:
 
 ## The game is over: into the books (the season's, or the second team's), growth points for
 ## his lines and his game goal, popularity, and a call-up or a trip down.
-func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_gp: Dictionary[String, float] = {}, clutch: int = 0, pitches_seen: Dictionary[StringName, int] = {}) -> Report:
+func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_gp: Dictionary[String, float] = {}, clutch: int = 0, pitches_seen: Dictionary[StringName, int] = {}, level: int = -1) -> Report:
 	var report := Report.new()
 	report.played = true
 	report.first_team = career.first_team
@@ -292,6 +308,10 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	report.goal_met = goal.achieved(bat, pitch)
 	if report.goal_met:
 		gp[goal.field] = float(gp.get(goal.field, 0.0)) + rules.game_goal_gp
+	# Played on screen: by its difficulty (Difficulty.REWARDS); simulated: 프로's at most.
+	var gp_share := Difficulty.reward(level if level >= 0 else Difficulty.Level.PRO, "gp", level >= 0)
+	for field: String in gp:
+		gp[field] = float(gp[field]) * gp_share
 	Growth.add(career, gp)
 	report.gp = gp
 	career.popularity += (1.0 if career.first_team else 0.3) * (1.0 + clutch + (1.0 if report.goal_met else 0.0))
@@ -299,7 +319,11 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	if (bat != null and bat.pa > 0) or (pitch != null and pitch.outs > 0):
 		report.rating = GameRating.rate(bat, pitch, chances, errors, report.goal_met, clutch, rules)
 		report.medal = GameRating.medal(report.rating, rules)
+		var before := career.points
 		report.reward = GameRating.open_box(career, report.medal, rules, Rng.new(hash("box:%d:%d" % [season.season_year, season.day])))
+		# A box's points by the difficulty too.
+		if career.points > before and level >= 0:
+			career.points = before + roundi((career.points - before) * Difficulty.reward(level, "points"))
 		career.ratings.append(report.rating)
 	if pitch != null:
 		PitchEvolution.note_game(career, pitch.pitches, pitches_seen)

@@ -178,26 +178,23 @@ func _draw_target_gauge() -> void:
 	var centre := _screen(scene.target)
 	var per_metre := (_screen(scene.target + Vector3(0.1, 0.0, 0.0)) - centre).length() * 10.0
 	var base := maxf(per_metre * 0.11, 16.0)
-	_text(centre + Vector2(-90.0, -base * GAUGE_FROM - 12.0 if state == DuelScene.State.CHARGE else -base - 14.0), scene.selected_type().label, 18, GOLD, HORIZONTAL_ALIGNMENT_CENTER, 180.0)
+	_text(centre + Vector2(-90.0, -base * scene.gauge_from - 12.0 if state == DuelScene.State.CHARGE else -base - 14.0), scene.selected_type().label, 18, GOLD, HORIZONTAL_ALIGNMENT_CENTER, 180.0)
 	if state != DuelScene.State.CHARGE:
 		draw_arc(centre, base, 0.0, TAU, 48, Color(1, 1, 1, 0.85), 2.0, true)
 		return
 	# The button is down: a ring closes on the target's circle. Let go when they meet. The
 	# circle is a green band as wide as a good pitch's window; the ring is green inside it,
 	# red once it has gone by.
-	var sweet := DuelScene.ACCURACY_SWEET
+	var sweet := scene.sweet
 	var at := scene.ring
-	var good := DuelScene.gauge_accuracy(at)
+	var good := scene.ring_accuracy()
 	draw_arc(centre, base, 0.0, TAU, 64, Color(GREEN, 0.35), maxf(base * 0.42, 9.0), true)
 	draw_arc(centre, base, 0.0, TAU, 64, Color(GREEN, 0.95), 2.5, true)
-	var radius := base * (lerpf(GAUGE_FROM, 1.0, at / sweet) if at <= sweet else lerpf(1.0, 0.15, (at - sweet) / (1.0 - sweet)))
+	# This pitch's ring: its own size, closing at its own even pace (DuelScene._roll_gauge).
+	var radius := base * lerpf(scene.gauge_from, DuelScene.GAUGE_END, at)
 	var colour := GOLD if good >= 0.85 else (GREEN if good >= 0.6 else (RED if at > sweet else INK))
 	draw_arc(centre, radius, 0.0, TAU, 64, Color(0.0, 0.0, 0.0, 0.55), 7.0, true)
 	draw_arc(centre, radius, 0.0, TAU, 64, colour, 4.0, true)
-
-
-## How many target circles wide the closing ring starts.
-const GAUGE_FROM := 3.4
 
 
 ## How well the pitch was let go, inside the ring while the pitcher winds up.

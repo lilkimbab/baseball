@@ -14,16 +14,20 @@ const TRAINING_PRICE := 250
 const TRAINING_GP := 10.0
 const FUNDS_PRICE := 200
 const FUNDS_POINTS := 50
-const GRADES: Array[String] = ["스탠다드", "프로", "엘리트"]
-const GRADE_LATIN: Array[String] = ["STANDARD", "PRO", "ELITE"]
+const GRADES: Array[String] = ["스탠다드", "프로", "엘리트", "시그니처"]
+const GRADE_LATIN: Array[String] = ["STANDARD", "PRO", "ELITE", "SIGNATURE"]
+## The signature grade: not for sale; each piece is earned by an achievement at 올스타 or
+## harder (data/achievements.ko.json) and then taken for nothing (the user: "special items by
+## difficulty too").
+const SIGNATURE := 3
 ## By grade: what gear adds to its rating and costs; growth points and price of training; the
 ## club points and price of funds.
-const GEAR_AMOUNT: Array[int] = [1, 2, 3]
-const GEAR_PRICES: Array[int] = [GEAR_PRICE, 1000, 2200]
+const GEAR_AMOUNT: Array[int] = [1, 2, 3, 4]
+const GEAR_PRICES: Array[int] = [GEAR_PRICE, 1000, 2200, 0]
 const TRAINING_GPS: Array[float] = [TRAINING_GP, 25.0, 50.0]
 const TRAINING_PRICES: Array[int] = [TRAINING_PRICE, 550, 1000]
-const FUNDS_AMOUNTS: Array[int] = [FUNDS_POINTS, 150, 400]
-const FUNDS_PRICES: Array[int] = [FUNDS_PRICE, 550, 1300]
+const FUNDS_AMOUNTS: Array[int] = [FUNDS_POINTS, 150, 400, 1000]
+const FUNDS_PRICES: Array[int] = [FUNDS_PRICE, 550, 1300, 0]
 
 ## The product picked (its base id) and the grade shown.
 static var picked := ""
@@ -49,7 +53,7 @@ func items() -> Array[Dictionary]:
 	for g: Dictionary in _rules.gear:
 		var rating := str(g.get("rating", ""))
 		var base_name := str(g.get("name", ""))
-		for grade: int in 3:
+		for grade: int in 4:
 			var base := "gear:" + base_name
 			out.append({"id": base + ("" if grade == 0 else ":%d" % grade), "base": base, "grade": grade, "kind": "장비",
 				"base_name": base_name, "name": base_name + ("" if grade == 0 else " " + GRADES[grade]), "price": GEAR_PRICES[grade],
@@ -61,7 +65,7 @@ func items() -> Array[Dictionary]:
 			out.append({"id": base + ("" if grade == 0 else ":%d" % grade), "base": base, "grade": grade, "kind": "훈련",
 				"base_name": "%s 특별 훈련" % CareerScreen.FIELD_NAMES[field], "name": "%s 특별 훈련%s" % [CareerScreen.FIELD_NAMES[field], "" if grade == 0 else " " + GRADES[grade]],
 				"price": TRAINING_PRICES[grade], "effect": "%s 성장 포인트 +%d" % [CareerScreen.FIELD_NAMES[field], roundi(TRAINING_GPS[grade])], "gp": TRAINING_GPS[grade], "field": field})
-	for grade: int in 3:
+	for grade: int in 4:
 		out.append({"id": "club" + ("" if grade == 0 else ":%d" % grade), "base": "club", "grade": grade, "kind": "구단", "base_name": "구단 운영 자금",
 			"name": "구단 운영 자금" + ("" if grade == 0 else " " + GRADES[grade]), "price": FUNDS_PRICES[grade], "effect": "구단 포인트 +%d" % FUNDS_AMOUNTS[grade], "funds": FUNDS_AMOUNTS[grade]})
 	return out
@@ -72,7 +76,7 @@ static func owned_grade(base_name: String) -> int:
 	var c := CareerSession.career
 	if c == null:
 		return -1
-	for grade: int in range(2, -1, -1):
+	for grade: int in range(SIGNATURE, -1, -1):
 		if c.gear.has(base_name + ("" if grade == 0 else " " + GRADES[grade])):
 			return grade
 	return -1
@@ -81,6 +85,13 @@ static func owned_grade(base_name: String) -> int:
 ## Why an item cannot be bought now ("" when it can).
 func problem(item: Dictionary) -> String:
 	var id := str(item["id"])
+	if int(item["grade"]) == SIGNATURE:
+		var key := "club" if id.begins_with("club") else "gear:" + str(item["base_name"])
+		if not Achievements.has_item(key):
+			var source := Achievements.source_of(key)
+			return "업적 '%s' 달성 보상 (%s)" % [source.name, source.about] if source != null else "업적 보상"
+		if id.begins_with("club") and int(Profile.owned.get(id, 0)) > 0:
+			return "이미 받았습니다"
 	if id.begins_with("club"):
 		if LeagueSession.season == null or LeagueSession.season.club == null:
 			return "리그 모드를 진행 중일 때 구매할 수 있습니다"
@@ -109,6 +120,9 @@ func buy(id: String) -> String:
 			return why
 		if not Profile.spend(int(item["price"])):
 			return "포인트가 부족합니다"
+		Profile.owned[id] = int(Profile.owned.get(id, 0)) + 1
+		Profile.save_file()
+		Achievements.bought()
 		if id.begins_with("club"):
 			LeagueSession.season.club.points += int(item["funds"])
 			LeagueSession.autosave()
@@ -125,6 +139,7 @@ func buy(id: String) -> String:
 			c.gear[str(item["name"])] = str(g.get("rating", ""))
 			Training.grow(c.player, PackedStringArray([str(g.get("rating", ""))]), float(int(item["amount"]) - already))
 			CareerSession.autosave()
+			Achievements.check_career(CareerSession.career_season)
 		return "%s 구매 완료" % item["name"]
 	return "없는 상품입니다"
 
@@ -179,7 +194,8 @@ func build() -> void:
 		grid.add_child(_card(family, base == picked))
 	var side := panel("", "", columns, 560.0, "")
 	if grades.has(picked):
-		_detail(side, grades[picked][clampi(picked_grade, 0, 2)], grades[picked])
+		var family: Array = grades[picked]
+		_detail(side, family[clampi(picked_grade, 0, family.size() - 1)], family)
 	else:
 		_detail(side, {}, [])
 
@@ -218,11 +234,12 @@ func _card(family: Array, on: bool) -> Button:
 	var shown := maxi(owned_grade(str(first["base_name"])), 0) if str(first["kind"]) == "장비" else 0
 	box.add_child(_art_tile(family[shown], 140.0, false))
 	box.add_child(UiKit.heading(str(first["base_name"]), 20))
-	box.add_child(UiKit.label("%s ~ %s" % [str(first["effect"]), str(family[2]["effect"]).get_slice(" ", str(family[2]["effect"]).get_slice_count(" ") - 1)], 16, UiTheme.GREEN, 600))
+	var top: Dictionary = family[mini(2, family.size() - 1)]
+	box.add_child(UiKit.label("%s ~ %s" % [str(first["effect"]), str(top["effect"]).get_slice(" ", str(top["effect"]).get_slice_count(" ") - 1)], 16, UiTheme.GREEN, 600))
 	var price := UiKit.hbox(6)
 	box.add_child(price)
 	price.add_child(GradeCoin.make("P", 22.0))
-	price.add_child(UiKit.number("%d ~ %d" % [int(first["price"]), int(family[2]["price"])], 22, UiTheme.ACCENT))
+	price.add_child(UiKit.number("%d ~ %d" % [int(first["price"]), int(top["price"])], 22, UiTheme.ACCENT))
 	if owned_grade(str(first["base_name"])) >= 0 and str(first["kind"]) == "장비":
 		price.add_child(UiKit.spacer(0.0, 0.0, true))
 		price.add_child(UiKit.badge(GRADES[owned_grade(str(first["base_name"]))], UiTheme.GREEN))
@@ -263,7 +280,12 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 	side.body.add_child(UiKit.rule())
 	if chosen.is_empty():
 		return
-	side.body.add_child(UiKit.segmented(["0", "1", "2"], GRADES, str(int(chosen["grade"])), func(id: String) -> void:
+	var ids: Array = []
+	var words: Array = []
+	for item: Dictionary in _family:
+		ids.append(str(int(item["grade"])))
+		words.append(GRADES[int(item["grade"])])
+	side.body.add_child(UiKit.segmented(ids, words, str(int(chosen["grade"])), func(id: String) -> void:
 		picked_grade = int(id)
 		message = ""
 		refresh()))
@@ -280,7 +302,7 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 		side.body.add_child(UiKit.label(why, 18, UiTheme.RED if why.begins_with("포인트") else UiTheme.DIM, 600))
 	if message != "":
 		side.body.add_child(UiKit.label(message, 18, UiTheme.ACCENT, 600))
-	var b := UiKit.button("구매  ·  %d P" % int(chosen["price"]), func() -> void:
+	var b := UiKit.button("구매  ·  %d P" % int(chosen["price"]) if int(chosen["grade"]) != SIGNATURE else "받기", func() -> void:
 		message = buy(str(chosen["id"]))
 		refresh(), "shopping-cart", "primary")
 	b.add_theme_font_size_override("font_size", 26)

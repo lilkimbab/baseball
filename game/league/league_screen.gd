@@ -8,6 +8,19 @@ extends Screen
 ## what can be done with him.
 
 const GAME_CHOICES: Array[int] = [36, 72, 144]
+## The mark on each trait's badge.
+const TRAIT_MARKS := {
+	"precision": "target", "slugger": "fire", "table_setter": "flag-pennant", "speedster": "person-simple-run",
+	"utility": "stack", "iron_glove": "shield", "balanced_batter": "chart-polar", "clutch": "lightning",
+	"strikeout": "hand-fist", "grounder": "drop", "fly_ball": "cloud", "pinpoint": "crosshair",
+	"closer": "lock", "workhorse": "timer", "balanced_pitcher": "chart-polar", "escape": "door-open",
+}
+## The ratings a trait raises, as the screens name them.
+const EFFECT_NAMES := {
+	"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주력",
+	"range": "수비 범위", "hands": "포구", "arm": "송구 파워", "accuracy": "송구 정확도", "clutch": "득점권", "movement": "구위",
+	"command": "제구", "control": "제구", "velocity": "구속", "composure": "위기관리", "stamina": "체력",
+}
 const SEASON_TABS: Array[Array] = [["home", "오늘"], ["roster", "1군"], ["lineup", "라인업"], ["farm", "2군"], ["scout", "스카우트"], ["traits", "특성"], ["records", "기록실"]]
 const FOCUS_NAMES := {"batting": "타격", "running": "주루", "fielding": "수비", "stuff": "구위", "control": "제구", "breaking": "변화"}
 
@@ -18,6 +31,8 @@ var _choice := ""
 ## The player picked in a list (his id), and the trait picked in the bag (its index).
 var _picked := ""
 var _picked_trait := -1
+## The trait shown beside the badge case (its index in ClubRules.traits).
+var _trait_view := -1
 ## The line-up tab (docs/08 R5): the row picked first ("L3" the fourth batter, "B<id>" a man
 ## on the bench, "R2" the third starter), and whether two batters trade order or positions.
 var _lineup_pick := ""
@@ -54,6 +69,9 @@ func _ready() -> void:
 
 func refresh() -> void:
 	if is_inside_tree() and LeagueSession.season != null:
+		# The league follows the difficulty setting (how strong the other clubs are).
+		LeagueSession.season.difficulty = Difficulty.by_id(Settings.difficulty)
+		Achievements.check_league(LeagueSession.season)
 		LeagueSession.autosave()
 	super.refresh()
 
@@ -177,7 +195,7 @@ func _build_season() -> void:
 		"farm":
 			_build_farm(s, team)
 		"scout":
-			_build_list("scout", s.club.candidates, s, team, "오늘의 영입 후보입니다. 하루에 한 명만 영입할 수 있습니다." + ("  (오늘은 이미 영입했습니다)" if s.club.signed_today else ""))
+			_build_scout(s, team)
 		"traits":
 			_build_traits(s)
 		"lineup":
@@ -946,6 +964,104 @@ func _build_list(kind: String, players: Array[Player], s: Season, team: Team, _n
 	_build_picked(columns, kind, picked, s, team)
 
 
+## The day's candidates as the scouts' reports (the other screens list players in tables;
+## five men to choose one from read better as reports): each a card with his face, what he
+## plays, his age, his rating and the room the scouts see in him, and his tools as bars. The
+## one picked stands beside them with the signing.
+func _build_scout(s: Season, team: Team) -> void:
+	var columns := UiKit.hbox(16)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	var title := "영입 후보  %d명" % s.club.candidates.size() + ("  ·  오늘 영입 완료" if s.club.signed_today else "")
+	var p := panel(title, "binoculars", columns, 0.0, "SCOUTING")
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var picked: Player = null
+	for man: Player in s.club.candidates:
+		if man.id == _picked:
+			picked = man
+	if picked == null and not s.club.candidates.is_empty():
+		picked = s.club.candidates[0]
+	if s.club.candidates.is_empty():
+		p.body.add_child(UiKit.label("오늘의 후보를 모두 만났습니다", 18, UiTheme.DIM, 600))
+	for man: Player in s.club.candidates:
+		p.body.add_child(_scout_card(s, man, picked == man))
+	# What club points buy here: a better scouting staff, and another report today.
+	var desk := UiKit.hbox(8)
+	p.body.add_child(desk)
+	desk.add_child(UiKit.badge("스카우트 Lv.%d" % s.club.scout_level, UiTheme.ACCENT))
+	desk.add_child(UiKit.label("구단 포인트 %d" % s.club.points, 15, UiTheme.DIM, 600))
+	var note := UiKit.label(message, 15, UiTheme.ACCENT, 600)
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	note.clip_text = true
+	desk.add_child(note)
+	var price := s.club.scout_upgrade_price(s.club_rules)
+	var upgrade := UiKit.button("레벨 업  %d" % price if price > 0 else "최고 레벨", func() -> void:
+		message = "스카우트 Lv.%d: 더 좋은 후보를 찾습니다." % (s.club.scout_level + 1) if s.club.upgrade_scout(s.club_rules) else "구단 포인트가 부족합니다."
+		if message.begins_with("스카우트"):
+			s.refresh_candidates(1 + int(s.club.reported_today))
+		refresh(), "binoculars")
+	upgrade.disabled = price == 0 or s.club.points < price
+	desk.add_child(upgrade)
+	var report_price := int(s.club_rules.points.get("scout_report", 60))
+	var report := UiKit.button("새 후보  %d" % report_price, func() -> void:
+		if s.club.buy_report(s.club_rules):
+			s.refresh_candidates(2)
+			_picked = ""
+			message = "새 보고서가 도착했습니다."
+		refresh(), "arrows-clockwise")
+	report.disabled = s.club.reported_today or s.club.points < report_price
+	desk.add_child(report)
+	_build_picked(columns, "scout", picked, s, team)
+
+
+## One candidate's report.
+func _scout_card(s: Season, man: Player, on: bool) -> DragCard:
+	var card := DragCard.make("S" + man.id, "", [], Color(1.0, 1.0, 1.0, 0.04))
+	card.tight()
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.set_lit(on)
+	card.clicked.connect(func(_t: String) -> void:
+		_picked = man.id
+		refresh())
+	var line := UiKit.hbox(14)
+	card.add_child(line)
+	line.add_child(PortraitStudio.face(self, man, null, 78.0))
+	var who := UiKit.vbox(0)
+	who.custom_minimum_size.x = 170.0
+	who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	line.add_child(who)
+	var role := ("선발 투수" if man.role() == &"SP" else "구원 투수") if man.is_pitcher() else Position.name_of(man.primary_position())
+	who.add_child(UiKit.label(role, 14, UiTheme.CYAN if man.is_pitcher() else UiTheme.GREEN, 700))
+	who.add_child(UiKit.label(man.name + (" ★" if man.is_foreign() else ""), 20, Color.WHITE, 700))
+	who.add_child(UiKit.label("%d세 · %s" % [s.season_year - man.born, Development.stars_text(Development.stars(man, s.club.scout_level))], 14, UiTheme.ACCENT, 600))
+	var ovr := ClubRules.player_ovr(man, s.ovr, s.catalog)
+	var mark := UiKit.vbox(-6)
+	mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	mark.custom_minimum_size.x = 64.0
+	line.add_child(mark)
+	var number := UiKit.number(UiTheme.shown_text(ovr), 34, UiTheme.rating_color(ovr))
+	number.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mark.add_child(number)
+	var grade := UiKit.caption("OVR · %s" % s.club_rules.grade_of(ovr).name)
+	grade.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	mark.add_child(grade)
+	# His tools, two columns of small bars.
+	var tools := GridContainer.new()
+	tools.columns = 2
+	tools.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	tools.add_theme_constant_override("h_separation", 14)
+	tools.add_theme_constant_override("v_separation", 0)
+	line.add_child(tools)
+	var pairs: Array = [["구위", man.pitching.stuff(s.catalog)], ["제구", man.pitching.control], ["체력", man.pitching.stamina], ["변화구", man.pitching.breaking(s.catalog)]] if man.is_pitcher() \
+		else [["컨택트", man.batting.contact()], ["파워", man.batting.power()], ["선구안", man.batting.eye], ["주력", man.batting.speed], ["수비", man.fielding.overall()]]
+	for pair: Array in pairs:
+		var bar := StatBar.make(str(pair[0]), float(pair[1]), -1.0, 62.0)
+		bar.custom_minimum_size = Vector2(150.0, 26.0)
+		tools.add_child(bar)
+	return card
+
+
 ## The player picked in a list: the man, his main ratings, and what can be done with him.
 func _build_picked(parent: Control, kind: String, p: Player, s: Season, team: Team) -> void:
 	var side := panel("선수 정보", "identification-card", parent, 520.0, "PLAYER")
@@ -1659,46 +1775,244 @@ func register(p: Player) -> String:
 	return "%s 1군 등록." % p.name
 
 
+## The traits as badges (as the reference games show special abilities): every trait the
+## league has, batters' and pitchers', its metal the best stage the club holds (grey: none
+## yet). The one picked stands beside it: what each stage gives, how many the club holds, who
+## wears it, and the draw, the merge and the fitting.
 func _build_traits(s: Season) -> void:
 	var c := s.club
 	var r := s.club_rules
-	var columns := UiKit.hbox(20)
+	if _trait_view < 0 or _trait_view >= r.traits.size():
+		_trait_view = 0
+		for item: Vector2i in c.bag:
+			_trait_view = item.x
+			break
+	var columns := UiKit.hbox(16)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
-	var p := panel("보유 특성  %d개" % c.bag.size(), "sparkle", columns, 0.0, "TRAITS")
+	var p := panel("특성 배지", "sparkle", columns, 0.0, "TRAITS")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var table := DataTable.new()
-	table.set_columns([["특성", 200.0, 0], ["단계", 70.0, 1], ["대상", 90.0, 1], ["효과", 520.0, 0]])
-	for i: int in c.bag.size():
-		var item := c.bag[i]
-		var def := r.traits[item.x]
-		var at := table.add_row([def.name, "%d" % (item.y + 1), "타자" if def.kind == &"batter" else "투수", def.note], i, {1: UiTheme.ACCENT})
-		if i == _picked_trait:
-			table.selected = at
-	table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
-		_picked_trait = int(tag)
-		refresh())
-	p.body.add_child(table)
-	var side := panel("특성 관리", "sliders-horizontal", columns, 460.0, "MANAGE")
-	side.body.add_child(UiKit.figure("%d" % c.points, "구단 포인트", UiTheme.ACCENT, 40))
-	side.body.add_child(UiKit.button("특성 뽑기 (%d 포인트)" % int(r.points.get("trait", 0)), func() -> void:
-		var pick := c.buy_trait(r, _rng)
-		message = ("%s 특성을 획득했습니다." % r.traits[pick].name) if pick >= 0 else "포인트가 부족합니다."
-		refresh(), "gift", "primary"))
-	var pair := c.mergeable(r)
-	if pair.x >= 0:
-		side.body.add_child(UiKit.button("합성: %s %d단계 → %d단계" % [r.traits[c.bag[pair.x].x].name, c.bag[pair.x].y + 1, c.bag[pair.x].y + 2], func() -> void:
-			c.merge(pair.x, pair.y, r)
-			_picked_trait = -1
-			refresh(), "stack"))
-	var equip := UiKit.button("선택한 특성 장착", func() -> void:
-		message = equip_best(_picked_trait)
+	for kind: StringName in [&"batter", &"pitcher"]:
+		var head := UiKit.hbox(8)
+		p.body.add_child(head)
+		head.add_child(UiKit.icon("baseball-helmet" if kind == &"batter" else "person-simple-throw", 20.0, tint))
+		head.add_child(UiKit.label("타자 특성" if kind == &"batter" else "투수 특성", 17, Color.WHITE, 700))
+		var grid := GridContainer.new()
+		grid.columns = 4
+		grid.add_theme_constant_override("h_separation", 8)
+		grid.add_theme_constant_override("v_separation", 8)
+		p.body.add_child(grid)
+		for i: int in r.traits.size():
+			if r.traits[i].kind == kind:
+				grid.add_child(_trait_tile(s, i))
+	var side := panel("특성 관리", "sliders-horizontal", columns, 470.0, "MANAGE")
+	_trait_detail(side.body, s, _trait_view)
+
+
+## One badge in the case: the metal of the best stage held, the name, how many are held.
+func _trait_tile(s: Season, index: int) -> DragCard:
+	var def := s.club_rules.traits[index]
+	var held := _trait_stages(s, index)
+	var best := -1
+	for stage: int in held:
+		best = maxi(best, stage)
+	var tile := DragCard.make("T%d" % index, "", [], Color(1.0, 1.0, 1.0, 0.035))
+	tile.tight()
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile.set_lit(index == _trait_view)
+	tile.clicked.connect(func(_t: String) -> void:
+		_trait_view = index
 		_picked_trait = -1
-		refresh(), "check")
-	equip.disabled = _picked_trait < 0 or _picked_trait >= c.bag.size()
-	side.body.add_child(equip)
+		message = ""
+		refresh())
+	var box := UiKit.vbox(0)
+	tile.add_child(box)
+	box.add_child(TraitBadge.make(best, str(TRAIT_MARKS.get(def.id, "sparkle")), 96.0))
+	var name := UiKit.label(def.name, 16, Color.WHITE if best >= 0 else UiTheme.DIM, 700)
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(name)
+	var gives := PackedStringArray()
+	for key: String in def.effect:
+		if not gives.has(str(EFFECT_NAMES.get(key, key))):
+			gives.append(str(EFFECT_NAMES.get(key, key)))
+	var effect := UiKit.label(" · ".join(gives.slice(0, 3)), 13, UiTheme.INK if best >= 0 else Color(1.0, 1.0, 1.0, 0.3), 500)
+	effect.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	effect.clip_text = true
+	box.add_child(effect)
+	var worn := _trait_wearers(s, index).size()
+	var parts := PackedStringArray()
+	if not held.is_empty():
+		parts.append("보유 %d" % held.size())
+	if worn > 0:
+		parts.append("장착 %d" % worn)
+	var words := "  ·  ".join(parts) if not parts.is_empty() else "미보유"
+	var sub := UiKit.label(words, 13, UiTheme.ACCENT if held.size() + worn > 0 else Color(1.0, 1.0, 1.0, 0.3), 600)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(sub)
+	return tile
+
+
+## The trait picked: its badge, what each stage gives, those held and worn, and what can be done.
+func _trait_detail(body: Control, s: Season, index: int) -> void:
+	var c := s.club
+	var r := s.club_rules
+	var def := r.traits[index]
+	var held := _trait_stages(s, index)
+	var wearers := _trait_wearers(s, index)
+	var best := -1
+	for stage: int in held:
+		best = maxi(best, stage)
+	for man: Player in wearers:
+		best = maxi(best, c.traits[man.id].y)
+	# The club's points and the draw.
+	var purse := UiKit.hbox(12)
+	body.add_child(purse)
+	purse.add_child(UiKit.icon("coins", 26.0, UiTheme.ACCENT))
+	purse.add_child(UiKit.number("%d" % c.points, 30, UiTheme.ACCENT))
+	var purse_words := UiKit.label("구단 포인트", 15, UiTheme.DIM, 600)
+	purse_words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	purse.add_child(purse_words)
+	var draw := UiKit.button("특성 뽑기  %d" % int(r.points.get("trait", 0)), func() -> void:
+		var pick := c.buy_trait(r, _rng)
+		if pick >= 0:
+			_trait_view = pick
+			message = "%s 특성을 얻었습니다." % r.traits[pick].name
+		else:
+			message = "포인트가 부족합니다."
+		refresh(), "gift", "primary")
+	draw.disabled = c.points < int(r.points.get("trait", 0))
+	purse.add_child(draw)
+	body.add_child(UiKit.spacer(0.0, 4.0))
+	# The badge itself.
+	var top := UiKit.hbox(14)
+	body.add_child(top)
+	top.add_child(TraitBadge.make(best, str(TRAIT_MARKS.get(def.id, "sparkle")), 92.0))
+	var words := UiKit.vbox(2)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(words)
+	words.add_child(UiKit.latin("BATTER" if def.kind == &"batter" else "PITCHER", 16, tint, true))
+	words.add_child(UiKit.heading(def.name, 30))
+	words.add_child(UiKit.label(def.note, 15, UiTheme.INK, 500))
+	# What each stage gives; the stages held are lit.
+	var stages := UiKit.vbox(4)
+	body.add_child(stages)
+	for stage: int in r.trait_tiers.size():
+		var row := UiKit.hbox(10)
+		stages.add_child(row)
+		var on := held.has(stage) or wearers.any(func(man: Player) -> bool: return c.traits[man.id].y == stage)
+		var metal: Color = TraitBadge.METALS[mini(stage, 2)][0]
+		var mark := UiKit.label("%d단계" % (stage + 1), 15, metal if on else UiTheme.DIM, 700)
+		mark.custom_minimum_size.x = 52.0
+		row.add_child(mark)
+		var parts := PackedStringArray()
+		var named: Dictionary = {}
+		for key: String in def.effect:
+			# Two engine ratings shown as one (주력, 제구): the larger of the two.
+			var shown := str(EFFECT_NAMES.get(key, key))
+			named[shown] = maxf(float(named.get(shown, 0.0)), def.effect[key] * r.trait_tiers[stage])
+		for shown: String in named:
+			parts.append("%s +%s" % [shown, String.num(float(named[shown]), 1).trim_suffix(".0")])
+		row.add_child(UiKit.label("  ".join(parts), 15, Color.WHITE if on else UiTheme.DIM, 600))
+	# Held, worn, and what to do with them.
+	# The stages held as a merging path: two of a stage make one of the next.
+	var counts: Dictionary = {}
+	for stage: int in held:
+		counts[stage] = int(counts.get(stage, 0)) + 1
+	var path := UiKit.hbox(6)
+	path.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.add_child(path)
+	for stage: int in r.trait_tiers.size():
+		if stage > 0:
+			var arrow := UiKit.label("2 ▸", 15, UiTheme.DIM, 700)
+			arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+			path.add_child(arrow)
+		var step := UiKit.vbox(0)
+		path.add_child(step)
+		var n := int(counts.get(stage, 0))
+		step.add_child(TraitBadge.make(stage if n > 0 else -1, str(TRAIT_MARKS.get(def.id, "sparkle")), 70.0))
+		var count := UiKit.label("%d단계 ×%d" % [stage + 1, n], 14, TraitBadge.METALS[mini(stage, 2)][0] if n > 0 else UiTheme.DIM, 700)
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		step.add_child(count)
+	var team: Team = s.teams[s.my_team]
+	# Who wears it, and who would (the best of the right kind without a trait): a press on one
+	# of those fits him with the best stage held.
+	var top_bag := -1
+	for i: int in c.bag.size():
+		if c.bag[i].x == index and (top_bag < 0 or c.bag[i].y > c.bag[top_bag].y):
+			top_bag = i
+	body.add_child(UiKit.label("장착한 선수" if not wearers.is_empty() else "장착 후보", 15, UiTheme.DIM, 700))
+	var men: Array[Player] = wearers.duplicate()
+	if men.is_empty():
+		for man: Player in team.first_team():
+			if not c.traits.has(man.id) and (def.kind == &"pitcher") == man.is_pitcher():
+				men.append(man)
+		men.sort_custom(func(a: Player, b: Player) -> bool: return ClubRules.player_ovr(a, s.ovr, s.catalog) > ClubRules.player_ovr(b, s.ovr, s.catalog))
+	for man: Player in men.slice(0, 3):
+		var row := DragCard.make("W" + man.id, "", [], Color(1.0, 1.0, 1.0, 0.04))
+		row.tight()
+		var line := UiKit.hbox(10)
+		row.add_child(line)
+		line.add_child(PortraitStudio.face(self, man, team, 34.0))
+		var who := UiKit.label(man.name, 16, Color.WHITE, 700)
+		who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		line.add_child(who)
+		var o := ClubRules.player_ovr(man, s.ovr, s.catalog)
+		line.add_child(UiKit.label(("선발" if man.role() == &"SP" else "구원") if man.is_pitcher() else Position.code(man.primary_position()), 14, UiTheme.CYAN if man.is_pitcher() else UiTheme.GREEN, 600))
+		line.add_child(UiKit.label("OVR " + UiTheme.shown_text(o), 14, UiTheme.rating_color(o), 700))
+		if c.traits.has(man.id):
+			line.add_child(UiKit.badge("%d단계" % (c.traits[man.id].y + 1), TraitBadge.METALS[mini(c.traits[man.id].y, 2)][0]))
+		elif top_bag >= 0:
+			line.add_child(UiKit.label("장착 ▸", 14, UiTheme.ACCENT, 700))
+			row.clicked.connect(func(_t: String) -> void:
+				var name := def.name
+				if c.equip(man, top_bag, r):
+					message = "%s에게 %s 장착." % [man.name, name]
+				refresh())
+		body.add_child(row)
+	body.add_child(UiKit.spacer(0.0, 0.0, true))
 	if message != "":
-		side.body.add_child(UiKit.label(message, 17, UiTheme.ACCENT, 600))
+		body.add_child(UiKit.label(message, 16, UiTheme.ACCENT, 600))
+	var actions := UiKit.hbox(8)
+	body.add_child(actions)
+	# The best one held goes on the best man of the right kind who has none.
+	var equip := UiKit.button("장착", func() -> void:
+		message = equip_best(top_bag)
+		refresh(), "check", "primary")
+	equip.disabled = top_bag < 0
+	equip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_child(equip)
+	var pair := Vector2i(-1, -1)
+	for i: int in c.bag.size():
+		for j: int in range(i + 1, c.bag.size()):
+			if pair.x < 0 and c.bag[i] == c.bag[j] and c.bag[i].x == index and c.bag[i].y < r.trait_tiers.size() - 1:
+				pair = Vector2i(i, j)
+	var merge := UiKit.button("합성" if pair.x < 0 else "합성: %d단계 둘 → %d단계" % [c.bag[pair.x].y + 1, c.bag[pair.x].y + 2], func() -> void:
+		c.merge(pair.x, pair.y, r)
+		message = "%s %d단계가 됐습니다." % [def.name, c.bag[c.bag.size() - 1].y + 1] if not c.bag.is_empty() else ""
+		refresh(), "stack")
+	merge.disabled = pair.x < 0
+	merge.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_child(merge)
+
+
+## Stages of a trait in the club's bag (one entry for each held).
+func _trait_stages(s: Season, index: int) -> Array[int]:
+	var out: Array[int] = []
+	for item: Vector2i in s.club.bag:
+		if item.x == index:
+			out.append(item.y)
+	return out
+
+
+## The club's players wearing a trait.
+func _trait_wearers(s: Season, index: int) -> Array[Player]:
+	var out: Array[Player] = []
+	var team: Team = s.teams[s.my_team]
+	for id: String in s.club.traits:
+		if s.club.traits[id].x == index and team.player(id) != null:
+			out.append(team.player(id))
+	return out
 
 
 ## Puts a bag trait on the first-team player of the right kind who has none, the best first.

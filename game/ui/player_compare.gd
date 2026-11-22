@@ -29,9 +29,9 @@ static func comparable(a: Player, b: Player) -> bool:
 ## The radar's spokes for a player: names and values.
 static func shape(p: Player, catalog: Dictionary) -> Array:
 	if p.is_pitcher():
-		return [PackedStringArray(["구위", "제구", "체력", "평정", "변화구"]),
+		return [PackedStringArray(["구위", "제구", "체력", "위기관리", "변화구"]),
 			PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)])]
-	return [PackedStringArray(["컨택트", "파워", "선구안", "주루", "수비"]),
+	return [PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]),
 		PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()])]
 
 
@@ -42,7 +42,7 @@ static func ratings(a: Player, b: Player, catalog: Dictionary) -> Array:
 		for pair: Array in [["구위", func(p: Player) -> float: return p.pitching.stuff(catalog)],
 				["제구", func(p: Player) -> float: return p.pitching.control],
 				["체력", func(p: Player) -> float: return p.pitching.stamina],
-				["평정", func(p: Player) -> float: return p.pitching.composure],
+				["위기관리", func(p: Player) -> float: return p.pitching.composure],
 				["변화구", func(p: Player) -> float: return p.pitching.breaking(catalog)],
 				["견제", func(p: Player) -> float: return p.pitching.hold]]:
 			rows.append([pair[0], (pair[1] as Callable).call(a), (pair[1] as Callable).call(b)])
@@ -52,10 +52,9 @@ static func ratings(a: Player, b: Player, catalog: Dictionary) -> Array:
 			["파워 (우투)", func(p: Player) -> float: return p.batting.power_r],
 			["파워 (좌투)", func(p: Player) -> float: return p.batting.power_l],
 			["선구안", func(p: Player) -> float: return p.batting.eye],
-			["주력", func(p: Player) -> float: return p.batting.speed],
-			["주루", func(p: Player) -> float: return p.batting.baserunning],
+			["주력", func(p: Player) -> float: return (p.batting.speed + p.batting.baserunning) * 0.5],
 			["수비", func(p: Player) -> float: return p.fielding.overall()],
-			["송구", func(p: Player) -> float: return p.fielding.arm]]:
+			["송구 파워", func(p: Player) -> float: return p.fielding.arm]]:
 		rows.append([pair[0], (pair[1] as Callable).call(a), (pair[1] as Callable).call(b)])
 	return rows
 

@@ -51,7 +51,7 @@ func _tick() -> void:
 					_aimed = _scene.target
 					_scene.press_pitch_button()
 			DuelScene.State.CHARGE:
-				if _scene.ring >= DuelScene.ACCURACY_SWEET + _late / DuelScene.GAUGE_TIME:
+				if _scene.ring >= _scene.sweet + _late / _scene.gauge_time:
 					_scene.release_pitch_button()
 	var live := _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT
 	if live and not _was_live and _scene.human_pitches():

@@ -210,7 +210,7 @@ func _fielding_shots() -> bool:
 					_scene.target = _scene.duel.zone.point(_rng.next_range(-0.1, 1.1), _rng.next_range(-0.1, 1.1))
 					_scene.press_pitch_button()
 			DuelScene.State.CHARGE:
-				if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
+				if _scene.ring >= _scene.sweet - 0.02:
 					_scene.release_pitch_button()
 	if _scene.choice_open() and _scene._controls_fielding():
 		if _scene.charge() < 0.0 and not _taken.has("gauge"):
@@ -263,7 +263,7 @@ func _pitch_for_the_player() -> void:
 				_scene.target = _scene.duel.zone.point(_rng.next_range(0.1, 0.9), _rng.next_range(0.1, 0.9))
 				_scene.press_pitch_button()
 		DuelScene.State.CHARGE:
-			if _scene.ring >= DuelScene.ACCURACY_SWEET - 0.02:
+			if _scene.ring >= _scene.sweet - 0.02:
 				_scene.release_pitch_button()
 
 

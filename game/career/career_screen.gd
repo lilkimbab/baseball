@@ -6,9 +6,9 @@ extends Screen
 ## spent on its ratings; a pitcher's pitches) and his division's table.
 
 const RATING_NAMES := {
-	"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루",
-	"range": "수비 범위", "hands": "포구", "arm": "송구", "accuracy": "송구 정확도",
-	"control": "제구", "stamina": "체력", "velocity": "구속", "movement": "구위·변화", "command": "로케이션",
+	"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력",
+	"range": "수비 범위", "hands": "포구", "arm": "송구 파워", "accuracy": "송구 정확도",
+	"control": "제구", "stamina": "체력", "velocity": "구속", "movement": "구위",
 }
 const FIELD_NAMES := {"batting": "타격", "fielding": "수비", "running": "주루", "pitching": "투구"}
 const FIELD_ICONS := {"batting": "baseball-helmet", "fielding": "shield", "running": "sneaker-move", "pitching": "person-simple-throw"}
@@ -27,6 +27,8 @@ func setup() -> void:
 
 func refresh() -> void:
 	if is_inside_tree() and CareerSession.career_season != null:
+		CareerSession.settle_points()
+		Achievements.check_career(CareerSession.career_season, CareerSession.last_report)
 		CareerSession.autosave()
 	super.refresh()
 
@@ -38,6 +40,7 @@ func build() -> void:
 		p.body.add_child(UiKit.label("진행 중인 커리어가 없습니다.", 20, UiTheme.DIM, 500))
 		p.body.add_child(UiKit.button("선수 생성", func() -> void: go(CareerSession.CREATE), "plus", "primary", 320.0))
 		return
+	CareerSession.settle_points()
 	var c := cs.career
 	var s := cs.season
 	var team: Team = s.teams[c.team_id]
@@ -239,7 +242,7 @@ func _build_numbers(parent: Control, cs: CareerSeason) -> void:
 	var figures := UiKit.hbox(0)
 	p.body.add_child(figures)
 	figures.add_theme_constant_override("separation", 8)
-	for pair: Array in [["%d" % roundi(c.popularity), "인기도"], ["%d" % c.points, "포인트"], ["%.1f" % avg if avg > 0.0 else "-", "평균 평점"]]:
+	for pair: Array in [["%d" % roundi(c.popularity), "인기도"], ["%d" % c.ratings.size(), "출전 경기"], ["%.1f" % avg if avg > 0.0 else "-", "평균 평점"]]:
 		var f := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 30)
 		f.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		figures.add_child(f)
@@ -347,7 +350,7 @@ func _build_pitches(parent: Control, cs: CareerSeason) -> void:
 		head_row.add_child(name)
 		head_row.add_child(UiKit.latin("%d km/h  ·  %d구" % [roundi(a.velo_avg), int(c.pitch_uses.get(a.type, 0))], 18, UiTheme.DIM))
 		box.add_child(StatBar.make("변화", a.movement, -1.0, 90.0))
-		box.add_child(StatBar.make("로케이션", a.command, -1.0, 90.0))
+		box.add_child(StatBar.make("제구", a.command, -1.0, 90.0))
 	for id: StringName in PitchEvolution.learnable(c, cs.rules):
 		var t: PitchType = catalog.get(id)
 		var b := UiKit.button("새 구종: %s (%d GP)" % [t.label if t != null else String(id), roundi(cs.rules.new_pitch_gp)], func() -> void:

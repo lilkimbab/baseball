@@ -29,6 +29,12 @@ var manager: AiManager
 var rng: Rng
 ## Who decides for the away team and the home team.
 var controllers: Array[Controller] = []
+## The side (0 away, 1 home) whose swing, and whose pitch, the person is making in this duel
+## (−1: the computer's): his duel is set by his difficulty (Difficulty), the computer's as
+## the computer's. The scene sets them before each duel.
+var person_bats := -1
+var person_pitches := -1
+var difficulty: int = Difficulty.Level.PRO
 ## Each side's manager orders (Tactics): none unless a player gives them.
 var tactics: Array[Tactics] = [Tactics.new(), Tactics.new()]
 
@@ -412,11 +418,15 @@ func new_duel(state: GameState) -> PitchDuel:
 	s.body_radius = motion.body_radius
 	s.body_ankle = motion.body_ankle
 	s.body_shoulder_share = motion.body_shoulder_share
-	if controllers[state.batting()] is AiController:
+	if state.batting() == person_bats:
+		Difficulty.for_batter(s, difficulty)
+	elif controllers[state.batting()] is AiController:
 		s.dodge = motion.dodge_chance
 		s.aim_scale = AI_AIM_SCALE
 		s.aim_forgiving = false
 		s.yaw_spread = SwingModel.YAW_SPREAD_DEG
+	if state.fielding() == person_pitches:
+		Difficulty.for_pitcher(s, difficulty)
 	last_duel = PitchDuel.new(cfg, field, s, rng)
 	return last_duel
 

@@ -57,6 +57,8 @@ var age_rates: Array[Vector2] = []
 var headroom: Array[Vector2] = []
 var focus: Dictionary[String, PackedStringArray] = {}
 var points: Dictionary[String, int] = {}
+## Club points to raise the scouting level to 2, to 3.
+var scout_upgrade := PackedInt32Array([600, 1200])
 var trait_tiers := PackedFloat64Array([1.0, 1.75, 2.5])
 var traits: Array[TraitDef] = []
 var colors: Array[ColorDef] = []

@@ -52,9 +52,9 @@ func build() -> void:
 	var radar: RadarChart
 	if p.is_pitcher():
 		var catalog := PitchCatalogIO.load_default()
-		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "평정", "변화구"]), PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)]), 300.0)
+		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "위기관리", "변화구"]), PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)]), 300.0)
 	else:
-		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주루", "수비"]), PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 300.0)
+		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]), PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 300.0)
 	radar.colour = tint
 	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	left.add_child(radar)
@@ -148,5 +148,5 @@ func begin() -> void:
 
 
 static func _rating_name(key: String) -> String:
-	var names := {"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주루", "range": "수비 범위", "hands": "포구", "arm": "송구", "velocity": "구속", "stuff": "구위", "control": "제구", "command": "로케이션", "movement": "변화", "stamina": "체력"}
+	var names := {"contact": "컨택트", "power": "파워", "eye": "선구안", "speed": "주력", "baserunning": "주력", "range": "수비 범위", "hands": "포구", "arm": "송구 파워", "velocity": "구속", "stuff": "구위", "control": "제구", "command": "제구", "movement": "구위", "stamina": "체력"}
 	return str(names.get(key, key))

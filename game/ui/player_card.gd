@@ -110,10 +110,10 @@ func show_player(p: Player, season: Season) -> void:
 	var radar: RadarChart
 	if p.is_pitcher():
 		var catalog := season.catalog if season != null else PitchCatalogIO.load_default()
-		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "평정", "변화구"]),
+		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "위기관리", "변화구"]),
 			PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)]), 330.0)
 	else:
-		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주루", "수비"]),
+		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]),
 			PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 330.0)
 	radar.colour = accent
 	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -136,7 +136,7 @@ func show_player(p: Player, season: Season) -> void:
 		_group(right, "투구 능력", "person-simple-throw")
 		right.add_child(StatBar.make("제구", p.pitching.control))
 		right.add_child(StatBar.make("체력", p.pitching.stamina))
-		right.add_child(StatBar.make("평정", p.pitching.composure))
+		right.add_child(StatBar.make("위기관리", p.pitching.composure))
 		right.add_child(StatBar.make("견제", p.pitching.hold))
 		_group(right, "구종", "baseball")
 		for a: ArsenalPitch in p.pitching.arsenal:
@@ -148,10 +148,10 @@ func show_player(p: Player, season: Season) -> void:
 		right.add_child(StatBar.make("파워", p.batting.power_r, p.batting.power_l))
 		right.add_child(StatBar.make("선구안", p.batting.eye))
 		right.add_child(StatBar.make("번트", p.batting.bunt))
-		right.add_child(StatBar.make("클러치", p.batting.clutch))
+		right.add_child(StatBar.make("득점권", p.batting.clutch))
 		_group(right, "주루 능력", "sneaker-move")
-		right.add_child(StatBar.make("주력", p.batting.speed))
-		right.add_child(StatBar.make("주루", p.batting.baserunning))
+		# One running rating: speed with base-running sense (as the person raises it).
+		right.add_child(StatBar.make("주력", (p.batting.speed + p.batting.baserunning) * 0.5))
 		_group(right, "수비 능력", "shield")
 		right.add_child(StatBar.make("수비 범위", p.fielding.range))
 		right.add_child(StatBar.make("포구", p.fielding.hands))

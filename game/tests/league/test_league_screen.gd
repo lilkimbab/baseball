@@ -228,7 +228,7 @@ func test_two_men_are_compared_from_the_picked_panel() -> void:
 	var view := PlayerCompare.open_for(screen, hitters[0], hitters[1], s)
 	assert_not_null(view)
 	var rows := PlayerCompare.ratings(hitters[0], hitters[1], s.catalog)
-	assert_eq(rows.size(), 9, "contact and power by hand, eye, speed, running, fielding, arm")
+	assert_eq(rows.size(), 8, "contact and power by hand, eye, running (speed and base-running as one), fielding, arm")
 	assert_almost_eq(float(rows[0][1]), hitters[0].batting.contact_r, 1e-6)
 	assert_almost_eq(float(rows[0][2]), hitters[1].batting.contact_r, 1e-6)
 	view.queue_free()

@@ -14,7 +14,8 @@ extends SubViewportContainer
 ##
 ## `still` renders one frame and stops (the shelf's thumbnails: cheap); otherwise it turns.
 
-const GRADE_RINGS: Array[Color] = [Color(0.78, 0.8, 0.86), Color(0.25, 0.55, 1.0), Color(1.0, 0.74, 0.26)]
+## Standard silver, pro blue, elite gold; signature (earned by achievements) violet.
+const GRADE_RINGS: Array[Color] = [Color(0.78, 0.8, 0.86), Color(0.25, 0.55, 1.0), Color(1.0, 0.74, 0.26), Color(0.78, 0.42, 1.0)]
 
 const PLAYER_MODEL := "res://assets/characters/player_base.glb"
 
@@ -116,10 +117,10 @@ func _init() -> void:
 
 
 ## Shows an item: "light_bat", "heavy_bat", "glove", "pitcher_glove", "mitt", "spikes",
-## "elbow_guard", "helmet", "rosin", "training", "coins", at a grade (0..2).
+## "elbow_guard", "helmet", "rosin", "training", "coins", at a grade (0..3, 3 the signature).
 func show_item(kind: String, grade: int = 0) -> void:
 	_pending = kind
-	_grade = clampi(grade, 0, 2)
+	_grade = clampi(grade, 0, 3)
 	_accent = GRADE_RINGS[_grade]
 	if is_inside_tree():
 		_show()
@@ -166,6 +167,12 @@ func _build(kind: String) -> Node3D:
 					wood.set_shader_parameter("barrel_from", 0.42 if kind == "light_bat" else 0.12)
 					wood.set_shader_parameter("barrel_cover", 0.97)
 					wood.set_shader_parameter("gloss", 0.9)
+				3:
+					# The signature: a pearl-white barrel (deep plum on the heavy one), mirror gloss.
+					wood.set_shader_parameter("barrel", Color(0.9, 0.88, 0.84) if kind == "light_bat" else Color(0.2, 0.05, 0.16))
+					wood.set_shader_parameter("barrel_from", 0.3)
+					wood.set_shader_parameter("barrel_cover", 1.0)
+					wood.set_shader_parameter("gloss", 1.0)
 			bat.material_override = wood
 			var hold := Node3D.new()
 			hold.add_child(bat)
@@ -177,8 +184,9 @@ func _build(kind: String) -> Node3D:
 			var node := _prop(path)
 			if node != null:
 				# Tan, chestnut, black leather; a pitcher's glove black, navy-black, black gloss.
-				var tints: Array = [Color(0.6, 0.38, 0.2), Color(0.36, 0.2, 0.11), Color(0.1, 0.09, 0.09)] if kind != "pitcher_glove" else [Color(0.11, 0.11, 0.12), Color(0.07, 0.08, 0.14), Color(0.06, 0.06, 0.07)]
-				var rough: Array = [0.65, 0.45, 0.26] if kind != "pitcher_glove" else [0.7, 0.45, 0.22]
+				# The signature: white leather; a pitcher's in camel.
+				var tints: Array = [Color(0.6, 0.38, 0.2), Color(0.36, 0.2, 0.11), Color(0.1, 0.09, 0.09), Color(0.88, 0.86, 0.82)] if kind != "pitcher_glove" else [Color(0.11, 0.11, 0.12), Color(0.07, 0.08, 0.14), Color(0.06, 0.06, 0.07), Color(0.6, 0.42, 0.2)]
+				var rough: Array = [0.65, 0.45, 0.26, 0.3] if kind != "pitcher_glove" else [0.7, 0.45, 0.22, 0.28]
 				_recolour(node, tints[_grade], rough[_grade])
 			return node
 		"spikes":
@@ -188,6 +196,7 @@ func _build(kind: String) -> Node3D:
 					[[Color(0.06, 0.06, 0.07), 0.7, 0.0], [Color(0.95, 0.95, 0.95), 0.6, 0.0], [Color(0.95, 0.95, 0.95), 0.8, 0.0]],
 					[[Color(0.95, 0.95, 0.96), 0.45, 0.0], [Color(0.07, 0.07, 0.08), 0.5, 0.0], [Color(0.85, 0.12, 0.14), 0.7, 0.0]],
 					[[Color(0.02, 0.02, 0.025), 0.12, 0.0], [Color(0.72, 0.73, 0.76), 0.22, 0.85], [Color(0.96, 0.96, 0.96), 0.8, 0.0]],
+					[[Color(0.96, 0.96, 0.97), 0.25, 0.0], [Color(0.85, 0.68, 0.3), 0.22, 0.9], [Color(0.08, 0.08, 0.09), 0.6, 0.0]],
 				]
 				_dress(shoes, "Shoes", looks[_grade])
 			return shoes
@@ -198,6 +207,7 @@ func _build(kind: String) -> Node3D:
 					[[Color(0.05, 0.05, 0.06), 0.75, 0.0], [Color(0.2, 0.2, 0.21), 0.9, 0.0], [Color(0.2, 0.2, 0.21), 0.9, 0.0]],
 					[[Color(0.07, 0.11, 0.3), 0.22, 0.1], [Color(0.12, 0.12, 0.13), 0.9, 0.0], [Color(0.12, 0.12, 0.13), 0.9, 0.0]],
 					[[Color(0.16, 0.17, 0.19), 0.2, 0.75], [Color(0.05, 0.05, 0.06), 0.8, 0.0], [Color(0.05, 0.05, 0.06), 0.8, 0.0]],
+					[[Color(0.85, 0.68, 0.3), 0.18, 0.9], [Color(0.95, 0.95, 0.96), 0.4, 0.0], [Color(0.95, 0.95, 0.96), 0.4, 0.0]],
 				]
 				_dress(guard, "ElbowGuard", looks[_grade])
 			return guard
@@ -279,7 +289,7 @@ func _rosin() -> Node3D:
 	word.font = UiTheme.numeric(false, true)
 	word.font_size = 64
 	word.pixel_size = 0.0007
-	word.modulate = [Color(0.12, 0.18, 0.4), Color(0.75, 0.1, 0.12), Color(0.72, 0.55, 0.18)][_grade]
+	word.modulate = [Color(0.12, 0.18, 0.4), Color(0.75, 0.1, 0.12), Color(0.72, 0.55, 0.18), Color(0.55, 0.25, 0.8)][_grade]
 	word.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	word.position = Vector3(0.0, 0.054, 0.0)
 	root.add_child(word)
@@ -350,8 +360,8 @@ func _coins() -> Node3D:
 	coin.radial_segments = 32
 	var stacks: Array = [[[Vector3(-0.04, 0.0, 0.0), 6], [Vector3(0.04, 0.0, -0.02), 9]],
 		[[Vector3(-0.07, 0.0, 0.0), 11], [Vector3(0.03, 0.0, -0.04), 16], [Vector3(0.06, 0.0, 0.06), 7]],
-		[[Vector3(-0.09, 0.0, 0.02), 14], [Vector3(0.0, 0.0, -0.06), 20], [Vector3(0.08, 0.0, 0.03), 12], [Vector3(-0.02, 0.0, 0.08), 6]]][_grade]
-	if _grade == 2:
+		[[Vector3(-0.09, 0.0, 0.02), 14], [Vector3(0.0, 0.0, -0.06), 20], [Vector3(0.08, 0.0, 0.03), 12], [Vector3(-0.02, 0.0, 0.08), 6]]][mini(_grade, 2)]
+	if _grade >= 2:
 		# And two gold bars.
 		var bar := BoxMesh.new()
 		bar.size = Vector3(0.1, 0.022, 0.045)

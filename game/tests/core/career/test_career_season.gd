@@ -59,11 +59,28 @@ func test_a_rookie_hitter_starts_down_is_called_up_and_plays_every_day() -> void
 func test_a_rookie_starter_takes_his_turn_once_up() -> void:
 	var cs := _career("SP", "power_arm", 32)
 	_play_out(cs)
-	assert_true(not cs.log.is_empty() and cs.log[0].contains("1군"), "called up at some point: %s" % ", ".join(cs.log))
+	assert_true(Array(cs.log).any(func(line: String) -> bool: return line.contains("1군 등록")), "called up at some point: %s" % ", ".join(cs.log))
 	var line: PitchingLine = cs.season.book.pitching.get(cs.career.player.id)
 	assert_not_null(line)
 	assert_gt(line.starts, 0, "a starter starts")
 	assert_gt(cs.career.gp["pitching"], 0.0)
+
+
+func test_a_rookie_catcher_plays_in_the_second_team() -> void:
+	# A second team's filler catcher is better than a rookie, and its manager played him: the
+	# career's catcher sat out every game (tools/balance_report.gd found it). He plays now.
+	var cs := _career("C", "defence", 33)
+	var played := 0
+	var guard := 0
+	while played < 8 and guard < 40:
+		if cs.has_game():
+			cs.quick()
+			played += 1
+		cs.next_day()
+		guard += 1
+	var line: BattingLine = cs.futures_book.batting.get(cs.career.player.id)
+	assert_not_null(line, "he batted")
+	assert_gte(line.pa, played * 3, "every game")
 
 
 func test_fielding_credit_reads_the_scorebook() -> void:

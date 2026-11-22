@@ -20,7 +20,9 @@ static func from_game(bat: BattingLine, pitch: PitchingLine, chances: int, error
 		var on_base := bat.hits + bat.walks + bat.intentional_walks + bat.hit_by_pitch
 		out["running"] = bat.stolen_bases * float(r.get("stolen_base", 0)) + bat.runs * float(r.get("run", 0)) + on_base * float(r.get("times_on_base", 0))
 	var f: Dictionary = rules.gp["fielding"]
-	out["fielding"] = chances * float(f.get("chance", 0)) + errors * float(f.get("error", 0))
+	# Capped: a first baseman's routine putouts would otherwise grow his fielding three times
+	# as fast as anyone's.
+	out["fielding"] = minf(chances * float(f.get("chance", 0)) + errors * float(f.get("error", 0)), float(f.get("max_per_game", INF)))
 	if pitch != null and pitch.outs > 0:
 		var p: Dictionary = rules.gp["pitching"]
 		var innings := pitch.outs / 3
@@ -97,5 +99,12 @@ static func raise(c: CareerPlayer, rating: String, rules: CareerRules) -> bool:
 	elif rating == "velocity":
 		Training.grow(c.player, PackedStringArray(["velocity"]), 2.5)
 	else:
-		Training.grow(c.player, PackedStringArray([rating]), 1.0)
+		# The person raises one rating where the engine keeps two (the user: "not too many
+		# ratings"): 주력 is speed and base-running sense, 제구 the control of every pitch.
+		var keys := PackedStringArray([rating])
+		if rating == "speed":
+			keys.append("baserunning")
+		elif rating == "control":
+			keys.append("command")
+		Training.grow(c.player, keys, 1.0)
 	return true

@@ -23,6 +23,8 @@ var training: Dictionary[String, String] = {}
 ## Today's scouting candidates; one may be signed a day.
 var candidates: Array[Player] = []
 var signed_today := false
+## Another scouting report was bought today.
+var reported_today := false
 
 
 static func for_team(team: Team) -> Club:
@@ -145,6 +147,37 @@ func train(team: Team, age_of: Callable, rules: ClubRules, ovr: Overall, catalog
 # --- Scouting ---
 
 
+## Raises the scouting level for points: better candidates (ClubRules.scout_level_bonus) and
+## a truer read of the room they have to grow. (Club points had one use, traits, and piled up.)
+func upgrade_scout(rules: ClubRules) -> bool:
+	if scout_level >= rules.scout_max_level or rules.scout_upgrade.is_empty():
+		return false
+	var price := rules.scout_upgrade[mini(scout_level - 1, rules.scout_upgrade.size() - 1)]
+	if points < price:
+		return false
+	points -= price
+	scout_level += 1
+	return true
+
+
+## The price of raising the scouting level now (0 at the top).
+func scout_upgrade_price(rules: ClubRules) -> int:
+	if scout_level >= rules.scout_max_level or rules.scout_upgrade.is_empty():
+		return 0
+	return rules.scout_upgrade[mini(scout_level - 1, rules.scout_upgrade.size() - 1)]
+
+
+## Pays for another scouting report today (a new set of candidates; once a day). The season
+## draws them (Season.refresh_candidates).
+func buy_report(rules: ClubRules) -> bool:
+	var price := int(rules.points.get("scout_report", 60))
+	if reported_today or points < price:
+		return false
+	points -= price
+	reported_today = true
+	return true
+
+
 ## Signs one of today's candidates to the second team. One a day; the second team has room
 ## for rules.second_team_size.
 func sign(index: int, team: Team, rules: ClubRules) -> Player:
@@ -176,12 +209,12 @@ func release(player_id: String, team: Team, rules: ClubRules) -> bool:
 	return false
 
 
-func earn(result: int, postseason: bool, rules: ClubRules) -> void:
+func earn(result: int, postseason: bool, rules: ClubRules, share: float = 1.0) -> void:
+	var key := "tie"
 	if postseason and result > 0:
-		points += int(rules.points.get("postseason_win", 0))
+		key = "postseason_win"
 	elif result > 0:
-		points += int(rules.points.get("win", 0))
+		key = "win"
 	elif result < 0:
-		points += int(rules.points.get("loss", 0))
-	else:
-		points += int(rules.points.get("tie", 0))
+		key = "loss"
+	points += roundi(int(rules.points.get(key, 0)) * share)

@@ -15,6 +15,21 @@ const AI_PITCH_DELAY := 1.3
 ## go early the pitch is short of his full speed and off; late, at full speed and off.
 const GAUGE_TIME := 1.15
 const ACCURACY_SWEET := 0.75
+## The gauge is not the same twice (the user: "make the circle's size random so the rhythm
+## cannot be learned"; the reference games change the meter with the pitcher's state): each
+## pitch the ring starts between these many target circles wide and closes at its own pace —
+## a breaking ball's a little slower, a tired or cold arm's quicker, and a little either way
+## besides — so the moment it meets the circle comes anywhere from about 0.6 to 1.2 s after the
+## button goes down. How near that moment he lets go is judged in seconds, the same every pitch
+## (TOLERANCE): only when, not how hard, changes.
+const GAUGE_FROM_MIN := 2.4
+const GAUGE_FROM_MAX := 3.6
+## Circles a second the ring closes at, at an even pace.
+const GAUGE_RATE := 2.4
+## The ring closes to this share of the circle before the pitch goes anyway.
+const GAUGE_END := 0.15
+## Seconds off the moment at which the pitch is no better than a wild one.
+const TOLERANCE := (1.0 - ACCURACY_SWEET) * GAUGE_TIME
 const MAX_FOLLOW_TIME := 6.5
 ## How far outside the strike zone the pointer can be put: to the side, and above or below.
 const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
@@ -62,6 +77,14 @@ var selected_pitch := 0
 var target := Vector3.ZERO
 var power := 0.0
 var ring := 0.0
+## This pitch's gauge (see GAUGE_FROM_MIN): how many circles wide the ring starts, seconds from
+## the button to the end of the gauge, and the share of it at which the ring meets the circle.
+var gauge_from := 3.4
+var gauge_time := GAUGE_TIME
+var sweet := ACCURACY_SWEET
+## Seconds off the moment at which this pitch is no better than a wild one: TOLERANCE by the
+## command of the pitch chosen (window_share).
+var tolerance := TOLERANCE
 var accuracy := 0.0
 var decision: PitchDecision
 
@@ -366,13 +389,50 @@ func press_pitch_button() -> void:
 	if state == State.PRE_PITCH:
 		power = 0.0
 		ring = 0.0
+		_roll_gauge()
 		_enter(State.CHARGE)
+
+
+## This pitch's gauge: where the ring starts and how fast it closes (see GAUGE_FROM_MIN).
+func _roll_gauge() -> void:
+	var r := _rng.fork(7000 + _pitch_count)
+	gauge_from = lerpf(GAUGE_FROM_MIN, GAUGE_FROM_MAX, r.next_float())
+	var family: StringName = selected_type().family if not pitch_ids.is_empty() else &"fastball"
+	var pace := {&"breaking": 0.9, &"offspeed": 0.95}.get(family, 1.0) as float
+	pace *= gauge_pace() * lerpf(0.9, 1.1, r.next_float())
+	gauge_time = (gauge_from - GAUGE_END) / (GAUGE_RATE * pace)
+	sweet = (gauge_from - 1.0) / (gauge_from - GAUGE_END)
+	tolerance = TOLERANCE * window_share(pitch_command())
+
+
+## How forgiving the moment is, by the command of the pitch thrown (the reference games: the
+## better a pitcher's control, the easier his spot): four fifths of the usual at 0, five
+## fourths at 100; a pitcher's best pitch is the easiest to put where he wants.
+static func window_share(command: float) -> float:
+	return lerpf(0.8, 1.25, clampf(command / 100.0, 0.0, 1.0))
+
+
+## The command of the pitch chosen (a game knows each pitch's; practice, the pitcher's).
+func pitch_command() -> float:
+	return settings.command
+
+
+## How much quicker than usual the ring closes for this pitcher now (1 fresh); a game makes a
+## tired or cold arm quicker (MatchScene).
+func gauge_pace() -> float:
+	return 1.0
+
+
+## How well the pitch is let go with the ring where it is now (0 to 1): 1 on the circle,
+## 0 `tolerance` seconds off.
+func ring_accuracy() -> float:
+	return clampf(1.0 - absf(ring - sweet) * gauge_time / tolerance, 0.0, 1.0)
 
 
 ## The button is let go: that is the pitch, as good as the ring was near the circle.
 func release_pitch_button() -> void:
 	if state == State.CHARGE:
-		accuracy = gauge_accuracy(ring)
+		accuracy = ring_accuracy()
 		_begin_windup()
 
 
@@ -404,9 +464,9 @@ func step(delta: float) -> void:
 				decision = _ai_pitch_decision()
 				_begin_windup()
 		State.CHARGE:
-			ring += delta / GAUGE_TIME
+			ring += delta / gauge_time
 			# He reaches his full speed as the ring reaches the circle.
-			power = clampf(ring / ACCURACY_SWEET, 0.0, 1.0)
+			power = clampf(ring / sweet, 0.0, 1.0)
 			if ring >= 1.0:
 				# Held too long: the pitch goes anyway, anywhere.
 				accuracy = 0.0
@@ -540,6 +600,12 @@ func _enter(next: State) -> void:
 
 func _new_duel() -> void:
 	_pitch_count += 1
+	# Practice is played at the difficulty set, as the games are (Difficulty).
+	var level := Difficulty.by_id(Settings.difficulty)
+	if human_bats():
+		Difficulty.for_batter(settings, level)
+	if human_pitches():
+		Difficulty.for_pitcher(settings, level)
 	duel = PitchDuel.new(cfg, field_model, settings, _rng.fork(100 + _pitch_count))
 	_pitch_clock = -1.0
 	_swing_clock = -1.0
@@ -650,7 +716,30 @@ func _finish_pitch() -> void:
 	banner_time = 2.4
 	if swing_motion != null:
 		swing_motion.relax()
+	_note_practice(in_play)
 	_enter(State.RESULT)
+
+
+## Practice (this scene on its own, not a game): the pitch into the person's practice record
+## (Profile.practice), shown on the practice screen.
+func _note_practice(in_play: bool) -> void:
+	if self is MatchScene or DisplayServer.get_name() == "headless" or duel == null:
+		return
+	var numbers := {}
+	if human_bats() and duel.swing != null:
+		numbers["swings"] = 1
+		numbers["perfect"] = 1 if duel.swing.judgment == &"perfect" else 0
+		if duel.contact != null and duel.contact.made_contact:
+			numbers["exit"] = duel.contact.velocity.length() * 3.6
+		if in_play:
+			numbers["distance"] = duel.carry_distance if duel.result == PitchDuel.Result.HOME_RUN else Trajectory.ground_distance(duel.ball.pos)
+		numbers["home_runs"] = 1 if duel.result == PitchDuel.Result.HOME_RUN else 0
+	if human_pitches() and duel.decision != null:
+		numbers["pitches"] = 1
+		numbers["strikes"] = 1 if duel.zone.contains(duel.pitch.plate_pos.x, duel.pitch.plate_pos.z, 0.0) else 0
+		numbers["miss"] = Vector2(duel.pitch.plate_pos.x - duel.decision.target.x, duel.pitch.plate_pos.z - duel.decision.target.z).length() * 100.0
+	if not numbers.is_empty():
+		Profile.record_practice(numbers)
 
 
 # --- The pitch's path: before it is thrown (the player's), and after (everyone's) ---

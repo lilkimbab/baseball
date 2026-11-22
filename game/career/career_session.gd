@@ -28,6 +28,17 @@ static func start(c: CareerPlayer, team_id: String, games: int, seed_value: int)
 	slot = "career_%s" % c.player.id
 
 
+## The points his reward boxes, the derby and the all-star game gave him go into the wallet the
+## shop spends (Profile): they piled up on the career before with nothing to buy.
+static func settle_points() -> int:
+	if career == null or career.points <= 0 or DisplayServer.get_name() == "headless":
+		return 0
+	var paid := career.points
+	Profile.earn(paid)
+	career.points = 0
+	return paid
+
+
 static func autosave() -> void:
 	if career_season == null or slot == "":
 		return

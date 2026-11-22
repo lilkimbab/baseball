@@ -22,6 +22,7 @@ static func start(team_id: String, games: int, seed_value: int, teams: Array[Tea
 	season.season_year = year
 	season.farm = FarmLeague.for_season(season)
 	season.manage(team_id)
+	season.difficulty = Difficulty.by_id(Settings.difficulty)
 	slot = "league_%s" % team_id
 	if carry != null:
 		season.club = carry
@@ -52,6 +53,7 @@ static func start_history(pack: SeasonPack, scenario_id: String, team_id: String
 		RosterMoves.trim(season, t, season.rules.registered_roster)
 	var s := pack.scenario(scenario_id)
 	season.manage(s.team if s != null else team_id)
+	season.difficulty = Difficulty.by_id(Settings.difficulty)
 	slot = "history_%s" % pack.id
 	pending = null
 	return season

@@ -140,6 +140,7 @@ func _record_result() -> void:
 	if _recorded or league_game == null or not game.over:
 		return
 	_recorded = true
+	LeagueSession.season.played_level = played_level()
 	LeagueSession.season.record(league_game, game, scorer.book)
 	LeagueSession.pending = null
 
@@ -484,3 +485,9 @@ func _redraw_overlays() -> void:
 		pitch_track.visible = false
 		pip_rect.visible = false
 	board.queue_redraw()
+
+
+## A managed game: the person makes the calls and plays a few plate appearances himself; the
+## rest goes by quickly.
+func profile_share() -> float:
+	return super() * 0.6
