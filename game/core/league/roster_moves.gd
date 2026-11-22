@@ -130,7 +130,7 @@ static func _foreign_ok(team: Team, down: Player, up: Player, rules: RuleSet) ->
 
 static func _reason(season: Season, up: Player) -> String:
 	if season.farm == null:
-		return ""
+		return "능력치"
 	if up.is_pitcher():
 		var l := season.farm.pitching(up.id)
 		return "2군 평균자책점 %.2f (%s이닝)" % [l.era(), l.innings_text()] if l.outs > 0 else "능력치"

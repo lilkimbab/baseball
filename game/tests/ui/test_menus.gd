@@ -96,7 +96,7 @@ func test_settings_are_kept_between_runs() -> void:
 
 func test_a_saved_league_shows_on_the_load_screen_and_loads() -> void:
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	LeagueSession.start(clubs[21].id, 36, 3)
+	LeagueSession.start(clubs[1].id, 36, 3)
 	LeagueSession.season.play_day()
 	LeagueSession.slot = "menu_test"
 	LeagueSession.autosave()
@@ -109,12 +109,12 @@ func test_a_saved_league_shows_on_the_load_screen_and_loads() -> void:
 	var s := SaveIO.load_league("menu_test")
 	assert_not_null(s)
 	assert_eq(s.day, day)
-	assert_eq(s.my_team, clubs[21].id)
+	assert_eq(s.my_team, clubs[1].id)
 
 
 func test_the_player_card_shows_every_rating() -> void:
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	var s := LeagueSession.start(clubs[22].id, 36, 4)
+	var s := LeagueSession.start(clubs[2].id, 36, 4)
 	var hub := HUB.instantiate() as HubScreen
 	add_child_autofree(hub)
 	var hitter: Player = null
@@ -141,7 +141,7 @@ func test_the_shop_sells_what_the_modes_in_progress_can_use() -> void:
 	for item: Dictionary in shop.items():
 		assert_ne(shop.problem(item), "", str(item["id"]))
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	var s := LeagueSession.start(clubs[23].id, 36, 6)
+	var s := LeagueSession.start(clubs[3].id, 36, 6)
 	var club_points := s.club.points
 	Profile.points = ShopScreen.FUNDS_PRICE - 1
 	assert_string_contains(shop.buy("club"), "부족")

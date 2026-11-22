@@ -37,6 +37,12 @@ PITCHING = os.path.join(SRC, "kbo_pitching_stats_season_1982-2026.csv")
 HISTORY = os.path.join(ROOT, "content-local", "kbo", "history.json")
 TODAY = {"games": 144, "extra_innings": 11, "foreign_players": 3, "asia_quota": 0, "registered_roster": 28, "designated_hitter": True, "pitch_clock": True}
 STARTER_IP_PER_GAME = 3.5
+# The newest season in the dataset (its clubs' futures squads are added, farm_rows).
+NEWEST = 2026
+FARM_YEARS = 2
+FARM_MAX_AGE = 33
+# Uniform numbers taken in each club (the futures men draw theirs after the first team).
+TAKEN = {}
 # The dataset's club names of the season being built -> club ids; its clubs' rows.
 CLUB_OF = {}
 TEAM_ROWS = []
@@ -232,15 +238,8 @@ def main():
         taken = set()
         everyone = [(r["_outs"] / 432.0, r, True) for r in t["p"]] + [(num(r["PA"]) / 600.0, r, False) for r in t["h"]]
         for _, r, is_pitcher in sorted(everyone, key=lambda e: -e[0]):
-            own = random.Random(int(r["Id"]) if r["Id"].isdigit() else r["Id"])
-            n = 99
-            for _ in range(200):
-                pick = own.randint(11, 69) if is_pitcher else own.randint(1, 66)
-                if pick not in taken:
-                    n = pick
-                    break
-            taken.add(n)
-            numbers[r["Id"]] = n
+            numbers[r["Id"]] = draw_number(r, is_pitcher, taken)
+        TAKEN[tid] = taken
 
         def number_for(r):
             return numbers[r["Id"]]
@@ -271,6 +270,13 @@ def main():
             bat_rows.append({"id": "kbo" + r["Id"], "pa": num(r["PA"]), "ab": num(r["AB"]), "h": num(r["H"]), "2b": num(r["2B"]), "3b": num(r["3B"]),
                              "hr": num(r["HR"]), "bb": num(r["BB"]), "hbp": num(r["HBP"]), "so": num(r["SO"]), "sb": num(r["SB"]), "cs": num(r["CS"])})
 
+    # The newest season: each club's futures squad as well (the user: "the futures players are
+    # the real second-team men, renamed"). The dataset has first-team records only, so a club's
+    # futures men are those who played for it in the two seasons before and have no first-team
+    # record this year — at 33 or younger, Koreans (a foreign player who is gone is gone) — with
+    # their last season's numbers for their ratings.
+    if season == str(NEWEST):
+        farm_rows(season, teams, player_rows, bat_rows, pit_rows, rng)
     write(os.path.join(out, "teams.csv"), team_rows)
     TEAM_ROWS[:] = team_rows
     write(os.path.join(out, "players.csv"), player_rows)
@@ -286,6 +292,67 @@ def main():
         if os.path.exists(listed):
             os.remove(listed)
     print("kaggle_to_tables: %s — %d clubs, %d players (%d hitters, %d pitchers) -> %s" % (season, len(team_rows), len(player_rows), len(bat_rows), len(pit_rows), out))
+
+
+def draw_number(r, is_pitcher, taken):
+    """A uniform number from the man's own id (the same every season), unique in his club."""
+    own = random.Random(int(r["Id"]) if r["Id"].isdigit() else r["Id"])
+    for _ in range(200):
+        pick = own.randint(11, 69) if is_pitcher else own.randint(1, 66)
+        if pick not in taken:
+            taken.add(pick)
+            return pick
+    for pick in range(70, 100):
+        if pick not in taken:
+            taken.add(pick)
+            return pick
+    return 99
+
+
+def farm_rows(season, teams, player_rows, bat_rows, pit_rows, rng):
+    s = int(season)
+    present = set()
+    for t in teams.values():
+        present.update(r["Id"] for r in t["p"] + t["h"])
+    latest_p, latest_h = {}, {}
+    for r in csv.DictReader(open(PITCHING, encoding="utf-8")):
+        y = int(r["Season"])
+        if s - FARM_YEARS <= y < s and r["Position"] == "P" and r["Id"] not in present:
+            if r["Id"] not in latest_p or y > int(latest_p[r["Id"]]["Season"]) or (y == int(latest_p[r["Id"]]["Season"]) and outs_of(r["IP"]) > outs_of(latest_p[r["Id"]]["IP"])):
+                latest_p[r["Id"]] = r
+    for r in csv.DictReader(open(BATTING, encoding="utf-8")):
+        y = int(r["Season"])
+        if s - FARM_YEARS <= y < s and r["Position"] != "P" and r["Id"] not in present and r["Id"] not in latest_p:
+            if r["Id"] not in latest_h or y > int(latest_h[r["Id"]]["Season"]) or (y == int(latest_h[r["Id"]]["Season"]) and num(r["PA"]) > num(latest_h[r["Id"]]["PA"])):
+                latest_h[r["Id"]] = r
+    added = 0
+    for kind, latest in (("p", latest_p), ("h", latest_h)):
+        for r in latest.values():
+            club = CLUB_OF.get(r["Team"])
+            born = int(r["Born"][:4]) if r["Born"][:4].isdigit() else 1980
+            if club is None or club not in teams or s - born > FARM_MAX_AGE or foreign(r) or asia_quota(r):
+                continue
+            ht, wt = parse_body(r["HtWt"])
+            bats, throws = (r["BatThrow"] or "R/R").split("/")
+            n = draw_number(r, kind == "p", TAKEN.setdefault(club, set()))
+            if kind == "p":
+                outs = outs_of(r["IP"])
+                g = max(num(r["G"]), 1)
+                role = "SP" if outs / 3.0 / g >= STARTER_IP_PER_GAME and g >= 5 else "RP"
+                player_rows.append({"id": "kbo" + r["Id"], "team": club, "name": names.person(r["Player"], False), "number": n, "born": r["Born"][:4],
+                                    "height_cm": ht, "weight_kg": wt, "bats": bats, "throws": throws, "positions": role, "role": role,
+                                    "origin": origin_of(r), "registered": 0})
+                pit_rows.append({"id": "kbo" + r["Id"], "g": num(r["G"]), "gs": num(r["G"]) if role == "SP" else 0, "outs": outs,
+                                 "bf": num(r["TBF"]), "so": num(r["SO"]), "bb": num(r["BB"]), "hr": num(r["HR"])})
+            else:
+                pos = {"OF": "LF/RF/CF", "DH": "DH/1B"}.get(r["Position"], r["Position"])
+                player_rows.append({"id": "kbo" + r["Id"], "team": club, "name": names.person(r["Player"], False), "number": n, "born": r["Born"][:4],
+                                    "height_cm": ht, "weight_kg": wt, "bats": bats, "throws": throws, "positions": pos, "role": "",
+                                    "origin": origin_of(r), "registered": 0})
+                bat_rows.append({"id": "kbo" + r["Id"], "pa": num(r["PA"]), "ab": num(r["AB"]), "h": num(r["H"]), "2b": num(r["2B"]), "3b": num(r["3B"]),
+                                 "hr": num(r["HR"]), "bb": num(r["BB"]), "hbp": num(r["HBP"]), "so": num(r["SO"]), "sb": num(r["SB"]), "cs": num(r["CS"])})
+            added += 1
+    print("kaggle_to_tables: %d futures players from %d-%d" % (added, s - FARM_YEARS, s - 1))
 
 
 def origin_of(row):

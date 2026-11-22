@@ -17,7 +17,8 @@ func after_all() -> void:
 
 func _league() -> Season:
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	return LeagueSession.start(clubs[24].id, 36, 9)
+	# A league of three divisions (an old save's): its second teams' league.
+	return LeagueSession.start(clubs[24].id, 36, 9, clubs)
 
 
 func test_every_second_team_plays_each_day_of_the_season() -> void:

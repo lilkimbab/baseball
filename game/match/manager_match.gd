@@ -33,6 +33,11 @@ var summary_gap := SUMMARY_GAP
 var summary_pitch_time := SUMMARY_PITCH
 var summary_result_time := SUMMARY_RESULT
 var intervening := false
+## The league's 직접 플레이 (the user: "I handle every player myself"): every plate appearance and
+## every pitch of his club is his, the whole game; the manager's calls stay at hand. Set by the
+## league screen for the next game (full_control_next) and read once.
+static var full_control_next := false
+var full_control := false
 var speed := 1.0
 var paused := false
 ## Every pitch live, as in watching.
@@ -113,6 +118,12 @@ func _start_game() -> void:
 	_play_at_home(g.home, g.day, LeagueSession.season.teams.get(g.home))
 	if s.postseason_of(g) != null:
 		interventions_left = POSTSEASON_INTERVENTIONS
+	full_control = full_control_next
+	full_control_next = false
+	if full_control:
+		interventions_left = -1
+		intervening = true
+		human_team = my_team
 	_chosen_team = my_team
 	balls = 0
 	strikes = 0
@@ -141,6 +152,7 @@ func _record_result() -> void:
 		return
 	_recorded = true
 	LeagueSession.season.played_level = played_level()
+	LeagueSession.season.played_share = 1.0 if full_control else person_share()
 	LeagueSession.season.record(league_game, game, scorer.book)
 	LeagueSession.pending = null
 
@@ -324,7 +336,7 @@ func _note_plate_appearance() -> void:
 		return
 	_pa_key = key
 	_pa_over = false
-	if intervening and key != _intervened_key:
+	if intervening and key != _intervened_key and not full_control:
 		_end_intervention()
 	win_chance = we.for_state(game)
 	leverage = we.leverage_of(game)
@@ -375,6 +387,8 @@ func _key_now() -> String:
 
 ## The player's plate appearance is over: the computer plays on.
 func _end_intervention() -> void:
+	if full_control:
+		return
 	intervening = false
 	human_team = -1
 	set_auto_changes(auto_changes)
@@ -487,7 +501,8 @@ func _redraw_overlays() -> void:
 	board.queue_redraw()
 
 
-## A managed game: the person makes the calls and plays a few plate appearances himself; the
-## rest goes by quickly.
+## A league game pays by how much of it he played himself (the user: "the manager's mode pays
+## least"): 직접 플레이 all of it; as the manager two fifths, and up to all of it with the share
+## of plate appearances he took over.
 func profile_share() -> float:
-	return super() * 0.6
+	return super() * (1.0 if full_control else 0.4 + 0.6 * person_share())

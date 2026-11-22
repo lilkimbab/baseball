@@ -126,7 +126,7 @@ func _build_next(parent: Control) -> void:
 		title_text = "다음 경기"
 		caption = "LEAGUE · DAY %d" % (s.day + 1)
 		colour = UiTheme.MODE_COLOURS["league"]
-		line = "%d부 리그 · %d년 시즌" % [d + 1, s.season_year]
+		line = "%s · %d년 시즌" % [LeagueScreen.league_name(s, d), s.season_year]
 		word = "리그로 이동"
 		action = func() -> void: go(LeagueSession.SCREEN)
 		if g != null:

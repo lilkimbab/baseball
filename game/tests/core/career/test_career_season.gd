@@ -26,9 +26,28 @@ func _play_out(cs: CareerSeason) -> Array[CareerSeason.Report]:
 	while not cs.season.finished() and guard < 400:
 		if cs.has_game():
 			reports.append(cs.quick())
+			_spend(cs)
 		cs.next_day()
 		guard += 1
 	return reports
+
+
+## Spends his growth points as a player would: the cheapest point of each field first.
+func _spend(cs: CareerSeason) -> void:
+	var c := cs.career
+	for field: String in ["batting", "running", "fielding", "pitching"]:
+		for i: int in 100:
+			var best := ""
+			var best_cost := INF
+			for rating: String in cs.rules.ratings.get(field, []):
+				if (field == "pitching") != c.is_pitcher():
+					continue
+				var price := Growth.cost(c, rating, cs.rules)
+				if price < best_cost:
+					best_cost = price
+					best = rating
+			if best == "" or not Growth.raise(c, best, cs.rules):
+				break
 
 
 func test_a_rookie_hitter_starts_down_is_called_up_and_plays_every_day() -> void:
@@ -47,7 +66,9 @@ func test_a_rookie_hitter_starts_down_is_called_up_and_plays_every_day() -> void
 		if r.first_team:
 			up_games += 1
 	assert_gt(up_games, 5)
-	assert_between(float(first.pa) / up_games, 3.4, 5.0)
+	# About three to five a game (a rookie bats low in the order, and a postseason game counts
+	# here while its plate appearances are not in the regular season's book).
+	assert_between(float(first.pa) / up_games, 3.0, 5.0)
 	var total := 0.0
 	for field: String in cs.career.gp:
 		total += cs.career.gp[field]

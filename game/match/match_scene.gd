@@ -1045,6 +1045,15 @@ var feats: GameFeats
 var _person_level := -1
 
 
+var _pa_keys: Dictionary = {}
+var _person_pa_keys: Dictionary = {}
+
+
+## The share of the game's plate appearances he played himself, at bat or on the mound (0 to 1).
+func person_share() -> float:
+	return float(_person_pa_keys.size()) / maxf(float(_pa_keys.size()), 1.0)
+
+
 ## Whose lines count for the achievements ("" his whole side; a career, the player's own).
 func feats_player() -> String:
 	return ""
@@ -1503,8 +1512,12 @@ func _person_flags() -> void:
 	resolver.difficulty = Difficulty.by_id(Settings.difficulty)
 	resolver.person_bats = game.batting() if human_bats() else -1
 	resolver.person_pitches = game.fielding() if human_pitches() else -1
+	# Plate appearances of the game, and those he played (his share of it: rewards).
+	var key := "%d%s%s" % [game.inning, game.top, game.batter_id()]
+	_pa_keys[key] = true
 	if human_bats() or human_pitches():
 		_person_level = resolver.difficulty if _person_level < 0 else mini(_person_level, resolver.difficulty)
+		_person_pa_keys[key] = true
 
 
 func _after_result() -> void:

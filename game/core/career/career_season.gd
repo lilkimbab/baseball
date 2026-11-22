@@ -394,7 +394,8 @@ func ready_for_call_up() -> bool:
 		var b: BattingLine = futures_book.batting.get(id)
 		if b != null and b.pa >= CALL_UP_PA and b.ops() >= CALL_UP_OPS:
 			return true
-	if futures_games < CALL_UP_MIN_GAMES:
+	# A month or so of a 144-game season; a short season's share of it.
+	if futures_games < mini(CALL_UP_MIN_GAMES, season.games_per_team / 4):
 		return false
 	var weakest := weakest_in_place()
 	return weakest != null and _ovr(career.player) >= _ovr(weakest) - CALL_UP_GAP

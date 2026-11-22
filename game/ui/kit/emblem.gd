@@ -39,7 +39,8 @@ static func mascot(club: Team) -> Texture2D:
 		_mascot_index = JsonIO.read_object(MASCOT_DIR.path_join("index.json"))
 		if _mascot_index.is_empty():
 			_mascot_index = {"": ""}
-	var words := club.name.split(" ")
+	# A futures team ("두림 그리즐리스 2군") wears its club's emblem: the name says 2군.
+	var words := club.name.trim_suffix(" 2군").split(" ")
 	var nick := words[words.size() - 1]
 	if _mascots.has(nick):
 		return _mascots[nick]

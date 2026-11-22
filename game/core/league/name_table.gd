@@ -6,6 +6,8 @@ var surnames := PackedStringArray()
 var surname_weights := PackedFloat64Array()
 var first := PackedStringArray()
 var second := PackedStringArray()
+## Common given names, used whole.
+var given := PackedStringArray()
 var avoid: Dictionary[String, bool] = {}
 var city_names := PackedStringArray()
 var city_codes := PackedStringArray()
@@ -19,17 +21,23 @@ var asia_first := PackedStringArray()
 var asia_last := PackedStringArray()
 
 
-## A Korean name: surname plus two given-name syllables, never one that is to be avoided.
+## A Korean name: a surname by its share of the population and a common given name whole
+## (data/names.ko.json "given"; random syllables made names nobody has), never one to avoid.
 func person(rng: Rng) -> String:
 	for attempt: int in 50:
-		var a := first[rng.next_int(first.size())]
-		var b := second[rng.next_int(second.size())]
-		if a == b:
-			continue
-		var full := surnames[rng.pick_weighted(surname_weights)] + a + b
+		var given_name := ""
+		if not given.is_empty():
+			given_name = given[rng.next_int(given.size())]
+		else:
+			var a := first[rng.next_int(first.size())]
+			var b := second[rng.next_int(second.size())]
+			if a == b:
+				continue
+			given_name = a + b
+		var full := surnames[rng.pick_weighted(surname_weights)] + given_name
 		if not avoid.has(full):
 			return full
-	return surnames[0] + first[0] + second[1]
+	return surnames[0] + (given[0] if not given.is_empty() else first[0] + second[1])
 
 
 ## A foreign player's name the way Korean broadcasts write it: "제이크 밀러". Asia-quota

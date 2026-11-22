@@ -23,11 +23,38 @@ func _screen() -> LeagueScreen:
 	return screen
 
 
-func test_a_short_season_goes_from_the_start_to_the_promotion_verdict() -> void:
+func test_a_season_with_one_club_ends_with_its_reward_and_a_new_choice() -> void:
+	# docs/08 R8-1 (the user: one club, one season, rewards, then a new one): ten clubs in one
+	# league, no second teams' league but second teams to call up, the reward paid once.
+	var screen := _screen()
+	var clubs := LeagueSession.league_clubs()
+	assert_eq(clubs.size(), 10)
+	screen.begin(clubs[4].id, 36)
+	var s := LeagueSession.season
+	assert_eq(s.divisions.size(), 1)
+	assert_null(s.farm, "no second teams' league in the league")
+	assert_false((s.teams[s.my_team] as Team).second_team().is_empty(), "second-team men to call up")
+	screen.quick_result()
+	screen.to_phase_end()
+	var before := Profile.points
+	screen.to_phase_end()
+	assert_eq(s.phase, Season.Phase.OVER)
+	var reward := LeagueScreen.season_reward(s)
+	assert_gt(int(reward["total"]), 0)
+	assert_almost_eq(float(reward["involvement"]), 0.4, 0.001, "left to the computer: two fifths")
+	assert_true(s.rewarded, "paid as the season ended")
+	assert_eq(Profile.points, before + int(reward["total"]), "paid once")
+	screen.refresh()
+	assert_eq(Profile.points, before + int(reward["total"]), "and only once")
+
+
+func test_an_old_league_of_three_divisions_goes_on_to_the_promotion_verdict() -> void:
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
 	var mine := clubs[25].id
-	screen.begin(mine, 36)
+	LeagueSession.start(mine, 36, 3, clubs)
+	LeagueSession.season.play_day()
+	screen._tab = "home"
 	var s := LeagueSession.season
 	assert_eq(s.division_of(mine), 2, "the player starts in the third division")
 	assert_not_null(s.club)
@@ -64,7 +91,7 @@ func test_a_short_season_goes_from_the_start_to_the_promotion_verdict() -> void:
 func test_the_club_panel_registers_within_the_rules_and_equips_traits() -> void:
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	screen.begin(clubs[22].id, 36)
+	screen.begin(clubs[2].id, 36)
 	var s := LeagueSession.season
 	var team: Team = s.teams[s.my_team]
 	var prospect := team.second_team()[0]
@@ -85,7 +112,7 @@ func test_the_club_panel_registers_within_the_rules_and_equips_traits() -> void:
 
 func test_a_managed_league_game_reports_its_result_to_the_season() -> void:
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	var s := LeagueSession.start(clubs[27].id, 36, 9)
+	var s := LeagueSession.start(clubs[7].id, 36, 9)
 	s.play_day()
 	var g := s.my_game_today()
 	assert_not_null(g)
@@ -276,10 +303,12 @@ func test_the_records_room_lists_the_leaders_and_the_clubs() -> void:
 
 
 func test_the_second_team_tab_shows_its_men_its_table_and_the_winter() -> void:
-	# docs/08 R6.
+	# docs/08 R6, in an old league of three divisions (a new league has no second teams' league).
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	screen.begin(clubs[5].id, 36)
+	LeagueSession.start(clubs[5].id, 36, 3, clubs)
+	LeagueSession.season.play_day()
+	screen._tab = "home"
 	var s := LeagueSession.season
 	for i: int in 3:
 		screen.quick_result()
@@ -295,3 +324,34 @@ func test_the_second_team_tab_shows_its_men_its_table_and_the_winter() -> void:
 	assert_true(line == "-" or line.contains("타석") or line.contains("이닝"))
 	for n: int in 6:
 		assert_eq(Development.stars_text(n if n <= 5 else 5).length(), 5)
+
+
+func test_a_trade_the_other_club_finds_fair_goes_through_before_the_deadline() -> void:
+	# The user: trades in the regular season. A star for a bench man is refused; the bench man
+	# and a better player for their regular is taken; the men change clubs and places.
+	var clubs := LeagueSession.league_clubs()
+	var s := LeagueSession.start(clubs[1].id, 36, 4)
+	var mine: Team = s.teams[s.my_team]
+	var theirs: Team = s.teams[s.divisions[0][3] if s.divisions[0][3] != s.my_team else s.divisions[0][4]]
+	var by_ovr := func(team: Team) -> Array[Player]:
+		var men: Array[Player] = team.players.duplicate()
+		men.sort_custom(func(x: Player, y: Player) -> bool: return ClubRules.player_ovr(x, s.ovr, s.catalog) > ClubRules.player_ovr(y, s.ovr, s.catalog))
+		return men
+	var my_men: Array[Player] = by_ovr.call(mine)
+	var their_men: Array[Player] = by_ovr.call(theirs)
+	var star := their_men[0]
+	var bench := my_men[my_men.size() - 1]
+	var no := Trade.weigh(s, mine, theirs, PackedStringArray([bench.id]), PackedStringArray([star.id]))
+	assert_false(bool(no["accepted"]), "a star for a bench man")
+	var fair := their_men[their_men.size() - 1]
+	var yes := Trade.weigh(s, mine, theirs, PackedStringArray([my_men[0].id]), PackedStringArray([fair.id]))
+	assert_true(bool(yes["accepted"]), "his best man for their worst")
+	var was_first := theirs.is_registered(fair.id)
+	Trade.apply(s, mine, theirs, PackedStringArray([my_men[0].id]), PackedStringArray([fair.id]))
+	assert_not_null(theirs.player(my_men[0].id))
+	assert_null(mine.player(my_men[0].id))
+	assert_not_null(mine.player(fair.id))
+	if was_first:
+		assert_true(theirs.is_registered(my_men[0].id), "he takes the first-team place of the man who left")
+	s.day = Trade.deadline(s) + 1
+	assert_false(bool(Trade.weigh(s, mine, theirs, PackedStringArray([my_men[1].id]), PackedStringArray([their_men[2].id]))["accepted"]), "not after the deadline")

@@ -90,6 +90,22 @@ var played_level := -1
 var level_games := PackedInt32Array([0, 0, 0, 0])
 ## The difficulty the league is played at: how strong the other clubs are (Difficulty.league_form).
 var difficulty: int = Difficulty.Level.PRO
+## Days played at each difficulty (the season's reward is by their average).
+var level_days := PackedInt32Array([0, 0, 0, 0])
+## How much of the manager's games he played himself (the season's reward is by it): the sum of
+## each game's share (1 played wholly, 0 left to the computer) and how many games.
+var involvement_sum := 0.0
+var involvement_games := 0
+## The share of the game about to be recorded he played himself (−1: simulated); set by the
+## scene, used once (Season.record).
+var played_share := -1.0
+## The season's reward has been paid (one season, then a new one: docs/08 R8-1).
+var rewarded := false
+## Who is hurt and for how long (Injuries; none in a season of the past, played as it was).
+var injuries := Injuries.new()
+## Today's news of the manager's club: [player id, days, cause] hurt, and the ids healed.
+var hurt_today: Array = []
+var healed_today := PackedStringArray()
 var featured := ""
 var featured_role := ""
 ## Decided once per game and club: "day:team" → starter id, and who has the day off.
@@ -209,6 +225,20 @@ func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	return sim
 
 
+## A game's injuries (Injuries): drawn for both sides; a computer club fills the first-team
+## place at once, the manager's club is told (hurt_today) and calls a man up himself.
+func _note_injuries(game: ScheduledGame, game_book: StatBook) -> void:
+	if history != null or my_team == "":
+		return
+	var hurt := injuries.note_game(self, game_book, rng.fork(hash("hurt:%d:%s" % [day, game.home])))
+	for h: Array in hurt:
+		var team: Team = teams[str(h[0])]
+		if team.id == my_team:
+			hurt_today.append([h[1], h[2], h[3]])
+		else:
+			RosterMoves.refill(self, team)
+
+
 ## Pitchers' overalls for the bullpen roles, worked out once a day (play_day empties it):
 ## ratings change over a season, and a cache kept from the first day, which a saved game
 ## does not carry, gave a season continued and the same season loaded different closers.
@@ -257,6 +287,9 @@ func squad_for(team: Team, on_day: int, starter_id: String) -> Team:
 	var first := team.first_team()
 	first.sort_custom(func(a: Player, b: Player) -> bool: return usage.rest_days(a.id, on_day) > usage.rest_days(b.id, on_day))
 	for p: Player in first:
+		# The injured are out (a club whose every man counts as registered keeps them listed).
+		if injuries.is_out(p.id):
+			continue
 		var factor := 1.0
 		if p.is_pitcher() and p.id != starter_id:
 			if p.role() == &"SP":
@@ -381,19 +414,21 @@ func starter_for(team: Team, on_day: int) -> Player:
 	var chosen: Player = null
 	if rotation.is_empty():
 		for p: Player in team.first_team():
-			if p.is_pitcher() and (chosen == null or usage.rest_days(p.id, on_day) > usage.rest_days(chosen.id, on_day)):
+			if p.is_pitcher() and not injuries.is_out(p.id) and (chosen == null or usage.rest_days(p.id, on_day) > usage.rest_days(chosen.id, on_day)):
 				chosen = p
 	else:
 		for k: int in rotation.size():
 			var p := rotation[(team.rotation_index + k) % rotation.size()]
-			if usage.can_start(p.id, on_day):
+			if usage.can_start(p.id, on_day) and not injuries.is_out(p.id):
 				chosen = p
 				team.rotation_index = (team.rotation_index + k + 1) % rotation.size()
 				break
 		if chosen == null:
 			for p: Player in rotation:
-				if chosen == null or usage.rest_days(p.id, on_day) > usage.rest_days(chosen.id, on_day):
+				if not injuries.is_out(p.id) and (chosen == null or usage.rest_days(p.id, on_day) > usage.rest_days(chosen.id, on_day)):
 					chosen = p
+		if chosen == null:
+			chosen = rotation[0]
 	_starters[key] = chosen.id
 	return chosen
 
@@ -409,7 +444,7 @@ func resting(team: Team, on_day: int) -> Dictionary[String, bool]:
 	for p: Player in team.first_team():
 		if p.is_pitcher():
 			continue
-		if sitting.get(p.id, -1) >= on_day:
+		if sitting.get(p.id, -1) >= on_day or injuries.is_out(p.id):
 			out[p.id] = true
 			continue
 		var chance := CATCHER_REST_CHANCE if p.primary_position() == Position.Kind.C else REST_DAY_CHANCE
@@ -428,6 +463,7 @@ func resting(team: Team, on_day: int) -> Dictionary[String, bool]:
 
 func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 	game.finish(state.score[0], state.score[1], state.inning)
+	_note_injuries(game, game_book)
 	var playoff := postseason_of(game)
 	var target := book
 	if playoff != null:
@@ -456,6 +492,9 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 		if played_level >= 0:
 			level_games[clampi(played_level, 0, 3)] += 1
 		played_level = -1
+		involvement_sum += maxf(played_share, 0.0)
+		involvement_games += 1
+		played_share = -1.0
 	for id: String in game_book.pitching:
 		var line: PitchingLine = game_book.pitching[id]
 		target.pitch(id).add(line)
@@ -513,9 +552,15 @@ func play_day(include_mine: bool = false) -> ScheduledGame:
 ## every division has its champion the season is over.
 func advance() -> void:
 	_develop_day()
+	hurt_today.clear()
+	healed_today = injuries.heal_day()
+	if phase != Phase.OVER and my_team != "":
+		level_days[clampi(difficulty, 0, 3)] += 1
 	day += 1
 	_overnight()
-	if phase == Phase.REGULAR and farm != null and day % RosterMoves.EVERY_DAYS == 0:
+	# The clubs' call-ups and send-downs, with or without a second teams' league (ratings and
+	# first-team form when there is none).
+	if phase == Phase.REGULAR and my_team != "" and (farm != null or history == null) and day % RosterMoves.EVERY_DAYS == 0:
 		RosterMoves.weekly(self)
 	if phase == Phase.REGULAR and regular_season_over():
 		phase = Phase.POSTSEASON

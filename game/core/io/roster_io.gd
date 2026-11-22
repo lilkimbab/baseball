@@ -191,6 +191,7 @@ static func load_names(path: String = NAMES_PATH) -> NameTable:
 		t.surname_weights.append(float(surnames[s]))
 	t.first = PackedStringArray(root.get("first", []) as Array)
 	t.second = PackedStringArray(root.get("second", []) as Array)
+	t.given = PackedStringArray(root.get("given", []) as Array)
 	var avoid: Array = root.get("avoid", [])
 	for name: Variant in avoid:
 		t.avoid[str(name)] = true

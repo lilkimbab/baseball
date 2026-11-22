@@ -21,12 +21,12 @@ const EFFECT_NAMES := {
 	"range": "수비 범위", "hands": "포구", "arm": "송구 파워", "accuracy": "송구 정확도", "clutch": "득점권", "movement": "구위",
 	"command": "제구", "control": "제구", "velocity": "구속", "composure": "위기관리", "stamina": "체력",
 }
-const SEASON_TABS: Array[Array] = [["home", "오늘"], ["roster", "1군"], ["lineup", "라인업"], ["farm", "2군"], ["scout", "스카우트"], ["traits", "특성"], ["records", "기록실"]]
+const SEASON_TABS: Array[Array] = [["home", "오늘"], ["roster", "1군"], ["lineup", "라인업"], ["farm", "2군"], ["trade", "트레이드"], ["scout", "스카우트"], ["traits", "특성"], ["records", "기록실"]]
 const FOCUS_NAMES := {"batting": "타격", "running": "주루", "fielding": "수비", "stuff": "구위", "control": "제구", "breaking": "변화"}
 
 var message := ""
 var _tab := "home"
-var _games := 36
+var _games := 144
 var _choice := ""
 ## The player picked in a list (his id), and the trait picked in the bag (its index).
 var _picked := ""
@@ -87,7 +87,7 @@ func build() -> void:
 
 
 func _build_setup() -> void:
-	content.add_child(UiKit.segmented(["league", "history"], ["가상 리그", "역사적 시즌"], _setup_mode, func(id: String) -> void:
+	content.add_child(UiKit.segmented(["league", "history"], ["리그", "역사적 시즌"], _setup_mode, func(id: String) -> void:
 		_setup_mode = id
 		_choice = ""
 		refresh()))
@@ -95,41 +95,70 @@ func _build_setup() -> void:
 		_build_history_setup()
 		return
 	set_heading("리그 모드")
-	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	var columns := UiKit.hbox(20)
+	# The league's ten clubs (docs/08 R8-1), each a card: emblem, name, strength.
+	var clubs := _league_clubs()
+	var columns := UiKit.hbox(16)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
-	var left := panel("구단 선택", "users-three", columns, 640.0, "SELECT CLUB")
-	var table := DataTable.new()
-	table.row_height = 52.0
-	table.set_columns([["구단", 420.0, 0], ["전력", 90.0, 2]])
+	var left := panel("구단 선택", "users-three", columns, 0.0, "SELECT CLUB")
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var grid := GridContainer.new()
+	grid.columns = 5
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	left.body.add_child(grid)
 	var chosen: Team = null
-	for i: int in range(20, mini(30, clubs.size())):
-		var t := clubs[i]
-		var power := _strength(t)
-		var row := table.add_row([t.name, UiTheme.shown_text(power)], t.id, {1: UiTheme.rating_color(power)})
+	if _choice == "" and not clubs.is_empty():
+		_choice = clubs[0].id
+	for t: Team in clubs:
 		if t.id == _choice:
-			table.selected = row
 			chosen = t
-	table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
-		_choice = str(tag)
-		refresh())
-	left.body.add_child(table)
-	var right := panel("새 시즌", "flag-pennant", columns, 0.0, "NEW SEASON")
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(_club_card(t, t.id == _choice))
+	var right := panel("새 시즌", "flag-pennant", columns, 600.0, "NEW SEASON")
 	if chosen != null:
-		var top := UiKit.hbox(24)
+		var top := UiKit.hbox(18)
 		right.body.add_child(top)
-		top.add_child(UiKit.club_mark(chosen, 180.0))
-		var words := UiKit.vbox(6)
+		top.add_child(UiKit.club_mark(chosen, 128.0))
+		var words := UiKit.vbox(4)
 		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		words.add_child(UiKit.latin("YOUR CLUB", 18, tint, true))
-		words.add_child(UiKit.heading(chosen.name, 44))
-		words.add_child(StatBar.make("종합 전력", _strength(chosen), -1.0, 110.0))
+		words.add_child(UiKit.latin("YOUR CLUB", 17, tint, true))
+		words.add_child(UiKit.heading(chosen.name, 36))
+		words.add_child(StatBar.make("종합 전력", _strength(chosen), -1.0, 100.0))
 		top.add_child(words)
+		# Its best men, a face each.
+		right.body.add_child(UiKit.caption("주요 선수"))
+		var stars := UiKit.hbox(8)
+		right.body.add_child(stars)
+		var men := chosen.first_team()
+		men.sort_custom(func(x: Player, y: Player) -> bool: return _ovr_of(x) > _ovr_of(y))
+		for man: Player in men.slice(0, 4):
+			var card := UiKit.vbox(0)
+			card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			stars.add_child(card)
+			var face := PortraitStudio.face(self, man, chosen, 76.0)
+			face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+			card.add_child(face)
+			var name := UiKit.label(man.name, 15, Color.WHITE, 700)
+			name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			name.clip_text = true
+			card.add_child(name)
+			var role := ("선발" if man.role() == &"SP" else "구원") if man.is_pitcher() else Position.code(man.primary_position())
+			var line := UiKit.label("%s · OVR %s" % [role, UiTheme.shown_text(_ovr_of(man))], 13, UiTheme.DIM, 600)
+			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			card.add_child(line)
 	right.body.add_child(UiKit.rule())
-	choices("시즌 길이", ["36", "72", "144"], ["36경기", "72경기", "144경기"], str(_games), func(v: String) -> void: _games = int(v), right.body)
+	right.body.add_child(UiKit.selector("시즌 길이", ["36", "72", "144"], ["36경기", "72경기", "144경기"], str(_games), func(v: String) -> void:
+		_games = int(v)
+		refresh()))
+	var levels: Array = []
+	for level_id: String in Difficulty.IDS:
+		levels.append(level_id)
+	right.body.add_child(UiKit.selector("난이도", levels, Difficulty.NAMES, Settings.difficulty, func(v: String) -> void:
+		Settings.difficulty = v
+		Settings.save_file()
+		refresh()))
 	right.body.add_child(UiKit.spacer(0.0, 0.0, true))
 	var start := UiKit.button("시즌 시작", func() -> void: begin(_choice, _games), "play", "primary")
 	start.add_theme_font_size_override("font_size", 26)
@@ -137,9 +166,65 @@ func _build_setup() -> void:
 	right.body.add_child(start)
 
 
-## What a division is called: "2부 리그"; a season of the past is one league, by its year.
+## The league's clubs for the choice, read once per screen.
+var _clubs_cache: Array[Team] = []
+
+
+func _league_clubs() -> Array[Team]:
+	if _clubs_cache.is_empty():
+		_clubs_cache = LeagueSession.league_clubs()
+	return _clubs_cache
+
+
+func _catalog() -> Dictionary[StringName, PitchType]:
+	if _pitch_catalog.is_empty():
+		_pitch_catalog = PitchCatalogIO.load_default()
+	return _pitch_catalog
+
+
+var _pitch_catalog: Dictionary[StringName, PitchType] = {}
+var _overall: Overall
+
+
+## A man's overall before a season exists (the club choice).
+func _ovr_of(p: Player) -> float:
+	if _overall == null:
+		_overall = LeagueEnvIO.load_overall()
+	return ClubRules.player_ovr(p, _overall, _catalog())
+
+
+## One club to choose: its emblem over its name, and its strength.
+func _club_card(t: Team, on: bool) -> DragCard:
+	var card := DragCard.make("T" + t.id, "", [], Color(1.0, 1.0, 1.0, 0.04))
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card.set_lit(on)
+	card.clicked.connect(func(_tag: String) -> void:
+		_choice = t.id
+		refresh())
+	var box := UiKit.vbox(4)
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	card.add_child(box)
+	var mark := UiKit.club_mark(t, 84.0)
+	mark.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	box.add_child(mark)
+	var name := UiKit.label(t.name, 16, Color.WHITE, 700)
+	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name.clip_text = true
+	box.add_child(name)
+	var power := _strength(t)
+	var line := UiKit.label("전력 %s" % UiTheme.shown_text(power), 14, UiTheme.rating_color(power), 700)
+	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(line)
+	return card
+
+
+## What a division is called: the league (one since R8-1), "2부 리그" in an old save of three,
+## a season of the past by its year.
 static func league_name(s: Season, d: int) -> String:
-	return "%d 시즌" % s.season_year if s.history != null else "%d부 리그" % (d + 1)
+	if s.history != null:
+		return "%d 시즌" % s.season_year
+	return LeagueSession.league_title() if s.divisions.size() == 1 else "%d부 리그" % (d + 1)
 
 
 ## A club's strength as one number: its first team's batting, pitching and fielding.
@@ -170,7 +255,7 @@ func _build_season() -> void:
 	var d := s.division_of(s.my_team)
 	var standing := s.standings[d].row(s.my_team)
 	var phase: String = ["정규 시즌", "포스트시즌", "시즌 종료"][s.phase]
-	var where := "%d부 리그" % (d + 1)
+	var where := league_name(s, d)
 	if s.history != null:
 		var sc := s.history.scenario(s.scenario_id)
 		where = "%s%s" % [sc.title if sc != null else s.history.title, " · 목표 %s" % SeasonPack.goal_text(sc) if sc != null else ""]
@@ -179,6 +264,9 @@ func _build_season() -> void:
 		var ids: Array = []
 		var labels: Array = []
 		for pair: Array in SEASON_TABS:
+			# A season of the past is played as it was: no trades.
+			if pair[0] == "trade" and s.history != null:
+				continue
 			ids.append(pair[0])
 			labels.append(pair[1])
 		var tabs := UiKit.tabs(ids, labels, _tab, func(id: String) -> void:
@@ -198,6 +286,8 @@ func _build_season() -> void:
 			_build_scout(s, team)
 		"traits":
 			_build_traits(s)
+		"trade":
+			_build_trade(s, team)
 		"lineup":
 			_build_lineup(s, team)
 		"records":
@@ -311,9 +401,15 @@ func _build_today(parent: Control, s: Season) -> void:
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.body.add_child(actions)
 	if g != null and not g.played:
-		var play := UiKit.button("경기 시작", play_on_screen, "play", "primary", 260.0)
+		# Three ways to play it: every pitch himself, as the manager, or at once.
+		var play := UiKit.button("직접 플레이", func() -> void:
+			ManagerMatch.full_control_next = true
+			play_on_screen(), "play", "primary", 240.0)
 		play.add_theme_font_size_override("font_size", 24)
 		actions.add_child(play)
+		actions.add_child(UiKit.button("감독 모드", func() -> void:
+			ManagerMatch.full_control_next = false
+			play_on_screen(), "strategy"))
 		actions.add_child(UiKit.button("빠른 결과", quick_result, "fast-forward"))
 	elif s.phase != Season.Phase.OVER:
 		actions.add_child(UiKit.button("다음 날", next_day, "caret-right", "primary", 200.0))
@@ -506,6 +602,9 @@ func _build_end(parent: Control, s: Season) -> void:
 	if s.history != null:
 		_build_history_end(parent, s)
 		return
+	if one_season(s):
+		_build_one_season_end(parent, s)
+		return
 	var d := s.division_of(s.my_team)
 	var p := panel("%d년 시즌 결과" % s.season_year, "trophy", parent, 0.0, "FINAL")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -537,6 +636,111 @@ func _build_end(parent: Control, s: Season) -> void:
 		LeagueSession.next_season(_rng.next_int(1000000))
 		LeagueSession.season.play_day()
 		message = "%d년 시즌이 시작되었습니다." % LeagueSession.season.season_year
+		refresh(), "play", "primary"))
+
+
+## What a season with one club pays at its end (the user, 2026-11-23: one club, one season,
+## then the rewards and a new one; the manager's mode pays least): by the final place, each
+## postseason series won and the title; times the season's length (144 games pay it all), its
+## difficulty (the days at each level, Difficulty.REWARDS) and how much he played himself (two
+## fifths for a season left wholly to the computer, all of it for one played wholly).
+const PLACE_POINTS: Array[int] = [2400, 1900, 1600, 1350, 1150, 950, 800, 650, 500, 400]
+const SERIES_POINTS := 600
+const TITLE_POINTS := 2000
+
+
+## {"lines": [[words, points]...], "length", "difficulty", "involvement", "total"}.
+static func season_reward(s: Season) -> Dictionary:
+	var d := s.division_of(s.my_team)
+	var lines: Array = []
+	var place := s.standings[d].rank_of(s.my_team)
+	var base := PLACE_POINTS[clampi(place - 1, 0, PLACE_POINTS.size() - 1)]
+	lines.append(["정규 시즌 %d위" % place, base])
+	var post := s.postseasons[d] if d < s.postseasons.size() else null
+	if post != null:
+		var won := 0
+		for sr: PlayoffSeries in post.rounds:
+			if sr.finished() and sr.winner() == s.my_team:
+				won += 1
+		if won > 0:
+			lines.append(["포스트시즌 시리즈 %d승" % won, won * SERIES_POINTS])
+			base += won * SERIES_POINTS
+		if post.finished() and post.champion() == s.my_team:
+			lines.append(["우승", TITLE_POINTS])
+			base += TITLE_POINTS
+	var length := clampf(float(s.games_per_team) / 144.0, 0.1, 1.0)
+	var days := 0
+	var weighted := 0.0
+	for level: int in 4:
+		days += s.level_days[level]
+		weighted += s.level_days[level] * Difficulty.reward(level, "points")
+	var difficulty := weighted / days if days > 0 else Difficulty.reward(s.difficulty, "points")
+	var played := s.involvement_sum / maxf(float(s.involvement_games), 1.0)
+	var involvement := 0.4 + 0.6 * clampf(played, 0.0, 1.0)
+	return {"lines": lines, "length": length, "difficulty": difficulty, "involvement": involvement, "played": played,
+		"total": roundi(base * length * difficulty * involvement)}
+
+
+## The end of a season with one club: the verdict, the reward (paid once), the awards, and a
+## new season with any club.
+func _build_one_season_end(parent: Control, s: Season) -> void:
+	var d := s.division_of(s.my_team)
+	var team: Team = s.teams[s.my_team]
+	var post := s.postseasons[d] if d < s.postseasons.size() else null
+	var p := panel("%d 시즌 결과" % s.season_year, "trophy", parent, 0.0, "FINAL")
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var reward := season_reward(s)
+	if not s.rewarded:
+		s.rewarded = true
+		Profile.earn(int(reward["total"]))
+		LeagueSession.autosave()
+	var top := UiKit.hbox(18)
+	p.body.add_child(top)
+	top.add_child(UiKit.club_mark(team, 110.0))
+	var words := UiKit.vbox(2)
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(words)
+	words.add_child(UiKit.latin("RESULT", 18, tint, true))
+	var champion := post != null and post.finished() and post.champion() == s.my_team
+	words.add_child(UiKit.heading("%s 우승" % post.round_name(post.format.size() - 1) if champion else "정규 시즌 %d위" % s.standings[d].rank_of(s.my_team), 40, UiTheme.ACCENT))
+	if post != null and post.finished():
+		words.add_child(UiKit.label("우승 %s  ·  준우승 %s" % [s.teams[post.champion()].name, s.teams[post.runner_up()].name], 17, UiTheme.INK, 600))
+	p.body.add_child(UiKit.rule())
+	# The reward, line by line.
+	p.body.add_child(UiKit.caption("시즌 보상"))
+	for line: Array in reward["lines"]:
+		var row := UiKit.hbox(8)
+		p.body.add_child(row)
+		var what := UiKit.label(str(line[0]), 17, UiTheme.INK, 600)
+		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(what)
+		row.add_child(UiKit.label("+%d" % int(line[1]), 17, Color.WHITE, 700))
+	for factor: Array in [["시즌 길이 %d경기" % s.games_per_team, float(reward["length"])], ["평균 난이도", float(reward["difficulty"])],
+			["직접 플레이 %d%%" % roundi(100.0 * float(reward["played"])), float(reward["involvement"])]]:
+		var row := UiKit.hbox(8)
+		p.body.add_child(row)
+		var what := UiKit.label(str(factor[0]), 16, UiTheme.DIM, 600)
+		what.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(what)
+		row.add_child(UiKit.label("×%.2f" % float(factor[1]), 16, UiTheme.DIM, 600))
+	var total := UiKit.hbox(8)
+	p.body.add_child(total)
+	total.add_child(GradeCoin.make("P", 26.0))
+	total.add_child(UiKit.number("+%d" % int(reward["total"]), 34, UiTheme.ACCENT))
+	p.body.add_child(UiKit.rule())
+	var awards := SeasonAwards.for_division(s, d, s.season_year)
+	p.body.add_child(UiKit.caption("시상"))
+	for a: SeasonAwards.Award in [awards.mvp, awards.pitcher, awards.rookie]:
+		if a != null:
+			p.body.add_child(UiKit.label(awards.line(a), 16, UiTheme.INK, 600))
+	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	p.body.add_child(UiKit.button("새 시즌 (구단 선택)", func() -> void:
+		# The season is over: its save goes, and a new one starts with any club.
+		SaveIO.delete_slot(LeagueSession.slot)
+		LeagueSession.season = null
+		LeagueSession.slot = ""
+		_choice = ""
+		message = ""
 		refresh(), "play", "primary"))
 
 
@@ -1130,7 +1334,7 @@ func _build_picked(parent: Control, kind: String, p: Player, s: Season, team: Te
 		"scout":
 			var sign := UiKit.button("영입", func() -> void:
 				var signed := s.club.sign(s.club.candidates.find(p), team, s.club_rules)
-				message = "%s 선수를 영입했습니다." % signed.name if signed != null else "영입할 수 없습니다."
+				message = "%s 선수를 영입했습니다(2군)." % signed.name if signed != null else "영입할 수 없습니다(2군 정원 %d명)." % s.club_rules.second_team_size
 				_picked = ""
 				refresh(), "handshake", "primary")
 			sign.disabled = s.club.signed_today
@@ -1146,19 +1350,23 @@ func _build_picked(parent: Control, kind: String, p: Player, s: Season, team: Te
 func _build_farm(s: Season, team: Team) -> void:
 	var bar := UiKit.hbox(16)
 	content.add_child(bar)
-	bar.add_child(UiKit.segmented(["players", "table"], ["2군 선수", "퓨처스 순위 · 지난 겨울"], _farm_view, func(id: String) -> void:
-		_farm_view = id
-		refresh()))
-	if _farm_view == "table":
+	# The league has no second teams' league (the career has the futures): the men off the
+	# first-team entry and last winter; an old league of three divisions keeps its futures.
+	var futures := s.farm != null
+	if futures:
+		bar.add_child(UiKit.segmented(["players", "table"], ["2군 선수", "퓨처스 순위 · 지난 겨울"], _farm_view, func(id: String) -> void:
+			_farm_view = id
+			refresh()))
+	if _farm_view == "table" and futures:
 		_build_farm_table(s, team)
 		return
 	var columns := UiKit.hbox(20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
 	var players := team.second_team()
-	var p := panel("2군  %d명" % players.size(), "users-three", columns, 0.0, "FUTURES")
+	var p := panel("2군  %d명" % players.size(), "users-three", columns, 0.0, "FUTURES" if futures else "SECOND TEAM")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var advice := RosterMoves.advice(s, team) if s.farm != null else ([] as Array[RosterMoves.Move])
+	var advice := RosterMoves.advice(s, team)
 	var advised: Dictionary[String, bool] = {}
 	for m: RosterMoves.Move in advice:
 		advised[m.up.id] = true
@@ -1175,7 +1383,7 @@ func _build_farm(s: Season, team: Team) -> void:
 	var table := DataTable.new()
 	table.row_height = 50.0
 	table.portrait_column = 1
-	table.set_columns([["포지션", 80.0, 1], ["선수", 240.0, 0], ["나이", 60.0, 1], ["OVR", 70.0, 2], ["잠재력", 120.0, 1], ["2군 기록", 280.0, 0], ["올해 성장", 100.0, 2]])
+	table.set_columns([["포지션", 80.0, 1], ["선수", 240.0, 0], ["나이", 60.0, 1], ["OVR", 70.0, 2], ["잠재력", 120.0, 1], ["2군 기록" if futures else "시즌 기록", 280.0, 0], ["올해 성장", 100.0, 2]])
 	var picked: Player = null
 	var level := s.club.scout_level if s.club != null else 1
 	for player: Player in players:
@@ -1183,7 +1391,7 @@ func _build_farm(s: Season, team: Team) -> void:
 		var role := String(player.role()) if player.is_pitcher() else Position.code(player.primary_position())
 		var grown := float(s.grown.get(player.id, 0.0))
 		var at := table.add_row([role, player.name + ("  ▲" if advised.has(player.id) else ""), "%d" % (s.season_year - player.born), UiTheme.shown_text(ovr),
-			Development.stars_text(Development.stars(player, level)), farm_line(s, player), "+%.1f" % grown if grown >= 0.05 else "-"], player.id,
+			Development.stars_text(Development.stars(player, level)), farm_line(s, player) if futures else _season_words(s, player), "+%.1f" % grown if grown >= 0.05 else "-"], player.id,
 			{0: UiTheme.CYAN if player.is_pitcher() else UiTheme.GREEN, 1: UiTheme.GREEN if advised.has(player.id) else UiTheme.INK, 3: UiTheme.rating_color(ovr), 4: UiTheme.ACCENT, 6: UiTheme.GREEN},
 			PortraitStudio.cached(player, team))
 		_face_later(table, at, player, team)
@@ -1223,23 +1431,34 @@ func _build_farm_table(s: Season, team: Team) -> void:
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
 	var d := s.division_of(s.my_team)
-	var left := panel("퓨처스리그 %d부" % (d + 1), "ranking", columns, 0.0, "FUTURES LEAGUE")
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var own_calendar := s.farm != null and s.farm.schedule != null
+	if s.farm != null:
+		var left := panel("퓨처스리그" if own_calendar else "퓨처스리그 %d부" % (d + 1), "ranking", columns, 0.0, "FUTURES LEAGUE")
+		left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		# The KBO's two futures leagues (north, south), or an old league's one table.
+		var groups: Array = [["북부리그", s.farm.north], ["남부리그", s.farm.south]] if own_calendar else [["", PackedStringArray()]]
+		var standings := s.farm.standings[0 if own_calendar else d]
+		for group: Array in groups:
+			var ids: PackedStringArray = group[1]
+			if str(group[0]) != "":
+				left.body.add_child(UiKit.caption(str(group[0])))
+			var table := DataTable.new()
+			table.set_columns([["순위", 60.0, 1], ["팀", 240.0, 0], ["경기", 70.0, 2], ["승", 60.0, 2], ["패", 60.0, 2], ["무", 60.0, 2], ["승률", 80.0, 2], ["게임차", 80.0, 2]])
+			var rows: Array[StandingsRow] = []
+			for r: StandingsRow in standings.ranked():
+				if ids.is_empty() or ids.has(r.team_id):
+					rows.append(r)
+			for i: int in rows.size():
+				var r := rows[i]
+				var side := s.farm.team_of(s, r.team_id)
+				var behind := (rows[0].wins - r.wins + r.losses - rows[0].losses) * 0.5
+				table.add_row(["%d" % (i + 1), side.name if side != null else r.team_id, str(r.games()), str(r.wins), str(r.losses), str(r.ties), BattingLine.rate_text(r.pct()) if r.wins + r.losses > 0 else "-", "-" if i == 0 else "%.1f" % behind],
+					r.team_id, {0: UiTheme.ACCENT, 1: tint if r.team_id == s.my_team else UiTheme.INK})
+			table.custom_minimum_size.y = 48.0 + 38.0 * rows.size()
+			left.body.add_child(table)
+	var right := panel("지난 겨울", "snowflake" if UiTheme.icon("snowflake") != null else "calendar-blank", columns, 640.0 if s.farm != null else 0.0, "WINTER")
 	if s.farm == null:
-		left.body.add_child(UiKit.label("이 시즌에는 2군 리그가 없습니다.", 17, UiTheme.DIM, 500))
-	else:
-		var table := DataTable.new()
-		table.set_columns([["순위", 60.0, 1], ["팀", 200.0, 0], ["경기", 70.0, 2], ["승", 60.0, 2], ["패", 60.0, 2], ["무", 60.0, 2], ["승률", 80.0, 2], ["게임차", 80.0, 2]])
-		var standings := s.farm.standings[d]
-		var rows := standings.ranked()
-		for i: int in rows.size():
-			var r := rows[i]
-			var club: Team = s.teams[r.team_id]
-			table.add_row(["%d" % (i + 1), club.short_name, str(r.games()), str(r.wins), str(r.losses), str(r.ties), BattingLine.rate_text(r.pct()) if r.wins + r.losses > 0 else "-", "-" if i == 0 else "%.1f" % standings.games_behind(r.team_id)],
-				r.team_id, {0: UiTheme.ACCENT, 1: tint if r.team_id == s.my_team else UiTheme.INK})
-		table.custom_minimum_size.y = 48.0 + 38.0 * rows.size()
-		left.body.add_child(table)
-	var right := panel("지난 겨울", "snowflake" if UiTheme.icon("snowflake") != null else "calendar-blank", columns, 640.0, "WINTER")
+		right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var w := s.last_winter
 	if w == null:
 		right.body.add_child(UiKit.label("첫 시즌입니다.", 16, UiTheme.DIM, 500))
@@ -1274,9 +1493,14 @@ func _build_records(s: Season) -> void:
 	var d := _records_division if _records_division >= 0 else s.division_of(s.my_team)
 	var bar := UiKit.hbox(16)
 	content.add_child(bar)
-	bar.add_child(UiKit.segmented(["batting", "pitching", "clubs"], ["타자 순위", "투수 순위", "팀 기록"], _records_view, func(id: String) -> void:
+	var views: Array = ["batting", "pitching", "clubs"]
+	var words: Array = ["타자 순위", "투수 순위", "팀 기록"]
+	bar.add_child(UiKit.segmented(views, words, _records_view, func(id: String) -> void:
 		_records_view = id
 		refresh()))
+	if _records_view == "winter":
+		_build_farm_table(s, s.teams[s.my_team])
+		return
 	bar.add_child(UiKit.spacer(0.0, 0.0, true))
 	var ids: Array = []
 	var labels: Array = []
@@ -1758,6 +1982,141 @@ func _lineup_pressed(tag: String, s: Season, team: Team) -> void:
 		_lineup_drop(first, tag, s, team)
 	_lineup_pick = ""
 	refresh()
+
+
+## A league of one season with a club (docs/08 R8-1; the user: "one club, one season, then the
+## rewards and a new one"): the clubs' first and second teams, no second teams' league.
+static func one_season(s: Season) -> bool:
+	return s.farm == null and s.history == null and s.divisions.size() == 1
+
+
+# --- Trades (docs/08 R8-1; Trade) ---
+
+
+var _trade_club := ""
+var _trade_give := PackedStringArray()
+var _trade_get := PackedStringArray()
+
+
+## My men on the left, the other club's on the right, best first; up to three picked on each
+## side; between them what goes and what comes, how the other club sees it, and the offer.
+func _build_trade(s: Season, team: Team) -> void:
+	var others: Array = []
+	for id: String in s.divisions[s.division_of(s.my_team)]:
+		if id != s.my_team:
+			others.append(id)
+	if _trade_club == "" or not others.has(_trade_club):
+		_trade_club = str(others[0]) if not others.is_empty() else ""
+	var theirs: Team = s.teams.get(_trade_club)
+	var bar := UiKit.hbox(12)
+	content.add_child(bar)
+	var open := Trade.open(s)
+	var left_days := Trade.deadline(s) - s.day
+	bar.add_child(UiKit.badge("트레이드 마감 %d일차" % (Trade.deadline(s) + 1), UiTheme.ACCENT if open else UiTheme.RED))
+	bar.add_child(UiKit.label(("남은 %d일" % left_days) if open else "이번 시즌 트레이드는 끝났습니다", 16, UiTheme.DIM, 600))
+	var note := UiKit.label(message, 16, UiTheme.ACCENT, 600)
+	note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	note.clip_text = true
+	bar.add_child(note)
+	var columns := UiKit.hbox(14)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	var left := panel("%s  보낼 선수" % team.short_name, "arrow-right", columns, 0.0, "GIVE")
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.body.add_child(_trade_list(s, team, _trade_give, true))
+	# The deal between the two lists.
+	var middle := panel("트레이드", "swap", columns, 380.0, "DEAL")
+	if theirs != null:
+		var pick := UiKit.selector("상대", others, others.map(func(id: Variant) -> String: return (s.teams[id] as Team).name), _trade_club, func(v: String) -> void:
+			_trade_club = v
+			_trade_get = PackedStringArray()
+			message = ""
+			refresh())
+		middle.body.add_child(pick)
+		var mark := UiKit.club_mark(theirs, 84.0)
+		mark.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		middle.body.add_child(mark)
+		var weigh := Trade.weigh(s, team, theirs, _trade_give, _trade_get)
+		middle.body.add_child(UiKit.caption("보내는 선수"))
+		for id: String in _trade_give:
+			middle.body.add_child(UiKit.label(team.player(id).name, 17, Color.WHITE, 700))
+		middle.body.add_child(UiKit.caption("받는 선수"))
+		for id: String in _trade_get:
+			middle.body.add_child(UiKit.label(theirs.player(id).name, 17, Color.WHITE, 700))
+		if not _trade_give.is_empty() and not _trade_get.is_empty():
+			# How the other club sees it: what it gets against what it gives.
+			var gets := float(weigh["get"])
+			var gives := float(weigh["give"])
+			var share := gets / maxf(gets + gives * Trade.MARGIN, 1.0)
+			middle.body.add_child(UiKit.caption("상대 구단의 평가"))
+			var meter := ProgressBar.new()
+			meter.custom_minimum_size = Vector2(0.0, 10.0)
+			meter.show_percentage = false
+			meter.max_value = 1.0
+			meter.value = share
+			meter.add_theme_stylebox_override("background", UiTheme.flat(Color(1.0, 1.0, 1.0, 0.08), 4))
+			meter.add_theme_stylebox_override("fill", UiTheme.flat(UiTheme.GREEN if share >= 0.5 else (UiTheme.ACCENT if share >= 0.44 else UiTheme.RED), 4))
+			middle.body.add_child(meter)
+			middle.body.add_child(UiKit.label("받아들일 만함" if share >= 0.5 else ("조금 부족함" if share >= 0.44 else "크게 부족함"), 15, UiTheme.INK, 600))
+		middle.body.add_child(UiKit.spacer(0.0, 0.0, true))
+		var offer := UiKit.button("제안하기", func() -> void:
+			var w := Trade.weigh(s, team, theirs, _trade_give, _trade_get)
+			message = str(w["reason"])
+			if bool(w["accepted"]):
+				Trade.apply(s, team, theirs, _trade_give, _trade_get)
+				_trade_give = PackedStringArray()
+				_trade_get = PackedStringArray()
+				LeagueSession.autosave()
+			refresh(), "handshake", "primary")
+		offer.disabled = not open or _trade_give.is_empty() or _trade_get.is_empty()
+		middle.body.add_child(offer)
+		var right := panel("%s  받을 선수" % theirs.short_name, "arrow-left", columns, 0.0, "GET")
+		right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		right.body.add_child(_trade_list(s, theirs, _trade_get, false))
+
+
+## A club's men as rows to pick (first team and second), best first.
+func _trade_list(s: Season, club: Team, picked: PackedStringArray, mine: bool) -> Control:
+	var scroll := UiKit.scroll()
+	var rows := UiKit.vbox(3)
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(rows)
+	var men := club.players.duplicate()
+	men.sort_custom(func(x: Player, y: Player) -> bool: return ClubRules.player_ovr(x, s.ovr, s.catalog) > ClubRules.player_ovr(y, s.ovr, s.catalog))
+	for man: Player in men:
+		var on := picked.has(man.id)
+		var row := DragCard.make("X" + man.id, "", [], Color(1.0, 1.0, 1.0, 0.04))
+		row.tight()
+		row.set_lit(on)
+		row.clicked.connect(func(_t: String) -> void:
+			var list := _trade_give if mine else _trade_get
+			if list.has(man.id):
+				list.remove_at(list.find(man.id))
+			elif list.size() < Trade.MAX_MEN:
+				list.append(man.id)
+			if mine:
+				_trade_give = list
+			else:
+				_trade_get = list
+			message = ""
+			refresh())
+		var line := UiKit.hbox(8)
+		row.add_child(line)
+		line.add_child(PortraitStudio.face(self, man, club, 30.0))
+		var name := UiKit.label(man.name, 16, Color.WHITE if on else UiTheme.INK, 700)
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name.clip_text = true
+		line.add_child(name)
+		line.add_child(UiKit.label(("선발" if man.role() == &"SP" else "구원") if man.is_pitcher() else Position.code(man.primary_position()), 14, UiTheme.CYAN if man.is_pitcher() else UiTheme.GREEN, 600))
+		line.add_child(UiKit.label("%d세" % (s.season_year - man.born), 14, UiTheme.DIM, 500))
+		line.add_child(UiKit.label("1군" if club.is_registered(man.id) else "2군", 13, UiTheme.ACCENT if club.is_registered(man.id) else UiTheme.DIM, 600))
+		var o := ClubRules.player_ovr(man, s.ovr, s.catalog)
+		var ovr := UiKit.label(UiTheme.shown_text(o), 16, UiTheme.rating_color(o), 700)
+		ovr.custom_minimum_size.x = 34.0
+		ovr.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		line.add_child(ovr)
+		rows.add_child(row)
+	return scroll
 
 
 ## Puts a second-team player on the first team, within the roster rules and the cost cap.

@@ -363,7 +363,7 @@ func _build_pitches(parent: Control, cs: CareerSeason) -> void:
 func _build_table(cs: CareerSeason) -> void:
 	var s := cs.season
 	var d := s.division_of(cs.career.team_id)
-	var p := panel("%d부 리그 순위" % (d + 1), "ranking", null, 0.0, "STANDINGS")
+	var p := panel("%s 순위" % LeagueScreen.league_name(cs.season, d), "ranking", null, 0.0, "STANDINGS")
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var table := DataTable.new()
 	table.row_height = 46.0

@@ -93,7 +93,7 @@ static func check_league(s: Season) -> void:
 		reach("league_games")
 	if s.phase != Season.Phase.REGULAR and d >= 0 and d < s.postseasons.size() and s.postseasons[d].seeds.has(s.my_team):
 		reach("postseason")
-	if s.phase != Season.Phase.REGULAR and d >= 0 and s.standings[d].rank_of(s.my_team) == 0:
+	if s.phase != Season.Phase.REGULAR and d >= 0 and s.standings[d].rank_of(s.my_team) == 1:
 		reach("pennant")
 	if s.champion_of(d) == s.my_team:
 		reach("champion", 1, s.managed_level())

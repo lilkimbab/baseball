@@ -44,9 +44,10 @@ func _initialize() -> void:
 	# --group <game|screen|sound|show>: the settings screen opens on that group.
 	if _args.has("group"):
 		SettingsScreen.group = str(_args["group"])
-	if (_args.has("league") or _names.has("league")) and not _args.has("history"):
-		var clubs := RosterIO.load_pack(LeagueSession.PACK)
-		LeagueSession.start(clubs[22].id, 36, 4)
+	# --setup: the league screen's club choice (no league started).
+	if (_args.has("league") or _names.has("league")) and not _args.has("history") and not _args.has("setup"):
+		var clubs := LeagueSession.league_clubs()
+		LeagueSession.start(clubs[2].id, 36, 4)
 		LeagueSession.slot = "menu_shots"
 		for i: int in 6:
 			LeagueSession.season.play_day(true)

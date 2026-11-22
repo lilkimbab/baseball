@@ -203,7 +203,9 @@ static func season_to(s: Season) -> Dictionary:
 		"grown": s.grown.duplicate(), "played_today": s.played_today.keys(),
 		"last_winter": _winter_to(s.last_winter) if s.last_winter != null else {},
 		"history": {"pack": s.history.id, "scenario": s.scenario_id} if s.history != null else {},
-		"level_games": Array(s.level_games), "difficulty": s.difficulty,
+		"level_games": Array(s.level_games), "difficulty": s.difficulty, "level_days": Array(s.level_days),
+		"involvement": [s.involvement_sum, s.involvement_games], "rewarded": s.rewarded,
+		"injuries": s.injuries.to_dict(),
 	}
 
 
@@ -355,6 +357,15 @@ static func season_from(d: Dictionary) -> Season:
 	if not winter.is_empty():
 		s.last_winter = _winter_from(winter)
 	s.difficulty = int(d.get("difficulty", Difficulty.Level.PRO))
+	var days_at: Array = d.get("level_days", [])
+	if days_at.size() == 4:
+		s.level_days = PackedInt32Array(days_at)
+	var involvement: Array = d.get("involvement", [])
+	if involvement.size() == 2:
+		s.involvement_sum = float(involvement[0])
+		s.involvement_games = int(involvement[1])
+	s.rewarded = bool(d.get("rewarded", false))
+	s.injuries.load_dict(d.get("injuries", {}))
 	var levels: Array = d.get("level_games", [])
 	if levels.size() == 4:
 		s.level_games = PackedInt32Array(levels)

@@ -180,9 +180,19 @@ func buy_report(rules: ClubRules) -> bool:
 
 ## Signs one of today's candidates to the second team. One a day; the second team has room
 ## for rules.second_team_size.
-func sign(index: int, team: Team, rules: ClubRules) -> Player:
+func sign(index: int, team: Team, rules: ClubRules, squad_cap: int = -1) -> Player:
 	if signed_today or index < 0 or index >= candidates.size():
 		return null
+	# A league of first teams only (squad_cap): he joins the squad, if there is room.
+	if squad_cap > 0:
+		if team.players.size() >= squad_cap:
+			return null
+		var man := candidates[index]
+		candidates.remove_at(index)
+		team.players.append(man)
+		homegrown[man.id] = true
+		signed_today = true
+		return man
 	if team.second_team().size() >= rules.second_team_size:
 		return null
 	var p := candidates[index]
@@ -197,8 +207,8 @@ func sign(index: int, team: Team, rules: ClubRules) -> Player:
 
 
 ## Lets a second-team player go, for a few points.
-func release(player_id: String, team: Team, rules: ClubRules) -> bool:
-	if team.is_registered(player_id):
+func release(player_id: String, team: Team, rules: ClubRules, from_squad: bool = false) -> bool:
+	if team.is_registered(player_id) and not from_squad:
 		return false
 	for i: int in team.players.size():
 		if team.players[i].id == player_id:

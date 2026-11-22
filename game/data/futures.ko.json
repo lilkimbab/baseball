@@ -1,0 +1,11 @@
+{
+  "note": "The futures league (퓨처스리그) of a league of one division (docs/08 R8-1): as the KBO's in 2026, twelve teams in two leagues of six — each club's second team, and two teams of their own (the armed forces' team and a city's). The names are changed the way the clubs' are (the user, 2026-11-22: real names cleverly changed): a club's second team is its club's name with 2군, except where the real one has a name of its own (a club id in 'names'). 'games' is a season's games for a 144-game first-team season, scaled with the season's length. 'level' is how far an independent team's players are above (or below) a second team's usual level, in rating points. Clubs of the league not listed in north or south (a fictional league) are split between the two.",
+  "games": 121,
+  "north": ["sangmu", "hanwha", "lg", "ssg", "doosan", "kiwoom"],
+  "south": ["ulsan", "lotte", "nc", "kt", "kia", "samsung"],
+  "names": {"kiwoom": "고양 레전즈"},
+  "independents": [
+    {"id": "sangmu", "name": "상문 파이어버즈", "short": "상문", "primary": "#1d3557", "secondary": "#c1121f", "accent": "#f1faee", "level": 4.0},
+    {"id": "ulsan", "name": "울주 웨이브스", "short": "울주", "primary": "#0b4f8a", "secondary": "#ffffff", "accent": "#f4a300", "level": 1.0}
+  ]
+}
