@@ -82,8 +82,9 @@ static func owned_grade(base_name: String) -> int:
 	return -1
 
 
-## Why an item cannot be bought now ("" when it can).
-func problem(item: Dictionary) -> String:
+## Why an item cannot be bought now ("" when it can). `with_money`: paid from the career
+## player's own money (gear only: CareerMoney.SHOP_RATE won a point) instead of points.
+func problem(item: Dictionary, with_money: bool = false) -> String:
 	var id := str(item["id"])
 	if int(item["grade"]) == SIGNATURE:
 		var key := "club" if id.begins_with("club") else "gear:" + str(item["base_name"])
@@ -104,6 +105,13 @@ func problem(item: Dictionary) -> String:
 		return "투수 전용 상품입니다" if pitching else "타자 전용 상품입니다"
 	if id.begins_with("gear:") and owned_grade(str(item["base_name"])) >= int(item["grade"]):
 		return "이미 보유한 장비입니다" if owned_grade(str(item["base_name"])) == int(item["grade"]) else "더 좋은 등급을 보유하고 있습니다"
+	if with_money:
+		if not id.begins_with("gear:"):
+			return "보유 금액으로는 장비만 구매할 수 있습니다"
+		if CareerSession.career_season.season.school:
+			return "프로 입단 후에 보유 금액으로 구매할 수 있습니다"
+		var short := money_price(item) - c.money
+		return "보유 금액이 %s 원 부족합니다" % FreeAgency.money(short) if short > 0 else ""
 	if Profile.points < int(item["price"]):
 		return "포인트가 부족합니다"
 	return ""
@@ -111,14 +119,16 @@ func problem(item: Dictionary) -> String:
 
 ## Buys an item: the points are taken and the mode it belongs to gets it (a better grade of gear
 ## he has adds only what it adds over the one he has). Returns what to say.
-func buy(id: String) -> String:
+func buy(id: String, with_money: bool = false) -> String:
 	for item: Dictionary in items():
 		if str(item["id"]) != id:
 			continue
-		var why := problem(item)
+		var why := problem(item, with_money)
 		if why != "":
 			return why
-		if not Profile.spend(int(item["price"])):
+		if with_money:
+			CareerSession.career.money -= money_price(item)
+		elif not Profile.spend(int(item["price"])):
 			return "포인트가 부족합니다"
 		Profile.owned[id] = int(Profile.owned.get(id, 0)) + 1
 		Profile.save_file()
@@ -142,6 +152,11 @@ func buy(id: String) -> String:
 			Achievements.check_career(CareerSession.career_season)
 		return "%s 구매 완료" % item["name"]
 	return "없는 상품입니다"
+
+
+## A piece of gear's price in won (10,000 won), bought with the career player's own money.
+static func money_price(item: Dictionary) -> int:
+	return int(item["price"]) * CareerMoney.SHOP_RATE
 
 
 ## Each item's model on the shelf (ProductStage): the game's own bat, gloves, spikes and guard,
@@ -309,6 +324,16 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 	b.add_theme_font_size_override("font_size", 26)
 	b.disabled = why != ""
 	side.body.add_child(b)
+	# Gear for the career's player may be paid from his salary instead (CareerMoney).
+	if str(chosen["id"]).begins_with("gear:") and int(chosen["grade"]) != SIGNATURE and CareerSession.career_season != null and CareerSession.career != null:
+		var with_money := problem(chosen, true)
+		var m := UiKit.button("보유 금액으로 구매  ·  %s 원" % FreeAgency.money(money_price(chosen)), func() -> void:
+			message = buy(str(chosen["id"]), true)
+			refresh(), "coins", "button")
+		m.add_theme_font_size_override("font_size", 20)
+		m.disabled = with_money != ""
+		side.body.add_child(m)
+		side.body.add_child(UiKit.label("보유 금액 %s 원%s" % [FreeAgency.money(CareerSession.career.money), "" if with_money == "" else "  ·  " + with_money], 15, UiTheme.DIM, 500))
 
 
 ## Before anything is picked: how points are earned, the day's goals as they stand, and what is

@@ -64,6 +64,8 @@ class Winter:
 	var rookies: Array = []
 	## [team id, player id, points gained over the season] of the ten who grew most.
 	var risers: Array = []
+	## The free agency's news, a line each (FreeAgency.news).
+	var free_agents := PackedStringArray()
 
 
 static func by_age(table: Array[Vector2], age: int) -> float:
@@ -117,10 +119,11 @@ static func grow_day(p: Player, age: int, played: bool, games_per_team: int) -> 
 
 
 ## The winter's decline for a man of this age (the age he will be next season).
-static func decline(p: Player, age: int) -> float:
+## `scale`: less for a man who paid for his conditioning (the career's own: CareerSeason).
+static func decline(p: Player, age: int, scale: float = 1.0) -> float:
 	if age < DECLINE_FROM:
 		return 0.0
-	var amount := DECLINE_BASE + DECLINE_SLOPE * (age - DECLINE_FROM)
+	var amount := (DECLINE_BASE + DECLINE_SLOPE * (age - DECLINE_FROM)) * scale
 	var hard := amount * PHYSICAL
 	var soft := amount * SKILL
 	var down := func(v: float, by: float) -> float: return maxf(v - by, 1.0)
@@ -224,7 +227,7 @@ static func winter(season: Season) -> Winter:
 	for team_id: String in team_ids:
 		var team: Team = season.teams[team_id]
 		for p: Player in team.players:
-			decline(p, w.year - p.born)
+			decline(p, w.year - p.born, float(season.decline_scales.get(p.id, 1.0)))
 		RosterMoves.refill(season, team)
 		if team_id != season.my_team or season.career_player != "":
 			for m: RosterMoves.Move in RosterMoves.advice(season, team, true):

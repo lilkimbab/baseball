@@ -12,7 +12,7 @@ const RATING_NAMES := {
 }
 const FIELD_NAMES := {"batting": "타격", "fielding": "수비", "running": "주루", "pitching": "투구"}
 const FIELD_ICONS := {"batting": "baseball-helmet", "fielding": "shield", "running": "sneaker-move", "pitching": "person-simple-throw"}
-const CAREER_TABS: Array[Array] = [["home", "오늘"], ["growth", "성장"], ["records", "기록"], ["table", "순위"]]
+const CAREER_TABS: Array[Array] = [["home", "오늘"], ["growth", "성장"], ["money", "계약·투자"], ["records", "기록"], ["table", "순위"]]
 
 var message := ""
 var _tab := "home"
@@ -97,6 +97,8 @@ func build() -> void:
 	match _tab:
 		"growth":
 			_build_growth(cs)
+		"money":
+			_build_money(cs)
 		"records":
 			_build_records(cs)
 		"table":
@@ -135,6 +137,12 @@ func _build_home(cs: CareerSeason, team: Team) -> void:
 	name_row.add_child(words)
 	name_row.add_child(UiKit.button("선수 카드", func() -> void: PlayerCard.open_for(self, p, s), "identification-card"))
 
+	# The winter of his free agency has a screen of its own (the stove league).
+	if not s.school and s.finished():
+		CareerSession.start_winter()
+	if _fa_hub_active(cs):
+		_build_fa_hub(columns, cs)
+		return
 	var middle := UiKit.vbox(16)
 	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(middle)
@@ -200,21 +208,7 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 		p.body.add_child(UiKit.heading("%d년 시즌 종료 · 겨울" % s.season_year, 24, UiTheme.ACCENT))
 		for line: String in cs.winter_lines:
 			p.body.add_child(UiKit.label(line, 18, UiTheme.INK, 500))
-		if not cs.fa_offers.is_empty():
-			p.body.add_child(UiKit.label("FA 계약 제안 — 구단을 고르세요", 18, UiTheme.ACCENT, 700))
-			for offer: Array in cs.fa_offers:
-				var club: Team = s.teams.get(str(offer[0]))
-				var row := UiKit.hbox(12)
-				if club != null:
-					row.add_child(UiKit.club_mark(club, 40.0))
-					row.add_child(UiKit.label(club.name, 18, UiTheme.INK, 700))
-				row.add_child(UiKit.label("%d년 · 연 %s" % [int(offer[1]), Draft.money_text(int(offer[2]))], 17, UiTheme.DIM, 600))
-				var id := str(offer[0])
-				row.add_child(UiKit.button("계약", func() -> void:
-					CareerSession.next_season(id)
-					refresh(), "handshake", "gold"))
-				p.body.add_child(row)
-		else:
+		if not _fa_hub_active(cs):
 			var go_on := UiKit.button("다음 시즌", func() -> void:
 				CareerSession.next_season()
 				refresh(), "caret-right", "primary", 240.0)
@@ -334,8 +328,9 @@ func _build_numbers(parent: Control, cs: CareerSeason) -> void:
 		var deal := UiKit.hbox(0)
 		deal.add_theme_constant_override("separation", 8)
 		p.body.add_child(deal)
-		var fa := CareerContract.fa_seasons(c, cs.season.total_days())
-		for pair: Array in [[Draft.money_text(c.salary).trim_suffix(" 원"), "연봉"], [Draft.money_text(c.money).trim_suffix(" 원"), "보유 금액"], ["%d/%d" % [fa, c.fa_years] if not c.free_agent_done else "완료", "FA 시즌"]]:
+		var fa := CareerFA.seasons_counted(c, cs.season.total_days())
+		var clock := "%d년 남음" % c.contract_years if c.contract_years > 0 else "%d/%d" % [mini(fa, CareerFA.need_seasons(c)), CareerFA.need_seasons(c)]
+		for pair: Array in [[FreeAgency.money(c.salary), "연봉"], [FreeAgency.money(c.money), "보유 금액"], [clock, "계약 기간" if c.contract_years > 0 else "FA 시즌"]]:
 			var f := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 22)
 			f.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			deal.add_child(f)
@@ -630,3 +625,410 @@ func to_end() -> void:
 		guard += 1
 	message = "시즌이 종료되었습니다."
 	refresh()
+
+
+# --- Free agency in the winter (CareerFA): the stove league ---
+
+
+func _fa_hub_active(cs: CareerSeason) -> bool:
+	return not cs.season.school and cs.season.finished() and (not cs.extension.is_empty() or cs.fa_state in ["eligible", "declared"])
+
+
+const GRADE_COLOURS := {"A": Color(0.93, 0.33, 0.3), "B": Color(0.35, 0.62, 1.0), "C": Color(0.62, 0.65, 0.7)}
+const ROLE_COLOURS := {"주전 보장": Color(0.34, 0.82, 0.45), "주전 경쟁": Color(0.35, 0.62, 1.0), "백업 역할": Color(0.62, 0.65, 0.7)}
+
+
+## The stove league: his free agency as a screen of its own (as sports games give theirs) —
+## the head with his grade, his price and his agent; then his club's offer before free agency,
+## the choice to file, or the clubs' offers side by side.
+func _build_fa_hub(parent: Control, cs: CareerSeason) -> void:
+	var c := cs.career
+	var s := cs.season
+	var p := panel("%d 스토브리그" % (s.season_year + 1), "handshake", parent, 0.0, "FREE AGENCY")
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# The head: grade, price, agent.
+	var head := UiKit.hbox(10)
+	p.body.add_child(head)
+	var title := UiKit.heading("FA 자격 취득" if cs.fa_state != "" else "비FA 다년계약 제안", 30)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	if cs.fa_grade != "":
+		head.add_child(UiKit.badge("%s등급" % cs.fa_grade, GRADE_COLOURS.get(cs.fa_grade, UiTheme.DIM)))
+	head.add_child(UiKit.badge("예상 연평균 %s 원" % FreeAgency.money(CareerFA.asking(cs)), Color(1.0, 1.0, 1.0, 0.85)))
+	if cs.agent:
+		head.add_child(UiKit.badge("에이전트 선임", Color(0.55, 0.85, 0.65)))
+	# The winter's news for him, in a line each.
+	if not cs.winter_lines.is_empty():
+		var news := UiKit.hbox(14)
+		p.body.add_child(news)
+		for line: String in cs.winter_lines:
+			news.add_child(UiKit.label(line, 14, UiTheme.DIM, 500))
+	p.body.add_child(UiKit.rule())
+	if not cs.extension.is_empty():
+		_build_extension(p.body, cs)
+	elif cs.fa_state == "eligible":
+		_build_fa_choice(p.body, cs)
+	else:
+		_build_fa_offers(p.body, cs)
+	if message != "":
+		p.body.add_child(UiKit.label(message, 16, UiTheme.ACCENT, 600))
+	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	# He may still hang up his spikes (a second press: no going back).
+	var foot := UiKit.hbox(10)
+	foot.alignment = BoxContainer.ALIGNMENT_END
+	p.body.add_child(foot)
+	var retire := UiKit.button("은퇴", func() -> void: pass, "flag-pennant", "danger")
+	retire.pressed.connect(func() -> void:
+		if retire.text == "은퇴":
+			retire.text = "정말 은퇴합니다 (되돌릴 수 없음)"
+			return
+		go(CareerSession.RETIRE, {"title": "은퇴식"}))
+	foot.add_child(retire)
+
+
+## His club's offer before free agency: the deal large, what it means, take it or wait.
+func _build_extension(body: Control, cs: CareerSeason) -> void:
+	var team: Team = cs.season.teams[cs.career.team_id]
+	body.add_child(UiKit.label("%s에서 FA 자격 취득 1년 전, 다년계약을 먼저 제안했습니다. 수락하면 계약 기간 동안 연봉이 고정되고, FA는 계약이 끝난 뒤 신청할 수 있습니다." % team.name, 16, UiTheme.INK, 500))
+	var offer := {"club": team.id, "years": int(cs.extension[0]), "bonus": int(cs.extension[1]), "annual": int(cs.extension[2]), "option": [], "role": "", "status": "", "asks": 0, "rank": cs.season.standings[0].rank_of(team.id)}
+	var card := _fa_card(cs, offer, -1)
+	card.custom_minimum_size.x = 620.0
+	card.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	body.add_child(card)
+	var row := UiKit.hbox(10)
+	body.add_child(row)
+	var take := UiKit.button("계약 수락", func() -> void:
+		CareerFA.accept_extension(cs)
+		message = "다년계약에 서명했습니다."
+		refresh(), "handshake", "gold")
+	take.add_theme_font_size_override("font_size", 20)
+	row.add_child(take)
+	row.add_child(UiKit.button("거절 (FA 도전)", func() -> void:
+		cs.extension = []
+		refresh(), "x"))
+
+
+## File or stay, and the agent: three cards side by side.
+func _build_fa_choice(body: Control, cs: CareerSeason) -> void:
+	var c := cs.career
+	if cs.fa_grade != "C":
+		body.add_child(UiKit.label("%s등급 FA를 영입하는 구단은 원소속 구단에 보상선수와 보상금을 내야 하므로, 영입을 주저하는 구단이 있을 수 있습니다." % cs.fa_grade, 15, UiTheme.DIM, 500))
+	var row := UiKit.hbox(14)
+	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(row)
+	row.add_child(_choice_card("handshake", "FA 신청", "여러 구단의 제안을 받아 비교하고, 재협상으로 조건을 끌어올릴 수 있습니다. 원소속 구단도 제안합니다.", "FA 신청", "primary", func() -> void:
+		CareerFA.declare(cs, Rng.new(hash("fa:%s:%d" % [c.player.id, cs.season.season_year])))
+		refresh(), false))
+	row.add_child(_choice_card("house", "잔류", "원소속 구단과 연봉 %s 원에 1년 재계약합니다. FA 자격은 유지되어 내년 겨울에 다시 신청할 수 있습니다." % FreeAgency.money(c.salary), "1년 재계약", "button", func() -> void:
+		CareerFA.stay(cs)
+		refresh(), false))
+	row.add_child(_choice_card("user", "에이전트", "계약 총액의 %d%%를 수수료로 받고 협상을 맡습니다. 구단마다 더 높은 조건을 이끌어 내고, 협상 여지를 알려 줍니다." % roundi(CareerFA.AGENT_FEE * 100.0), "에이전트 선임 완료" if cs.agent else "에이전트 선임", "button", func() -> void:
+		CareerFA.hire_agent(cs)
+		message = "에이전트를 선임했습니다."
+		refresh(), cs.agent))
+	# What the papers say: the clubs interested (his own one besides).
+	var keen := CareerFA.interested(cs)
+	body.add_child(CenteredPanel.section("관심을 보이는 구단 %d곳" % keen.size()))
+	if keen.is_empty():
+		body.add_child(UiKit.label("아직 다른 구단의 관심은 확인되지 않았습니다. 원소속 구단의 제안은 받을 수 있습니다.", 15, UiTheme.DIM, 500))
+	var clubs := UiKit.hbox(10)
+	body.add_child(clubs)
+	for id: String in keen:
+		var team: Team = cs.season.teams[id]
+		var chip := UiKit.well(8.0)
+		var line := UiKit.hbox(8)
+		chip.add_child(line)
+		line.add_child(UiKit.club_mark(team, 34.0))
+		var words := UiKit.vbox(-2)
+		words.add_child(UiKit.label(team.name, 16, Color.WHITE, 700))
+		words.add_child(UiKit.label("지난 시즌 %d위" % cs.season.standings[0].rank_of(id), 13, UiTheme.DIM, 500))
+		line.add_child(words)
+		clubs.add_child(chip)
+
+
+func _choice_card(icon_name: String, title: String, about: String, action: String, look: String, pick: Callable, done: bool) -> PanelContainer:
+	var well := UiKit.well(16.0)
+	well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var box := UiKit.vbox(10)
+	well.add_child(box)
+	box.add_child(UiKit.icon(icon_name, 40.0, tint))
+	box.add_child(UiKit.heading(title, 26))
+	var words := UiKit.label(about, 16, UiTheme.INK, 500)
+	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	words.custom_minimum_size.x = 220.0
+	box.add_child(words)
+	box.add_child(UiKit.spacer(0.0, 0.0, true))
+	var b := UiKit.button(action, pick, "check" if done else "", look)
+	b.add_theme_font_size_override("font_size", 20)
+	b.disabled = done
+	box.add_child(b)
+	return well
+
+
+## The offers, two to a row, the best deal first.
+func _build_fa_offers(body: Control, cs: CareerSeason) -> void:
+	var order: Array[int] = []
+	for i: int in cs.fa_offers.size():
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return FreeAgency.total_of(CareerFA.deal_of(cs.fa_offers[a])) > FreeAgency.total_of(CareerFA.deal_of(cs.fa_offers[b])))
+	var top := UiKit.hbox(10)
+	body.add_child(top)
+	var count := UiKit.label("구단 제안 %d건 · 계약 총액 순" % cs.fa_offers.size(), 17, Color.WHITE, 700)
+	count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(count)
+	if not cs.agent:
+		var agent := UiKit.button("에이전트 선임 (수수료 %d%%)" % roundi(CareerFA.AGENT_FEE * 100.0), func() -> void:
+			CareerFA.hire_agent(cs)
+			message = "에이전트를 선임했습니다. 구단별 협상 여지를 알려 주고 더 좋은 조건을 이끌어 냅니다."
+			refresh(), "user")
+		top.add_child(agent)
+	var scroll := UiKit.scroll()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 470.0
+	# (It takes the panel's height; the foot's spacer only what is left.)
+	scroll.size_flags_stretch_ratio = 20.0
+	body.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	scroll.add_child(grid)
+	for i: int in order:
+		var card := _fa_card(cs, cs.fa_offers[i], i)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(card)
+	# Every club walked away: a year with his own club at this winter's salary.
+	if cs.fa_offers.all(func(o: Dictionary) -> bool: return str(o["status"]) == "withdrawn"):
+		body.add_child(UiKit.label("모든 구단과의 협상이 결렬됐습니다.", 17, UiTheme.RED, 700))
+		body.add_child(UiKit.button("원소속 구단과 1년 계약 (연봉 %s 원)" % FreeAgency.money(cs.career.salary), func() -> void:
+			CareerFA.stay(cs)
+			refresh(), "house"))
+
+
+## A club's offer as a card: a band in its colours (emblem, name, its place last season, what he
+## would be there), the total and the years large, the bonus, the salary and the option in
+## tiles, the agent's word, and the answers. `index` −1: shown only (the extension).
+func _fa_card(cs: CareerSeason, o: Dictionary, index: int) -> PanelContainer:
+	var club: Team = cs.season.teams[str(o["club"])]
+	var own := str(o["club"]) == cs.career.team_id
+	var status := str(o["status"])
+	var well := UiKit.well(0.0)
+	var box := UiKit.vbox(0)
+	well.add_child(box)
+	var band := UiKit.band(club.primary, 74.0)
+	box.add_child(band)
+	var top := UiKit.hbox(12)
+	band.get_child(1).add_child(top)
+	top.add_child(UiKit.club_mark(club, 46.0))
+	var words := UiKit.vbox(-2)
+	words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	top.add_child(words)
+	words.add_child(UiKit.label(club.name, 21, Color.WHITE, 800))
+	words.add_child(UiKit.label("%s지난 시즌 %d위" % ["원소속 구단 · " if own else "", int(o["rank"])], 14, Color(1, 1, 1, 0.75), 600))
+	if str(o.get("role", "")) != "":
+		top.add_child(UiKit.badge(str(o["role"]), ROLE_COLOURS.get(str(o["role"]), UiTheme.DIM)))
+	var inner := MarginContainer.new()
+	for side: String in ["left", "right", "top", "bottom"]:
+		inner.add_theme_constant_override("margin_" + side, 14)
+	box.add_child(inner)
+	var col := UiKit.vbox(10)
+	inner.add_child(col)
+	# The deal: the total and the years large.
+	var deal := CareerFA.deal_of(o)
+	var big := UiKit.hbox(16)
+	col.add_child(big)
+	var total := UiKit.vbox(-4)
+	total.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	total.add_child(UiKit.caption("계약 총액"))
+	total.add_child(UiKit.number("%s 원" % FreeAgency.money(FreeAgency.total_of(deal)), 36, Color.WHITE))
+	big.add_child(total)
+	var years := UiKit.vbox(-4)
+	var y_caption := UiKit.caption("계약 기간")
+	y_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	years.add_child(y_caption)
+	var y_number := UiKit.number("%d년" % int(deal[0]), 36, Color.WHITE)
+	y_number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	years.add_child(y_number)
+	big.add_child(years)
+	var tiles := UiKit.hbox(8)
+	col.add_child(tiles)
+	var parts: Array = [[FreeAgency.money(int(deal[1])), "계약금"], [FreeAgency.money(int(deal[2])), "연봉"]]
+	var option: Array = o.get("option", [])
+	if not option.is_empty():
+		parts.append([FreeAgency.money(int(option[0])), "옵션 (연)"])
+	for part: Array in parts:
+		var t := UiKit.tile(str(part[0]), str(part[1]), 0.0, 20)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tiles.add_child(t)
+	if not option.is_empty():
+		col.add_child(UiKit.label(CareerFA.option_text(option), 14, UiTheme.DIM, 500))
+	if index < 0:
+		return well
+	# The answers, and the agent's word on how far it can still go.
+	var foot := UiKit.hbox(8)
+	col.add_child(foot)
+	var room := CareerFA.room_word(cs, o)
+	var hint := UiKit.label(room, 14, UiTheme.GREEN if room == "협상 여지 큼" else UiTheme.DIM, 600)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	foot.add_child(hint)
+	if status == "withdrawn":
+		foot.add_child(UiKit.badge("협상 결렬", UiTheme.RED))
+		well.modulate.a = 0.5
+		return well
+	if status == "final":
+		foot.add_child(UiKit.badge("최종 제안", Color(1.0, 1.0, 1.0, 0.8)))
+	else:
+		var more := UiKit.button("재협상 (%d회 남음)" % int(o["asks"]), func() -> void:
+			message = CareerFA.ask_more(cs, index, Rng.new(hash("ask:%s:%d:%d" % [cs.career.player.id, index, int(o["asks"])])))
+			refresh(), "chart-line-up")
+		more.add_theme_font_size_override("font_size", 16)
+		more.disabled = int(o["asks"]) <= 0
+		foot.add_child(more)
+	var id := str(o["club"])
+	var sign := UiKit.button("계약 체결", func() -> void:
+		CareerSession.next_season(id)
+		message = ""
+		refresh(), "handshake", "gold")
+	sign.add_theme_font_size_override("font_size", 17)
+	foot.add_child(sign)
+	return well
+
+
+# --- His contract and his money (CareerFA, CareerMoney) ---
+
+
+const INVEST_KINDS: Array = [["training", "트레이닝", "barbell", "이번 시즌 경기마다 얻는 성장 포인트가 늘어납니다"],
+	["conditioning", "컨디셔닝", "shield", "부상 회복이 빨라지고, 31세부터는 비시즌 노쇠가 줄어듭니다"],
+	["donations", "사회 공헌", "gift", "인기도가 올라 올스타 투표, FA 몸값, 원소속 구단의 대우에 도움이 됩니다"]]
+
+
+func _build_money(cs: CareerSeason) -> void:
+	var c := cs.career
+	var s := cs.season
+	var columns := UiKit.hbox(20)
+	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(columns)
+	# The deal and the money.
+	var left := panel("계약", "handshake", columns, 440.0, "CONTRACT")
+	left.body.add_child(UiKit.heading(CareerFA.contract_line(c) if not s.school else "고교 선수", 22, UiTheme.ACCENT))
+	var tiles := UiKit.hbox(8)
+	left.body.add_child(tiles)
+	for pair: Array in [[FreeAgency.money(c.salary), "연봉"], [FreeAgency.money(c.money), "보유 금액"], [FreeAgency.money(c.earned), "누적 수입"]]:
+		var t := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 22)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tiles.add_child(t)
+	if not s.school:
+		c.player.salary = c.salary if c.contract_years <= 0 else c.player.salary
+		FreeAgency.ensure(s)
+		var everyone: Array[int] = []
+		for id: String in s.teams:
+			for q: Player in (s.teams[id] as Team).players:
+				if q.origin == &"":
+					everyone.append(q.salary)
+		everyone.sort()
+		everyone.reverse()
+		left.body.add_child(UiKit.label("리그 연봉 순위 %d위 / %d명" % [everyone.find(c.player.salary) + 1, everyone.size()], 17, UiTheme.INK, 600))
+		var need := CareerFA.need_seasons(c)
+		var counted := CareerFA.seasons_counted(c, s.total_days())
+		left.body.add_child(UiKit.rule())
+		left.body.add_child(UiKit.caption("FA"))
+		if c.contract_years > 0:
+			left.body.add_child(UiKit.label("계약 만료 후 FA 자격 (%d/%d시즌)" % [counted, need], 16, UiTheme.INK, 500))
+		else:
+			left.body.add_child(UiKit.label("%s FA까지 %d시즌 남음 (1군 등록일 %d%% 이상인 시즌만 인정)" % ["첫" if c.fa_count == 0 else "%d번째" % (c.fa_count + 1), maxi(need - counted, 0), roundi(CareerContract.FA_DAYS_SHARE * 100.0)], 16, UiTheme.INK, 500))
+		left.body.add_child(_season_pips(mini(counted, need), need))
+		if not c.contract_option.is_empty():
+			left.body.add_child(UiKit.rule())
+			left.body.add_child(UiKit.caption("옵션"))
+			left.body.add_child(UiKit.label(CareerFA.option_text(c.contract_option), 16, UiTheme.INK, 600))
+			left.body.add_child(UiKit.label("이번 시즌 달성 (겨울에 지급)" if CareerFA.option_met(cs, c.contract_option) else "아직 미달성 (시즌 종료 후 확정)", 15, UiTheme.GREEN if CareerFA.option_met(cs, c.contract_option) else UiTheme.DIM, 600))
+	# What his money buys.
+	var middle := panel("개인 투자", "coins", columns, 0.0, "INVEST")
+	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	middle.body.add_child(UiKit.label("연봉이 오를수록 더 좋은 지원을 받을 수 있습니다. 모든 지원은 시즌 단위로 계약합니다.", 16, UiTheme.INK, 500))
+	var goal := CareerMoney.next_goal(cs)
+	if goal != "":
+		middle.body.add_child(UiKit.label("다음 목표: %s" % goal, 15, UiTheme.ACCENT, 700))
+	for kind: Array in INVEST_KINDS:
+		var head := UiKit.hbox(8)
+		middle.body.add_child(head)
+		head.add_child(UiKit.icon(str(kind[2]), 22.0, tint))
+		head.add_child(UiKit.label(str(kind[1]), 19, Color.WHITE, 700))
+		var about := UiKit.label(str(kind[3]), 14, UiTheme.DIM, 500)
+		about.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(about)
+		var row := UiKit.hbox(8)
+		middle.body.add_child(row)
+		var list := CareerMoney.catalog(str(kind[0]))
+		for level: int in range(1, list.size() + 1):
+			row.add_child(_invest_card(cs, str(kind[0]), level))
+	if message != "":
+		middle.body.add_child(UiKit.label(message, 16, UiTheme.ACCENT, 600))
+	# Gear: the shop takes his money too.
+	var right := panel("장비", "shopping-cart", columns, 340.0, "GEAR")
+	right.body.add_child(UiKit.label("상점 장비는 포인트 대신 보유 금액으로도 구매할 수 있습니다 (1P = %s 원)." % FreeAgency.money(CareerMoney.SHOP_RATE), 15, UiTheme.INK, 500))
+	if c.gear.is_empty():
+		right.body.add_child(UiKit.label("보유한 장비가 없습니다.", 15, UiTheme.DIM, 500))
+	for name: String in c.gear:
+		right.body.add_child(UiKit.label("%s  ·  %s" % [name, str(RATING_NAMES.get(c.gear[name], c.gear[name]))], 15, UiTheme.INK, 600))
+	right.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	right.body.add_child(UiKit.button("상점으로", func() -> void: go("res://ui/shop_screen.tscn"), "storefront"))
+
+
+## One grade of an investment: its name, price and effect, and the way to take it.
+func _invest_card(cs: CareerSeason, kind: String, level: int) -> PanelContainer:
+	var item: Array = CareerMoney.catalog(kind)[level - 1]
+	var have := CareerMoney.grade(cs, kind)
+	var well := UiKit.well(8.0)
+	well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var box := UiKit.vbox(2)
+	well.add_child(box)
+	box.add_child(UiKit.latin(["STANDARD", "PRO", "ELITE"][level - 1], 14, ProductStage.GRADE_RINGS[level - 1], true))
+	box.add_child(UiKit.label(str(item[0]), 17, Color.WHITE, 700))
+	var effect := ""
+	match kind:
+		"training":
+			effect = "성장 포인트 +%d%%" % roundi(float(item[2]) * 100.0)
+		"conditioning":
+			effect = "부상 기간 -%d%% · 노쇠 -%d%%" % [roundi(float(item[2]) * 100.0), roundi(float(item[3]) * 100.0)]
+		_:
+			effect = "인기도 +%d" % int(item[2])
+	box.add_child(UiKit.label(effect, 14, UiTheme.GREEN, 600))
+	var why := CareerMoney.problem(cs, kind, level)
+	var on := kind != "donations" and have == level
+	var label := "이용 중" if on else "%s 원" % FreeAgency.money(CareerMoney.price_now(cs, kind, level))
+	var b := UiKit.button(label, func() -> void:
+		message = CareerMoney.buy(cs, kind, level)
+		CareerSession.autosave()
+		Achievements.check_career(cs)
+		refresh(), "check" if on else "coins", "gold" if why == "" else "button")
+	b.add_theme_font_size_override("font_size", 17)
+	b.custom_minimum_size.y = 40.0
+	b.disabled = why != ""
+	if why != "" and not on:
+		b.tooltip_text = why
+	box.add_child(b)
+	if why != "" and not on and why.ends_with("부족"):
+		box.add_child(UiKit.label(why, 13, UiTheme.DIM, 500))
+	if on:
+		well.modulate = Color(1.0, 0.97, 0.85)
+	return well
+
+
+## The free agency clock as a row of pips, one a season (filled when counted).
+func _season_pips(counted: int, need: int) -> Control:
+	var row := UiKit.hbox(4)
+	for i: int in need:
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(0.0, 12.0)
+		pip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		pip.color = Color(tint, 0.95) if i < counted else Color(1.0, 1.0, 1.0, 0.12)
+		row.add_child(pip)
+	var words := UiKit.latin("%d / %d" % [counted, need], 16, UiTheme.INK, true)
+	words.custom_minimum_size.x = 56.0
+	words.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(words)
+	return row

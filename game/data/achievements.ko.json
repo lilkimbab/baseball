@@ -64,6 +64,10 @@
     {"id": "big_game", "name": "인생 경기", "about": "경기 평점 9.0 이상", "category": "career", "tier": 1, "key": "big_game", "target": 1},
     {"id": "evolve", "name": "진화", "about": "구종 진화", "category": "career", "tier": 1, "key": "evolve", "target": 1},
     {"id": "ovr_80", "name": "프랜차이즈 스타", "about": "커리어 선수 OVR 80", "category": "career", "tier": 2, "key": "ovr_80", "target": 1},
+    {"id": "salary_100m", "name": "억대 연봉", "about": "커리어 선수 연봉 1억 원", "category": "career", "tier": 0, "key": "salary_100m", "target": 1},
+    {"id": "fa_jackpot", "name": "FA 대박", "about": "총액 50억 원 이상 다년계약", "category": "career", "tier": 1, "key": "deal_50", "target": 1},
+    {"id": "deal_100", "name": "100억의 사나이", "about": "총액 100억 원 이상 다년계약", "category": "career", "tier": 2, "key": "deal_100", "target": 1},
+    {"id": "donor", "name": "선행 스타", "about": "사회 공헌에 기부하기", "category": "career", "tier": 0, "key": "donor", "target": 1},
     {"id": "first_ball", "name": "첫 기념구", "about": "커리어 선수의 1군 첫 기념구 받기", "category": "career", "tier": 0, "key": "milestone_balls", "target": 1},
     {"id": "ball_shelf", "name": "기념구 진열장", "about": "커리어 선수의 기념구 10개 모으기", "category": "career", "tier": 2, "key": "milestone_balls", "target": 10},
 

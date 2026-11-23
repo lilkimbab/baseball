@@ -126,6 +126,7 @@ static func pay_day(cs: CareerSeason) -> void:
 	var whole := int(cs.salary_paid)
 	if whole > 0:
 		cs.career.money += whole
+		cs.career.earned += whole
 		cs.salary_paid -= whole
 
 
@@ -149,10 +150,21 @@ static func winter(cs: CareerSeason, rng: Rng) -> PackedStringArray:
 	for entry: Variant in cs.season.game_logs.get(id, []):
 		c.game_log.append([cs.season.season_year] + (entry as Array))
 	var age := cs.season.season_year + 1 - c.player.born
+	cs.last_salary = c.salary
+	# A deal of several years (CareerFA): a year of it gone, its option paid when the season met
+	# its line; the club cannot let him go while it runs.
+	var under := c.contract_years > 0
+	if under:
+		c.contract_years -= 1
+		if CareerFA.option_met(cs, c.contract_option):
+			var paid := int(c.contract_option[0])
+			c.money += paid
+			c.earned += paid
+			lines.append("옵션 달성: 보너스 %s 원 지급" % FreeAgency.money(paid))
 	# Released: two seasons running almost all in the second team.
 	var recent := c.first_days.slice(maxi(c.first_days.size() - 2, 0))
 	var low := recent.size() == 2 and recent.all(func(d: int) -> bool: return float(d) / maxi(cs.season.total_days(), 1) < RELEASE_SHARE)
-	if low and age >= RELEASE_AGE:
+	if low and age >= RELEASE_AGE and not under:
 		lines.append("방출: %s이(가) 재계약하지 않았습니다." % team.name)
 		c.salary = MINIMUM
 		c.released = true
@@ -161,48 +173,37 @@ static func winter(cs: CareerSeason, rng: Rng) -> PackedStringArray:
 	var won := titles(cs)
 	for title: String in won:
 		c.money += TITLE_PRIZE
-		lines.append("%s 타이틀 (상금 %s)" % [title, Draft.money_text(TITLE_PRIZE)])
+		c.earned += TITLE_PRIZE
+		lines.append("%s 타이틀 (상금 %s 원)" % [title, FreeAgency.money(TITLE_PRIZE)])
 	if not won.is_empty():
 		perf = minf(perf + 0.3 * won.size(), 2.5)
+	if c.contract_years > 0:
+		lines.append("%s 계약 %d년 남음 · 연봉 %s 원 (계약 기간 동안 고정)" % [c.contract_kind, c.contract_years, FreeAgency.money(c.salary)])
+		return lines
+	if under:
+		lines.append("%s 계약이 만료되어 올겨울부터 매년 연봉 협상을 합니다." % c.contract_kind)
+		c.contract_kind = ""
+		c.contract_option = []
 	var before := c.salary
 	c.salary = renewed(c, share, perf)
 	if c.salary > before:
-		lines.append("연봉 인상: %s → %s" % [Draft.money_text(before), Draft.money_text(c.salary)])
+		lines.append("연봉 인상: %s → %s 원" % [FreeAgency.money(before), FreeAgency.money(c.salary)])
 	elif c.salary < before:
-		lines.append("연봉 삭감: %s → %s (2군에 오래 있었습니다)" % [Draft.money_text(before), Draft.money_text(c.salary)] if share < RELEASE_SHARE * 3.0 else "연봉 삭감: %s → %s" % [Draft.money_text(before), Draft.money_text(c.salary)])
+		lines.append("연봉 삭감: %s → %s 원%s" % [FreeAgency.money(before), FreeAgency.money(c.salary), " (2군에 오래 있었습니다)" if share < RELEASE_SHARE * 3.0 else ""])
 	else:
-		lines.append("연봉 동결: %s" % Draft.money_text(c.salary))
-	if fa_ready(c, cs.season.total_days()):
-		lines.append("FA 자격을 얻었습니다.")
+		lines.append("연봉 동결: %s 원" % FreeAgency.money(c.salary))
+	if CareerFA.ready(c, cs.season.total_days()):
+		lines.append("FA 자격을 취득했습니다%s." % ("" if c.fa_count == 0 else " (%d번째)" % (c.fa_count + 1)))
 	return lines
 
 
-## Seasons counted for free agency (each with three in four of its days on the first team).
+## Seasons counted for free agency since the clock last started (CareerFA).
 static func fa_seasons(c: CareerPlayer, season_days: int) -> int:
-	var n := 0
-	for d: int in c.first_days:
-		if float(d) / maxi(season_days, 1) >= FA_DAYS_SHARE:
-			n += 1
-	return n
+	return CareerFA.seasons_counted(c, season_days)
 
 
 static func fa_ready(c: CareerPlayer, season_days: int) -> bool:
-	return not c.free_agent_done and fa_seasons(c, season_days) >= c.fa_years
-
-
-## Free agency's offers: [club id, years, money a year (10,000 won)], his own club among them.
-static func offers(cs: CareerSeason, clubs: Array, rng: Rng) -> Array:
-	var c := cs.career
-	var perf := performance(cs)
-	var base := maxf(c.salary * (0.9 + perf * 0.5), MINIMUM * 2.0)
-	var others := clubs.filter(func(id: String) -> bool: return id != c.team_id)
-	var out: Array = [[c.team_id, 3, roundi(base / 100.0) * 100]]
-	for i: int in mini(FA_OFFERS - 1, others.size()):
-		var id: String = others[rng.next_int(others.size())]
-		others.erase(id)
-		var years := rng.next_int_range(2, 4)
-		out.append([id, years, roundi(base * rng.next_range(0.95, 1.3) / 100.0) * 100])
-	return out
+	return CareerFA.ready(c, season_days)
 
 
 ## His first-team totals over the seasons gone (and the one on, if given): batting, pitching.

@@ -37,13 +37,6 @@
 **📜 다시 쓰는 KBO 역사**<br>
 역사에 남은 시즌을 그해의 구단과 규칙 그대로 다시 플레이할 수 있습니다.
 
-| | |
-|:---:|:---:|
-| <img src="docs/images/cheering.jpg" alt="응원단상"> | <img src="docs/images/scoreboard.jpg" alt="전광판"> |
-| 📣 응원단상과 관중 | 🖥️ KBO식 전광판 |
-| <img src="docs/images/loading.jpg" alt="대진"> | <img src="docs/images/ratings.jpg" alt="능력치"> |
-| 🆚 중계 대진 카드 | 📊 선수 능력치 |
-
 ---
 
 ## 🎮 모드

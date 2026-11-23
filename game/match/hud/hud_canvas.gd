@@ -115,7 +115,8 @@ static func club_colour(club: Team) -> Color:
 ## broadcast, 2K14 and The Show have it"): the club's colour from bright at the left to deep at
 ## the right, a gloss along the top, a slanted stripe of its second colour, its emblem large and
 ## faint behind, the plate's cut corners and shadow. Text on it stays white.
-func team_plate(rect: Rect2, club: Team, cut: float = 12.0, alpha: float = 0.96) -> void:
+## `watermark`: the club's emblem faint behind the plate's right end (on a tall plate).
+func team_plate(rect: Rect2, club: Team, cut: float = 12.0, alpha: float = 0.96, watermark: bool = true) -> void:
 	var base := HudCanvas.club_colour(club)
 	var accent := club.accent if club != null else UiTheme.ACCENT
 	if absf(accent.get_luminance() - base.get_luminance()) < 0.12:
@@ -133,7 +134,7 @@ func team_plate(rect: Rect2, club: Team, cut: float = 12.0, alpha: float = 0.96)
 		var v := (p.y - rect.position.y) / maxf(rect.size.y, 1.0)
 		shades.append(bright.lerp(deep, clampf(u * 0.85 + v * 0.25, 0.0, 1.0)))
 	draw_polygon(shape, shades)
-	if club != null and rect.size.y >= 70.0:
+	if club != null and watermark and rect.size.y >= 70.0:
 		# (Inside the plate, behind its right end.)
 		var side := rect.size.y - 10.0
 		var mark := Rect2(Vector2(rect.end.x - side - rect.size.x * 0.2, rect.position.y + 5.0), Vector2(side, side))

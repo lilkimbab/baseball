@@ -234,12 +234,7 @@ const PLATES := {
 ## 90s: one for one up to 65 (so a point of growth is a point on screen), squeezed above it
 ## so that 99 stays 99. The engine never sees these numbers.
 static func shown(value: float) -> float:
-	if value <= 65.0:
-		return maxf(value + 18.0, 1.0)
-	if value > RatingScale.NATURAL:
-		# Past the natural top (a special man, a career built to the limit): one for one, to 130.
-		return minf(value, RatingScale.MAX)
-	return minf(83.0 + (value - 65.0) * 16.0 / 34.0, 99.0)
+	return RatingScale.shown(value)
 
 
 static func shown_text(value: float) -> String:

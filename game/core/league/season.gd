@@ -88,6 +88,9 @@ var grown: Dictionary[String, float] = {}
 var played_today: Dictionary[String, bool] = {}
 ## The winter before this season (who retired, the rookies, who grew most), for the screens.
 var last_winter: Development.Winter
+## How much of the winter's decline each man takes (player id → share; the career's own man
+## when he paid for his conditioning). Not saved: set as the winter begins.
+var decline_scales: Dictionary = {}
 ## A season of the past being played again, and the scenario taken, if any.
 var history: SeasonPack
 var scenario_id := ""

@@ -82,8 +82,16 @@ func test_free_agency_after_eight_full_seasons() -> void:
 	assert_false(CareerContract.fa_ready(c, 190), "a short season does not count")
 	c.first_days.append(170)
 	assert_true(CareerContract.fa_ready(c, 190))
-	c.free_agent_done = true
-	assert_false(CareerContract.fa_ready(c, 190), "once")
+	# Signed: the clock starts again, four seasons this time (CareerFA), and not while a deal runs.
+	c.fa_count = 1
+	c.fa_since = c.first_days.size()
+	c.contract_years = 4
+	assert_false(CareerContract.fa_ready(c, 190), "not right after a deal")
+	for i: int in 4:
+		c.first_days.append(180)
+	assert_false(CareerContract.fa_ready(c, 190), "not while the deal runs")
+	c.contract_years = 0
+	assert_true(CareerContract.fa_ready(c, 190), "again four seasons on")
 
 
 func test_a_trade_moves_him_and_one_of_theirs_comes_back() -> void:

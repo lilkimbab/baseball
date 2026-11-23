@@ -16,7 +16,7 @@ extends RefCounted
 ## additions in turn (migrate). A test (test_save_formats) fails when a saved key is in no
 ## format, so a new key cannot be forgotten.
 
-const FORMAT := 4
+const FORMAT := 5
 const ROOT := "user://saves"
 ## The keys of format 1's season and career, as they were first written.
 const BASE_KEYS := {
@@ -41,6 +41,11 @@ const ADDED := {
 		# Each game's line of the men followed; a career's whole record.
 		"season": {"game_logs": {}},
 		"career": {"game_log": [], "retired": false},
+	},
+	5: {
+		# A career's deals and free agency (CareerFA), its winter's choices, its spending
+		# (CareerMoney) (2026-11-23).
+		"career": {"contract": {}, "winter": {}, "invest": {}},
 	},
 }
 ## format → Callable(Dictionary) -> Dictionary bringing a save of that format to the next.
@@ -291,7 +296,7 @@ static func _farm_from(d: Dictionary, s: Season) -> FarmLeague:
 
 
 static func _winter_to(w: Development.Winter) -> Dictionary:
-	return {"year": w.year, "retired": w.retired.duplicate(true), "rookies": w.rookies.duplicate(true), "risers": w.risers.duplicate(true)}
+	return {"year": w.year, "retired": w.retired.duplicate(true), "rookies": w.rookies.duplicate(true), "risers": w.risers.duplicate(true), "free_agents": Array(w.free_agents)}
 
 
 static func _winter_from(d: Dictionary) -> Development.Winter:
@@ -300,6 +305,7 @@ static func _winter_from(d: Dictionary) -> Development.Winter:
 	w.retired = (d.get("retired", []) as Array).duplicate(true)
 	w.rookies = (d.get("rookies", []) as Array).duplicate(true)
 	w.risers = (d.get("risers", []) as Array).duplicate(true)
+	w.free_agents = PackedStringArray(d.get("free_agents", []))
 	return w
 
 
@@ -603,6 +609,10 @@ static func career_to(cs: CareerSeason) -> Dictionary:
 		"fa_years": c.fa_years, "free_agent_done": c.free_agent_done, "seasons": c.seasons.duplicate(true), "milestones": c.milestones.duplicate(true),
 		"season_first_days": cs.first_team_days, "events_seen": cs.events_seen.duplicate(), "salary_paid": cs.salary_paid,
 		"released": c.released, "game_log": c.game_log.duplicate(true), "retired": c.retired, "winter_lines": Array(cs.winter_lines), "fa_offers": cs.fa_offers.duplicate(true), "release_team": cs.release_team,
+		"contract": {"years": c.contract_years, "length": c.contract_length, "bonus": c.contract_bonus, "total": c.contract_total, "option": c.contract_option.duplicate(), "kind": c.contract_kind,
+			"fa_count": c.fa_count, "fa_since": c.fa_since, "earned": c.earned, "donated": c.donated},
+		"winter": {"fa_state": cs.fa_state, "fa_grade": cs.fa_grade, "agent": cs.agent, "extension": cs.extension.duplicate(), "last_salary": cs.last_salary},
+		"invest": {"trainer": cs.trainer, "conditioning": cs.conditioning, "paid": cs.invest_paid.duplicate(), "donation": cs.donation},
 		"ratings": Array(c.ratings),
 		"futures_book": book_to(cs.futures_book), "futures_games": cs.futures_games, "futures_day": cs._futures_day,
 		"recent_futures": cs.recent_futures.duplicate(true), "recent_first": cs.recent_first.duplicate(true), "futures_days": cs.futures_days,
@@ -670,8 +680,44 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 	for line: Variant in d.get("winter_lines", []):
 		cs.winter_lines.append(str(line))
 	for offer: Variant in d.get("fa_offers", []):
-		var o: Array = offer
-		cs.fa_offers.append([str(o[0]), int(o[1]), int(o[2])])
+		if offer is Dictionary:
+			var o: Dictionary = (offer as Dictionary).duplicate(true)
+			for key: String in ["years", "bonus", "annual", "limit", "asks", "rank"]:
+				o[key] = int(o.get(key, 0))
+			o["need"] = float(o.get("need", 0.0))
+			cs.fa_offers.append(o)
+		else:
+			# (A save from before deals had bonuses: [club, years, a year's money].)
+			var a: Array = offer
+			cs.fa_offers.append({"club": str(a[0]), "years": int(a[1]), "bonus": 0, "annual": int(a[2]), "option": [], "role": "", "need": 0.0, "limit": int(a[2]), "asks": 0, "status": "", "rank": 0})
+	var deal: Dictionary = d.get("contract", {})
+	c.contract_years = int(deal.get("years", 0))
+	c.contract_length = int(deal.get("length", c.contract_years))
+	c.contract_bonus = int(deal.get("bonus", 0))
+	c.contract_total = int(deal.get("total", 0))
+	c.contract_option = (deal.get("option", []) as Array).duplicate()
+	c.contract_kind = str(deal.get("kind", ""))
+	c.fa_count = int(deal.get("fa_count", 0))
+	c.fa_since = int(deal.get("fa_since", 0))
+	c.earned = int(deal.get("earned", 0))
+	c.donated = int(deal.get("donated", 0))
+	if c.free_agent_done and c.fa_count == 0:
+		# (A save from before free agency came round again: his clock starts from now.)
+		c.fa_count = 1
+		c.fa_since = c.first_days.size()
+	var winter: Dictionary = d.get("winter", {})
+	cs.fa_state = str(winter.get("fa_state", ""))
+	cs.fa_grade = str(winter.get("fa_grade", ""))
+	cs.agent = bool(winter.get("agent", false))
+	cs.extension = (winter.get("extension", []) as Array).duplicate()
+	cs.last_salary = int(winter.get("last_salary", c.salary))
+	if cs.fa_state == "" and not cs.fa_offers.is_empty():
+		cs.fa_state = "declared"
+	var invest: Dictionary = d.get("invest", {})
+	cs.trainer = int(invest.get("trainer", 0))
+	cs.conditioning = int(invest.get("conditioning", 0))
+	cs.invest_paid = (invest.get("paid", {}) as Dictionary).duplicate()
+	cs.donation = int(invest.get("donation", 0))
 	cs.release_team = str(d.get("release_team", ""))
 	for key: Variant in d.get("events_seen", []):
 		cs.events_seen.append(str(key))
@@ -685,4 +731,7 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 		cs.derby[id] = int(derby[id])
 	cs.derby_waiting = bool(d.get("derby_waiting", false))
 	cs.log = PackedStringArray(d.get("log", []) as Array)
+	if c.player != null:
+		c.player.salary = c.salary if c.contract_years <= 0 else roundi(float(c.contract_total) / maxi(c.contract_length, 1) / 100.0) * 100
+	CareerMoney.apply(cs)
 	return cs

@@ -19,3 +19,14 @@ static func norm(rating: float) -> float:
 	if rating > NATURAL:
 		n += (minf(rating, MAX) - NATURAL) / NATURAL * 0.5
 	return n
+
+
+## A rating as the screens show it (UiTheme.shown; free agency prices men by it): the engine's
+## 20..99 with the league's average at 50, shown so that the average reads 68 — one for one up
+## to 65, squeezed above it so that 99 stays 99, one for one again past 99 to MAX.
+static func shown(value: float) -> float:
+	if value <= 65.0:
+		return maxf(value + 18.0, 1.0)
+	if value > NATURAL:
+		return minf(value, MAX)
+	return minf(83.0 + (value - 65.0) * 16.0 / 34.0, 99.0)

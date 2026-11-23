@@ -136,6 +136,15 @@ static func check_career(cs: CareerSeason, last: CareerSeason.Report = null) -> 
 		reach("big_game")
 	if not c.milestones.is_empty():
 		reach("milestone_balls", c.milestones.size())
+	# His money (CareerFA, CareerMoney).
+	if c.salary >= 10000:
+		reach("salary_100m")
+	if c.contract_total >= 500000:
+		reach("deal_50")
+	if c.contract_total >= 1000000:
+		reach("deal_100")
+	if c.donated > 0:
+		reach("donor")
 	if UiTheme.shown(ClubRules.player_ovr(c.player, cs.season.ovr, cs.season.catalog)) >= 80.0:
 		reach("ovr_80")
 	for name: String in c.gear:

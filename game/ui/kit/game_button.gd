@@ -78,8 +78,10 @@ func _ready() -> void:
 		add_theme_font_size_override("font_size", 18)
 	if HEADLINE.has(look):
 		add_theme_font_override("font", UiTheme.display(800))
-		add_theme_font_size_override("font_size", int(HEADLINE[look]))
-		add_theme_constant_override("icon_max_width", int(HEADLINE[look]))
+		# (A size set by its screen stays: a small gold button on a card.)
+		if not has_theme_font_size_override("font_size"):
+			add_theme_font_size_override("font_size", int(HEADLINE[look]))
+		add_theme_constant_override("icon_max_width", get_theme_font_size("font_size"))
 	if look == "menu":
 		alignment = HORIZONTAL_ALIGNMENT_LEFT
 	resized.connect(func() -> void: pivot_offset = size * 0.5)

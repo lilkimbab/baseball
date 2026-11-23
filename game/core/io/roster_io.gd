@@ -104,6 +104,11 @@ static func player_from(entry: Dictionary) -> Player:
 	p.weight_kg = entry.get("weight_kg", 88.0)
 	p.origin = StringName(str(entry.get("origin", "")))
 	p.potential = float(entry.get("potential", -1.0))
+	var deal: Dictionary = entry.get("contract", {})
+	p.salary = int(deal.get("salary", 0))
+	p.contract_years = int(deal.get("years", 0))
+	p.service = int(deal.get("service", 0))
+	p.fa_count = int(deal.get("fa", 0))
 	var positions: Dictionary = entry.get("positions", {})
 	for code: String in positions:
 		p.positions[code] = float(positions[code])
@@ -174,6 +179,8 @@ static func player_to(p: Player, exact: bool = false) -> Dictionary:
 		d["origin"] = String(p.origin)
 	if p.potential >= 0.0:
 		d["potential"] = snappedf(p.potential, 0.000001)
+	if p.salary > 0:
+		d["contract"] = {"salary": p.salary, "years": p.contract_years, "service": p.service, "fa": p.fa_count}
 	if not p.record.is_empty():
 		d["record"] = p.record.duplicate()
 	if p.pitching != null:

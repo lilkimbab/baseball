@@ -103,8 +103,20 @@ static func start_winter() -> void:
 		if not others.is_empty():
 			cs.release_team = str(others[rng.next_int(others.size())])
 			cs.winter_lines.append("%s의 입단 테스트에 합격했습니다 (연봉 %s)." % [cs.season.teams[cs.release_team].name, Draft.money_text(CareerContract.MINIMUM)])
-	elif CareerContract.fa_ready(career, cs.season.total_days()):
-		cs.fa_offers = CareerContract.offers(cs, clubs, rng)
+	else:
+		# Free agency (CareerFA): the grade by last season's salary, his to file or not; or, a
+		# winter before it, his club's offer of a deal of several years.
+		career.player.salary = cs.last_salary
+		FreeAgency.ensure(cs.season)
+		if CareerFA.ready(career, cs.season.total_days()):
+			cs.fa_state = "eligible"
+			cs.fa_grade = str(FreeAgency.grades(cs.season, [career.player] as Array[Player]).get(career.player.id, "C"))
+			cs.winter_lines.append("FA 등급: %s등급 (직전 연봉 %s 원 기준)" % [cs.fa_grade, FreeAgency.money(cs.last_salary)])
+		else:
+			cs.extension = CareerFA.extension_offer(cs)
+			if not cs.extension.is_empty():
+				cs.winter_lines.append("%s에서 비FA 다년계약을 제안했습니다: %s" % [cs.season.teams[career.team_id].name, FreeAgency.deal_text(cs.extension)])
+		career.player.salary = career.salary if career.contract_years <= 0 else roundi(float(career.contract_total) / maxi(career.contract_length, 1) / 100.0) * 100
 	for line: String in cs.winter_lines:
 		cs.log.append("%d년 겨울: %s" % [cs.season.season_year, line])
 	_winter_cues(cs)
@@ -155,23 +167,49 @@ static func next_season(fa_club: String = "") -> void:
 	var c := career
 	var to := c.team_id
 	var fa_cue: Array = []
+	var news := PackedStringArray()
+	var rng := Rng.new(hash("market:%s:%d" % [c.player.id, old.season_year]))
 	if c.released and cs.release_team != "":
 		to = cs.release_team
 	if fa_club != "":
-		for offer: Array in cs.fa_offers:
-			if str(offer[0]) == fa_club:
-				to = fa_club
-				c.salary = int(offer[2])
-				c.free_agent_done = true
-				cs.log.append("%d년 FA 계약: %s %d년 (연 %s)" % [old.season_year, old.teams[fa_club].name, int(offer[1]), Draft.money_text(int(offer[2]))])
-				fa_cue = [&"contract", "%d FA 계약" % (old.season_year + 1), "%s 입단" % old.teams[fa_club].name, PackedStringArray(["%d년 · 연봉 %s" % [int(offer[1]), Draft.money_text(int(offer[2]))]])]
-	var w := Development.winter(old)
-	if to != c.team_id:
-		var from: Team = old.teams[c.team_id]
+		# His free agency (CareerFA): the deal, and an A or B man's compensation player.
+		var o := CareerFA.sign(cs, fa_club)
+		if not o.is_empty():
+			to = fa_club
+			var deal := CareerFA.deal_of(o)
+			var staying := fa_club == c.team_id
+			var line := "FA %s: %s (%s등급) %s %s" % ["잔류" if staying else "이적", c.player.name, cs.fa_grade, old.teams[fa_club].name, FreeAgency.deal_text(deal)]
+			cs.log.append("%d년 %s" % [old.season_year, line])
+			news.append(line)
+			var more := PackedStringArray([FreeAgency.deal_text(deal)])
+			if not (o["option"] as Array).is_empty():
+				more.append(CareerFA.option_text(o["option"]))
+			fa_cue = [&"contract", "%d FA 계약" % (old.season_year + 1), "%s %s" % [old.teams[fa_club].name, "잔류" if staying else "입단"], more]
+	var from_id := c.team_id
+	if to != from_id:
+		var from: Team = old.teams[from_id]
 		from.players.erase(c.player)
 		from.registered.erase(c.player.id)
 		(old.teams[to] as Team).players.append(c.player)
-	var moved := to != c.team_id
+		if fa_club == to:
+			var moved_ids: Array[String] = [c.player.id]
+			var pick := FreeAgency.compensate(old, cs.fa_grade, from_id, to, c.player.id, moved_ids, rng)
+			var paid := roundi(cs.last_salary * float(FreeAgency.COMPENSATION.get(cs.fa_grade, 1.5)) / 100.0) * 100
+			var line := "FA 보상: %s → %s (%s보상금 %s 원)" % [old.teams[to].name, old.teams[from_id].name, "보상선수 %s, " % pick if pick != "" else "", FreeAgency.money(paid)]
+			cs.log.append("%d년 %s" % [old.season_year, line])
+			news.append(line)
+	# The league's free agents go to market (FreeAgency), then the winter: his conditioning makes
+	# his decline gentler (CareerMoney).
+	c.player.salary = c.salary if c.contract_years <= 0 else roundi(float(c.contract_total) / maxi(c.contract_length, 1) / 100.0) * 100
+	for signing: FreeAgency.Signing in FreeAgency.offseason(old, rng, c.player.id):
+		var line := FreeAgency.news(old, signing)
+		news.append(line)
+		if signing.grade == "A" or signing.to == to or signing.from == to:
+			cs.log.append("%d년 겨울 %s" % [old.season_year, line])
+	old.decline_scales[c.player.id] = CareerMoney.decline_share(cs)
+	var w := Development.winter(old)
+	w.free_agents = news
+	var moved := to != from_id
 	var start_first := not moved and not c.released and float(cs.first_team_days) / maxi(old.total_days(), 1) >= 0.5
 	c.released = false
 	c.team_id = to

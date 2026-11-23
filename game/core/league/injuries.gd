@@ -50,10 +50,16 @@ func cause_of(player_id: String) -> String:
 	return str(CAUSES.get(str(out[player_id][1]), "부상")) if out.has(player_id) else ""
 
 
+## Days out a man takes of an injury's (player id → share; the career's own man with a
+## conditioning team: CareerMoney). Not saved: set by the career as it loads.
+var scales: Dictionary = {}
+
+
 ## Hurts a man for `days`: off the first-team entry (the injured list: no wait to come back).
 func injure(team: Team, p: Player, days: int, cause: String) -> void:
 	if p == null or days <= 0:
 		return
+	days = maxi(roundi(days * float(scales.get(p.id, 1.0))), 1)
 	out[p.id] = [maxi(days, days_left(p.id)), cause]
 	if not team.registered.is_empty() and team.registered.has(p.id):
 		team.registered.remove_at(team.registered.find(p.id))

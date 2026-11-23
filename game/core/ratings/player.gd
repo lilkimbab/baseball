@@ -31,6 +31,14 @@ var origin: StringName = &""
 ## Room left to grow, in rating points on his main ratings (Development): hidden;
 ## scouts see it as stars. Below zero: not yet given one (an old pack or save).
 var potential := -1.0
+## His contract (FreeAgency): the annual value (10,000 won; with an FA deal's bonus spread over
+## its years), the years of a multi-year deal left (0: signed year by year), the seasons counted
+## toward free agency since he came in or last moved as a free agent, and how many times he has
+## been one. Unset (salary 0) for a man from a roster pack: FreeAgency.ensure sets it.
+var salary := 0
+var contract_years := 0
+var service := 0
+var fa_count := 0
 
 
 func is_pitcher() -> bool:
@@ -118,6 +126,10 @@ func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	p.forms = forms.duplicate()
 	p.origin = origin
 	p.potential = potential
+	p.salary = salary
+	p.contract_years = contract_years
+	p.service = service
+	p.fa_count = fa_count
 	var s := func(v: float, key: String) -> float: return clampf(v * factor + float(deltas.get(key, 0.0)), 1.0, maxf(RatingScale.NATURAL, v))
 	var b := BattingRatings.new()
 	b.contact_r = s.call(batting.contact_r, "contact")

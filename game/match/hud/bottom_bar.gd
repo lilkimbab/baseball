@@ -9,10 +9,15 @@ extends HudCanvas
 ## (.287), ERA to two (3.45), innings in thirds (5⅔).
 
 const HEIGHT := 92.0
-const CARD := 540.0
+## The batter's and the pitcher's cards (the user, 2026-11-23: "the number next to the name, the
+## card too big with too much empty space"): a lower third as broadcasts draw one, sat on the
+## bar's foot.
+const CARD := 440.0
+const CARD_HEIGHT := 78.0
 ## The overall's block at a card's right end.
-const OVR_BLOCK := 92.0
+const OVR_BLOCK := 74.0
 ## The detail cards (Tab).
+const DETAIL_WIDTH := 540.0
 const DETAIL_HEIGHT := 280.0
 ## Their header band in the club's colours.
 const DETAIL_HEAD := 46.0
@@ -42,8 +47,9 @@ func _draw() -> void:
 	var field := g.fielding_team()
 	var batter := bat.player(g.batter_id())
 	var pitcher := field.player(g.pitcher_id())
-	_batter_card(Rect2(Vector2(20.0, top), Vector2(CARD, HEIGHT)), bat, batter, g)
-	_pitcher_card(Rect2(Vector2(view.x - CARD - 20.0, top), Vector2(CARD, HEIGHT)), field, pitcher, g)
+	var card_top := top + HEIGHT - CARD_HEIGHT
+	_batter_card(Rect2(Vector2(20.0, card_top), Vector2(CARD, CARD_HEIGHT)), bat, batter, g)
+	_pitcher_card(Rect2(Vector2(view.x - CARD - 20.0, card_top), Vector2(CARD, CARD_HEIGHT)), field, pitcher, g)
 	var middle_x := CARD + 36.0
 	var middle_w := view.x - 2.0 * CARD - 72.0
 	var keys := Rect2(Vector2(middle_x, top + HEIGHT - 34.0), Vector2(middle_w, 34.0))
@@ -62,26 +68,48 @@ func _draw() -> void:
 			size -= 1
 		text(line.position + Vector2(92.0, 34.0 - (20 - size) * 0.35), scene.last_text, size, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, line.size.x - 100.0, 700)
 	if detail:
-		_batter_detail(Rect2(Vector2(20.0, top - DETAIL_HEIGHT - 14.0), Vector2(CARD, DETAIL_HEIGHT)), batter, g)
-		_pitcher_detail(Rect2(Vector2(view.x - CARD - 20.0, top - DETAIL_HEIGHT - 14.0), Vector2(CARD, DETAIL_HEIGHT)), pitcher, g)
+		_batter_detail(Rect2(Vector2(20.0, top - DETAIL_HEIGHT - 14.0), Vector2(DETAIL_WIDTH, DETAIL_HEIGHT)), batter, g)
+		_pitcher_detail(Rect2(Vector2(view.x - DETAIL_WIDTH - 20.0, top - DETAIL_HEIGHT - 14.0), Vector2(DETAIL_WIDTH, DETAIL_HEIGHT)), pitcher, g)
 
 
 ## A player's card: the plate, his club's colour down the edge, a grey line over his name, the
 ## overall in a block of its own at the right (as the menus' player card has it).
-func _card(rect: Rect2, side: int, head: String, name: String, ovr: int) -> void:
-	# In his club's colours, its emblem large behind (the user, 2026-11-23: "less black").
+func _card(rect: Rect2, side: int, head: String, p: Player, ovr: int, note: String) -> Vector2:
+	# In his club's colours (the user, 2026-11-23: "less black"), the emblem at the left.
 	var club := scene.club(side)
-	team_plate(rect, club, 12.0)
+	team_plate(rect, club, 12.0, 0.96, false)
 	if club != null:
-		Emblem.draw_emblem(self, club, Rect2(rect.position + Vector2(16.0, 18.0), Vector2(54.0, 54.0)))
-	text(rect.position + Vector2(80.0, 32.0), head, 16, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 600)
-	text(rect.position + Vector2(80.0, 72.0), name, 32, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 800)
-	# The overall on a gold tab.
-	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK + 6.0, rect.position.y + 10.0), Vector2(OVR_BLOCK - 16.0, rect.size.y - 24.0))
-	draw_colored_polygon(plate_shape(block, 8.0), Color(0.0, 0.0, 0.0, 0.38))
-	draw_rect(Rect2(block.position, Vector2(block.size.x, 3.0)), UiTheme.ACCENT)
-	figure(block.position + Vector2(0.0, 46.0), UiTheme.shown_text(ovr), 42, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x, true)
-	figure(block.position + Vector2(0.0, 64.0), "OVR", 13, Color(1, 1, 1, 0.75), HORIZONTAL_ALIGNMENT_CENTER, block.size.x)
+		Emblem.draw_emblem(self, club, Rect2(rect.position + Vector2(14.0, (rect.size.y - 48.0) * 0.5), Vector2(48.0, 48.0)))
+	var x := rect.position.x + 74.0
+	var right := rect.end.x - OVR_BLOCK - 12.0
+	# Above: his place in the order (or his role) and hand; today's figures at the right.
+	text(Vector2(x, rect.position.y + 26.0), head, 15, Color(1, 1, 1, 0.78), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 600)
+	if note != "":
+		text(Vector2(x, rect.position.y + 26.0), note, 15, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT, right - x, 600)
+	# Below: his number on a white chip in the club's colour, then his name, as a broadcast
+	# writes them (the user, 2026-11-23: no gold here).
+	var number := str(p.number)
+	var digits := UiTheme.numeric(true, true)
+	var chip := Rect2(Vector2(x, rect.position.y + 36.0), Vector2(digits.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26).x + 16.0, 32.0))
+	draw_colored_polygon(plate_shape(chip, 6.0), Color(1.0, 1.0, 1.0, 0.94))
+	var ink := HudCanvas.club_colour(club)
+	if ink.get_luminance() > 0.55:
+		ink = ink.darkened(0.55)
+	var f := digits
+	draw_string(f, Vector2(chip.position.x, chip.position.y + 26.0), number, HORIZONTAL_ALIGNMENT_CENTER, chip.size.x, 26, ink)
+	var nx := chip.end.x + 10.0
+	var size := 28
+	while size > 20 and text_width(p.name, size, 800) > right - nx:
+		size -= 1
+	text(Vector2(nx, rect.position.y + 61.0), p.name, size, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 800)
+	# The overall in white on a dark tab, its tier's colour (UiTheme.TIERS) in the line on top.
+	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK + 2.0, rect.position.y + 8.0), Vector2(OVR_BLOCK - 12.0, rect.size.y - 18.0))
+	var tier := UiTheme.rating_color(ovr)
+	draw_colored_polygon(plate_shape(block, 8.0), Color(0.0, 0.0, 0.0, 0.42))
+	draw_rect(Rect2(block.position, Vector2(block.size.x, 3.0)), tier if tier.get_luminance() >= 0.2 else Color(0.75, 0.77, 0.8))
+	figure(block.position + Vector2(0.0, 40.0), UiTheme.shown_text(ovr), 36, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, block.size.x, true)
+	figure(block.position + Vector2(0.0, 55.0), "OVR", 12, Color(1, 1, 1, 0.65), HORIZONTAL_ALIGNMENT_CENTER, block.size.x)
+	return Vector2(x, right)
 
 
 func _batter_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> void:
@@ -93,9 +121,7 @@ func _batter_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> voi
 	var throws := g.fielding_team().player(g.pitcher_id())
 	var side := p.batting_side(throws.throws if throws != null else &"R")
 	var head := "%d번 · %s · %s타" % [slot + 1, Position.name_of(pos), "좌" if side == &"L" else "우"]
-	_card(rect, g.batting(), head, p.name, roundi(_ovr.batter(p, pos)))
-	# Today's line at the right of the grey line, the name below with the whole width.
-	text(Vector2(rect.end.x - OVR_BLOCK - 276.0, rect.position.y + 32.0), today_batting(scene.scorer.book.bat(p.id)), 16, UiTheme.INK, HORIZONTAL_ALIGNMENT_RIGHT, 260.0, 500)
+	_card(rect, g.batting(), head, p, roundi(_ovr.batter(p, pos)), today_batting(scene.scorer.book.bat(p.id)))
 
 
 func _pitcher_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> void:
@@ -104,17 +130,14 @@ func _pitcher_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> vo
 		return
 	var starter := p.id == team.starter_id
 	var head := "%s · %s투" % ["선발" if starter else "구원", "좌" if p.throws == &"L" else "우"]
-	_card(rect, g.fielding(), head, p.name, roundi(Overall.pitcher(p, scene.catalog)))
-	# The pitch count and what is left of him at the right of the grey line.
 	var pitches: int = g.pitch_counts.get(p.id, 0)
-	var x := rect.end.x - OVR_BLOCK - 206.0
-	text(Vector2(x, rect.position.y + 32.0), "투구", 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
-	figure(Vector2(x + 38.0, rect.position.y + 34.0), str(pitches), 22, Color.WHITE)
 	# What is left of him today, named so (the rating 체력 is on the Tab card, in its tier's
-	# colour; this is the game's, in one colour of its own).
+	# colour; this is the game's, in one colour of its own), and a thin bar of it at the foot.
 	var left := stamina_left(p, pitches, starter)
-	text(Vector2(x + 82.0, rect.position.y + 17.0), "남은 체력", 12, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 600)
-	bar(Rect2(Vector2(x + 82.0, rect.position.y + 24.0), Vector2(108.0, 8.0)), left, UiTheme.STAMINA)
+	var span := _card(rect, g.fielding(), head, p, roundi(Overall.pitcher(p, scene.catalog)), "투구 %d  ·  남은 체력 %d%%" % [pitches, roundi(left * 100.0)])
+	var foot := Rect2(Vector2(span.x, rect.end.y - 9.0), Vector2(span.y - span.x, 4.0))
+	draw_rect(foot, Color(0.0, 0.0, 0.0, 0.45))
+	draw_rect(Rect2(foot.position, Vector2(foot.size.x * clampf(left, 0.0, 1.0), foot.size.y)), UiTheme.STAMINA)
 
 
 # --- The detail cards (Tab) ---

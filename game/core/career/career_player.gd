@@ -32,6 +32,22 @@ var salary := 3000
 var first_days: Array[int] = []
 var fa_years := 8
 var free_agent_done := false
+## His deal (CareerFA): the years left of a deal of several years (0: signed year by year; the
+## salary is fixed while it runs), its signing bonus and total, its option ([money a year, what
+## he has to do]: CareerFA.OPTIONS), and what kind it was ("FA", "비FA 다년", "").
+var contract_years := 0
+var contract_length := 0
+var contract_bonus := 0
+var contract_total := 0
+var contract_option: Array = []
+var contract_kind := ""
+## Free agency: how many times he has been one, and from which of his seasons (first_days) the
+## clock runs again (NEXT_FA seasons after a deal).
+var fa_count := 0
+var fa_since := 0
+## His money's story: all he has earned (salary, bonuses, prizes, options) and given away.
+var earned := 0
+var donated := 0
 ## Not kept by his club this winter (CareerContract): another club signs him.
 var released := false
 var seasons: Array = []

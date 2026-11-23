@@ -85,6 +85,21 @@ var events_seen := PackedStringArray()
 var winter_lines := PackedStringArray()
 var fa_offers: Array = []
 var release_team := ""
+## The winter's free agency for him (CareerFA): "" none, "eligible" (his to choose), "declared"
+## (the offers are in), "stayed" (he did not file); the grade he would be; an agent hired; his
+## club's offer of a deal before free agency (비FA 다년계약: [years, bonus, annual], or []).
+var fa_state := ""
+## His salary of the season gone (the grade is set by it; the winter renews it).
+var last_salary := 0
+var fa_grade := ""
+var agent := false
+var extension: Array = []
+## This season's spending on himself (CareerMoney): the trainer's and the conditioning team's
+## grade (0 none), what he has paid for them, and a donation made (its grade).
+var trainer := 0
+var conditioning := 0
+var invest_paid: Dictionary = {}
+var donation := 0
 var _futures_day := -1
 ## The all-star break: held once at mid-season. Who was picked, whether the career player's
 ## all-star game and derby turn are still to come, the derby's home runs.
@@ -423,7 +438,8 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	if report.goal_met:
 		gp[goal.field] = float(gp.get(goal.field, 0.0)) + rules.game_goal_gp
 	# Played on screen: by its difficulty (Difficulty.REWARDS); simulated: 프로's at most.
-	var gp_share := Difficulty.reward(level if level >= 0 else Difficulty.Level.PRO, "gp", level >= 0)
+	# (His trainer adds to it: CareerMoney.)
+	var gp_share := Difficulty.reward(level if level >= 0 else Difficulty.Level.PRO, "gp", level >= 0) * CareerMoney.growth_share(self)
 	for field: String in gp:
 		gp[field] = float(gp[field]) * gp_share
 	Growth.add(career, gp)

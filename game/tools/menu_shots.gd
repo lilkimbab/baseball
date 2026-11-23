@@ -116,10 +116,35 @@ func _initialize() -> void:
 				var cs := CareerSession.career_season
 				var guard := 0
 				while not cs.season.finished() and guard < 400:
+					if cs.all_star_today:
+						cs.quick_all_star()
+					if cs.derby_waiting:
+						cs.quick_derby()
 					if cs.has_game():
 						cs.quick()
 					cs.next_day()
 					guard += 1
+				# --fa: a star with his eight seasons in, at his free agency (--fa-declared: filed,
+				# with an agent, the offers in).
+				if _args.has("fa"):
+					var c := CareerSession.career
+					for i: int in 8:
+						c.first_days.append(cs.season.total_days())
+					for key: String in ["contact_r", "contact_l", "power_r", "power_l", "eye"]:
+						c.player.batting.set(key, 88.0)
+					CareerSession.start_winter()
+					if _args.has("fa-declared"):
+						CareerFA.hire_agent(cs)
+						CareerFA.declare(cs, Rng.new(3))
+			# --rich: money in hand and a trainer hired (the 계약·투자 tab).
+			if _args.has("rich"):
+				CareerSession.career.money = 24000
+				CareerSession.career.earned = 61000
+				CareerSession.career_season.trainer = 1
+				CareerSession.career_season.invest_paid = {"training": 2000}
+		# (No cutscenes waiting: the screen itself is the picture.)
+		if CareerSession.career_season != null:
+			CareerSession.career_season.cues.clear()
 		CareerSession.slot = "menu_shots_career"
 	_next()
 
