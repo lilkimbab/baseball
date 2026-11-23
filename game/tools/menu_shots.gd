@@ -136,6 +136,45 @@ func _initialize() -> void:
 					if _args.has("fa-declared"):
 						CareerFA.hire_agent(cs)
 						CareerFA.declare(cs, Rng.new(3))
+			# --legacy: a veteran of fifteen seasons with his story kept (the retirement: its
+			# flashback, ceremony and settling up).
+			if _args.has("legacy"):
+				var c := CareerSession.career
+				var cs := CareerSession.career_season
+				var team: Team = cs.season.teams[c.team_id]
+				var now := cs.season.season_year
+				var others: Array = Array(cs.season.divisions[0]).filter(func(id: String) -> bool: return id != c.team_id)
+				for i: int in 14:
+					var b := BattingLine.new()
+					b.games = 130
+					b.pa = 560
+					b.ab = 500
+					b.hits = 155
+					b.doubles = 28
+					b.home_runs = 24
+					b.rbi = 88
+					b.walks = 52
+					b.stolen_bases = 9
+					c.seasons.append([now - 14 + i, team.name, 150, "1군 타율 .310 24홈런", SaveIO.fields(b), SaveIO.fields(PitchingLine.new())])
+				c.pro_years = 14
+				CareerLegacy.note(c, now - 14, "draft", "%s 1라운드 2순위" % team.name, "서울고 출신 · 계약금 3억 원", c.team_id)
+				CareerLegacy.note(c, now - 14, "debut", "첫 1군 등록", "%s · 41일차" % team.name, c.team_id)
+				CareerLegacy.note(c, now - 14, "milestone", "데뷔 첫 홈런", "vs %s" % cs.season.teams[others[0]].name, c.team_id)
+				CareerLegacy.note(c, now - 11, "all_star", "올스타 선정", "청팀 유격수 부문 · 512,330표", c.team_id)
+				CareerLegacy.note(c, now - 9, "title", "홈런왕 · 타점왕", "%d KBO 시상식" % (now - 9), c.team_id)
+				CareerLegacy.note(c, now - 7, "deal", "FA 잔류 · %s" % team.name, "4년 총액 96억 원 (계약금 40억 · 연봉 14억)", c.team_id)
+				CareerLegacy.note(c, now - 5, "champion", "%s 우승" % team.name, "%d 한국시리즈" % (now - 5), c.team_id)
+				CareerLegacy.note(c, now - 3, "milestone", "통산 2000안타", "vs %s" % cs.season.teams[others[1]].name, c.team_id)
+				CareerLegacy.note(c, now, "tour", "은퇴 투어", "마지막 시즌을 발표했습니다", c.team_id)
+				c.titles_won = [[now - 9, "홈런왕"], [now - 9, "타점왕"], [now - 6, "홈런왕"]]
+				c.all_stars = 8
+				c.championships = [now - 5]
+				c.deals = [[now - 7, "FA 잔류 · %s 4년 총액 96억 원" % team.name]]
+				c.best_salary = 140000
+				c.earned = 1250000
+				c.final_season = true
+				for id: String in others.slice(0, 6):
+					c.tour_gifts.append([id, CareerLegacy.GIFTS[c.tour_gifts.size()]])
 			# --rich: money in hand and a trainer hired (the 계약·투자 tab).
 			if _args.has("rich"):
 				CareerSession.career.money = 24000

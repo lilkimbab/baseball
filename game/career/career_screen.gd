@@ -66,7 +66,7 @@ func build() -> void:
 			p.body.add_child(UiKit.heading("%s 선수는 은퇴했습니다" % cs.career.player.name, 26, UiTheme.ACCENT))
 			for line: String in Array(cs.log).slice(maxi(cs.log.size() - 3, 0)):
 				p.body.add_child(UiKit.label(line, 17, UiTheme.INK, 500))
-			p.body.add_child(UiKit.button("은퇴식 다시 보기", func() -> void: go(CareerSession.RETIRE), "trophy"))
+			p.body.add_child(UiKit.button("은퇴 결산 보기", func() -> void: go(CareerSession.RETIRE), "trophy"))
 		else:
 			p.body.add_child(UiKit.label("진행 중인 커리어가 없습니다.", 20, UiTheme.DIM, 500))
 		p.body.add_child(UiKit.button("선수 생성", func() -> void: go(CareerSession.CREATE), "plus", "primary", 320.0))
@@ -207,28 +207,46 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 		CareerSession.start_winter()
 		p.body.add_child(UiKit.heading("%d년 시즌 종료 · 겨울" % s.season_year, 24, UiTheme.ACCENT))
 		for line: String in cs.winter_lines:
-			p.body.add_child(UiKit.label(line, 18, UiTheme.INK, 500))
-		if not _fa_hub_active(cs):
+			p.body.add_child(UiKit.label(line, 18, UiTheme.ACCENT if line.begins_with("구단이 은퇴를") else UiTheme.INK, 500))
+		if cs.career.final_season:
+			# His farewell tour is over: the ceremony (CareerLegacy).
+			var farewell := UiKit.button("은퇴식", func() -> void: go(CareerSession.FAREWELL, {"title": "은퇴식"}), "trophy", "primary", 240.0)
+			farewell.add_theme_font_size_override("font_size", 22)
+			actions.add_child(farewell)
+		elif not _fa_hub_active(cs):
 			var go_on := UiKit.button("다음 시즌", func() -> void:
 				CareerSession.next_season()
 				refresh(), "caret-right", "primary", 240.0)
 			go_on.add_theme_font_size_override("font_size", 22)
 			actions.add_child(go_on)
+			# A veteran may announce his last season: a farewell tour, the clubs' gifts on the road.
+			if s.season_year + 1 - cs.career.player.born >= 33:
+				var tour := UiKit.button("은퇴 투어 발표", func() -> void:
+					CareerLegacy.announce(cs)
+					message = "다음 시즌이 마지막 시즌입니다. 원정 구장마다 상대 구단이 작별 선물을 준비합니다."
+					CareerSession.next_season()
+					refresh(), "flag-pennant")
+				tour.tooltip_text = "다음 시즌을 마지막으로 은퇴합니다"
+				actions.add_child(tour)
 		# He may hang up his spikes in any winter (a second press: no going back).
-		var retire := UiKit.button("은퇴", func() -> void: pass, "flag-pennant", "danger")
-		retire.pressed.connect(func() -> void:
-			if retire.text == "은퇴":
-				retire.text = "정말 은퇴합니다 (되돌릴 수 없음)"
-				return
-			go(CareerSession.RETIRE, {"title": "은퇴식"}))
-		actions.add_child(retire)
+		if not cs.career.final_season:
+			var retire := UiKit.button("은퇴", func() -> void: pass, "flag-pennant", "danger")
+			retire.pressed.connect(func() -> void:
+				if retire.text == "은퇴":
+					retire.text = "정말 은퇴합니다 (되돌릴 수 없음)"
+					return
+				go(CareerSession.FAREWELL, {"title": "은퇴식"}))
+			actions.add_child(retire)
 	if s.phase != Season.Phase.OVER:
 		actions.add_child(UiKit.button("시즌 끝까지 진행", to_end, "skip-forward"))
+		if c.final_season:
+			p.body.add_child(UiKit.label("은퇴 투어 · 마지막 시즌 (작별 선물 %d개)" % c.tour_gifts.size(), 17, UiTheme.ACCENT, 700))
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	p.body.add_child(actions)
 	if message != "":
 		p.body.add_child(UiKit.label(message, 17, UiTheme.ACCENT, 600))
 	_build_schedule(p, cs, team)
+
 
 
 ## The club's next games as a row of cards (the reference's schedule strip): the other club's
@@ -682,7 +700,7 @@ func _build_fa_hub(parent: Control, cs: CareerSeason) -> void:
 		if retire.text == "은퇴":
 			retire.text = "정말 은퇴합니다 (되돌릴 수 없음)"
 			return
-		go(CareerSession.RETIRE, {"title": "은퇴식"}))
+		go(CareerSession.FAREWELL, {"title": "은퇴식"}))
 	foot.add_child(retire)
 
 

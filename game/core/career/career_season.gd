@@ -238,7 +238,9 @@ func _check_all_star() -> void:
 	if all_star_selected.has(me):
 		all_star_today = true
 		career.popularity += 5.0
+		career.all_stars += 1
 		log.append("%d일: 올스타 선정" % (season.day + 1))
+		CareerLegacy.note(career, season.season_year, "all_star", "올스타 선정" if career.all_stars == 1 else "올스타 %d회 선정" % career.all_stars, said, career.team_id)
 	var field := AllStar.derby_field(season, d, career, all_star_selected, int(rules.all_star.get("derby", 8)))
 	var outs := int(rules.all_star.get("derby_outs", 10))
 	var rng := Rng.new(hash("derby:%d" % season.season_year))
@@ -409,6 +411,9 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 		season.record(g, state, book)
 		if not totals_before.is_empty():
 			_milestones(totals_before, g)
+		# His last season's road trips: each club's gift (CareerLegacy).
+		if career.final_season and not report.postseason:
+			CareerLegacy.tour_gift(self, g.home)
 	else:
 		futures_games += 1
 		_futures_day = season.day
@@ -482,6 +487,7 @@ func _milestones(before: Array, g: ScheduledGame) -> void:
 	var vs_name := vs.name if vs != null else ""
 	for m: Array in Milestones.crossed(before, after, career.is_pitcher()):
 		career.milestones.append([str(m[0]), season.season_year, season.day + 1, vs_name])
+		CareerLegacy.note(career, season.season_year, "milestone", str(m[1]), "vs %s" % vs_name, career.team_id)
 		cue(&"milestone", "%d년 %d일차 · vs %s" % [season.season_year, season.day + 1, vs_name], str(m[1]), PackedStringArray(["기념구"]))
 		log.append("%s 달성! 기념구를 챙겼습니다" % str(m[1]))
 
@@ -624,6 +630,7 @@ func call_up() -> void:
 	var first := not events_seen.has("first_call_up")
 	if first:
 		events_seen.append("first_call_up")
+		CareerLegacy.note(career, season.season_year, "debut", "첫 1군 등록", "%s · %d일차" % [team.name, season.day + 1], team.id)
 	cue(&"call_up", "%d년 %s" % [season.season_year, team.name], "첫 1군 등록" if first else "1군 등록", PackedStringArray(["%d일 · 퓨처스에서 올라왔습니다" % (season.day + 1)]))
 
 

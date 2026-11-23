@@ -16,7 +16,7 @@ extends RefCounted
 ## additions in turn (migrate). A test (test_save_formats) fails when a saved key is in no
 ## format, so a new key cannot be forgotten.
 
-const FORMAT := 5
+const FORMAT := 6
 const ROOT := "user://saves"
 ## The keys of format 1's season and career, as they were first written.
 const BASE_KEYS := {
@@ -46,6 +46,11 @@ const ADDED := {
 		# A career's deals and free agency (CareerFA), its winter's choices, its spending
 		# (CareerMoney) (2026-11-23).
 		"career": {"contract": {}, "winter": {}, "invest": {}},
+	},
+	6: {
+		# A career's story and its end (CareerLegacy): moments, honours, the farewell tour, the
+		# settling up (2026-11-23).
+		"career": {"legacy": {}},
 	},
 }
 ## format → Callable(Dictionary) -> Dictionary bringing a save of that format to the next.
@@ -613,6 +618,9 @@ static func career_to(cs: CareerSeason) -> Dictionary:
 			"fa_count": c.fa_count, "fa_since": c.fa_since, "earned": c.earned, "donated": c.donated},
 		"winter": {"fa_state": cs.fa_state, "fa_grade": cs.fa_grade, "agent": cs.agent, "extension": cs.extension.duplicate(), "last_salary": cs.last_salary},
 		"invest": {"trainer": cs.trainer, "conditioning": cs.conditioning, "paid": cs.invest_paid.duplicate(), "donation": cs.donation},
+		"legacy": {"moments": c.moments.duplicate(true), "titles": c.titles_won.duplicate(true), "all_stars": c.all_stars, "championships": c.championships.duplicate(),
+			"deals": c.deals.duplicate(true), "best_salary": c.best_salary, "final_season": c.final_season, "tour_gifts": c.tour_gifts.duplicate(true),
+			"grade": c.legacy_grade, "reward": c.legacy_reward, "number_retired": c.number_retired},
 		"ratings": Array(c.ratings),
 		"futures_book": book_to(cs.futures_book), "futures_games": cs.futures_games, "futures_day": cs._futures_day,
 		"recent_futures": cs.recent_futures.duplicate(true), "recent_first": cs.recent_first.duplicate(true), "futures_days": cs.futures_days,
@@ -713,6 +721,18 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 	cs.last_salary = int(winter.get("last_salary", c.salary))
 	if cs.fa_state == "" and not cs.fa_offers.is_empty():
 		cs.fa_state = "declared"
+	var legacy: Dictionary = d.get("legacy", {})
+	c.moments = (legacy.get("moments", []) as Array).duplicate(true)
+	c.titles_won = (legacy.get("titles", []) as Array).duplicate(true)
+	c.all_stars = int(legacy.get("all_stars", 0))
+	c.championships = (legacy.get("championships", []) as Array).duplicate()
+	c.deals = (legacy.get("deals", []) as Array).duplicate(true)
+	c.best_salary = int(legacy.get("best_salary", c.salary))
+	c.final_season = bool(legacy.get("final_season", false))
+	c.tour_gifts = (legacy.get("tour_gifts", []) as Array).duplicate(true)
+	c.legacy_grade = str(legacy.get("grade", ""))
+	c.legacy_reward = int(legacy.get("reward", 0))
+	c.number_retired = bool(legacy.get("number_retired", false))
 	var invest: Dictionary = d.get("invest", {})
 	cs.trainer = int(invest.get("trainer", 0))
 	cs.conditioning = int(invest.get("conditioning", 0))

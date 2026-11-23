@@ -9,6 +9,8 @@ const MATCH := "res://career/career_match.tscn"
 const DERBY := "res://career/home_run_derby.tscn"
 const DRAFT := "res://career/draft_screen.tscn"
 const RETIRE := "res://career/retire_screen.tscn"
+## His retirement at his park (FarewellScene), on to the settling up (RETIRE).
+const FAREWELL := "res://career/farewell_scene.tscn"
 
 static var career: CareerPlayer
 static var season: Season
@@ -83,6 +85,7 @@ static func turn_pro() -> void:
 	var club_name: String = season.teams[c.team_id].name
 	if picked != null:
 		career_season.cue(&"draft", "%d KBO 신인 드래프트" % (d.year + 1), "%s %d라운드 %d순위" % [club_name, picked.round, picked.number], PackedStringArray(["계약금 %s" % Draft.money_text(c.signing_bonus), "%s 출신" % (school.name if school != null else "")]))
+		CareerLegacy.note(c, d.year + 1, "draft", "%s %d라운드 %d순위" % [club_name, picked.round, picked.number], "%s 출신 · 계약금 %s 원" % [school.name if school != null else "", FreeAgency.money(c.signing_bonus)], c.team_id)
 	else:
 		career_season.cue(&"contract", "%d 육성선수 계약" % (d.year + 1), "%s 입단" % club_name, PackedStringArray(["연봉 %s" % Draft.money_text(c.salary)]))
 	draft = null
@@ -103,7 +106,12 @@ static func start_winter() -> void:
 		if not others.is_empty():
 			cs.release_team = str(others[rng.next_int(others.size())])
 			cs.winter_lines.append("%s의 입단 테스트에 합격했습니다 (연봉 %s)." % [cs.season.teams[cs.release_team].name, Draft.money_text(CareerContract.MINIMUM)])
+	elif career.final_season:
+		# The farewell tour is over (CareerLegacy): the ceremony waits.
+		cs.winter_lines.append("은퇴 투어를 마쳤습니다 (작별 선물 %d개). 이제 은퇴식이 남았습니다." % career.tour_gifts.size())
 	else:
+		if CareerLegacy.should_retire(cs):
+			cs.winter_lines.append("구단이 은퇴를 권유했습니다. 은퇴 투어를 발표하면 다음 시즌이 마지막 시즌이 됩니다.")
 		# Free agency (CareerFA): the grade by last season's salary, his to file or not; or, a
 		# winter before it, his club's offer of a deal of several years.
 		career.player.salary = cs.last_salary
@@ -128,12 +136,16 @@ static func _winter_cues(cs: CareerSeason) -> void:
 	var year := cs.season.season_year
 	var team: Team = cs.season.teams[career.team_id]
 	if cs.season.champion_of(0) == career.team_id:
+		career.championships.append(year)
+		CareerLegacy.note(career, year, "champion", "%s 우승" % team.name, "%d 한국시리즈" % year, team.id)
 		cs.cue(&"champion", "%d 한국시리즈" % year, "%s 우승!" % team.name, PackedStringArray(["%d년 통합 챔피언" % year if cs.season.standings[0].ranked()[0].team_id == career.team_id else "%d년 챔피언" % year]))
 	var won := CareerContract.titles(cs)
 	if not won.is_empty():
 		var names := PackedStringArray()
 		for t: String in won:
 			names.append(award_name(t))
+			career.titles_won.append([year, award_name(t)])
+		CareerLegacy.note(career, year, "title", " · ".join(names), "%d KBO 시상식" % year, team.id)
 		cs.cue(&"award", "%d KBO 시상식" % year, names[0], PackedStringArray(names.slice(1)) + PackedStringArray(["상금 %s" % Draft.money_text(CareerContract.TITLE_PRIZE * won.size())]))
 	if career.released and cs.release_team != "":
 		cs.cue(&"contract", "%d 입단 테스트 합격" % (year + 1), "%s 입단" % cs.season.teams[cs.release_team].name, PackedStringArray(["연봉 %s" % Draft.money_text(CareerContract.MINIMUM)]))
@@ -255,10 +267,20 @@ static func retire() -> Array:
 	var sum := CareerContract.totals(c)
 	var bat: BattingLine = sum[0]
 	var pitch: PitchingLine = sum[1]
+	if not c.titles_won.is_empty():
+		titles = maxi(titles, c.titles_won.size())
 	var met := HallOfFame.marks(c, bat, pitch, titles, cs.pro_games)
+	# The settling up (CareerLegacy): his grade, its reward (into the shop's wallet), his number
+	# retired.
+	var settled := c.legacy_grade != ""
+	CareerLegacy.settle(cs, bat, pitch, not met.is_empty())
+	if not settled and not Profile.tool_run() and DisplayServer.get_name() != "headless":
+		Profile.earn(c.legacy_reward)
 	c.retired = true
 	var age := cs.season.season_year - c.player.born
 	cs.log.append("%d년 은퇴 (%d세, 프로 %d시즌)" % [cs.season.season_year, age, c.pro_years])
+	cs.log.append("커리어 결산: %s (결산 보상 %dP)%s" % [c.legacy_grade, c.legacy_reward, " · 등번호 %d 영구결번" % c.player.number if c.number_retired else ""])
+	Achievements.check_career(cs)
 	if not met.is_empty():
 		cs.log.append("명예의 전당 헌액: %s" % ", ".join(met))
 		HallOfFame.add({"name": c.player.name, "position": c.position, "years": c.pro_years, "retired": cs.season.season_year,

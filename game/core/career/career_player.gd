@@ -58,6 +58,22 @@ var milestones: Array = []
 var game_log: Array = []
 ## Retired (CareerSession.retire): the career is over.
 var retired := false
+## His story (CareerLegacy): the moments the flashback at his farewell shows ([year, kind,
+## title, line, club id]), his honours (titles [year, name], all-star selections, championships'
+## years, deals [year, line]), his best salary; the farewell tour (his last season announced, the
+## gifts the clubs gave [club id, gift]); and what his retirement settled (his grade, the reward
+## paid, his number retired).
+var moments: Array = []
+var titles_won: Array = []
+var all_stars := 0
+var championships: Array = []
+var deals: Array = []
+var best_salary := 0
+var final_season := false
+var tour_gifts: Array = []
+var legacy_grade := ""
+var legacy_reward := 0
+var number_retired := false
 var gear: Dictionary[String, String] = {}
 ## Game ratings this season.
 var ratings := PackedFloat64Array()

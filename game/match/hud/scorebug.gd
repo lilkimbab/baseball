@@ -25,6 +25,9 @@ func _draw() -> void:
 		return
 	if scene.pregame_showing() or scene.post_game_showing():
 		return
+	# (A farewell is no game: no score.)
+	if scene.broadcast != null and scene.broadcast.showing(Broadcast.Kind.FAREWELL):
+		return
 	# The manager's situation board has its own line score where the bug would be.
 	var board := scene as ManagerMatch
 	if board != null and not board.game.over and board.board_visible():

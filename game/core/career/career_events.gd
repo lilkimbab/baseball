@@ -70,6 +70,7 @@ static func trade(cs: CareerSeason, rng: Rng) -> String:
 	var line := "%d일: 트레이드 — %s에서 %s로%s" % [s.day + 1, from.name, to.name, " (상대: %s)" % back.name if back != null else ""]
 	cs.log.append(line)
 	cs.events_seen.append("trade:%d" % s.season_year)
+	CareerLegacy.note(cs.career, s.season_year, "trade", "%s 이적" % to.name, "%s에서 트레이드" % from.name, to.id)
 	cs.cue(&"trade", "%d년 트레이드" % s.season_year, "%s 이적" % to.name, PackedStringArray(["%s → %s" % [from.name, to.name]] + (["맞트레이드: %s" % back.name] if back != null else [])), from.id)
 	return line
 

@@ -91,6 +91,8 @@ static func accept_extension(cs: CareerSeason) -> void:
 		return
 	_take(cs, deal, [], "비FA 다년")
 	cs.log.append("%d년 비FA 다년계약: %s" % [cs.season.season_year, FreeAgency.deal_text(deal)])
+	cs.career.deals.append([cs.season.season_year + 1, "비FA 다년계약 · %s" % FreeAgency.deal_text(deal)])
+	CareerLegacy.note(cs.career, cs.season.season_year + 1, "deal", "비FA 다년계약", FreeAgency.deal_text(deal), cs.career.team_id)
 	cs.cue(&"contract", "%d 비FA 다년계약" % (cs.season.season_year + 1), "%s 다년계약" % cs.season.teams[cs.career.team_id].name, PackedStringArray([FreeAgency.deal_text(deal)]))
 	cs.extension = []
 
@@ -286,6 +288,10 @@ static func sign(cs: CareerSeason, club_id: String) -> Dictionary:
 			c.fa_count += 1
 			c.fa_since = c.first_days.size()
 			c.free_agent_done = true
+			var club: Team = cs.season.teams[club_id]
+			var what := "FA %s" % ("잔류" if club_id == c.team_id else "이적")
+			c.deals.append([cs.season.season_year + 1, "%s · %s %s" % [what, club.name, FreeAgency.deal_text(deal)]])
+			CareerLegacy.note(c, cs.season.season_year + 1, "deal", "%s · %s" % [what, club.name], FreeAgency.deal_text(deal), club_id)
 			if cs.agent:
 				var fee := roundi(FreeAgency.total_of(deal) * AGENT_FEE / 100.0) * 100
 				c.money -= fee
@@ -303,6 +309,7 @@ static func _take(cs: CareerSeason, deal: Array, option: Array, kind: String) ->
 	c.contract_option = option.duplicate()
 	c.contract_kind = kind
 	c.salary = int(deal[2])
+	c.best_salary = maxi(c.best_salary, c.salary)
 	c.player.salary = roundi(float(c.contract_total) / c.contract_years / 100.0) * 100
 	c.money += int(deal[1])
 	c.earned += int(deal[1])

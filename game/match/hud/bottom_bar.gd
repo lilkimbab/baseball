@@ -36,7 +36,7 @@ func _draw() -> void:
 	if scene.pregame_showing() or scene.post_game_showing():
 		return
 	# (Nor while the champions celebrate: their title's band has the bottom.)
-	if scene.broadcast != null and scene.broadcast.current != null and scene.broadcast.current.kind == Broadcast.Kind.CHAMPION:
+	if scene.broadcast != null and scene.broadcast.current != null and scene.broadcast.current.kind in [Broadcast.Kind.CHAMPION, Broadcast.Kind.FAREWELL]:
 		return
 	begin()
 	if _ovr == null:

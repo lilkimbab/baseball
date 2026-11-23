@@ -42,8 +42,14 @@ func _draw() -> void:
 			_game_end(a)
 		Broadcast.Kind.CHAMPION:
 			_champion(seg.data, t, a)
+		Broadcast.Kind.FAREWELL:
+			_farewell(seg.data, t, a)
 	if seg.holds:
-		keycaps(Vector2(0.0, view.y - BottomBar.HEIGHT - 34.0), "Space 건너뛰기", view.x, 15)
+		# (In the corner when a band has the bottom of the screen.)
+		if seg.kind in [Broadcast.Kind.CHAMPION, Broadcast.Kind.FAREWELL]:
+			keycaps(Vector2(view.x - 260.0, view.y - 28.0), "Space 건너뛰기", 240.0, 15)
+		else:
+			keycaps(Vector2(0.0, view.y - BottomBar.HEIGHT - 34.0), "Space 건너뛰기", view.x, 15)
 
 
 ## Before the first pitch: the two clubs, their records and the park.
@@ -407,6 +413,49 @@ func _champion(data: Dictionary, t: float, a: float) -> void:
 	var champs := y + 62.0 + big * 1.02 + 52.0
 	figure(Vector2(tx, champs), "C H A M P I O N S", 30, Color(UiTheme.GOLD, a), HORIZONTAL_ALIGNMENT_LEFT, -1.0, true)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(k, k))
+
+
+## A retirement at his park (FarewellScene): the ceremony's name in the corner from the start;
+## as his number goes up, a band low across the screen — his name large, his number retired or
+## his career in a line — and paper falling for the toss.
+func _farewell(data: Dictionary, t: float, a: float) -> void:
+	var side := GameState.HOME
+	var club := scene.club(side)
+	# The ceremony's name, top left, as a broadcast heads its special.
+	var tag := str(data.get("title", ""))
+	var tw := text_width(tag, 22, 700) + 44.0
+	var tag_rect := Rect2(Vector2(40.0, 36.0), Vector2(tw, 44.0))
+	team_plate(tag_rect, club, 10.0, 0.95 * a, false)
+	text(Vector2(tag_rect.position.x, tag_rect.position.y + 30.0), tag, 22, Color(Color.WHITE, a), HORIZONTAL_ALIGNMENT_CENTER, tw, 700)
+	if t >= FieldScenes.FAREWELL_TOSS:
+		var colours: Array[Color] = [UiTheme.GOLD, Color.WHITE]
+		if club != null:
+			colours.append(HudCanvas.club_colour(club))
+		_confetti(t - FieldScenes.FAREWELL_TOSS, colours, a)
+	var from := FieldScenes.FAREWELL_REVEAL - 0.4
+	if t < from:
+		return
+	var b := clampf((t - from) / 0.5, 0.0, 1.0) * a
+	var h := 150.0
+	var band := Rect2(Vector2(0.0, view.y - h - 70.0 + (1.0 - b) * 40.0), Vector2(view.x, h))
+	var mid := Color(0.02, 0.02, 0.03, 0.82 * b)
+	var edge := Color(0.02, 0.02, 0.03, 0.0)
+	draw_polygon(PackedVector2Array([band.position, Vector2(view.x * 0.5, band.position.y), Vector2(view.x * 0.5, band.end.y), Vector2(0.0, band.end.y)]), PackedColorArray([edge, mid, mid, edge]))
+	draw_polygon(PackedVector2Array([Vector2(view.x * 0.5, band.position.y), Vector2(view.x, band.position.y), band.end, Vector2(view.x * 0.5, band.end.y)]), PackedColorArray([mid, edge, edge, mid]))
+	draw_rect(Rect2(Vector2(view.x * 0.2, band.position.y), Vector2(view.x * 0.6, 3.0)), Color(UiTheme.GOLD, 0.9 * b))
+	var name := str(data.get("name", ""))
+	var retired := bool(data.get("retired", false))
+	var left := view.x * 0.5 - 420.0
+	if club != null:
+		Emblem.draw_emblem(self, club, Rect2(Vector2(left, band.position.y + 22.0), Vector2(104.0, 104.0)))
+	# As KBO clubs write it: "THANK YOU" and his name, and under it his number retired, "영원한
+	# ○○맨", or his years (CareerLegacy.slogan); his career in a line beside.
+	figure(Vector2(left + 128.0, band.position.y + 74.0), "THANK YOU", 50, Color(UiTheme.GOLD, b), HORIZONTAL_ALIGNMENT_LEFT, -1.0, true)
+	var thanks_w := UiTheme.numeric(true, true).get_string_size("THANK YOU", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 50).x
+	shout(Vector2(left + 128.0 + thanks_w + 18.0, band.position.y + 76.0), name, 54, Color(Color.WHITE, b))
+	text(Vector2(left + 130.0, band.position.y + 118.0), str(data.get("slogan", "")), 24, Color(UiTheme.GOLD if retired else Color.WHITE, b), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+	var slogan_w := text_width(str(data.get("slogan", "")), 24, 700)
+	text(Vector2(left + 130.0 + slogan_w + 22.0, band.position.y + 118.0), str(data.get("line", "")), 19, Color(UiTheme.DIM, b), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
 
 
 ## Confetti falling over the screen (`u` seconds since it began): small paper strips that

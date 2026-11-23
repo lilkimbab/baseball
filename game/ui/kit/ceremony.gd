@@ -12,10 +12,10 @@ extends CanvasLayer
 ##
 ##   Ceremony.play(self, Ceremony.Kind.AWARD, player, club, "2027 KBO 시상식", "홈런왕", ["42홈런"], func() -> void: ...)
 
-enum Kind { DRAFT, CONTRACT, AWARD, CHAMPION, TRADE, CALL_UP, MILESTONE }
+enum Kind { DRAFT, CONTRACT, AWARD, CHAMPION, TRADE, CALL_UP, MILESTONE, RETIREMENT }
 
 ## How long each kind lasts (s).
-const LENGTH := {Kind.DRAFT: 7.5, Kind.CONTRACT: 6.5, Kind.AWARD: 7.5, Kind.CHAMPION: 8.0, Kind.TRADE: 6.5, Kind.CALL_UP: 4.5, Kind.MILESTONE: 5.5}
+const LENGTH := {Kind.DRAFT: 7.5, Kind.CONTRACT: 6.5, Kind.AWARD: 7.5, Kind.CHAMPION: 8.0, Kind.TRADE: 6.5, Kind.CALL_UP: 4.5, Kind.MILESTONE: 5.5, Kind.RETIREMENT: 10.0}
 const FADE := 0.5
 const GOLD := Color(1.0, 0.8, 0.32)
 
@@ -47,10 +47,39 @@ var _sound: AudioStreamPlayer
 
 
 ## The kinds by the names the career's cues use (CareerSeason.cue).
-const KINDS := {&"draft": Kind.DRAFT, &"contract": Kind.CONTRACT, &"award": Kind.AWARD, &"champion": Kind.CHAMPION, &"trade": Kind.TRADE, &"call_up": Kind.CALL_UP, &"milestone": Kind.MILESTONE}
+const KINDS := {&"draft": Kind.DRAFT, &"contract": Kind.CONTRACT, &"award": Kind.AWARD, &"champion": Kind.CHAMPION, &"trade": Kind.TRADE, &"call_up": Kind.CALL_UP, &"milestone": Kind.MILESTONE, &"retirement": Kind.RETIREMENT}
 
 ## Somewhere one is showing (a screen waits for it before the next).
 static var showing := false
+
+## A still (CareerFlashback): the stage alone in a viewport of `still_size`, the moment held at
+## `time`, the man at `still_age` — a photograph of a moment of his career; no words, no sound,
+## no end.
+var still := false
+var still_age := -1
+var still_size := Vector2i(520, 620)
+
+
+## A still of a moment: add it under a node; its picture is `picture()`.
+static func make_still(p: Player, team: Team, what: Kind, at: float, age: int, size: Vector2i) -> Ceremony:
+	var c := Ceremony.new()
+	c.kind = what
+	c.player = p
+	c.club = team
+	c.still = true
+	c.still_age = age
+	c.still_size = size
+	c.time = at
+	return c
+
+
+func picture() -> Texture2D:
+	return _viewport.get_texture() if _viewport != null else null
+
+
+## When its thing is up: the moment a still holds a little after.
+func raised_at() -> float:
+	return _raise_at()
 
 
 ## Plays a list of cues one after another ([kind name, heading, big line, more lines, club,
@@ -89,6 +118,18 @@ static func play(holder: Node, what: Kind, p: Player, team: Team, heading: Strin
 
 
 func _ready() -> void:
+	if still:
+		_viewport = SubViewport.new()
+		_viewport.own_world_3d = true
+		_viewport.transparent_bg = true
+		_viewport.msaa_3d = Viewport.MSAA_4X
+		_viewport.size = still_size
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		add_child(_viewport)
+		_build_stage()
+		_pose_and_props()
+		_move_camera()
+		return
 	layer = 90
 	_rng = Rng.new(hash("%s:%d:%s" % [player.id if player != null else "", kind, subtitle]))
 	_back = Control.new()
@@ -188,13 +229,13 @@ func _build_stage() -> void:
 		_viewport.add_child(_puppet)
 		_puppet.set_body(player.height_cm / 100.0, SkinnedPuppet.build_for(player.height_cm, player.weight_kg, player.primary_position()))
 		_puppet.set_hair(1 + absi(hash(player.id)) % 4, MatchScene.hair_color_of(player))
-		_puppet.set_face(player.id, 2026 - player.born)
+		_puppet.set_face(player.id, still_age if still_age >= 0 else 2026 - player.born)
 		if club != null:
 			_puppet.set_logo(style.cap_letter, style.cap_ink())
 		_puppet.repaint()
 		_puppet.rotation.y = PI
 		_puppet.apply(PuppetClips.standing())
-		if kind in [Kind.DRAFT, Kind.CONTRACT, Kind.TRADE]:
+		if kind in [Kind.DRAFT, Kind.CONTRACT, Kind.TRADE, Kind.RETIREMENT]:
 			_jersey = _make_jersey(style)
 			_viewport.add_child(_jersey)
 		elif kind in [Kind.AWARD, Kind.CHAMPION]:
@@ -313,6 +354,10 @@ func _make_trophy(big: bool) -> Node3D:
 
 
 func _process(delta: float) -> void:
+	if still:
+		_pose_and_props()
+		_move_camera()
+		return
 	time += delta
 	var length: float = LENGTH[kind]
 	if not _finished and time >= length:
@@ -325,8 +370,8 @@ func _process(delta: float) -> void:
 	if not _finished and _rng.next_float() < rate * delta:
 		_flashes.append([_rng.next_float(), 0.35 + 0.4 * _rng.next_float(), time])
 	_flashes = _flashes.filter(func(f: Array) -> bool: return time - float(f[2]) < 0.25)
-	if kind in [Kind.AWARD, Kind.CHAMPION] and time > _raise_at():
-		_rain(delta, 90.0 if kind == Kind.CHAMPION else 40.0)
+	if kind in [Kind.AWARD, Kind.CHAMPION, Kind.RETIREMENT] and time > _raise_at():
+		_rain(delta, 90.0 if kind == Kind.CHAMPION else (30.0 if kind == Kind.RETIREMENT else 40.0))
 	_back.queue_redraw()
 	_front.queue_redraw()
 
@@ -342,6 +387,8 @@ func _raise_at() -> float:
 			return 1.4
 		Kind.MILESTONE:
 			return 0.9
+		Kind.RETIREMENT:
+			return 3.4
 	return 3.0
 
 
@@ -354,7 +401,7 @@ func _pose_and_props() -> void:
 		return
 	var up := _raise_at()
 	var pose := PuppetClips.standing()
-	var bows := kind in [Kind.DRAFT, Kind.CONTRACT, Kind.AWARD, Kind.TRADE]
+	var bows := kind in [Kind.DRAFT, Kind.CONTRACT, Kind.AWARD, Kind.TRADE, Kind.RETIREMENT]
 	if bows and time > 0.9 and time < up:
 		# Down for half a second, held, and up again.
 		var k := smoothstep(0.9, 1.4, time) * (1.0 - smoothstep(up - 0.9, up - 0.4, time))
@@ -370,6 +417,9 @@ func _pose_and_props() -> void:
 				to = PuppetClips.hold(1.08, 0.26, 0.3) if time < up + 1.6 else PuppetClips.hold(1.08, 0.26, 0.3).blend(PuppetClips.hold(2.0, 0.26, 0.12), smoothstep(up + 1.6, up + 2.1, time))
 			Kind.CHAMPION:
 				to = PuppetClips.hold(2.02, 0.3, 0.1) if fmod(time - up, 1.6) < 1.2 else PuppetClips.fist_pump()
+			Kind.RETIREMENT:
+				# His framed jersey held up, then a long wave goodbye to the stands.
+				to = PuppetClips.hold(1.42, 0.56, 0.32) if time < up + 3.2 else PuppetClips.hold(1.42, 0.56, 0.32).blend(PuppetClips.wave(time), smoothstep(up + 3.2, up + 3.7, time))
 			Kind.MILESTONE:
 				# The ball held out in both hands at the chest, then raised once for the crowd.
 				to = PuppetClips.hold(1.38, 0.1, 0.36) if time < up + 2.6 else PuppetClips.hold(1.38, 0.1, 0.36).blend(PuppetClips.hold(1.9, 0.08, 0.26), smoothstep(up + 2.6, up + 3.0, time))
@@ -382,7 +432,7 @@ func _pose_and_props() -> void:
 	var mid := (r + l) * 0.5
 	var shown := time >= up
 	if _jersey != null:
-		_jersey.visible = shown
+		_jersey.visible = shown and not (kind == Kind.RETIREMENT and time > up + 3.4)
 		_jersey.position = mid + Vector3(0.0, -0.36, 0.06)
 		_jersey.rotation = Vector3.ZERO
 	if _trophy != null:
@@ -395,6 +445,12 @@ func _pose_and_props() -> void:
 
 func _move_camera() -> void:
 	var h := player.height_cm / 100.0 if player != null else 1.85
+	if still:
+		# A photograph: from the knees up, square on, room over his head for what he holds up.
+		var up := h * (0.8 if kind in [Kind.CHAMPION, Kind.MILESTONE] else 0.68)
+		_camera.fov = 30.0
+		_camera.look_at_from_position(Vector3(0.0, up + 0.05, 3.3), Vector3(0.0, up, 0.0))
+		return
 	var k := smoothstep(0.0, float(LENGTH[kind]), time)
 	# In slowly from a full figure to the waist up, drifting across.
 	var from := Vector3(0.9, h * 0.58, 6.2)
@@ -511,6 +567,8 @@ func _lower_third(view: Vector2, k: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if still:
+		return
 	# The screen under it must not take the keys meant for skipping.
 	var key := event as InputEventKey
 	if key != null and key.pressed and key.keycode in [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:

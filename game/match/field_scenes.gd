@@ -43,6 +43,8 @@ var _stop := Vector3.ZERO
 var _down := Vector3.ZERO
 var _yaw_down := 0.0
 var _applauded := false
+## A farewell's words over centre field (his number, or a thank-you).
+var _banner: Label3D
 
 
 func _init(s: MatchScene) -> void:
@@ -645,6 +647,8 @@ func show(t: float) -> void:
 		_show_medical(t)
 	elif kind == &"champion":
 		_show_champion(t)
+	elif kind == &"farewell":
+		_show_farewell(t)
 
 
 func _hide_cast() -> void:
@@ -675,4 +679,173 @@ func _restore() -> void:
 		_stretcher.visible = false
 	if _ambulance != null:
 		_ambulance.visible = false
+	if _banner != null:
+		_banner.visible = false
 	kind = &""
+
+
+# --- A retirement at his park (the user, 2026-11-23: "a ceremony at the real ballpark, as the
+# KBO does it") ---
+# As KBO clubs see a star off: his teammates line up along the baselines, he walks out of the
+# dugout to the front of home plate, bows to the stands behind it and waves, his number goes up
+# over centre field (retired, or a thank-you), and his teammates come together and toss him.
+
+const FAREWELL_LENGTH := 23.0
+## Where he stands: in front of home plate, toward the mound.
+const FAREWELL_SPOT := Vector3(0.0, 4.5, 0.0)
+const FAREWELL_WALK := 2.0
+const FAREWELL_BOW := 8.4
+const FAREWELL_WAVE := 10.2
+const FAREWELL_REVEAL := 12.6
+const FAREWELL_TOSS := 16.0
+
+
+func plan_farewell(side: int, hero: Player, retired: bool) -> void:
+	kind = &"farewell"
+	plan.clear()
+	var g := scene.game
+	var team := g.teams[side]
+	var dugout := scene._dugout(side)
+	var rng := Rng.new(hash("farewell:%s" % hero.id))
+	var men := 0
+	for id: String in team.players:
+		if id == hero.id or team.removed.has(id) or men >= 16:
+			continue
+		# Two lines from home plate down the baselines, facing where he will stand.
+		var line := 1.0 if men % 2 == 0 else -1.0
+		var d := 6.0 + float(men / 2) * 2.3
+		var slot := Vector3(line * d * 0.7071, d * 0.7071, 0.0)
+		var from := dugout + Vector3(rng.next_range(-2.5, 2.5), rng.next_range(-1.5, 1.5), 0.0)
+		_add(side, team.players[id], from, slot, rng.next_float() * 1.2, &"line", 5.0, FAREWELL_SPOT)
+		men += 1
+	_add(side, hero, dugout, FAREWELL_SPOT, FAREWELL_WALK, &"hero", 3.0, FAREWELL_SPOT + Vector3(0.0, -20.0, 0.0))
+	var style := UniformStyle.for_team(scene.club(side), side == 1)
+	var boss := Player.new()
+	boss.id = "manager_%s" % team.team_id
+	boss.name = "감독"
+	plan.append({"side": side, "player": boss, "from": dugout, "slot": FAREWELL_SPOT + Vector3(1.8, 0.8, 0.0), "delay": 0.4, "role": &"line", "speed": 4.0, "face": FAREWELL_SPOT,
+		"style": UniformStyle.make(style.cap.darkened(0.2), Color(0.12, 0.13, 0.16), style.cap, style.cap, style.cap_letter)})
+	_prepare_figures()
+	# His number over centre field, beyond the wall.
+	if _banner == null:
+		_banner = Label3D.new()
+		_banner.font = UiTheme.display(900)
+		_banner.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+		_banner.outline_size = 24
+		_banner.outline_modulate = Color(0.05, 0.05, 0.08, 0.9)
+		scene.add_child(_banner)
+	var club := scene.club(side)
+	# (The number alone in the sky, as a retired number hangs; the words are the broadcast's.)
+	_banner.text = str(hero.number) if retired else "THANK YOU"
+	_banner.font_size = 260 if retired else 150
+	_banner.pixel_size = 0.06
+	_banner.modulate = Color(1.0, 0.92, 0.7) if retired else Color.WHITE
+	if club != null:
+		_banner.outline_modulate = Color(club.primary.darkened(0.5), 0.95)
+	var wall := scene.park.collision.boundary_distance(0.0) if scene.park != null else 120.0
+	_banner.position = Field.to_world(Vector3(0.0, wall + 6.0, 24.0))
+	_banner.visible = false
+
+
+func farewell_shots() -> Array[Broadcast.Shot]:
+	var spot := FAREWELL_SPOT
+	var dugout := scene._dugout(GameState.HOME)
+	var wall := scene.park.collision.boundary_distance(0.0) if scene.park != null else 120.0
+	var banner := Vector3(0.0, wall + 6.0, 22.0)
+	var walk_mid := (dugout + spot) * 0.5
+	return [
+		# The park from high over the first-base side, coming down: the lines forming.
+		Broadcast.Shot.make(0.0, Vector3(55.0, 30.0, 42.0), Vector3(0.0, 8.0, 0.0), 50.0, Vector3(34.0, 14.0, 22.0), Vector3(0.0, 4.0, 0.0), 46.0),
+		# Out of the dugout and down the line of his teammates.
+		Broadcast.Shot.make(FAREWELL_WALK + 1.2, spot + Vector3(0.0, 9.0, 1.7), walk_mid + Vector3(0.0, 0.0, 1.4), 46.0, spot + Vector3(0.0, 7.0, 1.6), spot + Vector3(0.0, -1.0, 1.4), 40.0),
+		# Close in front of him as he bows and waves to the stands.
+		Broadcast.Shot.make(FAREWELL_BOW - 0.6, spot + Vector3(0.6, -4.6, 1.55), spot + Vector3(0.0, 0.0, 1.45), 32.0, spot + Vector3(0.3, -3.8, 1.55), spot + Vector3(0.0, 0.0, 1.5), 28.0),
+		# Over his shoulder to centre field: his number goes up.
+		Broadcast.Shot.make(FAREWELL_REVEAL - 0.3, spot + Vector3(1.2, -3.0, 2.1), banner, 44.0, spot + Vector3(0.6, -2.4, 2.2), banner, 26.0),
+		# Tossed by his teammates, from low in front.
+		Broadcast.Shot.make(FAREWELL_TOSS - 0.3, spot + Vector3(-1.5, -7.5, 1.0), spot + Vector3(0.0, 0.0, 2.4), 38.0, spot + Vector3(-0.8, -6.2, 0.9), spot + Vector3(0.0, 0.0, 2.7), 36.0),
+		# From out by second base back to home plate and the full stands behind it.
+		Broadcast.Shot.make(FAREWELL_LENGTH - 3.4, Vector3(0.0, 40.0, 9.0), spot + Vector3(0.0, -6.0, 3.0), 50.0, Vector3(0.0, 46.0, 12.0), spot + Vector3(0.0, -14.0, 6.0), 56.0),
+	]
+
+
+func _show_farewell(t: float) -> void:
+	var toss := t >= FAREWELL_TOSS
+	var hero_at := FAREWELL_SPOT
+	for i: int in scene._rush.size():
+		var fig := scene._rush[i]
+		if i >= plan.size():
+			fig.visible = false
+			continue
+		var e := plan[i]
+		var role: StringName = e["role"]
+		var from: Vector3 = e["from"]
+		var slot: Vector3 = e["slot"]
+		var delay: float = e["delay"]
+		var speed: float = e["speed"]
+		if toss and role == &"line":
+			# The lines break and come round him.
+			var off := Vector2(slot.x - FAREWELL_SPOT.x, slot.y - FAREWELL_SPOT.y).normalized()
+			from = slot
+			slot = FAREWELL_SPOT + Vector3(off.x, off.y, 0.0) * (0.75 if i % 2 == 0 else 1.25)
+			delay = FAREWELL_TOSS - 0.8
+			speed = 6.0
+		var run_time := maxf(Vector2(slot.x - from.x, slot.y - from.y).length() / speed, 0.01)
+		var u := clampf((t - delay) / run_time, 0.0, 1.0)
+		var at := from.lerp(slot, u)
+		var face: Vector3 = e["face"]
+		var pose := PuppetClips.standing()
+		if role == &"hero":
+			if t < delay:
+				pose = PuppetClips.standing()
+			elif u < 1.0:
+				pose = PuppetClips.run_at((t - delay) * 1.8, 0.35)
+				face = slot
+			elif toss:
+				# On his back on their hands, up and down three times.
+				var k := fmod(t - FAREWELL_TOSS, TOSS_EVERY) / TOSS_EVERY
+				var lift := TOSS_HEIGHT * sin(k * PI) if t < FAREWELL_TOSS + TOSS_EVERY * 3.0 else 0.0
+				var yaw := MatchScene._yaw_toward(Vector2(at.x, at.y), Vector2(at.x + 1.0, at.y))
+				fig.visible = true
+				fig.position = Field.to_world(Vector3(at.x, at.y, Field.ground_height(at.x, at.y) + TOSS_REST + lift)) - Basis(Vector3.UP, yaw) * Vector3(0.0, 0.0, 0.9)
+				fig.rotation = Vector3(PI / 2.0, yaw, 0.0)
+				fig.apply(PuppetClips.tossed(t, k))
+				continue
+			elif t < FAREWELL_BOW:
+				pose = PuppetClips.wave(t)
+			elif t < FAREWELL_WAVE:
+				# A deep bow to the stands, held.
+				var k := smoothstep(FAREWELL_BOW, FAREWELL_BOW + 0.5, t) * (1.0 - smoothstep(FAREWELL_WAVE - 0.5, FAREWELL_WAVE, t))
+				pose = PuppetClips.bow(k)
+			elif t < FAREWELL_REVEAL:
+				pose = PuppetClips.wave(t)
+			else:
+				# He turns to centre field to see his number go up, and raises his arms.
+				face = Vector3(0.0, 100.0, 0.0)
+				pose = PuppetClips.hold(1.95, 0.5, 0.15) if t > FAREWELL_REVEAL + 1.2 else PuppetClips.standing()
+			hero_at = at
+		else:
+			if t < delay:
+				pose = PuppetClips.standing()
+			elif u < 1.0:
+				pose = PuppetClips.run_at((t - delay) * 3.0, 0.8)
+				face = slot
+			elif toss:
+				var k := fmod(t - FAREWELL_TOSS, TOSS_EVERY) / TOSS_EVERY
+				pose = PuppetClips.hold(1.75 + 0.35 * sin(k * PI), 0.35, 0.3)
+				face = FAREWELL_SPOT
+			else:
+				# Applauding him: hands together at the chest, again and again.
+				pose = PuppetClips.hold(1.3, 0.06 + 0.1 * absf(sin(t * 8.0 + i)), 0.3)
+				face = hero_at
+		fig.visible = true
+		fig.position = Field.to_world(Vector3(at.x, at.y, Field.ground_height(at.x, at.y)))
+		var turn := MatchScene._yaw_toward(Vector2(at.x, at.y), Vector2(face.x, face.y)) if Vector2(face.x - at.x, face.y - at.y).length() > 0.05 else fig.rotation.y
+		fig.rotation = Vector3(0.0, turn, 0.0)
+		fig.apply(pose)
+	scene.umpire.visible = false
+	if _banner != null:
+		var r := clampf((t - FAREWELL_REVEAL) / 0.8, 0.0, 1.0)
+		_banner.visible = r > 0.0
+		_banner.modulate.a = r
+		_banner.scale = Vector3.ONE * lerpf(0.6, 1.0, 1.0 - pow(1.0 - r, 3.0))

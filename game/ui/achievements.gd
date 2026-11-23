@@ -145,6 +145,11 @@ static func check_career(cs: CareerSeason, last: CareerSeason.Report = null) -> 
 		reach("deal_100")
 	if c.donated > 0:
 		reach("donor")
+	# His farewell (CareerLegacy).
+	if c.retired and c.legacy_grade == "레전드":
+		reach("legend_career")
+	if c.number_retired:
+		reach("number_retired")
 	if UiTheme.shown(ClubRules.player_ovr(c.player, cs.season.ovr, cs.season.catalog)) >= 80.0:
 		reach("ovr_80")
 	for name: String in c.gear:

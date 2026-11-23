@@ -1093,7 +1093,7 @@ func _pay_profile() -> void:
 
 ## A look away from the play (the cheering stage, the scoreboard): the small views give way.
 func cutaway_showing() -> bool:
-	return broadcast != null and broadcast.current != null and broadcast.current.kind in [Broadcast.Kind.BOARD, Broadcast.Kind.FANS, Broadcast.Kind.WALK_OFF, Broadcast.Kind.BENCH_CLEAR, Broadcast.Kind.INJURY, Broadcast.Kind.CHAMPION]
+	return broadcast != null and broadcast.current != null and broadcast.current.kind in [Broadcast.Kind.BOARD, Broadcast.Kind.FANS, Broadcast.Kind.WALK_OFF, Broadcast.Kind.BENCH_CLEAR, Broadcast.Kind.INJURY, Broadcast.Kind.CHAMPION, Broadcast.Kind.FAREWELL]
 
 
 ## The broadcast's introduction is on (the match-up, the line-ups): it has the screen alone.
@@ -2466,7 +2466,7 @@ func refresh(delta: float) -> void:
 	if broadcast.current != null and not broadcast.holding():
 		broadcast.step(delta)
 	broadcast_cards.queue_redraw()
-	var rushing := broadcast.showing(Broadcast.Kind.WALK_OFF) or broadcast.showing(Broadcast.Kind.BENCH_CLEAR) or broadcast.showing(Broadcast.Kind.INJURY) or broadcast.showing(Broadcast.Kind.CHAMPION)
+	var rushing := broadcast.showing(Broadcast.Kind.WALK_OFF) or broadcast.showing(Broadcast.Kind.BENCH_CLEAR) or broadcast.showing(Broadcast.Kind.INJURY) or broadcast.showing(Broadcast.Kind.CHAMPION) or broadcast.showing(Broadcast.Kind.FAREWELL)
 	if rushing or _rush_shown:
 		_show_rush(broadcast.time if rushing else -1.0)
 	if broadcast.showing(Broadcast.Kind.REPLAY) and _replay_play != null:

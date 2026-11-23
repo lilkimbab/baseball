@@ -186,6 +186,7 @@ static func winter(cs: CareerSeason, rng: Rng) -> PackedStringArray:
 		c.contract_option = []
 	var before := c.salary
 	c.salary = renewed(c, share, perf)
+	c.best_salary = maxi(c.best_salary, c.salary)
 	if c.salary > before:
 		lines.append("연봉 인상: %s → %s 원" % [FreeAgency.money(before), FreeAgency.money(c.salary)])
 	elif c.salary < before:
