@@ -1,5 +1,5 @@
 extends GutTest
-## The records room (queue stage 5): each game's line of the men followed, a career's seasons
+## The records room: each game's line of the men followed, a career's seasons
 ## and totals, retirement and the hall of fame; and what a full season of logs costs a save.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

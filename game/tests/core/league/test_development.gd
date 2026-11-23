@@ -1,5 +1,5 @@
 extends GutTest
-## Players growing and ageing (docs/08 R6): the young have room and fill it faster when they
+## Players growing and ageing: the young have room and fill it faster when they
 ## play, the old lose a little each winter and the oldest retire, rookies take their places,
 ## and a league stays as strong as it was over the years.
 

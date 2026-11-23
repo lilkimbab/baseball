@@ -1,6 +1,6 @@
 class_name LineupPlan
 extends RefCounted
-## Editing the manager's batting order (Team.batting_plan, docs/08 R5): an order is nine
+## Editing the manager's batting order (Team.batting_plan): an order is nine
 ## [player id, position code] pairs from the lead-off man down. Two men in it trade places in
 ## the order, or trade positions; a man off the bench takes a place, order and position both.
 ## Nothing here changes a plan that is not the team's own copy until it is stored.

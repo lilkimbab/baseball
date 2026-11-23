@@ -1,6 +1,6 @@
 class_name SeasonAwards
 extends RefCounted
-## The end-of-season awards of one division (docs/02 section 4.1, docs/13 S7-8): MVP, the
+## The end-of-season awards of one division: MVP, the
 ## pitching award, rookie of the year, the best at each position (as the KBO's Golden Glove:
 ## pitcher, catcher, the four infield places, three outfielders and a designated hitter), and
 ## the title holders (KBO's individual titles).

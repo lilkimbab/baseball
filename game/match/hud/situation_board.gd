@@ -1,6 +1,6 @@
 class_name SituationBoard
 extends HudCanvas
-## The situation board of the manager mode (docs/05 section 3.5, docs/13 S7-6): over the
+## The situation board of the manager mode (docs/04 section 3.5): over the
 ## darkened field, the line score at the top, both batting orders at the sides with the man
 ## at bat marked, the diamond with the count and outs in the middle and the plate
 ## appearances so far below it, and at the bottom a key moment marked, the orders in force and

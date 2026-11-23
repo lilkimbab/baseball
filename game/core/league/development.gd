@@ -1,6 +1,6 @@
 class_name Development
 extends RefCounted
-## How players change from year to year in the league (docs/08 R6, IDEAS 12): the young grow
+## How players change from year to year in the league (IDEAS 12): the young grow
 ## toward a peak they were born with, the old lose a little every winter, the oldest retire,
 ## and their places go to rookies drafted into the second team.
 ##

@@ -1,6 +1,6 @@
 extends GutTest
 ## Line-ups and substitutions: who may play, no re-entry, and the designated hitter rules
-## (docs/13 S4-3).
+##.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

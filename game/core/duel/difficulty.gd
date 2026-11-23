@@ -57,7 +57,10 @@ const REWARDS := {
 ## club win .51 / .71 on 루키, about .38 / .60 on 프로 (at +0.04 it was .33 / .56: an
 ## ordinary squad finished last), .29 / .46 on 올스타 and .22 / .42 on 레전드 — from 올스타 up
 ## even the best squad as given has to be built up to contend.
-const LEAGUE_FORM := {Level.ROOKIE: -0.03, Level.PRO: 0.025, Level.ALL_STAR: 0.08, Level.LEGEND: 0.12}
+## Re-measured 2026-11-23 evening (after the real pitch mixes and injuries came in, every level
+## had fallen: 루키 .42/.62, 프로 .37/.52, 올스타 .19/.35, 레전드 .21/.37 over two runs) and set
+## lower again, toward the targets above.
+const LEAGUE_FORM := {Level.ROOKIE: -0.07, Level.PRO: 0.015, Level.ALL_STAR: 0.045, Level.LEGEND: 0.10}
 
 
 static func league_form(level: int) -> float:

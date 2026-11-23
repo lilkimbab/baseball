@@ -1,6 +1,6 @@
 extends PlayTest
-## The player's own fielding in the play (docs/05 2.3), the chances that could have gone
-## either way and the tries that came up short (docs/05 3.4), and a play taken up part way.
+## The player's own fielding in the play (docs/04 2.3), the chances that could have gone
+## either way and the tries that came up short (docs/04 3.4), and a play taken up part way.
 
 
 func _manual(kind: Position.Kind, time: float = -1.0, at: Vector3 = Vector3.ZERO) -> PlayChoice:

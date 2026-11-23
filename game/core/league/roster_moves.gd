@@ -1,6 +1,6 @@
 class_name RosterMoves
 extends RefCounted
-## Call-ups and send-downs between the first and second teams (docs/08 R6): every week the
+## Call-ups and send-downs between the first and second teams: every week the
 ## computer clubs bring up a second-team man who has become better than the weakest first-team
 ## man of his kind (a starter for a starter, a reliever for a reliever, a catcher for a
 ## catcher, an infielder for an infielder, an outfielder for an outfielder), counting what each

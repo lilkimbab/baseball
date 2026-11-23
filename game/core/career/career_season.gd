@@ -1,10 +1,10 @@
 class_name CareerSeason
 extends RefCounted
-## A career player's season (docs/02 section 6.4, docs/13 S8-3): the league season around him,
+## A career player's season: the league season around him,
 ## his second-team games until he is called up, his first-team games after, and what each game
 ## earns him.
 ##
-## In a league of the KBO's ten clubs (docs/08 R8-3) his second team plays in the futures
+## In a league of the KBO's ten clubs his second team plays in the futures
 ## league (FarmLeague: twelve teams, north and south, on its own calendar). In an older league
 ## of three divisions the second team plays the same days as the first, against the same
 ## club's second team, made up with fillers at second-team level (A).
@@ -98,7 +98,7 @@ var special := ""
 static var _names: NameTable
 ## Popularity from games.
 var log := PackedStringArray()
-## The cutscenes waiting to be shown (queue stage 6, Ceremony): [kind, heading, big line, more
+## The cutscenes waiting to be shown (Ceremony): [kind, heading, big line, more
 ## lines, the club he left (a trade)], kinds &"draft", &"contract", &"award", &"champion",
 ## &"trade", &"call_up". Shown by the career's screen and gone; not saved (a scene missed by
 ## quitting is not owed).
@@ -210,6 +210,16 @@ func _check_all_star() -> void:
 	var d := season.division_of(career.team_id)
 	all_star_selected = AllStar.select(season, d, career, int(rules.all_star.get("players", 22)))
 	var me := career.player.id
+	# The fans' vote announced (AllStarVote), whether he is in it or not.
+	var board := AllStar.board(season, d, all_star_selected, career)
+	var said := "아쉽게도 이번 올스타에는 뽑히지 못했습니다"
+	if all_star_selected.has(me):
+		said = "올스타 선정! 감독 추천으로 합류합니다"
+		for line: String in board:
+			var f := line.split("|")
+			if f.size() >= 6 and f[5] == "1":
+				said = "올스타 선정! %s %s 부문 · %s표" % [AllStar.TEAM_NAMES[int(f[0])].substr(0, 2), f[1], AllStarVote._thousands(int(f[4]))]
+	cue(&"all_star_vote", "%d 올스타 팬 투표 최종 결과" % season.season_year, said, board)
 	if all_star_selected.has(me):
 		all_star_today = true
 		career.popularity += 5.0
@@ -378,8 +388,12 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	if special == "all_star":
 		return _finish_all_star(state, book, report)
 	var g := club_game()
+	# His first-team totals before this game, for the milestones it reaches (Milestones).
+	var totals_before := CareerContract.totals(career, self) if career.first_team and not report.postseason else []
 	if career.first_team:
 		season.record(g, state, book)
+		if not totals_before.is_empty():
+			_milestones(totals_before, g)
 	else:
 		futures_games += 1
 		_futures_day = season.day
@@ -442,6 +456,18 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 		send_down()
 		report.sent_down = true
 	return report
+
+
+## The milestones this game reached: kept on the career, a ceremony with the ball for each.
+func _milestones(before: Array, g: ScheduledGame) -> void:
+	var after := CareerContract.totals(career, self)
+	var other := g.home if g.away == career.team_id else g.away
+	var vs: Team = season.teams.get(other)
+	var vs_name := vs.name if vs != null else ""
+	for m: Array in Milestones.crossed(before, after, career.is_pitcher()):
+		career.milestones.append([str(m[0]), season.season_year, season.day + 1, vs_name])
+		cue(&"milestone", "%d년 %d일차 · vs %s" % [season.season_year, season.day + 1, vs_name], str(m[1]), PackedStringArray(["기념구"]))
+		log.append("%s 달성! 기념구를 챙겼습니다" % str(m[1]))
 
 
 ## A game's line into his last RECENT.

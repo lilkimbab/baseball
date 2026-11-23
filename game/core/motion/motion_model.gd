@@ -82,7 +82,7 @@ var dodge_chance := 0.25
 
 
 static func lerp_rating(range_pair: Vector2, rating: float) -> float:
-	return lerpf(range_pair.x, range_pair.y, clampf(rating / 99.0, 0.0, 1.0))
+	return lerpf(range_pair.x, range_pair.y, RatingScale.norm(rating))
 
 
 func top_speed_for(speed_rating: float) -> float:

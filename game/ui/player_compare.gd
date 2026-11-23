@@ -1,6 +1,6 @@
 class_name PlayerCompare
 extends Control
-## Two players side by side (docs/08 R5; the reference's line-up screen compares the man in
+## Two players side by side (the reference's line-up screen compares the man in
 ## the line-up with the one picked on a radar): each man in his uniform at a side with his
 ## overall, their shapes laid over each other on one radar in the middle, and under it every
 ## rating and this season's numbers in three columns — his, the name, the other's — the better

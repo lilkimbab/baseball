@@ -19,7 +19,7 @@ var clip: JointClip
 ## Seconds from the start of the delivery to the release of the ball.
 var release_time := 0.0
 ## Seconds of the recording skipped at the start: none from the windup, the start of the leg
-## lift from the set position (docs/13 S10-4).
+## lift from the set position.
 var offset := 0.0
 var _full_release := 0.0
 
@@ -62,7 +62,7 @@ func frame(clock: float) -> Dictionary[StringName, Vector3]:
 	return walk_back(finish, clip.sample(offset), minf(back, 1.0))
 
 
-## From the follow-through back to the set position (docs/13 S12-7), `back` from 0 to 1. The
+## From the follow-through back to the set position, `back` from 0 to 1. The
 ## body goes back at an even pace while the feet take turns, the farther one first: one stays
 ## planted while the other is picked up and put down nearer the rubber, so neither slides.
 static func walk_back(finish: Dictionary[StringName, Vector3], set_frame: Dictionary[StringName, Vector3], back: float) -> Dictionary[StringName, Vector3]:

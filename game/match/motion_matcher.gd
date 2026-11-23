@@ -1,6 +1,6 @@
 class_name MotionMatcher
 extends RefCounted
-## Motion matching for fielders and runners on the move (docs/13 S12, approved proposal 4):
+## Motion matching for fielders and runners on the move (approved proposal 4):
 ## a database of recorded locomotion (the CMU runs, jogs, turns and stops, converted by
 ## tools/mocap/convert_bvh.py into content-local/animations/cmu) in which, every
 ## SEARCH_EVERY seconds, the frame is found whose motion best matches where the player is

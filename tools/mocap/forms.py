@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Picks the game's pitching and batting forms from the OBP trials (docs/13 S10-1, S10-2).
+"""Picks the game's pitching and batting forms from the OBP trials.
 
     python3 tools/mocap/forms.py            (./dev mocap forms)
 

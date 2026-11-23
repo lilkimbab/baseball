@@ -1,5 +1,5 @@
 extends PlayTest
-## Fielding and running motion (docs/13 S12): who catches and throws when in a play, the glove
+## Fielding and running motion: who catches and throws when in a play, the glove
 ## meeting the ball, and feet that stay planted while the body moves.
 
 

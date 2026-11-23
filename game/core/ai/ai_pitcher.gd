@@ -1,6 +1,6 @@
 class_name AiPitcher
 extends RefCounted
-## The computer pitcher (docs/03 section 8.1, docs/13 S5-8): picks a pitch from his own
+## The computer pitcher (docs/02 section 8.1): picks a pitch from his own
 ## arsenal by the count, and a target either on the edges of the zone or just off it where a
 ## batter might chase. Behind in the count he comes in with fastballs; ahead he expands.
 ## The share of pitches that end up in the zone comes out of these targets plus his command.
@@ -74,7 +74,7 @@ static func options_for(pitcher: Player, catalog: Dictionary[StringName, PitchTy
 		t.label = base.label
 		t.family = base.family
 		t.speed_kmh = a.velo_avg
-		t.spin_rpm = base.spin_rpm * lerpf(0.85, 1.15, clampf(a.movement / 99.0, 0.0, 1.0))
+		t.spin_rpm = base.spin_rpm * lerpf(0.85, 1.15, RatingScale.norm(a.movement))
 		t.efficiency = base.efficiency
 		t.tilt_deg = base.tilt_deg
 		var o := Option.new()
@@ -93,7 +93,7 @@ static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes
 	var weights := PackedFloat64Array()
 	var behind := balls >= 2 and balls > strikes
 	var ahead := strikes == 2 and balls <= 1
-	# His own mix for this count where the pitch table has it (queue stage 3); otherwise the
+	# His own mix for this count where the pitch table has it; otherwise the
 	# usual lean: more fastballs behind, more breaking balls with two strikes.
 	var count_bucket := 1 if strikes > balls else (2 if balls > strikes else 0)
 	for o: Option in options:
@@ -118,7 +118,7 @@ static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes
 	var choice := PitchDecision.new()
 	choice.type = pick.type
 	choice.target = target
-	choice.quality = clampf(QUALITY_BASE + QUALITY_BY_COMMAND * pick.command / 99.0 + rng.next_normal() * QUALITY_SPREAD, 0.0, 1.0)
+	choice.quality = clampf(QUALITY_BASE + QUALITY_BY_COMMAND * RatingScale.norm(pick.command) + rng.next_normal() * QUALITY_SPREAD, 0.0, 1.0)
 	# Each pitch a little faster or slower than his average (a 147 fastball from 144 to 150, as a
 	# real one spreads): the average shown on his card is what his pitches come to.
 	choice.effort = rng.next_range(EFFORT_LOW, EFFORT_HIGH)

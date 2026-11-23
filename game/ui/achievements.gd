@@ -134,6 +134,8 @@ static func check_career(cs: CareerSeason, last: CareerSeason.Report = null) -> 
 			reach("evolve")
 	if last != null and last.rating >= 9.0:
 		reach("big_game")
+	if not c.milestones.is_empty():
+		reach("milestone_balls", c.milestones.size())
 	if UiTheme.shown(ClubRules.player_ovr(c.player, cs.season.ovr, cs.season.catalog)) >= 80.0:
 		reach("ovr_80")
 	for name: String in c.gear:

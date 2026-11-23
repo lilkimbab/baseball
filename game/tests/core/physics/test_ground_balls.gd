@@ -1,5 +1,5 @@
 extends PhysicsTest
-## Ground balls: bounce losses and rolling resistance (docs/04 section 8.2).
+## Ground balls: bounce losses and rolling resistance (docs/03 section 8.2).
 ## The target ranges are estimates from how long infielders and outfielders have on such
 ## balls; the surface constants in data/physics.json were tuned to meet them.
 

@@ -1,5 +1,5 @@
 extends GutTest
-## A pro career over several seasons (docs/08 R8-3): salary and money, the winter, the next
+## A pro career over several seasons: salary and money, the winter, the next
 ## season with his club, trades, release, free agency, pitches picked up.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

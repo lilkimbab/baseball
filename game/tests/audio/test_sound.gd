@@ -1,5 +1,5 @@
 extends GutTest
-## The game's sound (docs/11, docs/13 S15): every sound the game asks for exists, the buses
+## The game's sound: every sound the game asks for exists, the buses
 ## are there with their effects, the fans' excitement follows the game, the cheering keeps
 ## to the beat and warms up with the fans, and a game's events make the right sounds.
 

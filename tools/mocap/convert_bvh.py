@@ -1,6 +1,6 @@
 """Converts CMU motion-capture BVH files (the cgspeed / una-dinosauria release) into the
 game's joint clips (game/match/joint_clip.gd), for running, stopping and throwing
-(docs/13 S12, approved proposals 3 and 4: recorded fielding and running, motion matching).
+(approved proposals 3 and 4: recorded fielding and running, motion matching).
 
     python3 tools/mocap/convert_bvh.py <bvh folder> <out folder>
 

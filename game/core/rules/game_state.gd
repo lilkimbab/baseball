@@ -35,7 +35,7 @@ var head_hits := PackedStringArray()
 var injured: Dictionary[String, Array] = {}
 ## The scene rolled the hit batters' injuries itself (the season does not roll them again).
 var scene_rolls := false
-## The bullpen (docs/08 R4): how warm each reliever is (0 cold, 1 ready to pitch) by team, who
+## The bullpen: how warm each reliever is (0 cold, 1 ready to pitch) by team, who
 ## is throwing out there now (at most MAX_WARMING a side), and how warm each pitcher was when
 ## he came into the game (a starter is ready).
 var warmth: Array[Dictionary] = [{}, {}]
@@ -46,7 +46,7 @@ var batters_faced: Dictionary[String, int] = {}
 ## outs + phantom_outs reaches three are not earned.
 var phantom_outs := 0
 ## The batter and pitcher who started the current count, when either was replaced during it
-## ("" otherwise). Official scoring charges some results to them (docs/12 section 5.3).
+## ("" otherwise). Official scoring charges some results to them (docs/09 section 5.3).
 var count_batter_id := ""
 var count_pitcher_id := ""
 ## Balls and strikes when the pitcher was replaced during the count.
@@ -110,7 +110,7 @@ func in_extra_innings() -> bool:
 	return inning > rules.innings
 
 
-# --- The bullpen (docs/08 R4) ---
+# --- The bullpen ---
 
 ## Pitches thrown in the game while a reliever throws in the bullpen to have him ready (about
 ## 15, some five minutes), and to have a ready one go cold again once he stops (about 60).

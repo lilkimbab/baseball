@@ -1,6 +1,6 @@
 class_name MatchSound
 extends Node3D
-## The sound of a game (docs/11, docs/13 S15), from what the scene shows — it hooks nothing,
+## The sound of a game, from what the scene shows — it hooks nothing,
 ## it watches: the bat when the ball is hit (its tier from the exit speed, solid, jammed or
 ## off the end from the swing's timing), the mitt when a pitch is caught (sharper the faster
 ## it came), a glove on each catch of a play, a tag, a slide, a bounce; the crowd's bed
@@ -163,7 +163,7 @@ func _cast() -> void:
 			var slots := Commentary.direction_slots(m._play.direction, left) if outfield == (group != "call_infield") else {}
 			var line := m.commentary.call_line(group, _rng.next_int(1000), slots)
 			if line != "":
-				caster.say(line, &"warm" if group == "call_single" or group == "call_infield" else &"hot")
+				caster.say(line, &"warm" if group == "call_single" or group == "call_infield" else &"build")
 	if m.log.size() > _log_seen:
 		if _log_seen > 0 or m.log.size() == 1:
 			caster.say(m.log[m.log.size() - 1], m.last_mood)

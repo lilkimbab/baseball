@@ -1,6 +1,6 @@
 class_name Club
 extends RefCounted
-## The player's club in the manager league (docs/02 section 5, docs/13 S7-9): points, the
+## The player's club in the manager league: points, the
 ## scouting level and today's candidates, traits on players and in the bag, who trains today,
 ## how much each player has grown, and which players came up through the club (its second-team
 ## prospects and the players it scouted: the franchise colour counts them on the first team)
@@ -73,7 +73,7 @@ func merge(i: int, j: int, rules: ClubRules) -> bool:
 	return true
 
 
-## Buys a random first-tier trait for the bag with points (docs/02 section 5.4: traits come
+## Buys a random first-tier trait for the bag with points (traits come
 ## as rewards; until there are other rewards, points buy them). Returns its index or −1.
 func buy_trait(rules: ClubRules, rng: Rng) -> int:
 	var price := int(rules.points.get("trait", 0))

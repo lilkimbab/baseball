@@ -17,7 +17,7 @@ two pitches (a curve or a knuckle curve, a changeup or a circle change) a hard c
 knuckle curve now and then and a changeup thrown a lot is now and then a circle change, the
 same for the same man every time.
 
-By the count (queue stage 3): each pitch's share when the count is even, when he is ahead
+By the count: each pitch's share when the count is even, when he is ahead
 (more strikes than balls) and when he is behind (more balls), so the game's pitchers choose
 as each man does; few pitches in a count and his overall share fills in (COUNT_PRIOR). And
 each batter's line against left- and right-handed pitchers (a pitcher's hand from the season's

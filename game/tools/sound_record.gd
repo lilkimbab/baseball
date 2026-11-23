@@ -1,5 +1,5 @@
 extends SceneTree
-## Records a game's sound without playing it aloud (docs/11 section 9: the bed, the periodic
+## Records a game's sound without playing it aloud (the bed, the periodic
 ## cheering, the bursts at events should show in a spectrogram): the computer plays both
 ## sides, everything the game would play is mixed (the dummy audio driver) and recorded off
 ## the Master bus to a WAV, with each second's loudness printed.

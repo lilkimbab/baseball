@@ -1,6 +1,6 @@
 class_name StadiumDef
 extends RefCounted
-## A ballpark (docs/06 6.1, docs/13 S13): its fence, foul ground, surface, which way it faces,
+## A ballpark (docs/05 6.1): its fence, foul ground, surface, which way it faces,
 ## its stands and what stands around it. The scene builds the park from it and the physics
 ## builds its collision model from the same numbers, so what is drawn is what the ball hits.
 

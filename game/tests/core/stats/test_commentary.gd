@@ -1,5 +1,5 @@
 extends GutTest
-## The one-line play-by-play (docs/13 S6-7): scorebook words, the way a strikeout ended.
+## The one-line play-by-play: scorebook words, the way a strikeout ended.
 
 
 func test_a_called_third_strike_is_a_looking_strikeout() -> void:
@@ -138,3 +138,12 @@ func test_the_caster_calls_the_ball_by_its_flight() -> void:
 		for pick: int in 12:
 			var l := c.call_line(group, pick, Commentary.direction_slots(8, false) if group != "call_infield" else Commentary.direction_slots(6, false))
 			assert_false(l.contains("{"), l)
+
+
+func test_how_excited_the_caster_is() -> void:
+	assert_eq(Commentary.mood_of("home_run_solo"), &"hot")
+	assert_eq(Commentary.mood_of("great_catch"), &"hot", "a catch nobody expected is shouted")
+	assert_eq(Commentary.mood_of("great_stop"), &"hot")
+	assert_eq(Commentary.mood_of("fly_out_deep"), &"warm", "a fly run down at the wall is lifted")
+	assert_eq(Commentary.mood_of("double_play"), &"warm")
+	assert_eq(Commentary.mood_of("ground_out"), &"calm")

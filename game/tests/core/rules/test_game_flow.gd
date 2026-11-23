@@ -1,6 +1,6 @@
 extends GutTest
 ## The rules of play: the count, forced runners, when runs count, the end of innings and of
-## the game (docs/13 S4-6).
+## the game.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 const NONE := RunnerMove.OutKind.NONE

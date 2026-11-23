@@ -1,5 +1,5 @@
 extends GutTest
-## The manager's orders (docs/13 S7-6): what each one does to the next pitch or play.
+## The manager's orders: what each one does to the next pitch or play.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

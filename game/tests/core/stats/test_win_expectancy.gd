@@ -1,5 +1,5 @@
 extends GutTest
-## Win probability and leverage from the base-out chain (docs/13 S7-6).
+## Win probability and leverage from the base-out chain.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

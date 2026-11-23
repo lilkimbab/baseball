@@ -1,6 +1,6 @@
 class_name PitchModel
 extends RefCounted
-## Turns "throw this pitch at that spot" into a ball state at release (docs/04, section 5).
+## Turns "throw this pitch at that spot" into a ball state at release (docs/03, section 5).
 
 const DT := 1.0 / 240.0
 const MAX_AIM_ITERATIONS := 8
@@ -135,6 +135,6 @@ static func apply_execution_error(target: Vector3, sigma_m: float, rng: Rng) -> 
 	return target + Vector3(rng.next_normal() * sigma_m, 0.0, rng.next_normal() * sigma_m)
 
 
-## Miss size (metres, per axis) from the command rating (1-99), per docs/04 section 5.2.
+## Miss size (metres, per axis) from the command rating (1-99), per docs/03 section 5.2.
 static func command_sigma(command: float) -> float:
 	return lerpf(0.26, 0.09, clampf(command / 100.0, 0.0, 1.0))

@@ -1,6 +1,6 @@
 class_name SubstitutionOptions
 extends RefCounted
-## Who a manager can send in now, and the substitution events for it (docs/13 S5-11). A
+## Who a manager can send in now, and the substitution events for it. A
 ## player who has left the game cannot come back, and a change is only offered if the team
 ## is still legal after it.
 

@@ -1,6 +1,6 @@
 class_name ClubRules
 extends RefCounted
-## The numbers of club management (data/club.ko.json, docs/02 section 5, docs/13 S7-9):
+## The numbers of club management (data/club.ko.json):
 ## grades and costs, the first-team cost cap, condition, scouting, training, points, traits
 ## and team colours. Read by ClubIO.
 

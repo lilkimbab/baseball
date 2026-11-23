@@ -1,6 +1,6 @@
 class_name Team
 extends RefCounted
-## A club and its players. The roster pack format is in docs/07 section 5.
+## A club and its players. The roster pack format is in docs/06 section 5.
 
 var id := ""
 var name := ""
@@ -15,7 +15,7 @@ var steal_style := 1.0
 var bunt_style := 1.0
 ## Next starter in the rotation.
 var rotation_index := 0
-## The manager's own choices (docs/08 R5), empty for the computer's: the batting order as
+## The manager's own choices, empty for the computer's: the batting order as
 ## [player id, position code] from the lead-off man down (with a designated hitter), and the
 ## starters in the order they take their turns.
 var batting_plan: Array = []

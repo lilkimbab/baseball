@@ -3,14 +3,17 @@ extends SceneTree
 ## club's real man in its uniform:
 ##
 ##   ./dev tool-win ceremony_shots build/ceremony/c [--only award,champion] [--at 1.0,3.0,5.0]
+##
+## all_star_vote (not in the default list): the fans' vote announced (AllStarVote), from a
+## league played to its break.
 
-const KINDS := ["draft", "contract", "award", "champion", "trade", "call_up"]
+const KINDS := ["draft", "contract", "award", "champion", "trade", "call_up", "milestone"]
 
 var _prefix := "user://ceremony"
 var _kinds: Array = []
 var _times: Array[float] = [1.2, 3.2, 4.4, 6.0]
 var _index := -1
-var _shown: Ceremony
+var _shown: CanvasLayer
 var _clock := 0.0
 var _taken := 0
 var _due: Array[String] = []
@@ -47,11 +50,11 @@ func _process(delta: float) -> bool:
 		_clock = 0.0
 		_taken = 0
 		return false
-	_clock = _shown.time
+	_clock = float(_shown.get("time"))
 	if _taken < _times.size() and _clock >= _times[_taken]:
 		_due.append("%s_%d" % [_kinds[_index], _taken])
 		_taken += 1
-	elif _taken >= _times.size() or _shown._finished:
+	elif _taken >= _times.size() or bool(_shown.get("_finished")):
 		# (Only after the last picture has been saved.)
 		_shown.queue_free()
 		_shown = null
@@ -60,6 +63,9 @@ func _process(delta: float) -> bool:
 
 
 func _start(kind: String) -> void:
+	if kind == "all_star_vote":
+		_vote()
+		return
 	var clubs := LeagueSession.league_clubs()
 	var club: Team = clubs[2]
 	var other: Team = clubs[5]
@@ -68,7 +74,23 @@ func _start(kind: String) -> void:
 		if not p.is_pitcher():
 			man = p
 			break
-	var heading := {"draft": "2027 KBO 신인 드래프트", "contract": "2028 FA 계약", "award": "2027 KBO 시상식", "champion": "2027 한국시리즈", "trade": "2027년 트레이드", "call_up": "2027년 %s" % club.name}
-	var big := {"draft": "%s 1라운드 3순위" % club.name, "contract": "%s 입단" % club.name, "award": "홈런왕", "champion": "%s 우승!" % club.name, "trade": "%s 이적" % club.name, "call_up": "첫 1군 등록"}
-	var more := {"draft": ["계약금 2억 5,000만원", "서울고 출신"], "contract": ["4년 · 연봉 12억"], "award": ["타점왕", "상금 3,000만원"], "champion": ["2027년 통합 챔피언"], "trade": ["%s → %s" % [other.name, club.name]], "call_up": ["37일 · 퓨처스에서 올라왔습니다"]}
+	var heading := {"draft": "2027 KBO 신인 드래프트", "contract": "2028 FA 계약", "award": "2027 KBO 시상식", "champion": "2027 한국시리즈", "trade": "2027년 트레이드", "call_up": "2027년 %s" % club.name, "milestone": "2027년 34일차 · vs %s" % other.name}
+	var big := {"draft": "%s 1라운드 3순위" % club.name, "contract": "%s 입단" % club.name, "award": "홈런왕", "champion": "%s 우승!" % club.name, "trade": "%s 이적" % club.name, "call_up": "첫 1군 등록", "milestone": "데뷔 첫 홈런"}
+	var more := {"draft": ["계약금 2억 5,000만원", "서울고 출신"], "contract": ["4년 · 연봉 12억"], "award": ["타점왕", "상금 3,000만원"], "champion": ["2027년 통합 챔피언"], "trade": ["%s → %s" % [other.name, club.name]], "call_up": ["37일 · 퓨처스에서 올라왔습니다"], "milestone": ["기념구"]}
 	_shown = Ceremony.play(root.get_child(0), Ceremony.KINDS[StringName(kind)], man, club, heading[kind], big[kind], PackedStringArray(more[kind]), Callable(), other if kind == "trade" else null)
+
+
+## A league of the default clubs played to its break, and its vote shown (the first club's men
+## as his).
+func _vote() -> void:
+	var clubs := LeagueSession.league_clubs()
+	var s := Season.create(clubs, clubs.size(), 36, 5, RuleSet.kbo_2026(), LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), LeagueEnvIO.load_overall(), ClubIO.load_default())
+	s.manage(clubs[0].id)
+	while not LeagueAllStar.due(s) and s.phase == Season.Phase.REGULAR:
+		s.play_day(true)
+		s.advance()
+	LeagueAllStar.hold(s)
+	var selected: Array[String] = []
+	selected.assign(s.all_star.get("selected", []))
+	var mine := LeagueAllStar.of_my_club(s)
+	_shown = AllStarVote.play(root.get_child(0), "%d 올스타 팬 투표 최종 결과" % s.season_year, AllStar.board(s, 0, selected, null, s.my_team), "우리 구단 %d명 선정 · 구단 포인트 +%d" % [mine.size(), LeagueAllStar.CLUB_PER_MAN * mine.size()], s)

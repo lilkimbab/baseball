@@ -1,7 +1,7 @@
 #pragma once
 // The ball's flight, in native code (approved proposal 5): drag, Magnus lift, gravity and the
 // seam-shifted wake integrated with RK4, the same model as game/core/physics/ball_sim.gd
-// (docs/04), in double precision. The game uses it when the library is there and its own
+// (docs/03), in double precision. The game uses it when the library is there and its own
 // GDScript otherwise.
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/dictionary.hpp>

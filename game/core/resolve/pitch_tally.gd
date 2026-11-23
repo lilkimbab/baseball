@@ -1,7 +1,7 @@
 class_name PitchTally
 extends RefCounted
 ## Pitch-by-pitch and batted-ball counts from the physical resolver, checked against the
-## targets for the pitcher and batter AI (docs/13 S5-8) and batted-ball quality (docs/12 8.3).
+## targets for the pitcher and batter AI and batted-ball quality (docs/09 8.3).
 
 var pitches := 0
 var in_zone := 0
@@ -188,7 +188,7 @@ func text() -> String:
 	_check("파울/투구", float(fouls + foul_tips) / maxi(pitches, 1), 0.16, 0.20)
 	_rows.append("%-26s %8.4f" % ["사구/투구", float(hit_by_pitch) / maxi(pitches, 1)])
 	var n := maxi(batted, 1)
-	# Set by the home-run and in-play rates (docs/12 8.3); KBO exit speeds are not published.
+	# Set by the home-run and in-play rates (docs/09 8.3); KBO exit speeds are not published.
 	_check("평균 타구 속도(km/h)", exit_speed / n, 140.0, 146.0)
 	_check("평균 발사각(°)", launch / n, 10.0, 14.0)
 	_check("땅볼 비율", float(grounders) / n, 0.43, 0.47)

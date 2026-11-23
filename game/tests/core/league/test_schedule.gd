@@ -1,5 +1,5 @@
 extends GutTest
-## The season calendar (docs/13 S7-1).
+## The season calendar.
 
 
 func _ids() -> PackedStringArray:

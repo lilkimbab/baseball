@@ -1,5 +1,5 @@
 """The cap, the shoes, the belt buckle and the trousers' side piping, shaped from the body they are worn on and from the
-things themselves (docs/13 S11-5, S11-8; the user: "the head and body look out of proportion ...
+things themselves (the user: "the head and body look out of proportion ...
 compare with the photographs"). A dome on the skull and a hull round the foot read as a
 swimming cap and clown shoes at any distance.
 

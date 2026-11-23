@@ -1,5 +1,5 @@
 extends GutTest
-## The second teams' league and the moves between the teams (docs/08 R6): each day of the
+## The second teams' league and the moves between the teams: each day of the
 ## season every second team plays, its men's numbers are kept, those who play grow faster,
 ## the computer clubs call up a second-team man who has become better, the player's club is
 ## told instead, and all of it is saved and goes on the same after loading.

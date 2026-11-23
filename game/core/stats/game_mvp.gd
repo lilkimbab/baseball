@@ -1,6 +1,6 @@
 class_name GameMvp
 extends RefCounted
-## The player of the game (docs/13 S6-10): the best day on the winning side, scored the way a
+## The player of the game: the best day on the winning side, scored the way a
 ## broadcast picks one: bases gained and runs made for a hitter, outs and runs saved for a
 ## pitcher. In a tie the best day of either side.
 

@@ -1,5 +1,5 @@
 extends GutTest
-## A career game on screen (docs/13 S8-3): only his scenes, a card before each, the result and
+## A career game on screen: only his scenes, a card before each, the result and
 ## growth points back to the career.
 
 const MATCH := preload("res://career/career_match.tscn")
@@ -48,7 +48,7 @@ func test_a_hitter_s_game_stops_for_his_scenes_and_reports_back() -> void:
 	assert_true(scene.game.over, "the game ended")
 	assert_between(scenes, 3, 6, "four or five turns at bat")
 	gut.p("a fielder's career game: %.1f min, %d scenes" % [t / 60.0, scenes])
-	assert_lt(t, 8.5 * 60.0, "docs/02: six to eight minutes")
+	assert_lt(t, 8.5 * 60.0, "six to eight minutes")
 	assert_not_null(scene.report, "the result went to the career")
 	assert_eq(CareerSession.last_report, scene.report)
 	assert_eq(CareerSession.career_season.futures_games, 1, "a second-team game")

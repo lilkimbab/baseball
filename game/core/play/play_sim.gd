@@ -1,6 +1,6 @@
 class_name PlaySim
 extends RefCounted
-## What happens once the ball is in play (docs/03 sections 8.3-8.4, docs/13 S5-3 to S5-7).
+## What happens once the ball is in play (docs/02 sections 8.3-8.4).
 ##
 ## The batted ball's whole path is known at contact. Every fielder's earliest chance at it is
 ## worked out from the movement model; the one who gets there first (on a fly, by priority)
@@ -949,7 +949,7 @@ func _aggression() -> float:
 
 
 func _judgment(r: PlayRunner) -> float:
-	return m.judgment_sd * lerpf(1.4, 0.6, clampf(r.baserunning / 99.0, 0.0, 1.0))
+	return m.judgment_sd * lerpf(1.4, 0.6, RatingScale.norm(r.baserunning))
 
 
 # --- Balls that end the play at once ---
@@ -1212,7 +1212,7 @@ func _runner_frames(r: PlayRunner) -> void:
 			return
 		if base < last and base < 4:
 			# Rounding the bag: he swings out a little before it, toward foul ground or the
-			# outfield, to take it at an angle (docs/13 S12-5).
+			# outfield, to take it at an angle.
 			var into := (p - prev).normalized()
 			var outward := (p - Vector2(0.0, Field.BASE_DISTANCE * sqrt(0.5))).normalized()
 			var share := ROUND_FROM / maxf(prev.distance_to(p), ROUND_FROM)

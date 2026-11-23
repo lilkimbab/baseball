@@ -11,10 +11,10 @@ var power := 55.0
 var eye := 55.0
 var command := 55.0
 
-## Half-width of the timing window in seconds at average contact (docs/05: easy 0.090,
+## Half-width of the timing window in seconds at average contact (docs/04: easy 0.090,
 ## normal 0.065, hard 0.045, real 0.030).
 var timing_window := 0.065
-## How much of an aiming error on screen becomes a bat-ball offset (docs/05: 0.035-0.10).
+## How much of an aiming error on screen becomes a bat-ball offset (docs/04: 0.035-0.10).
 var aim_scale := 0.05
 ## A person's small errors are forgiven and large ones count in full (SwingModel.error_scale);
 ## off, the whole error is scaled by aim_scale (the computer batter, whose error is its read).

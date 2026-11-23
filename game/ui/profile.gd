@@ -1,6 +1,6 @@
 class_name Profile
 extends RefCounted
-## What belongs to the person playing, across every mode and save (docs/02): points earned by
+## What belongs to the person playing, across every mode and save: points earned by
 ## playing (the shop spends them), experience and the level it makes, lifetime numbers, the
 ## day's goals, and what has been bought. Kept in user://profile.json.
 

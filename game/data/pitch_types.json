@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it. Types marked evolved are reached only by the career mode's pitch evolution (docs/02 section 6.3): a four-seam with more spin and ride, a slider thrown harder, a curve with more spin, a changeup with more fade (A: typical Statcast values for such pitches). Added 2026-11-23 (the user: more of the pitches really thrown): sinker, forkball, knuckle curve, slurve, screwball, knuckleball ('knuckle': the flutter of a ball thrown nearly without spin, m/s², PitchDuel); the circle change is thrown from the start by some as well as reached by evolving a changeup.",
+  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it. Types marked evolved are reached only by the career mode's pitch evolution: a four-seam with more spin and ride, a slider thrown harder, a curve with more spin, a changeup with more fade (A: typical Statcast values for such pitches). Added 2026-11-23 (the user: more of the pitches really thrown): sinker, forkball, knuckle curve, slurve, screwball, knuckleball ('knuckle': the flutter of a ball thrown nearly without spin, m/s², PitchDuel); the circle change is thrown from the start by some as well as reached by evolving a changeup.",
   "types": [
     {
       "id": "four_seam",

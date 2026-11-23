@@ -1,6 +1,6 @@
 class_name DataTable
 extends VBoxContainer
-## A table as the menus show them (docs/05 section 5; the reference's line-up and roster
+## A table as the menus show them (docs/04 section 5; the reference's line-up and roster
 ## tables): a header that stays put, rows under it that scroll, striped, lit under the
 ## pointer, one of them chosen. A row can carry a small portrait, coloured cells and a tag the
 ## screen reads back when it is picked.
@@ -185,6 +185,9 @@ func _draw_rows() -> void:
 
 static func _text(on: Control, font: Font, text: String, x: float, width: float, align: int, baseline: float, font_size: int, colour: Color) -> void:
 	var how := [HORIZONTAL_ALIGNMENT_LEFT, HORIZONTAL_ALIGNMENT_CENTER, HORIZONTAL_ALIGNMENT_RIGHT][clampi(align, 0, 2)] as HorizontalAlignment
+	var edge := UiTheme.ink_edge(colour)
+	if edge.a > 0.0:
+		on.draw_string_outline(font, Vector2(x, baseline), text, how, maxf(width - 10.0, 10.0), font_size, 3, edge)
 	on.draw_string(font, Vector2(x, baseline), text, how, maxf(width - 10.0, 10.0), font_size, colour)
 
 

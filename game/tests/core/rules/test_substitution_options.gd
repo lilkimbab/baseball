@@ -1,5 +1,5 @@
 extends GutTest
-## The substitution choices offered to a manager (docs/13 S5-11).
+## The substitution choices offered to a manager.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

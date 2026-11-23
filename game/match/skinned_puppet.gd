@@ -74,12 +74,12 @@ var gloves := false
 ## Standing height in metres; the model is scaled to it. Set before adding to the scene, or
 ## change it with set_body().
 var height := 1.83
-## The body build (docs/13 S11-1): &"lean", &"standard", &"solid" or &"heavy", each a model
+## The body build: &"lean", &"standard", &"solid" or &"heavy", each a model
 ## built by ./dev model.
 var build: StringName = &"standard"
 ## The batting helmet's ear flaps: &"left" (on the model's left ear: the ear toward the
 ## pitcher for a right-handed batter, and for a left-hander too once the figure is mirrored),
-## or &"both" for a switch hitter (docs/13 S11-5).
+## or &"both" for a switch hitter.
 var helmet_flaps: StringName = &"left"
 ## The team's letter on the front of the cap and helmet ("" none).
 var logo := ""
@@ -95,7 +95,7 @@ var long_sleeves := false
 var high_socks := false
 var guards: Array[StringName] = []
 ## &"glove" for an infielder's or pitcher's glove, &"outfield" for an outfielder's,
-## &"first_base" for a first baseman's mitt, &"mitt" for the catcher's (docs/13 S11-8).
+## &"first_base" for a first baseman's mitt, &"mitt" for the catcher's.
 var glove_kind: StringName = &"glove"
 var _glove_shown: StringName = &""
 
@@ -277,7 +277,7 @@ func _load_model() -> void:
 			# track; the helmet's shell shades the face without it.
 			flap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_logos.clear()
-	# Detail too small to see from afar stops being drawn there (docs/13 S11-10); the body and
+	# Detail too small to see from afar stops being drawn there; the body and
 	# clothes drop to simpler meshes with distance by themselves (the import makes their LODs).
 	for part: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		var far: float = FAR_DETAIL.get(_detail_kind(String(part.name)), 0.0)
@@ -1062,7 +1062,7 @@ static var _skin_copies: Dictionary[int, ShaderMaterial] = {}
 static var _pores: NoiseTexture2D
 
 
-## Skin (docs/13 S11-3, S14): the painted MakeHuman skin through match/skin.gdshader, with
+## Skin: the painted MakeHuman skin through match/skin.gdshader, with
 ## the maps make_player.py bakes for each build — creases shaded (ambient occlusion), where
 ## skin shines and where it is matte, where the beard grows — and the painted skin's own fine
 ## relief, pores, a second sharp highlight for oil and sweat, light scattering under the
@@ -1185,7 +1185,7 @@ static func _front_of(part: MeshInstance3D, y: float) -> Vector3:
 	return best
 
 
-## Hair (docs/13 S11-4): the style's strand texture as a cut-out, tinted to the player's colour.
+## Hair: the style's strand texture as a cut-out, tinted to the player's colour.
 func _hair_material(original: Material) -> Material:
 	var base := _solid(original, true) as StandardMaterial3D
 	if base == null:
@@ -1197,7 +1197,7 @@ func _hair_material(original: Material) -> Material:
 	return m
 
 
-## Which face keys, how far (docs/13 S11-6; queue 2-1, 2026-11-23: no two men with one face):
+## Which face keys, how far (queue 2-1, 2026-11-23: no two men with one face):
 ## for each group one key picked from the player's id and how far. The eyes, brows and lashes
 ## carry the same keys (tools/blender/make_player.py: face_keys_to_parts), so the face around
 ## the eyes may change too: their size, spacing, height and slant, the fold of the lid, the

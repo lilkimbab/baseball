@@ -35,7 +35,7 @@ OUT_GLB = ARGS[0] if ARGS else "player_base.glb"
 PREVIEW = ARGS[1] if len(ARGS) > 1 and ARGS[1] != "-" else None
 BUILD = ARGS[2] if len(ARGS) > 2 else "standard"
 
-# Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/12, section 4). Every
+# Body shape: a professional ballplayer of about 183 cm and 88 kg (docs/09, section 4). Every
 # setting below was chosen by measuring the body it gives (tools/blender/anthropometry.py, which
 # prints the table on every build) against the US Army's survey of men (ANSUR II) and, for
 # girths, the upper part of its range: a ballplayer is broader in the shoulders and thicker in
@@ -52,7 +52,7 @@ SHAPE = {
     # measurement and came out 6.9 heads tall with the chin 4 cm above the shoulders.)
     "head-scale-vert-decr": 0.18, "head-scale-horiz-incr": 0.15,
     "head-back-scale-depth-decr": 0.5, "head-scale-depth-decr": 0.3,
-    # A man's face (docs/13 S11-6): a wider, firmer jaw and chin, cheekbones, a brow ridge.
+    # A man's face: a wider, firmer jaw and chin, cheekbones, a brow ridge.
     # Without these the default face reads as a woman's at close range.
     "chin-width-incr": 0.3, "chin-bones-incr": 0.35, "l-cheek-bones-incr": 0.25, "r-cheek-bones-incr": 0.25,
     "eyebrows-trans-forward": 0.35, "forehead-nubian-incr": 0.2, "head-square": 0.25,
@@ -107,7 +107,7 @@ PAIRED_KEYS = {
     "eyebrows-trans-up": ["eyebrows-trans-up"], "eyebrows-trans-down": ["eyebrows-trans-down"],
 }
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
-# Builds (docs/13 S11-1): MPFB weight and muscle for a lean, standard, solid and heavy player
+# Builds: MPFB weight and muscle for a lean, standard, solid and heavy player
 # of the same height. Weight rises with muscle first (athletes), then with mass. The trunk's
 # width and depth at chest and waist are printed for the build checks.
 BUILDS = {
@@ -125,7 +125,7 @@ BUILD_SHAPE = {
     "heavy": {"measure-waist-circ-incr": 1.0, "stomach-pregnant-incr": 0.2},
 }
 
-# Hair (docs/13 S11-4): MakeHuman's four short styles (CC0, from MPFB's system assets). Every
+# Hair: MakeHuman's four short styles (CC0, from MPFB's system assets). Every
 # model carries all four; the game shows one per player. Hair under the cap is cut away, so
 # only the sides, back and sideburns show below it. Textures are scaled down to this size.
 HAIR_STYLES = ["short01", "short02", "short03", "short04"]
@@ -146,7 +146,7 @@ BELT_CENTRE = 0.575
 TUCK = 0.05
 
 SKIN, HANDS, JERSEY, BELT, PANTS, SOCKS, SHOES, UNDERSHIRT = range(8)
-# The jersey's neckline (docs/13 S11-7): a V in front, from the sides of the neck down to
+# The jersey's neckline: a V in front, from the sides of the neck down to
 # where the button placket starts; the undershirt's round neck shows inside it.
 V_DEPTH = 0.105
 V_TOP_HALF = 0.062
@@ -503,7 +503,7 @@ def body_marks(body, top):
 
 
 def bake_skin_maps(body, rig, hidden, detail_png, relief_png, size=1024):
-    """Bakes the maps the game's skin shader reads (docs/13 S14: skin that reads as a
+    """Bakes the maps the game's skin shader reads (skin that reads as a
     person's, not a doll's), onto the body's own UVs:
       detail (per build): R ambient occlusion within 7 cm (the creases of the
         eyes, nostrils, mouth and ears, between the fingers; not the shadow of an arm, which
@@ -882,7 +882,7 @@ def prepare_body(body, rig):
 def make_garment(body, name, regions, looseness, slots, anatomy_of, snap_neckline=None, drape=None):
     """Copies the faces of some regions into a new mesh, subdivides it once for a smoother
     outline, lifts every point off the skin by how loose the garment is there (looseness:
-    vertex -> metres, docs/13 S11-2), smooths away the anatomy underneath and unwraps it
+    vertex -> metres), smooths away the anatomy underneath and unwraps it
     front/back. The copied skin weights make it move with the body."""
     obj = body.copy()
     obj.data = body.data.copy()
@@ -1077,7 +1077,7 @@ def hang(verts, skin, start, end, ease, blend, sectors=12, slices=36, hold=1.0, 
 
 
 # Round each part of a garment, the arc length (m) a pinstripe fabric's stripes are counted in
-# (docs/13 S11-9): the cloth's own radius about there, so stripes stay about 2.5 cm apart.
+#: the cloth's own radius about there, so stripes stay about 2.5 cm apart.
 WRAP_RADIUS = {"leg": 0.085, "arm": 0.065, "trunk": 0.16}
 
 
@@ -1124,7 +1124,7 @@ def wrap_uvs(bm, anatomy):
 
 
 def bake_folds(garment, body, out_png, pinned, size=1024, frames=40, slack=0.022):
-    """Bakes a garment's folds into a normal map (docs/13 S11-2): a finer copy of it is hung
+    """Bakes a garment's folds into a normal map: a finer copy of it is hung
     on the body as cloth, held where it is held in life (pinned(co) -> True), given a little
     more cloth than the body needs (slack: 2%; at 4.5% a fitted jersey settled into lumps that
     made the body under it look uneven) so it gathers into folds as it settles, and the
@@ -1493,7 +1493,7 @@ def main():
     stand_on_ground(body, rig)
     stem = os.path.splitext(OUT_GLB)[0]
     marks = body_marks(body, max(v.co.z for v in body.data.vertices))
-    # The body's measurements against the tables (docs/12 section 4), kept next to the model.
+    # The body's measurements against the tables (docs/09 section 4), kept next to the model.
     numbers = anthropometry.measure(body, rig, marks, bpy)
     for line in anthropometry.report(numbers):
         print("make_player: measure %s %s" % (BUILD, line))
@@ -1556,7 +1556,7 @@ def main():
         return lift
 
     def jersey_drape(bm, a, skin):
-        """A uniform top (docs/13 S11-2, from photographs): fitted — it follows the chest and
+        """A uniform top (from photographs): fitted — it follows the chest and
         the back a centimetre off them, runs a little straighter than the body from the
         chest to where it is tucked in (a tucked jersey is pulled down, not hung), and the
         sleeves lie on the tops of the arms and hang open under them."""
@@ -1618,7 +1618,7 @@ def main():
 
     jersey = make_garment(body, "Jersey", (JERSEY,), jersey_looseness, [JERSEY], anatomy_of, None, jersey_drape)
     pants = make_garment(body, "Pants", (PANTS, BELT), pants_looseness, [PANTS, BELT], anatomy_of, None, pants_drape)
-    # How far the jersey stands off the body at chest height (docs/13 S11-2: 2 to 5 cm).
+    # How far the jersey stands off the body at chest height (2 to 5 cm).
     depsgraph = bpy.context.evaluated_depsgraph_get()
     tree = BVHTree.FromObject(body, depsgraph)
     gaps = [tree.find_nearest(v.co)[3] for v in jersey.data.vertices if abs(v.co.z - chest_z) < 0.02 and abs(v.co.x) < 0.17]
@@ -1632,7 +1632,7 @@ def main():
     fit_report(tree, pants, "pants", {"seat": top * 0.5, "thigh": (top * 0.47 + knee_z) * 0.5, "knee": knee_z, "calf": knee_z * 0.68, "hem": 0.11})
     if os.environ.get("TAILOR"):
         tailor_views(os.environ["TAILOR"], [body, jersey, pants], top)
-    # Folds (docs/13 S11-2): the jersey hangs from the shoulders and is tucked in at the belt;
+    # Folds: the jersey hangs from the shoulders and is tucked in at the belt;
     # the trousers hang from the belt and are held at the hem over the socks.
     jz = [v.co.z for v in jersey.data.vertices]
     pz = [v.co.z for v in pants.data.vertices]

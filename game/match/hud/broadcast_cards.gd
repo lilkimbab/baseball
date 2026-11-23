@@ -1,6 +1,6 @@
 class_name BroadcastCards
 extends HudCanvas
-## The broadcast's cards (docs/11 section 6, docs/13 S16), on the HUD's plates: the match-up
+## The broadcast's cards, on the HUD's plates: the match-up
 ## before the first pitch, the starting pitcher, the visitors' order; the inning with the half
 ## just over; the batter coming up (a lower third); the pitching change; "REPLAY". They slide
 ## in and out with their segment (Broadcast), and say how to skip one that holds the game.
@@ -40,6 +40,8 @@ func _draw() -> void:
 			_replay_tag(a)
 		Broadcast.Kind.GAME_END:
 			_game_end(a)
+		Broadcast.Kind.CHAMPION:
+			_champion(seg.data, t, a)
 	if seg.holds:
 		keycaps(Vector2(0.0, view.y - BottomBar.HEIGHT - 34.0), "Space 건너뛰기", view.x, 15)
 
@@ -336,10 +338,99 @@ func _half(data: Dictionary, a: float) -> void:
 func _replay_tag(a: float) -> void:
 	var r := Rect2(Vector2(view.x - 260.0, 40.0), Vector2(220.0, 54.0))
 	panel(r, Color(UiTheme.PANEL, 0.95 * a), 10.0)
-	draw_rect(Rect2(r.position + Vector2(0.0, r.size.y - 4.0), Vector2(r.size.x - 10.0, 4.0)), Color(UiTheme.BRAND, a))
+	draw_rect(Rect2(r.position + Vector2(0.0, r.size.y - 4.0), Vector2(r.size.x - 10.0, 4.0)), Color(UiTheme.BRAND if HudCanvas.style == &"red" else HudCanvas.style_colour(2), a))
 	figure(r.position + Vector2(0.0, 38.0), "REPLAY", 30, Color(Color.WHITE, a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, true)
 	var kind: StringName = scene.broadcast.current.data.get("kind", &"home_run")
 	text(Vector2(r.position.x, r.end.y + 26.0), "홈런" if kind == &"home_run" else "호수비", 17, Color(UiTheme.INK, a), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 600)
+
+
+## The title won (the user, 2026-11-23: "bigger, less awkward, not that red"): as a broadcast
+## crowns its champions — confetti in gold, white and the club's colours over the whole
+## screen, and across the middle a wide black band edged in gold: the year and the round in
+## gold, the club's emblem large, its name and "우승" in the shouting face, CHAMPIONS under it.
+const CONFETTI := 150
+const CROWN_FROM := 3.4
+## Seconds after it comes that the band settles low (CHAMPION's toss starts soon after).
+const SETTLE_AT := 3.0
+
+
+func _champion(data: Dictionary, t: float, a: float) -> void:
+	if t < CROWN_FROM:
+		return
+	var u := t - CROWN_FROM
+	a *= clampf(u / 0.45, 0.0, 1.0)
+	var side := int(data.get("side", GameState.HOME))
+	var club := scene.club(side)
+	var colours: Array[Color] = [UiTheme.GOLD, Color(1.0, 0.93, 0.66), Color.WHITE]
+	if club != null:
+		colours.append(HudCanvas.club_colour(club))
+		colours.append(club.secondary)
+	_confetti(u, colours, a)
+	# Big in the middle as it comes; after a few seconds it settles smaller low on the screen,
+	# out of the way of the toss (drawn about the band's middle, then moved and scaled).
+	var settle := smoothstep(SETTLE_AT, SETTLE_AT + 0.8, u)
+	var s := lerpf(1.0, 0.7, settle)
+	var centre_y := lerpf(view.y * 0.56, view.y - 150.0, settle)
+	draw_set_transform(Vector2(view.x * 0.5 * (1.0 - s), centre_y) * k, 0.0, Vector2(k * s, k * s))
+	# The band: dark in the middle, fading out to the sides, gold lines along its edges.
+	var h := 250.0
+	var y := -h * 0.5
+	var grow := 1.0 + 0.08 * (1.0 - clampf(u / 0.35, 0.0, 1.0))
+	var band := Rect2(Vector2(0.0, y - h * (grow - 1.0) * 0.5), Vector2(view.x, h * grow))
+	var mid := Color(0.02, 0.02, 0.03, 0.86 * a)
+	var edge := Color(0.02, 0.02, 0.03, 0.0)
+	draw_polygon(PackedVector2Array([band.position, Vector2(view.x * 0.5, band.position.y), Vector2(view.x * 0.5, band.end.y), Vector2(0.0, band.end.y)]), PackedColorArray([edge, mid, mid, edge]))
+	draw_polygon(PackedVector2Array([Vector2(view.x * 0.5, band.position.y), Vector2(view.x, band.position.y), band.end, Vector2(view.x * 0.5, band.end.y)]), PackedColorArray([mid, edge, edge, mid]))
+	for line_y: float in [band.position.y, band.end.y - 3.0]:
+		var gold := Color(UiTheme.GOLD, 0.95 * a)
+		var clear := Color(UiTheme.GOLD, 0.0)
+		draw_polygon(PackedVector2Array([Vector2(view.x * 0.08, line_y), Vector2(view.x * 0.5, line_y), Vector2(view.x * 0.5, line_y + 3.0), Vector2(view.x * 0.08, line_y + 3.0)]), PackedColorArray([clear, gold, gold, clear]))
+		draw_polygon(PackedVector2Array([Vector2(view.x * 0.5, line_y), Vector2(view.x * 0.92, line_y), Vector2(view.x * 0.92, line_y + 3.0), Vector2(view.x * 0.5, line_y + 3.0)]), PackedColorArray([gold, clear, clear, gold]))
+	# The words, centred as a group with the emblem at their left.
+	var name := club.name if club != null else scene.game.teams[side].short_name
+	var title := "%s 우승!" % name
+	var big := 96
+	while big > 60 and text_width(title, big, 800) * 1.05 > view.x - 520.0:
+		big -= 4
+	var words := maxf(text_width(title, big, 800) * 1.05, 420.0)
+	var mark := 190.0
+	var left := (view.x - (mark + 40.0 + words)) * 0.5
+	var slide := (1.0 - clampf(u / 0.45, 0.0, 1.0)) * 40.0
+	if club != null and a > 0.3:
+		# A ring of light behind it, the club's two colours as a stripe under it.
+		draw_circle(Vector2(left + mark * 0.5, y + h * 0.5), mark * 0.56, Color(UiTheme.GOLD, 0.12 * a))
+		Emblem.draw_emblem(self, club, Rect2(Vector2(left - slide, y + h * 0.5 - mark * 0.5), Vector2(mark, mark)))
+	var tx := left + mark + 40.0 + slide
+	var tag := "%d %s" % [int(data.get("year", 2026)), str(data.get("round", "")) if str(data.get("round", "")) != "" else "포스트시즌"]
+	text(Vector2(tx, y + 62.0), tag, 28, Color(UiTheme.GOLD, a), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+	shout(Vector2(tx, y + 62.0 + big * 1.02), title, big, Color(Color.WHITE, a))
+	var champs := y + 62.0 + big * 1.02 + 52.0
+	figure(Vector2(tx, champs), "C H A M P I O N S", 30, Color(UiTheme.GOLD, a), HORIZONTAL_ALIGNMENT_LEFT, -1.0, true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(k, k))
+
+
+## Confetti falling over the screen (`u` seconds since it began): small paper strips that
+## tumble (narrowing as they turn edge-on) and sway, each its own from its index.
+func _confetti(u: float, colours: Array[Color], a: float) -> void:
+	for i: int in CONFETTI:
+		var r1 := fposmod(sin(float(i) * 12.9898) * 43758.5453, 1.0)
+		var r2 := fposmod(sin(float(i) * 78.233) * 12543.123, 1.0)
+		var r3 := fposmod(sin(float(i) * 39.425) * 24634.634, 1.0)
+		var speed := 150.0 + 170.0 * r2
+		# (Half of it on the screen at once, as it is fired, the rest following from above.)
+		var fall := (r3 - 0.5) * (view.y + 80.0) + u * speed
+		if fall < -40.0:
+			continue
+		var y := fposmod(fall, view.y + 80.0) - 40.0
+		var x := r1 * view.x + sin(u * (1.2 + r3) + i) * 38.0
+		var turn := u * (2.0 + 3.0 * r2) + i
+		var w := 7.0 * absf(cos(u * (3.0 + 4.0 * r1) + i))
+		var c: Color = colours[i % colours.size()]
+		var along := Vector2(cos(turn), sin(turn))
+		var across := along.orthogonal()
+		var at := Vector2(x, y)
+		var quad := PackedVector2Array([at - along * 7.0 - across * w * 0.5, at + along * 7.0 - across * w * 0.5, at + along * 7.0 + across * w * 0.5, at - along * 7.0 + across * w * 0.5])
+		draw_colored_polygon(quad, Color(c, 0.95 * a))
 
 
 ## The last out: the winner and the final score, before the summary.

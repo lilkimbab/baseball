@@ -1,6 +1,6 @@
 class_name DraftScreen
 extends Screen
-## Draft day (신인 드래프트; docs/08 R8-3; the user, 2026-11-23: "a KBO-style draft-day
+## Draft day (신인 드래프트; the user, 2026-11-23: "a KBO-style draft-day
 ## screen"): the clubs' order on the left, the picks called one by one on a board in the middle
 ## (round, pick, club, the man, his school and position), and his own card on the right. When
 ## his name is called the board stops and his card turns into the club's: the round and pick,
@@ -133,7 +133,7 @@ func _fill_card() -> void:
 		row.add_child(words)
 		_card.add_child(row)
 		_card.add_child(UiKit.label("계약금 %s" % Draft.money_text(his.bonus), 24, UiTheme.ACCENT, 700))
-		_card.add_child(UiKit.button("입단 계약", sign, "handshake", "primary", 320.0))
+		_card.add_child(UiKit.button("입단 계약", sign, "handshake", "gold", 320.0))
 	elif over:
 		var club: Team = _clubs.get(_draft.developmental_team)
 		_card.add_child(UiKit.heading("지명받지 못했습니다", 26, UiTheme.DIM))

@@ -8,7 +8,7 @@ extends RefCounted
 const PITCH_RELEASE := 1.15
 const PITCH_LENGTH := 2.1
 ## Hand position at release in puppet space; matches the physics release point of a
-## right-hander standing on the rubber (docs/04, section 5.1).
+## right-hander standing on the rubber (docs/03, section 5.1).
 const RELEASE_HAND := Vector3(0.55, 1.546, -1.68)
 const BAT_LENGTH := 0.85
 
@@ -120,7 +120,7 @@ static func run(phase: float) -> PuppetPose:
 	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))
 
 
-# --- Fielding, throwing, running and umpiring (docs/13 S12, stage A key poses) ---
+# --- Fielding, throwing, running and umpiring (stage A key poses) ---
 
 
 ## How high (m) a foot comes up when it steps.
@@ -249,7 +249,7 @@ static func dive(side: float = -1.0) -> PuppetPose:
 ## A throw of the given style, t in seconds from the release (negative before): &"over" the
 ## full overhand, &"snap" an infielder's quick, shorter-armed throw from a lower slot,
 ## &"toss" an underhand flip for a few metres, &"crow_hop" an outfielder's hop onto the back
-## foot before a long throw (docs/13 S12-3).
+## foot before a long throw.
 static func throw_styled(t: float, style: StringName) -> PuppetPose:
 	var a := PuppetPose.at
 	match style:
@@ -370,7 +370,7 @@ static func flinch() -> PuppetPose:
 	return _pose(a.call(0.0, 0.86, -0.04), 0.0, 22.0, 26.0, a.call(0.1, 0.98, 0.14), a.call(-0.24, 0.9, 0.16), a.call(0.17, 0.08, 0.06), a.call(-0.17, 0.08, -0.12))
 
 
-## A home run's hitter coming home: a fist up, the other arm out a little (queue stage 6).
+## A home run's hitter coming home: a fist up, the other arm out a little.
 static func fist_pump() -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.94, 0.02), 0.0, 0.0, 4.0, a.call(0.2, 1.95, 0.12), a.call(-0.3, 0.95, 0.12), a.call(0.13, 0.08, 0.06), a.call(-0.13, 0.08, -0.08))
@@ -403,6 +403,15 @@ static func bow(k: float) -> PuppetPose:
 static func hold(height: float, apart: float, reach: float) -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.955, 0.0), 0.0, 0.0, 1.0, a.call(apart * 0.5, height, reach), a.call(-apart * 0.5, height, reach), a.call(0.12, 0.08, 0.0), a.call(-0.12, 0.08, 0.0))
+
+
+## Tossed in the air on his back (a manager's 헹가래; the figure is laid down by its caller):
+## arms flung wide, legs loose, flailing more at the top of each toss (`k`, 0 to 1).
+static func tossed(t: float, k: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var fling := sin(k * PI)
+	var kick := 0.1 * sin(t * 9.0)
+	return _pose(a.call(0.0, 0.95, 0.0), 0.0, 4.0 * sin(t * 5.0), 0.0, a.call(0.62, 1.32 + 0.18 * fling, 0.18 + 0.1 * fling), a.call(-0.62, 1.32 + 0.18 * fling, 0.18 + 0.1 * fling), a.call(0.2, 0.1, 0.14 + kick), a.call(-0.2, 0.12, 0.1 - kick))
 
 
 ## A wave to the stands with the right hand, `t` seconds in.

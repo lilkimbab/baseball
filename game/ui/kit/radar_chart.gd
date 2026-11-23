@@ -1,13 +1,13 @@
 class_name RadarChart
 extends Control
-## A player's shape at a glance (docs/05 section 5): one spoke a rating group (contact, power,
+## A player's shape at a glance (docs/04 section 5): one spoke a rating group (contact, power,
 ## eye, running, fielding for a hitter), the filled polygon how far along each he is; a second
 ## outline for the man he is compared with.
 
 var axes := PackedStringArray()
 var values := PackedFloat32Array()
 var compare := PackedFloat32Array()
-var colour := UiTheme.ACCENT
+var colour := UiTheme.RADAR
 var compare_colour := UiTheme.CYAN
 var max_value := 99.0
 var show_numbers := true
@@ -61,7 +61,10 @@ func _draw() -> void:
 		at.x = clampf(at.x, 0.0, maxf(size.x - total, 0.0))
 		draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, UiTheme.DIM)
 		if number != "":
-			draw_string(bold, at + Vector2(w + 5.0, 1.0), number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, UiTheme.rating_color(values[i]))
+			var ink := UiTheme.rating_color(values[i])
+			if UiTheme.ink_edge(ink).a > 0.0:
+				draw_string_outline(bold, at + Vector2(w + 5.0, 1.0), number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, 3, UiTheme.ink_edge(ink))
+			draw_string(bold, at + Vector2(w + 5.0, 1.0), number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 17, ink)
 
 
 func _shape(centre: Vector2, radius: float, amounts: PackedFloat32Array, tint: Color, fill: float) -> void:

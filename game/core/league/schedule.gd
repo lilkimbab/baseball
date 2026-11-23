@@ -1,6 +1,6 @@
 class_name Schedule
 extends RefCounted
-## A division's regular season (docs/13 S7-1): every club meets each of the other nine the
+## A division's regular season: every club meets each of the other nine the
 ## same number of times, half at home and half away, in series of three games (two where the
 ## numbers do not divide by three), six game days a week with Monday off, as in the KBO.
 ##

@@ -1,5 +1,5 @@
 {
-  "note": "League environment for the stat resolver (docs/03 section 6, docs/12 section 8). Rates are per plate appearance. 'basis' says where each group of numbers comes from: K = KBO record page, A = assumption to be tuned with ./dev sim.",
+  "note": "League environment for the stat resolver (docs/02 section 6, docs/09 section 8). Rates are per plate appearance. 'basis' says where each group of numbers comes from: K = KBO record page, A = assumption to be tuned with ./dev sim.",
   "default": "kbo_2025",
   "presets": {
     "kbo_2025": {
@@ -29,7 +29,7 @@
     }
   },
   "coefficients": {
-    "note": "rate = league_rate * exp(k * (rating - 50) / 15) (docs/03 section 6.3)",
+    "note": "rate = league_rate * exp(k * (rating - 50) / 15) (docs/02 section 6.3)",
     "batter": {
       "K": {
         "contact": -0.28
@@ -92,7 +92,7 @@
       "HR": 0.35,
       "1B": 0.1
     },
-    "platoon_note": "KBO 2023-2026 투구별 기록(로컬): 같은 손 상대 OPS .679/.716/.678/.693, 다른 손 .708/.746/.709/.740 (차이 약 .034). 처음 값(MLB 기준 K 1.06/0.96 등)은 게임에서 .083 차이를 냈다: 편차를 30%로 줄임 (40%에서 .046) (queue stage 3, tools/pitch_data_report.gd)"
+    "platoon_note": "KBO 2023-2026 투구별 기록(로컬): 같은 손 상대 OPS .679/.716/.678/.693, 다른 손 .708/.746/.709/.740 (차이 약 .034). 처음 값(MLB 기준 K 1.06/0.96 등)은 게임에서 .083 차이를 냈다: 편차를 30%로 줄임 (40%에서 .046) (tools/pitch_data_report.gd)"
   },
   "calibration": {
     "note": "Multipliers on the league rates when drawing outcomes, tuned with ./dev sim so that the simulated totals match the targets. They make up for effects that do not average out (tired pitchers, managers' choices). 1 = no correction.",

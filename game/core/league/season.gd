@@ -1,6 +1,6 @@
 class_name Season
 extends RefCounted
-## A season of the manager league (docs/13 S7-3 to S7-8): every division's schedule, played a
+## A season of the manager league: every division's schedule, played a
 ## day at a time, then each division's postseason, then promotion and relegation. The
 ## player's own game is handed out to be played on screen; the others are worked out at once
 ## by the stat resolver.
@@ -13,7 +13,7 @@ extends RefCounted
 ##   a slump (low OPS over his last 20 games) sits for a few games;
 ## - only the first team (1군 엔트리) dresses;
 ## - everyone plays at today's condition (최악 to 최상, ratings −6% to +6%), and the player's
-##   club with its traits and team colours (docs/13 S7-9).
+## club with its traits and team colours.
 
 const RECENT_GAMES := 20
 ## A day off for a regular, per game (about one or two a month; catchers more) (A).
@@ -69,7 +69,7 @@ var clubs: Dictionary[String, Club] = {}
 var condition: Dictionary[String, int] = {}
 var streak: Dictionary[String, int] = {}
 var season_year := 2026
-## The second teams' league (docs/08 R6); null where there is none (the career mode, which
+## The second teams' league; null where there is none (the career mode, which
 ## plays its own player's second-team games, and batch simulations).
 var farm: FarmLeague
 ## A career's own player (CareerSeason): his club is managed by the computer like the others,
@@ -88,7 +88,7 @@ var grown: Dictionary[String, float] = {}
 var played_today: Dictionary[String, bool] = {}
 ## The winter before this season (who retired, the rookies, who grew most), for the screens.
 var last_winter: Development.Winter
-## A season of the past being played again (docs/08 R7), and the scenario taken, if any.
+## A season of the past being played again, and the scenario taken, if any.
 var history: SeasonPack
 var scenario_id := ""
 ## A player who plays whenever he is on the first team (the career player): he starts at his
@@ -109,7 +109,7 @@ var involvement_games := 0
 ## The share of the game about to be recorded he played himself (−1: simulated); set by the
 ## scene, used once (Season.record).
 var played_share := -1.0
-## The season's reward has been paid (one season, then a new one: docs/08 R8-1).
+## The season's reward has been paid (one season, then a new one: ).
 var rewarded := false
 ## Who is hurt and for how long (Injuries; none in a season of the past, played as it was).
 var injuries := Injuries.new()
@@ -676,7 +676,7 @@ func champion_of(d: int) -> String:
 	return postseasons[d].champion()
 
 
-## Clubs going up and down (docs/02 section 4.1): each division's postseason champion and
+## Clubs going up and down: each division's postseason champion and
 ## runner-up go up, its bottom two of the regular season go down. Per division: [up, down].
 func movements() -> Array[Array]:
 	var out: Array[Array] = []

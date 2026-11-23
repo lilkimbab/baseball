@@ -9,10 +9,10 @@ extends SceneTree
 ##          photograph the screen after it  --menus: the player's side, with the pause menu
 ##          and the pitch clock  --manager: the manager mode (situation board, orders menu,
 ##          a ball in play shown from the summary)  --moves: a close camera on each catch,
-##          throw and slide in the plays (docs/13 S12)  --running: the same for steals and
+## throw and slide in the plays --running: the same for steals and
 ##          pickoffs only, fast-forwarding to them  --fielding: the player's team in the
 ##          field (pitches scripted), the throw gauge held during a ball in play
-##          --manual: the player's own fielder run at the ball (docs/05 2.3)  --highlight:
+##          --manual: the player's own fielder run at the ball (docs/04 2.3)  --highlight:
 ##          the player at bat (swings scripted), the slow-motion moments photographed; with
 ##          --force every fly and every first catch is made one, to see the cameras
 
@@ -47,6 +47,8 @@ func _initialize() -> void:
 	var args := CmdArgs.parse(OS.get_cmdline_user_args())
 	_prefix = args.get("out", _prefix)
 	_plays = int(str(args.get("plays", "2")))
+	# --hud-style red|graphite|navy: the broadcast's plates in that colour (HudCanvas.STYLES).
+	HudCanvas.style = StringName(str(args.get("hud-style", String(HudCanvas.style))))
 	Engine.time_scale = float(str(args.get("speed", "2")))
 	_manager = args.has("manager")
 	var packed := load("res://match/manager_match.tscn" if _manager else "res://match/match.tscn") as PackedScene

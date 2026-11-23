@@ -7,16 +7,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="$ROOT/game/ui/icons"
 TMP="$(mktemp -d)"
-ICONS="house baseball baseball-cap baseball-helmet trophy user user-circle users-three target storefront gear-six
-floppy-disk arrow-left caret-left caret-right caret-up caret-down x check check-circle play fast-forward
-calendar-blank chart-bar chart-line-up list-numbers lightning star coins coin shopping-cart sun moon cloud
-cloud-rain cloud-sun wind thermometer sliders-horizontal monitor speaker-high eye game-controller keyboard
-mouse sign-out info warning lock arrows-clockwise magnifying-glass binoculars barbell first-aid shield
-sneaker-move crosshair medal crown flag-pennant clock map-pin ticket handshake student graduation-cap
-ranking table plus minus pencil-simple trash timer person-simple-throw person-simple-run hand-fist
-t-shirt strategy identification-card article tree-structure swap arrow-right stack plus-circle
-shooting-star fire drop sparkle tag gift package hand-coins seal-check chart-polar note-pencil
-arrow-u-up-left door-open power skip-forward list-bullets funnel sort-ascending globe-hemisphere-east"
+ICONS="house baseball baseball-helmet trophy user user-circle users-three target storefront gear-six
+floppy-disk arrow-left caret-left caret-right x check play fast-forward calendar-blank
+chart-bar chart-line-up list-numbers lightning star coins coin shopping-cart sun moon cloud
+wind sliders-horizontal monitor speaker-high eye keyboard mouse info warning lock
+arrows-clockwise binoculars barbell shield sneaker-move crosshair medal crown flag-pennant
+clock handshake student graduation-cap ranking table plus minus trash timer
+person-simple-throw person-simple-run hand-fist strategy identification-card article swap
+arrow-right stack fire drop sparkle tag gift chart-polar arrow-u-up-left door-open power
+skip-forward list-bullets funnel"
 (cd "$TMP" && npm pack @phosphor-icons/core@2.1.1 >/dev/null 2>&1 && tar -xzf phosphor-icons-core-2.1.1.tgz)
 mkdir -p "$OUT"
 for name in $ICONS; do

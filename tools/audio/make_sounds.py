@@ -1,4 +1,4 @@
-"""Makes the game's own sounds (docs/11, docs/13 S15): every effect, the crowd, the cheering
+"""Makes the game's own sounds: every effect, the crowd, the cheering
 instruments and the short music, synthesised from noise and oscillators, written as OGG
 Vorbis into game/audio/. Nothing is recorded or taken from anywhere; real chants, walk-up
 songs and menu music can be dropped into content-local/audio/ and are played instead.
@@ -187,10 +187,6 @@ def bat_end(tier):
     return mix(tink * 0.6, hum, click * (0.6 + 0.1 * tier))
 
 
-def foul_tip():
-    return mix(band(noise(0.02), 1800, 8000) * decay(0.02, 0.002), mode(0.05, 900, 0.01) * 0.3)
-
-
 def mitt(tier):
     """The catcher's mitt: a leather pop that gets sharper with the pitch's speed."""
     k = tier / 3.0
@@ -204,10 +200,6 @@ def glove():
     return mix(band(noise(0.06), 500, 3200) * decay(0.06, 0.01), mode(0.06, 150 * RNG.uniform(0.9, 1.1), 0.02) * 0.6)
 
 
-def bare_hand():
-    return band(noise(0.04), 900, 4500) * decay(0.04, 0.006)
-
-
 def bounce(ground):
     thud = mode(0.1, (95 if ground == "grass" else 120) * RNG.uniform(0.9, 1.1), 0.025)
     if ground == "grass":
@@ -217,29 +209,11 @@ def bounce(ground):
     return mix(thud, rustle)
 
 
-def fence(kind):
-    if kind == "pad":
-        return mix(mode(0.25, 70, 0.06), band(noise(0.1), 150, 900) * decay(0.1, 0.02) * 0.5)
-    if kind == "wall":
-        return mix(mode(0.3, 310, 0.05), mode(0.3, 870, 0.03) * 0.6, band(noise(0.01), 800, 6000) * decay(0.01, 0.002))
-    return band(noise(0.35), 1500, 9000) * decay(0.35, 0.08) * (1 - np.exp(-t_axis(0.35) / 0.01))
-
-
-def step(ground):
-    n = 0.07
-    grit = band(noise(n), 600 if ground == "dirt" else 1200, 5000) * decay(n, 0.014)
-    return mix(grit, mode(n, 90, 0.015) * 0.6)
-
-
 def slide():
     n = 0.8
     t = t_axis(n)
     env = np.clip(t / 0.05, 0, 1) * np.exp(-np.maximum(t - 0.25, 0) / 0.18)
     return band(noise(n), 250, 4000) * env * (1 + 0.4 * RNG.standard_normal(len(t)))
-
-
-def dive():
-    return mix(mode(0.2, 80, 0.05), band(noise(0.35), 400, 4000) * decay(0.35, 0.09) * 0.6)
 
 
 def swing(power):
@@ -269,12 +243,7 @@ def blip(freqs, length=0.06, tau=0.03, shape="sine"):
 def ui_sounds():
     write("ui/move", blip([1320], 0.04, 0.012), peak=0.35)
     write("ui/select", mix(blip([880], 0.08, 0.03), at(blip([1320], 0.08, 0.03), 0.045, 0.13)), peak=0.45)
-    write("ui/back", mix(blip([990], 0.07, 0.025), at(blip([660], 0.08, 0.03), 0.05, 0.13)), peak=0.4)
     write("ui/confirm", mix(blip([660, 990], 0.1, 0.04), at(blip([880, 1320], 0.14, 0.06), 0.07, 0.22)), peak=0.5)
-    write("ui/tick", blip([2200], 0.02, 0.006), peak=0.25)
-    write("ui/judge_perfect", mix(blip([1046, 1568], 0.18, 0.08), at(blip([2093], 0.2, 0.08), 0.06, 0.26)), peak=0.5)
-    write("ui/judge_good", blip([988, 1480], 0.15, 0.06), peak=0.45)
-    write("ui/judge_bad", blip([220, 233], 0.2, 0.1, "square"), peak=0.4)
 
 
 # --- The crowd --------------------------------------------------------------------------
@@ -384,8 +353,6 @@ def crowd_sounds():
     write("crowd/roar", roar, peak=0.85)
     write("crowd/groan", shout(1.8, "o", 90, 0.08, 1.2, glide=0.82), peak=0.65)
     write("crowd/groan_big", shout(2.6, "o", 140, 0.06, 1.8, glide=0.78) + shout(2.6, "u", 60, 0.1, 1.8, glide=0.85) * 0.5, peak=0.7)
-    write("crowd/boo", shout(2.4, "u", 90, 0.25, 1.0), peak=0.6)
-    write("crowd/ooh", shout(1.4, "o", 100, 0.18, 0.7, glide=1.08), peak=0.65)
     # The rise as a big fly goes up: louder and brighter, in three lengths.
     for length in (2, 4, 6):
         n = int(length * SR)
@@ -395,13 +362,6 @@ def crowd_sounds():
         rise = np.stack([lowpass_sweep(bed[:, c], 700, 3500) for c in range(2)], axis=1) * (0.15 + 0.85 * swell)[:, None]
         rise += shout(length, "o", 90, length * 0.8, 0.05, glide=1.15) * 0.8
         write("crowd/rise_%d" % length, rise, peak=0.75)
-    # Near voices for the batting and pitching cameras.
-    for i, vowel in enumerate(["e", "a", "o", "i"]):
-        one = shout(RNG.uniform(0.4, 0.8), vowel, 2, 0.05, 0.3)
-        write("crowd/voice_%d" % (i + 1), one[:, 0], peak=0.5)
-    t = t_axis(0.9)
-    whistle = np.sin(2 * np.pi * (2400 + 600 * np.clip(t / 0.3, 0, 1) - 400 * np.clip((t - 0.5) / 0.4, 0, 1)) * t) * np.clip(t / 0.03, 0, 1) * np.clip((0.9 - t) / 0.2, 0, 1)
-    write("crowd/whistle_fan", whistle, peak=0.35)
 
 
 # --- Cheering instruments ---------------------------------------------------------------
@@ -450,7 +410,6 @@ def cheer_sounds():
     write("cheer/whistle", fan_whistle(), peak=0.45)
     write("cheer/hey", chant_hey(), peak=0.7)
     write("cheer/oh", chant_oh(), peak=0.7)
-    write("cheer/hey_small", chant_hey(30), peak=0.5)
 
 
 # --- Music ------------------------------------------------------------------------------
@@ -544,14 +503,6 @@ def music_sounds():
     write("music/win", win, peak=0.65)
     lose = sequence([(0, 1.5, ["A3", "C4", "E4"]), (1.5, 1.5, ["F3", "A3", "C4"]), (3, 3, ["E3", "G#3", "B3"])], 90, lambda f, s: organ(f, s, (0, 8, 6, 4, 0, 0, 0, 0, 0)))
     write("music/lose", lose, peak=0.55)
-    # The pressure of a big moment: a low drone and a heartbeat, looping.
-    t = t_axis(8.0)
-    drone = (np.sin(2 * np.pi * 55 * t) + 0.5 * np.sin(2 * np.pi * 82.4 * t)) * 0.25 * (1 + 0.2 * np.sin(2 * np.pi * 0.25 * t))
-    beat = np.zeros_like(t)
-    for k in range(10):
-        for off, g in ((0.0, 1.0), (0.22, 0.7)):
-            beat += at(mode(0.2, 52, 0.05) * g, k * 0.8 + off, 8.0)
-    write("music/pressure", loop_seam(mix(drone, beat), 0.5), peak=0.6)
     # The menus: an upbeat loop, 16 bars at 120 (I-V-vi-IV in C), drums, bass, organ chords, a lead.
     bpm = 120
     bars = 16
@@ -737,23 +688,15 @@ def main():
             for v in range(2):
                 write("sfx/bat_jam_%d_%d" % (tier, v + 1), bat_jam(tier), peak=0.55 + 0.08 * tier)
                 write("sfx/bat_end_%d_%d" % (tier, v + 1), bat_end(tier), peak=0.5 + 0.08 * tier)
-        for v in range(2):
-            write("sfx/foul_tip_%d" % (v + 1), foul_tip(), peak=0.5)
         for tier in range(1, 4):
             for v in range(2):
                 write("sfx/mitt_%d_%d" % (tier, v + 1), mitt(tier), peak=0.55 + 0.1 * tier)
         for v in range(3):
             write("sfx/glove_%d" % (v + 1), glove(), peak=0.55)
-        write("sfx/bare_hand", bare_hand(), peak=0.4)
         for ground in ("grass", "dirt"):
             for v in range(2):
                 write("sfx/bounce_%s_%d" % (ground, v + 1), bounce(ground), peak=0.5)
-            for v in range(3):
-                write("sfx/step_%s_%d" % (ground, v + 1), step(ground), peak=0.3)
-        for kind in ("pad", "wall", "net"):
-            write("sfx/fence_%s" % kind, fence(kind), peak=0.6)
         write("sfx/slide", slide(), peak=0.5)
-        write("sfx/dive", dive(), peak=0.5)
         write("sfx/swing", swing(0.6), peak=0.4)
         write("sfx/swing_power", swing(1.0), peak=0.5)
         write("sfx/base_tag", base_tag(), peak=0.4)

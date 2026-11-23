@@ -1,6 +1,6 @@
 class_name SceneGoal
 extends RefCounted
-## The goal of one career scene (docs/02 section 6.2): shown on the scene card before the
+## The goal of one career scene: shown on the scene card before the
 ## player goes in, checked when the plate appearance ends. Each counts in one field
 ## (batting or pitching) and is worth GOAL_GP growth points there.
 

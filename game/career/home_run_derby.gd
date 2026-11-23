@@ -1,10 +1,10 @@
 class_name HomeRunDerby
 extends DuelScene
-## The career player's turn in the home run derby (docs/02 section 6.4, docs/13 S8-8): batting
+## The career player's turn in the home run derby: batting
 ## practice pitches over the middle at about 112 km/h; every swing that is not a home run is an
 ## out, a take is nothing; ten outs and the turn is over. The count goes back to the career.
 
-## The league's derby (queue stage 4): his hitter, set by the league screen before it opens;
+## The league's derby: his hitter, set by the league screen before it opens;
 ## null for the career's.
 static var league_batter: Player
 

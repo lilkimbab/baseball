@@ -1,6 +1,6 @@
 shader_type spatial;
 render_mode cull_disabled;
-// A flag on its pole (docs/13 S13): the cloth waves from the hoist (UV.x = 0) outward, more
+// A flag on its pole: the cloth waves from the hoist (UV.x = 0) outward, more
 // the harder the wind blows. Per instance: COLOR the flag's colour.
 
 uniform float wind : hint_range(0.0, 2.0) = 1.0;

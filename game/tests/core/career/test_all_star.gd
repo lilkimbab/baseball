@@ -1,5 +1,5 @@
 extends GutTest
-## The all-star break (docs/13 S8-8): picks, the two teams, the derby, and the career
+## The all-star break: picks, the two teams, the derby, and the career
 ## player's part.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
@@ -59,6 +59,9 @@ func test_the_all_star_game_counts_for_nothing_in_the_season() -> void:
 	cs.call_up()
 	var guard := 0
 	while not cs.all_star_done and guard < 200:
+		# (Kept up to the break: a rookie may be sent down for his form, which is not what this
+		# is about; his recent games are forgotten before each one.)
+		cs.recent_first.clear()
 		if cs.has_game():
 			cs.quick()
 		cs.next_day()
@@ -85,3 +88,42 @@ func test_more_power_hits_more_derby_home_runs() -> void:
 		weak += AllStar.derby_swings(40.0, 10, rng)
 		strong += AllStar.derby_swings(85.0, 10, rng)
 	assert_gt(strong, weak * 2)
+
+
+func test_the_fans_vote_is_announced_as_two_best_twelves() -> void:
+	# 청팀 and 백팀, each with its best twelve by place; his own line lit; a show to announce it.
+	var cs := _career_season("SS", "contact", 43)
+	cs.career.popularity = 500.0
+	var guard := 0
+	while not cs.all_star_done and guard < 200:
+		cs.recent_first.clear()
+		if cs.has_game():
+			cs.quick()
+		cs.next_day()
+		guard += 1
+	var d := cs.season.division_of(cs.career.team_id)
+	var sides := AllStar.teams(cs.season, d, cs.all_star_selected, cs.career)
+	assert_eq(sides[0].name, "청팀 올스타")
+	assert_eq(sides[1].short_name, "백팀")
+	assert_eq(sides[0].primary, AllStar.TEAM_COLOURS[0][0])
+	var board := AllStar.board(cs.season, d, cs.all_star_selected, cs.career)
+	var per_side := [0, 0]
+	var slots: Array = []
+	for line: String in board:
+		var f := line.split("|")
+		assert_eq(f.size(), 6, line)
+		per_side[int(f[0])] += 1
+		if int(f[0]) == 0:
+			slots.append(f[1])
+		assert_gt(int(f[4]), 100000, "a ballot's count")
+	assert_eq(per_side, [12, 12], "twelve a side")
+	assert_eq(slots[0], "선발투수")
+	assert_eq(slots[3], "포수")
+	assert_eq(slots[11], "지명타자")
+	var kinds: Array = cs.cues.map(func(c: Array) -> StringName: return c[0])
+	assert_true(kinds.has(&"all_star_vote"), "announced as a show")
+	var vote: Array = cs.cues[kinds.find(&"all_star_vote")]
+	assert_eq((vote[3] as PackedStringArray).size(), 24)
+	if cs.all_star_selected.has(cs.career.player.id):
+		assert_string_contains(str(vote[2]), "올스타 선정")
+	assert_eq(AllStarVote._thousands(1234567), "1,234,567")

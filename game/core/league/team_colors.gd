@@ -1,6 +1,6 @@
 class_name TeamColors
 extends RefCounted
-## Team colours (docs/02 section 5.5): a first team built a certain way gets a bonus for the
+## Team colours: a first team built a certain way gets a bonus for the
 ## whole club. Limits keep one combination from ruling the game: at most rules.color_limit
 ## colours at once (the first ones in the table that are met), and no rating goes up by more
 ## than rules.color_cap however many colours add to it.

@@ -1,6 +1,6 @@
 class_name LeagueRecords
 extends RefCounted
-## The records room of a division (docs/08 R5): the leaders in each of the KBO's batting and
+## The records room of a division: the leaders in each of the KBO's batting and
 ## pitching categories, and the clubs' batting and pitching side by side. Rates (an average,
 ## an ERA) count only for men who qualify as the KBO has it, against the games their club has
 ## played so far: 3.1 plate appearances a game for a hitter, an inning a game for a pitcher.

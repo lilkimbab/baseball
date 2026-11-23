@@ -1,7 +1,7 @@
 extends PlayTest
-## The player's own fielder (docs/05 2.3): he runs at his own speed where he is pushed, takes
+## The player's own fielder (docs/04 2.3): he runs at his own speed where he is pushed, takes
 ## the ball when it comes within his reach, dives for one just beyond it, and stays in the
-## park. And the slow-motion moments (docs/05 3.4): only real ones, and not one after another.
+## park. And the slow-motion moments (docs/04 3.4): only real ones, and not one after another.
 
 const DT := 1.0 / 60.0
 
@@ -68,7 +68,7 @@ func test_he_catches_the_fly_he_gets_under_and_not_the_one_he_does_not() -> void
 
 
 func test_he_catches_only_with_the_glove_up() -> void:
-	# docs/05 2.3 (the user: "C를 눌러서 잡게 해"): under the ball without the catch key, it falls
+	# docs/04 2.3 (the user: "C를 눌러서 잡게 해"): under the ball without the catch key, it falls
 	# by him; the key a moment before it comes is a catch; pressed too soon, the glove is down
 	# again by then.
 	var path := _fly_to(95.0, 3.0, 34.0)

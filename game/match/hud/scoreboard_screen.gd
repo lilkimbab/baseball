@@ -1,6 +1,6 @@
 class_name ScoreboardScreen
 extends Control
-## What the park's scoreboard shows during a game (docs/13 S13-6), drawn into the board's
+## What the park's scoreboard shows during a game, drawn into the board's
 ## viewport: the line score by innings with runs, hits and errors, the count and outs, the man
 ## at bat with his number and average, and the speed of the last pitch.
 

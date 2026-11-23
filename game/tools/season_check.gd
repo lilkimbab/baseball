@@ -2,8 +2,8 @@ extends SceneTree
 
 const BuildRoster := preload("res://tools/build_roster.gd")
 const RosterRoundtrip := preload("res://tools/roster_roundtrip.gd")
-## Plays a real season's pack again and compares it with what really happened (docs/07 4.3,
-## docs/13 S17): the clubs of a season pack (SeasonPack) play its season several times with
+## Plays a real season's pack again and compares it with what really happened (docs/06 4.3,
+## ): the clubs of a season pack (SeasonPack) play its season several times with
 ## the statistical resolver; each qualified hitter's average OPS is set against his real OPS
 ## (from the builder's batting table), each club's winning percentage against the real table,
 ## and the league's totals against the real ones.

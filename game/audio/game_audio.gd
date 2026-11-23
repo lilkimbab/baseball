@@ -1,6 +1,6 @@
 class_name GameAudio
 extends RefCounted
-## The game's sound (docs/11, docs/13 S15): the buses — Music, Crowd, SFX, Voice and UI under
+## The game's sound: the buses — Music, Crowd, SFX, Voice and UI under
 ## the Master — their volumes from the settings, and the sounds by name. The sounds are the
 ## game's own (tools/audio/make_sounds.py, in audio/); one with the same name in the local
 ## content pack (content-local/audio/<name>.ogg: real chants, walk-up songs, menu music) is

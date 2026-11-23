@@ -1,5 +1,5 @@
 extends PhysicsTest
-## The weather of a game (docs/08 R3): the wind carries a batted ball, warm air carries it
+## The weather of a game: the wind carries a batted ball, warm air carries it
 ## farther, a dome has no wind, and the draw follows the season.
 
 ## Where a fly first comes down (m from the plate) in still air or with `wind` (field m/s).

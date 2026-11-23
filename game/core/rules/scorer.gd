@@ -2,7 +2,7 @@ class_name Scorer
 extends RefCounted
 ## Keeps the official record of a game from its events: batting and pitching lines, runs
 ## batted in, earned runs, errors, and the winning, losing, saving and holding pitchers
-## (docs/12 section 5.3).
+## (docs/09 section 5.3).
 
 ## Facts about one pitcher's time on the mound, for saves and holds.
 class Appearance:

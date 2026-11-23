@@ -1,5 +1,4 @@
-"""Headgear and catcher's gear fitted to the player's own head, chest and legs (docs/13 S11-5,
-S11-8; the user: "the uniform, the catcher's gear and the helmets still look unnatural").
+"""Headgear and catcher's gear fitted to the player's own head, chest and legs (the user: "the uniform, the catcher's gear and the helmets still look unnatural").
 
 Every piece is a shell with thickness and finished edges, shaped from the body it is worn on:
 rays from inside the head, the trunk or the leg find the surface underneath, the piece stands

@@ -1,5 +1,5 @@
 {
-  "note": "Weight of each ability in a position player's overall rating, per position (docs/07 section 4.2). Order: contact, power, eye, speed, baserunning, range, hands, arm, accuracy. Each row adds up to 1.",
+  "note": "Weight of each ability in a position player's overall rating, per position (docs/06 section 4.2). Order: contact, power, eye, speed, baserunning, range, hands, arm, accuracy. Each row adds up to 1.",
   "abilities": ["contact", "power", "eye", "speed", "baserunning", "range", "hands", "arm", "accuracy"],
   "positions": {
     "C":  [0.20, 0.18, 0.10, 0.02, 0.02, 0.10, 0.16, 0.16, 0.06],

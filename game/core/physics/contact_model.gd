@@ -1,6 +1,6 @@
 class_name ContactModel
 extends RefCounted
-## Bat-ball collision as a closed-form model (docs/04, section 7). The bat is not a physics
+## Bat-ball collision as a closed-form model (docs/03, section 7). The bat is not a physics
 ## object: the swing is reduced to where and how the barrel meets the ball.
 
 
@@ -41,6 +41,6 @@ static func resolve(cfg: PhysicsConfig, ball_vel: Vector3, ball_spin: Vector3, b
 	return result
 
 
-## Barrel speed (m/s) at the sweet spot from the power rating (1-99), docs/04 section 7.2.
+## Barrel speed (m/s) at the sweet spot from the power rating (1-99), docs/03 section 7.2.
 static func bat_speed_from_power(power: float) -> float:
 	return lerpf(104.5, 128.5, clampf(power / 100.0, 0.0, 1.0)) / 3.6

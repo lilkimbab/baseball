@@ -1,5 +1,5 @@
 extends GutTest
-## Saves of older formats load and play on (queue stage 1, 2026-11-23); and nothing new is
+## Saves of older formats load and play on (2026-11-23); and nothing new is
 ## saved without its place among the formats (SaveIO.ADDED).
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

@@ -1,5 +1,5 @@
 extends GutTest
-## The manager's own line-up and rotation (docs/08 R5): a batting order and positions he set
+## The manager's own line-up and rotation: a batting order and positions he set
 ## are the ones played, a man who cannot play today gives way at his position to the best one
 ## free, a plan that does not cover the field is not used, the starters take their turns in
 ## his order, and all of it is saved with the league.

@@ -1,6 +1,6 @@
 class_name Emblem
 extends Control
-## A club's emblem (docs/13 S11-9; the clubs are fictional, so are their marks): a shield, a
+## A club's emblem (the clubs are fictional, so are their marks): a shield, a
 ## roundel or a pennant diamond in the club's colours — which one, and the device on it (a
 ## star, stitches, a stripe), from the club's id — with its mascot (the animal or thing its
 ## nickname names, a game-icons.net drawing: 그리즐리스 a bear's head, 호크스 a hawk's) or, for

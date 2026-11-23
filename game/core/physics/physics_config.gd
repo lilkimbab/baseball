@@ -14,7 +14,7 @@ var cl0 := 0.0
 var cl1 := 0.0
 var cl2 := 0.0
 var spin_decay_tau := 0.0
-## Batted balls (docs/04 section 4.2): Nathan's fit to Statcast.
+## Batted balls (docs/03 section 4.2): Nathan's fit to Statcast.
 var bat_cd0 := 0.0
 var bat_cd_per_mph := 0.0
 var bat_cd_spin := 0.0
@@ -39,7 +39,7 @@ var _fallback_surface := SurfaceParams.new()
 ## finalize().
 var native := PackedFloat64Array()
 ## The wind over the field (m/s, field coordinates: x toward first base, y toward centre
-## field), the same everywhere and at every height (docs/04: v − v_wind in the air terms).
+## field), the same everywhere and at every height (docs/03: v − v_wind in the air terms).
 ## It carries batted balls; a pitch is aimed and thrown as if the air were still (over 18 m
 ## the wind moves it a centimetre or two). Weather.physics sets it for a game.
 var wind := Vector3.ZERO
@@ -70,7 +70,7 @@ func surface(surface_name: StringName) -> SurfaceParams:
 	return found
 
 
-## Collision efficiency of the bat at a point `along_bat` metres from the tip (docs/04, 7.2).
+## Collision efficiency of the bat at a point `along_bat` metres from the tip (docs/03, 7.2).
 func bat_efficiency(along_bat: float) -> float:
 	var off := (along_bat - sweet_spot_from_tip) / sweet_spot_width
 	return clampf(efficiency_max * (1.0 - off * off), efficiency_min, efficiency_max)

@@ -1,6 +1,6 @@
 class_name OrdersPanel
 extends CenteredPanel
-## The manager's orders menu (docs/05 section 2.5, docs/13 S7-6): F opens it and the game
+## The manager's orders menu (docs/04 section 2.5): F opens it and the game
 ## waits. Orders for the coming plate appearance (batting or fielding, as it is our turn),
 ## the standing defence and baserunning, substitutions, and reservations.
 

@@ -1,6 +1,6 @@
 class_name StatBar
 extends Control
-## A rating as the menus show it (docs/05 section 5): its name, a bar filled to the value in
+## A rating as the menus show it (docs/04 section 5): its name, a bar filled to the value in
 ## the colour of its tier, and the number. With `second` set (a hitter's ratings against
 ## left-handers), a second thinner bar under the first and both numbers.
 
@@ -47,7 +47,10 @@ func _draw() -> void:
 		_bar(Rect2(left, mid + 1.0, width, height), second)
 	var text := UiTheme.shown_text(value)
 	var at := Vector2(left + width + 10.0, mid + 7.0)
-	draw_string(bold, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, UiTheme.rating_color(value))
+	var ink := UiTheme.rating_color(value)
+	if UiTheme.ink_edge(ink).a > 0.0:
+		draw_string_outline(bold, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, 3, UiTheme.ink_edge(ink))
+	draw_string(bold, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, ink)
 	var used := bold.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20).x
 	if second >= 0.0:
 		draw_string(font, at + Vector2(used + 4.0, 0.0), "/" + UiTheme.shown_text(second), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, UiTheme.rating_color(second))
@@ -68,6 +71,9 @@ func _bar(rect: Rect2, amount: float) -> void:
 	var shine := fill
 	shine.size.y *= 0.5
 	_round_rect(shine, colour, radius * 0.5)
+	# (A black bar is outlined, or it would be lost in its track.)
+	if UiTheme.ink_edge(colour).a > 0.0:
+		draw_rect(fill, Color(1.0, 1.0, 1.0, 0.35), false, 1.0)
 
 
 func _round_rect(rect: Rect2, colour: Color, radius: float) -> void:

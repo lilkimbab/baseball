@@ -1,5 +1,5 @@
 extends GutTest
-## Enforces the architecture rule from docs/07: everything under core/ is pure logic.
+## Enforces the architecture rule from docs/06: everything under core/ is pure logic.
 ## It must not touch the scene tree, input, rendering, engine physics, wall-clock time or
 ## engine random numbers, so it can run headless and stay deterministic.
 

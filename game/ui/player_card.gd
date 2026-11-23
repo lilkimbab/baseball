@@ -1,6 +1,6 @@
 class_name PlayerCard
 extends Control
-## The player card (docs/05 section 5: the same everywhere, docs/13 S9-4; laid out after the
+## The player card (docs/04 section 5: the same everywhere; laid out after the
 ## reference's player detail): the man himself in his uniform on the left; who he is, his
 ## overall and grade along the top; his shape as a radar chart and the positions he plays on
 ## a small field; every rating as a bar in its group; his numbers this season. Opened over
@@ -115,7 +115,6 @@ func show_player(p: Player, season: Season) -> void:
 	else:
 		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]),
 			PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 330.0)
-	radar.colour = accent
 	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	middle.add_child(radar)
 	middle.add_child(UiKit.caption("포지션 숙련도"))

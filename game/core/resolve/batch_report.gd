@@ -45,7 +45,7 @@ static func run(teams: Array[Team], game_count: int, rules: RuleSet, env: League
 			if park != null:
 				(sim.resolver as PhysicalResolver).use_park(park)
 			if weather:
-				# Each game in a day's weather over the season (docs/08 R3): three in four at
+				# Each game in a day's weather over the season: three in four at
 				# night, the rest by day.
 				var where := park if park != null else StadiumDef.standard()
 				var w := Weather.for_game(where, g % 180, &"night" if g % 4 != 0 else &"day", rng.fork(100000 + g))

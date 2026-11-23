@@ -1,6 +1,6 @@
 class_name SettingsScreen
 extends Screen
-## Settings (docs/05 section 6, docs/13 S9-5): game, screen, sound and what the match screen
+## Settings (docs/04 section 6): game, screen, sound and what the match screen
 ## shows, a group at a time. Saved as soon as they change; the screen ones take effect at once.
 
 const GROUPS: Array[Array] = [["game", "게임", "baseball"], ["screen", "화면", "monitor"], ["sound", "소리", "speaker-high"], ["show", "표시", "eye"]]

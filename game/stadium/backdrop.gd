@@ -1,6 +1,6 @@
 class_name Backdrop
 extends Node3D
-## What lies beyond a park's stands (docs/13 S13-8): thirteen kinds of place, each put
+## What lies beyond a park's stands: thirteen kinds of place, each put
 ## together from the same parts — land and water, wooded ridges and bare mountains, buildings
 ## wearing photographs of real fronts (apartment complexes in ranks as round a Korean park,
 ## offices on a street grid, towers), a harbour, a river and its bridges, a beach, factories,

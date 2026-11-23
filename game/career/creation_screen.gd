@@ -1,9 +1,9 @@
 class_name CreationScreen
 extends Screen
-## Making the career's player (docs/02 section 6.1, docs/13 S8-1): the player stands on the
+## Making the career's player: the player stands on the
 ## left as he is being made, with his starting ratings as a chart; in the middle who he is
 ## (name, number, hands, build, looks) and what he plays (position, type); on the right where
-## he starts (docs/08 R8-3): a third-year student at a high school of his choice (its weekend
+## he starts: a third-year student at a high school of his choice (its weekend
 ## league, then the draft decides his club), or at once in a club's second team; and the length
 ## of his pro seasons.
 
@@ -64,7 +64,6 @@ func build() -> void:
 		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "위기관리", "변화구"]), PackedFloat32Array([p.pitching.stuff(catalog), p.pitching.control, p.pitching.stamina, p.pitching.composure, p.pitching.breaking(catalog)]), 300.0)
 	else:
 		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]), PackedFloat32Array([p.batting.contact(), p.batting.power(), p.batting.eye, (p.batting.speed + p.batting.baserunning) * 0.5, p.fielding.overall()]), 300.0)
-	radar.colour = tint
 	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	left.add_child(radar)
 

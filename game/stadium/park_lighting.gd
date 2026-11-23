@@ -1,6 +1,6 @@
 class_name ParkLighting
 extends Node3D
-## The light a game is played in (docs/13 S13-7): the sky, the sun and the stadium lights for
+## The light a game is played in: the sky, the sun and the stadium lights for
 ## a day game (14:00), one at dusk (17:00), a night game (18:30 start, under the lights) or one
 ## under a dome. The sun stands where it would over Seoul in the season, turned by the way the
 ## park faces, so it is behind the batter as parks are built to have it.
@@ -115,7 +115,7 @@ func _reflections() -> ReflectionProbe:
 	return probe
 
 
-## A photographed sky in place of the painted one (docs/13 S13-7; CC0 skies from Poly Haven,
+## A photographed sky in place of the painted one (CC0 skies from Poly Haven,
 ## tools/assets/fetch_materials.sh): clouds, haze at the horizon, a real sunset, stars. Each
 ## is turned so that its sun stands where the game's sun does (the shadows agree with the
 ## sky). SKIES: the file, where its sun is (degrees right of the picture's middle), and how
@@ -243,7 +243,7 @@ func _environment() -> Environment:
 	env.sky = sky
 	_photographed_sky(env, sky)
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	# Shadows lit by the blue sky alone look cold on skin (docs/13 S11-3): part of the ambient
+	# Shadows lit by the blue sky alone look cold on skin: part of the ambient
 	# light is the warm light bounced off the grass, dirt and stands.
 	env.ambient_light_sky_contribution = 0.6
 	# AgX keeps skin and bright colours from going orange and flat the way ACES does, and

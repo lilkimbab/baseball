@@ -1,7 +1,7 @@
 class_name FormCatalog
 extends RefCounted
 ## The pitching and batting forms in the local content pack (content-local/forms/, made by
-## ./dev mocap forms from the OBP recordings; docs/13 S10) and which one each player uses.
+## ./dev mocap forms from the OBP recordings) and which one each player uses.
 ##
 ## A player's form comes from his own entry (Player.forms) if it names one in the pack;
 ## otherwise it is picked for him, the same every time: a pitcher by the arm-slot shares of

@@ -1,6 +1,6 @@
 class_name UniformFonts
 extends RefCounted
-## The lettering sewn onto the uniforms (docs/13 S11-9; the user: "bring in the number and
+## The lettering sewn onto the uniforms (the user: "bring in the number and
 ## letter faces real ballplayers wear"). Four kinds, as on real jerseys:
 ##   block   full block, the numbers and names of most MLB and KBO clubs;
 ##   tuscan  block with split serifs (Boston's and Detroit's kind);

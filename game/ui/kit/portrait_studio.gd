@@ -49,6 +49,13 @@ static func request(holder: Node, p: Player, team: Team, done: Callable) -> void
 	_studio._queue.append([key, p, team, done])
 
 
+## How many faces are still to be drawn (the loading screen waits for a game's line-ups).
+static func pending() -> int:
+	if _studio == null or not is_instance_valid(_studio):
+		return 0
+	return _studio._queue.size() + (0 if _studio._current.is_empty() else 1)
+
+
 ## A picture box with the player's face, filled in when it is ready.
 static func face(holder: Node, p: Player, team: Team, side: float = 64.0) -> TextureRect:
 	var box := TextureRect.new()

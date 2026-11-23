@@ -1,6 +1,6 @@
 class_name QuickMatchScreen
 extends Screen
-## A quick game (docs/02 section 3, docs/05 section 5): the two clubs face each other across
+## A quick game (docs/04 section 5): the two clubs face each other across
 ## the screen, each with its strengths as bars and a list to pick another from; between them
 ## the game's length, which side the player takes (or watching), how — full action (he bats
 ## and pitches) or managing (the computer plays, he gives orders and steps in) — the park and
@@ -10,7 +10,7 @@ static var away_index := 0
 static var home_index := 1
 static var side := "home"
 static var style := "action"
-## The park ("" for the home club's own) and the time of day (docs/13 S13).
+## The park ("" for the home club's own) and the time of day.
 static var park := ""
 static var time := "day"
 ## The game the match screens read when they start from here; cleared when read.

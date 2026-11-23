@@ -136,7 +136,7 @@ case "$cmd" in
     if [ "${1:-}" = "list" ]; then
       python3 "$convert" list "${2:-pitch}"
     elif [ "${1:-}" = "forms" ]; then
-      # The twenty pitching and twenty batting forms (docs/13 S10), with catalogues. Each round
+      # The twenty pitching and twenty batting forms, with catalogues. Each round
       # checks every clip on the player model and replaces the trials that fail.
       for round in 1 2 3 4; do
         python3 "$ROOT/tools/mocap/forms.py" | grep -v "^convert_obp"
@@ -189,7 +189,7 @@ case "$cmd" in
     ls -la "$GAME/native/bin"
     ;;
   kbo)
-    # ./dev kbo [season ...|all]   Real KBO seasons into the local content pack (docs/13 S17): the
+    # ./dev kbo [season ...|all] Real KBO seasons into the local content pack: the
     # Kaggle dataset "KBO Player Stats 1982-2026" (CC BY-NC-SA 4.0, needs ~/.kaggle/access_token)
     # -> content-local/raw/kbo-<season>/ tables -> content-local/rosters/kbo-<season>.json roster
     # pack and content-local/seasons/kbo-<season>.json season pack (R7), then the pack is brought

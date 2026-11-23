@@ -1,5 +1,5 @@
 extends PlayTest
-## The play after contact: who fields the ball, throws, runners, calls (docs/13 S5-2 to S5-7).
+## The play after contact: who fields the ball, throws, runners, calls.
 
 # --- Movement (S5-3, S5-5) ---
 

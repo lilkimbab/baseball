@@ -1,6 +1,6 @@
 class_name GameLog
 extends RefCounted
-## Each game's line of the players the person follows (queue stage 5: "each player's games"):
+## Each game's line of the players the person follows ("each player's games"):
 ## his own club's men in a league season, his own player in a career (both teams). Kept on the
 ## season (Season.game_logs: player id → entries) and saved with it; the others' games are not
 ## kept, so a save stays small (a club's 35 men × 144 games is about 60 KB compressed).

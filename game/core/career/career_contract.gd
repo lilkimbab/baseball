@@ -1,6 +1,6 @@
 class_name CareerContract
 extends RefCounted
-## A pro career's money and its winters (docs/08 R8-3, R8-4; the user, 2026-11-23: "contract
+## A pro career's money and its winters (the user, 2026-11-23: "contract
 ## money, trades and free agency as the KBO has them; a long stay in the second team brings a
 ## pay cut or a release").
 ##

@@ -1,5 +1,5 @@
 extends GutTest
-## A rookie's season (docs/13 S8-3): second team first, called up, plays every day after.
+## A rookie's season: second team first, called up, plays every day after.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 
@@ -118,7 +118,7 @@ func test_fielding_credit_reads_the_scorebook() -> void:
 
 func test_his_second_team_plays_in_the_futures_league() -> void:
 	# A career in the league's ten clubs: his second team's games are on the futures league's
-	# own calendar (twelve teams), recorded in its table like the rest (docs/08 R8-3).
+	# own calendar (twelve teams), recorded in its table like the rest.
 	var r := CareerIO.load_default()
 	var spec := PlayerCreator.Spec.new()
 	spec.name = "퓨처스신인"

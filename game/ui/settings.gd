@@ -1,6 +1,6 @@
 class_name Settings
 extends RefCounted
-## The player's settings (docs/05 section 6, docs/13 S9-5), kept in user://settings.json and
+## The player's settings (docs/04 section 6), kept in user://settings.json and
 ## applied when the game starts and whenever they change.
 
 const PATH := "user://settings.json"
@@ -32,7 +32,7 @@ static var quality := 2
 static var upscale := 1
 ## Frames a second (0 no limit).
 static var fps_limit := 0
-## Sound (docs/11): the whole, and each part of it (GameAudio's buses).
+## Sound: the whole, and each part of it (GameAudio's buses).
 static var volume := 0.8
 static var music_volume := 0.7
 static var crowd_volume := 0.9

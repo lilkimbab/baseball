@@ -1,6 +1,6 @@
 class_name FarmLeague
 extends RefCounted
-## The second teams' league (퓨처스리그; docs/08 R6, IDEAS 12): on each day of the regular
+## The second teams' league (퓨처스리그, IDEAS 12): on each day of the regular
 ## season every club's second team plays the second team of the club its first team plays,
 ## settled at once with the statistical resolver. Its own table per division and its own
 ## book of numbers; who played feeds the players' growth (Development).
@@ -31,7 +31,7 @@ var _fillers: Dictionary[String, Array] = {}
 var _names: NameTable
 
 
-## A league of one division (docs/08 R8-1) has the KBO's futures league (data/futures.ko.json):
+## A league of one division has the KBO's futures league (data/futures.ko.json):
 ## the clubs' second teams and two teams of their own, north and south, on a calendar of their
 ## own. An older league of three divisions keeps the old way: each second team plays its club's
 ## opponent of the day.

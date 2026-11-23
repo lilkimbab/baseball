@@ -1,8 +1,26 @@
 class_name HudCanvas
 extends Control
 ## Base for the HUD layers: everything is drawn in units of a 1920 x 1080 screen and scaled
-## to the window, so 720p and 1080p show the same layout (docs/13 S6). Positions projected
+## to the window, so 720p and 1080p show the same layout. Positions projected
 ## from the 3D scene come in screen pixels; `from_screen` turns them into HUD units.
+
+## The broadcast's own plates (the inning and the count, the play-by-play, its tags): their
+## colours. The user, 2026-11-23: "the red that shows everywhere looks odd — are these the
+## right colours for a game?"). Graphite with a gold line by default: neutral, as broadcasts
+## keep their own graphics, so that the clubs' colours (red ones too) stand on it; red and
+## navy kept for comparison (`--hud-style` in the capture tools). Each: the top, the foot, a
+## line along the top (none when clear), the ink on a white tab.
+const STYLES := {
+	&"red": [Color(0.86, 0.16, 0.2), Color(0.42, 0.04, 0.09), Color(1.0, 1.0, 1.0, 0.0), Color(0.55, 0.05, 0.09)],
+	&"graphite": [Color(0.2, 0.21, 0.24), Color(0.055, 0.06, 0.075), Color(0.98, 0.78, 0.3), Color(0.1, 0.11, 0.13)],
+	&"navy": [Color(0.11, 0.2, 0.38), Color(0.03, 0.065, 0.15), Color(0.98, 0.78, 0.3), Color(0.06, 0.12, 0.26)],
+}
+static var style := &"graphite"
+
+
+static func style_colour(i: int) -> Color:
+	return (STYLES.get(style, STYLES[&"red"]) as Array)[i]
+
 
 ## Screen pixels per HUD unit, and the window's size in HUD units.
 var k := 1.0
@@ -28,7 +46,8 @@ func from_screen(p: Vector2) -> Vector2:
 ## Text of the broadcast graphics (the score bug, the bars, the panels): the television face.
 func text(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, weight: int = 600) -> void:
 	var f := UiTheme.face(&"broadcast", weight)
-	draw_string_outline(f, at, line, align, width, font_size, 4, Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
+	var edge := UiTheme.ink_edge(color)
+	draw_string_outline(f, at, line, align, width, font_size, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
 	draw_string(f, at, line, align, width, font_size, color)
 
 
@@ -39,7 +58,8 @@ func text_width(line: String, font_size: int, weight: int = 600) -> float:
 ## A figure or Latin capitals (a speed, a count, a score): the condensed face.
 func figure(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, slanted: bool = false) -> void:
 	var f := UiTheme.numeric(slanted, true)
-	draw_string_outline(f, at, line, align, width, font_size, 4, Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
+	var edge := UiTheme.ink_edge(color)
+	draw_string_outline(f, at, line, align, width, font_size, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
 	draw_string(f, at, line, align, width, font_size, color)
 
 
@@ -50,7 +70,7 @@ func shout(at: Vector2, line: String, font_size: int, color: Color, align: Horiz
 	draw_string(f, at, line, align, width, font_size, color)
 
 
-## A plate of the menus (docs/05 section 5) drawn with plain draw calls (no shader, so a dozen
+## A plate of the menus (docs/04 section 5) drawn with plain draw calls (no shader, so a dozen
 ## on screen cost nothing): graphite, lighter at the top, the top-left and bottom-right
 ## corners cut on the slant, a hairline edge with a light line along the top, a soft shadow.
 func panel(rect: Rect2, color: Color = UiTheme.PANEL, cut: float = 10.0) -> void:
@@ -139,8 +159,8 @@ func brand_plate(rect: Rect2, cut: float = 10.0, alpha: float = 0.96) -> void:
 	for p: Vector2 in shape:
 		shadow.append(p + Vector2(0.0, 5.0))
 	draw_colored_polygon(shadow, Color(0.0, 0.0, 0.0, 0.35 * alpha))
-	var top := Color(0.86, 0.16, 0.2, alpha)
-	var foot := Color(0.42, 0.04, 0.09, alpha)
+	var top := Color(style_colour(0), alpha)
+	var foot := Color(style_colour(1), alpha)
 	var shades := PackedColorArray()
 	for p: Vector2 in shape:
 		shades.append(top.lerp(foot, clampf((p.y - rect.position.y) / maxf(rect.size.y, 1.0) * 0.8 + (p.x - rect.position.x) / maxf(rect.size.x, 1.0) * 0.3, 0.0, 1.0)))
@@ -149,6 +169,9 @@ func brand_plate(rect: Rect2, cut: float = 10.0, alpha: float = 0.96) -> void:
 	var edge := shape.duplicate()
 	edge.append(shape[0])
 	draw_polyline(edge, Color(1.0, 1.0, 1.0, 0.2 * alpha), 1.2, true)
+	var line := style_colour(2)
+	if line.a > 0.0:
+		draw_rect(Rect2(rect.position + Vector2(cut, 0.0), Vector2(rect.size.x - cut, 3.0)), Color(line, line.a * alpha))
 
 
 ## A band of a club's colour down the left edge of a plate; with `cut`, its top follows the

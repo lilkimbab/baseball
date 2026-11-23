@@ -31,7 +31,7 @@ const IDLE_PERIOD := 2.6
 const STILL_JOINTS: Array[StringName] = [&"ThoraxTop", &"BatGrip", &"BatSweetSpot", &"LeftFoot", &"RightFoot"]
 
 var clip: JointClip
-## The same batter's swings at a high and a low pitch, if there are any (docs/13 S10-3): the
+## The same batter's swings at a high and a low pitch, if there are any: the
 ## swing is blended toward one of them by the height the bat meets the ball.
 var high: JointClip
 var low: JointClip

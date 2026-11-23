@@ -30,7 +30,7 @@ var throw_wild := 1.0
 ## The base a runner is stealing from on this pitch (the player's steal): he broke with the
 ## pitcher's first move. 0 for none.
 var stealing := 0
-## The player's own fielding (docs/05 2.3): the fielder he moves himself, where that has taken
+## The player's own fielding (docs/04 2.3): the fielder he moves himself, where that has taken
 ## him ((time, x, y) samples), and when and where he got the ball. With `manual_time` below
 ## zero he has not got it: the play is worked out as if he never does (the others back him
 ## up). `manual_dive`: he got it diving. `manual_ready`: the earliest he can let a throw go

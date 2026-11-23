@@ -1,4 +1,4 @@
-"""Softens the baked uniform fold maps (docs/13 S11-2): the cloth simulation settles into many
+"""Softens the baked uniform fold maps: the cloth simulation settles into many
 fine pleats, which baked as is came out as thin sharp lines, dark curves on the trousers like a
 pattern rather than folds. The shade is blurred over about a centimetre and halved in depth;
 the normals are blurred a little less, so the broad folds stay and the pleats soften.

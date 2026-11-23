@@ -1,6 +1,6 @@
 extends SceneTree
 ## Plays many games between clubs of league-average talent and compares the league totals
-## with the targets in data/league_env.json (docs/13 S4-12).
+## with the targets in data/league_env.json.
 ##
 ##   godot --headless --path game --script res://tools/sim_batch.gd -- --games 2000
 ##
@@ -10,8 +10,8 @@ extends SceneTree
 ##          the leagues are played at the same time on worker threads
 ##          --physical: every pitch and ball in play simulated (S5), with the pitch-level checks
 ##          --park <id>: (with --physical) the games are played in that ballpark
-##          --weather: (with --physical) each game in a day's weather and wind (docs/08 R3)
-##          --no-warmup: relievers pitch as if always ready (to measure docs/08 R4)
+## --weather: (with --physical) each game in a day's weather and wind
+## --no-warmup: relievers pitch as if always ready (to measure )
 ##          --dump <file>: save the totals as JSON instead of printing them
 ##          --merge <file,file,...>: add up saved totals and print them
 ## Prints one line per measure: the simulated value, the target, and "!!" when it is outside
@@ -38,7 +38,7 @@ func _initialize() -> void:
 	var leagues := maxi(int(str(args.get("leagues", "4"))), 1)
 	var physical := args.has("physical")
 	GameState.warm_ups_matter = not args.has("no-warmup")
-	# --park <id>: physical games in that ballpark (docs/13 S13) instead of the practice park.
+	# --park <id>: physical games in that ballpark instead of the practice park.
 	var park: StadiumDef = StadiumIO.load_park(str(args["park"])) if args.has("park") else null
 	var names := RosterIO.load_names()
 	# Shared data is loaded once here, before the leagues run side by side on worker threads.

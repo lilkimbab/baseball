@@ -1,5 +1,5 @@
 extends GutTest
-## The broadcast's moments (docs/11 section 6, docs/13 S16): the introduction holds the first
+## The broadcast's moments: the introduction holds the first
 ## pitch and can be skipped, each half gets its card with the half just over, a new batter and
 ## a new pitcher get theirs, the cameras move through their shots, a home run is replayed.
 

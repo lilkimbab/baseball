@@ -1,5 +1,5 @@
 {
-  "note": "Career mode (docs/02 section 6, docs/13 S8). A new player starts at second-team level: every rating at base, his type's strengths higher, its weak side lower. Numbers marked A in the docs are assumptions to tune by play. Pitchers start with two pitches, as a high-school pitcher has, and learn more (the user, 2026-11-23); a knuckleball is not learned.",
+  "note": "Career mode. A new player starts at second-team level: every rating at base, his type's strengths higher, its weak side lower. Numbers marked A in the docs are assumptions to tune by play. Pitchers start with two pitches, as a high-school pitcher has, and learn more (the user, 2026-11-23); a knuckleball is not learned. A rating point costs cost_base × (1 + (rating − 40)/20)² growth points: at 26 (17 before, 2026-11-23) a new player ends his first 144-game season about 75 shown, a star after two or three (tools/balance_report.gd).",
   "base": 40,
   "strength": 14,
   "weakness": -4,
@@ -235,7 +235,7 @@
     "scene_goal": 10,
     "game_goal": 25,
     "clutch": 1.5,
-    "cost_base": 17,
+    "cost_base": 26,
     "type_discount": 0.2
   },
   "ratings": {

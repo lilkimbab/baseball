@@ -1,6 +1,6 @@
 class_name SkinVeins
 extends RefCounted
-## The veins and tendons that show under the skin of a ballplayer's arms and hands (docs/13 S11-3;
+## The veins and tendons that show under the skin of a ballplayer's arms and hands (
 ## the user: "the veins on the arms are too artificial ... model them finely, as in life").
 ##
 ## One thick cord winding from elbow to wrist reads as a cable under rubber. In life the

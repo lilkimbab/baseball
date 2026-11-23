@@ -1,5 +1,5 @@
 extends GutTest
-## Uniform lettering and trim (docs/13 S11-9; the user: "bring in the number and letter faces
+## Uniform lettering and trim (the user: "bring in the number and letter faces
 ## real ballplayers wear ... it looks made by an AI").
 
 

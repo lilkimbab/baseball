@@ -1,6 +1,6 @@
 class_name Growth
 extends RefCounted
-## Growth points (docs/02 section 6.3): earned in four fields — batting, fielding, running,
+## Growth points: earned in four fields — batting, fielding, running,
 ## pitching — only by playing in that field, and spent only on that field's ratings. The next
 ## point of a rating costs base × (1 + (value − 40) / 20)², a fifth less for the type's
 ## strengths.
@@ -73,9 +73,16 @@ static func value(p: Player, rating: String) -> float:
 	return 0.0
 
 
+## Past 99 (RatingScale.NATURAL) each point costs twice as much again every BEYOND_DOUBLING
+## points: the way to 130 is there for a career really worked at, and long.
+const BEYOND_DOUBLING := 10.0
+
+
 static func cost(c: CareerPlayer, rating: String, rules: CareerRules) -> float:
 	var v := value(c.player, rating)
 	var price := rules.cost_base * pow(1.0 + (v - 40.0) / 20.0, 2.0)
+	if v >= RatingScale.NATURAL:
+		price *= pow(2.0, (v - RatingScale.NATURAL + 1.0) / BEYOND_DOUBLING)
 	var type := rules.type_by_id(c.type_id)
 	if type != null and (type.strengths.has(rating) or (rating == "movement" and type.strengths.has("stuff"))):
 		price *= 1.0 - rules.type_discount
@@ -88,16 +95,16 @@ static func raise(c: CareerPlayer, rating: String, rules: CareerRules) -> bool:
 	var field := rules.field_of(rating)
 	if field == "" or (field == "pitching") != c.is_pitcher():
 		return false
-	if value(c.player, rating) >= 99.0:
+	if value(c.player, rating) >= RatingScale.MAX:
 		return false
 	var price := cost(c, rating, rules)
 	if float(c.gp.get(field, 0.0)) < price:
 		return false
 	c.gp[field] = float(c.gp[field]) - price
 	if rating == "stamina":
-		c.player.pitching.stamina = minf(c.player.pitching.stamina + 1.0, 99.0)
+		c.player.pitching.stamina = minf(c.player.pitching.stamina + 1.0, RatingScale.MAX)
 	elif rating == "velocity":
-		Training.grow(c.player, PackedStringArray(["velocity"]), 2.5)
+		Training.grow(c.player, PackedStringArray(["velocity"]), 2.5, RatingScale.MAX)
 	else:
 		# The person raises one rating where the engine keeps two (the user: "not too many
 		# ratings"): 주력 is speed and base-running sense, 제구 the control of every pitch.
@@ -106,5 +113,5 @@ static func raise(c: CareerPlayer, rating: String, rules: CareerRules) -> bool:
 			keys.append("baserunning")
 		elif rating == "control":
 			keys.append("command")
-		Training.grow(c.player, keys, 1.0)
+		Training.grow(c.player, keys, 1.0, RatingScale.MAX)
 	return true

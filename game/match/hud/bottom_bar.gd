@@ -1,6 +1,6 @@
 class_name BottomBar
 extends HudCanvas
-## The bottom bar (docs/13 S6-3): the batter on the left (order, position, name, overall,
+## The bottom bar: the batter on the left (order, position, name, overall,
 ## today's line), the pitcher on the right (role, hand, name, overall, pitch count and
 ## stamina), the keys in between, and above them the last play in one line. Holding Tab
 ## opens the detail cards: ratings and today's record for both.
@@ -30,6 +30,9 @@ func _draw() -> void:
 	# batter's card under it (the user: "첫 타석" showed under the line-up).
 	if scene.pregame_showing() or scene.post_game_showing():
 		return
+	# (Nor while the champions celebrate: their title's band has the bottom.)
+	if scene.broadcast != null and scene.broadcast.current != null and scene.broadcast.current.kind == Broadcast.Kind.CHAMPION:
+		return
 	begin()
 	if _ovr == null:
 		_ovr = LeagueEnvIO.load_overall()
@@ -47,12 +50,12 @@ func _draw() -> void:
 	panel(keys, UiTheme.PANEL_DARK, 0.0)
 	keycaps(Vector2(middle_x, keys.end.y - 10.0), scene.help_keys() + "   Tab 상세", middle_w, 15)
 	if scene.last_text != "" and Settings.commentary:
-		# The play-by-play on the broadcast's red, a white tab with the inning at its left.
+		# The play-by-play on the broadcast's plate, a white tab with the inning at its left.
 		var line := Rect2(Vector2(middle_x, top), Vector2(middle_w, 50.0))
 		brand_plate(line, 10.0)
 		var tab := Rect2(line.position + Vector2(10.0, 9.0), Vector2(74.0, 32.0))
 		draw_colored_polygon(plate_shape(tab, 6.0), Color(1, 1, 1, 0.92))
-		text(tab.position + Vector2(0.0, 23.0), "%d회%s" % [g.inning, "초" if g.top else "말"], 16, Color(0.55, 0.05, 0.09), HORIZONTAL_ALIGNMENT_CENTER, tab.size.x, 800)
+		text(tab.position + Vector2(0.0, 23.0), "%d회%s" % [g.inning, "초" if g.top else "말"], 16, HudCanvas.style_colour(3), HORIZONTAL_ALIGNMENT_CENTER, tab.size.x, 800)
 		# (Smaller for a long line, so it stays on its plate.)
 		var size := 20
 		while size > 14 and text_width(scene.last_text, size, 700) > line.size.x - 104.0:
@@ -107,8 +110,11 @@ func _pitcher_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> vo
 	var x := rect.end.x - OVR_BLOCK - 206.0
 	text(Vector2(x, rect.position.y + 32.0), "투구", 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
 	figure(Vector2(x + 38.0, rect.position.y + 34.0), str(pitches), 22, Color.WHITE)
+	# What is left of him today, named so (the rating 체력 is on the Tab card, in its tier's
+	# colour; this is the game's, in one colour of its own).
 	var left := stamina_left(p, pitches, starter)
-	bar(Rect2(Vector2(x + 82.0, rect.position.y + 22.0), Vector2(108.0, 8.0)), left, UiTheme.GREEN if left > 0.35 else (UiTheme.ORANGE if left > 0.15 else UiTheme.RED))
+	text(Vector2(x + 82.0, rect.position.y + 17.0), "남은 체력", 12, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 600)
+	bar(Rect2(Vector2(x + 82.0, rect.position.y + 24.0), Vector2(108.0, 8.0)), left, UiTheme.STAMINA)
 
 
 # --- The detail cards (Tab) ---
@@ -125,9 +131,8 @@ func _batter_detail(rect: Rect2, p: Player, g: GameState) -> void:
 	var throws := g.fielding_team().player(g.pitcher_id())
 	var hand: StringName = throws.throws if throws != null else &"R"
 	var body := _detail_head(rect, g.batting(), p.name, "상대 %s투" % ("좌" if hand == &"L" else "우"))
-	var tint := HudCanvas.club_colour(scene.club(g.batting()))
 	_radar(body.position + Vector2(100.0, 118.0), 58.0, ["컨택", "파워", "선구안", "주력", "수비"],
-		[p.batting.contact(), p.batting.power(), p.batting.eye, p.batting.speed, p.fielding.overall()], tint)
+		[p.batting.contact(), p.batting.power(), p.batting.eye, p.batting.speed, p.fielding.overall()])
 	var x0 := body.position.x + 196.0
 	heading(Vector2(x0, body.position.y + 24.0), "%s투 상대" % ("좌" if hand == &"L" else "우"), "", UiTheme.ACCENT, 15)
 	var rows: Array = [["컨택", p.batting.contact_vs(hand)], ["파워", p.batting.power_vs(hand)], ["선구안", p.batting.eye], ["주력", p.batting.speed], ["수비", p.fielding.overall()]]
@@ -149,10 +154,9 @@ func _pitcher_detail(rect: Rect2, p: Player, g: GameState) -> void:
 	var team := g.fielding_team()
 	var starter := p.id == team.starter_id
 	var body := _detail_head(rect, g.fielding(), p.name, "%s · %s투" % ["선발" if starter else "구원", "좌" if p.throws == &"L" else "우"])
-	var tint := HudCanvas.club_colour(scene.club(g.fielding()))
 	var stuff := p.pitching.stuff(scene.catalog)
 	_radar(body.position + Vector2(100.0, 118.0), 58.0, ["구위", "제구", "견제", "체력", "위기관리"],
-		[stuff, p.pitching.control, p.pitching.hold, p.pitching.stamina, p.pitching.composure], tint)
+		[stuff, p.pitching.control, p.pitching.hold, p.pitching.stamina, p.pitching.composure])
 	var x0 := body.position.x + 196.0
 	heading(Vector2(x0, body.position.y + 24.0), "능력", "", UiTheme.ACCENT, 15)
 	var pitches: int = g.pitch_counts.get(p.id, 0)
@@ -166,9 +170,13 @@ func _pitcher_detail(rect: Rect2, p: Player, g: GameState) -> void:
 	_tiles(Rect2(Vector2(x1, body.position.y + 36.0), Vector2(132.0, 124.0)), [
 		["이닝", line.innings_text(), false], ["투구", pitches, false], ["피안타", line.hits, false],
 		["실점", line.runs, false], ["볼넷", line.walks + line.intentional_walks, false], ["삼진", line.strikeouts, line.strikeouts > 0]], 3)
-	# His pitches and their speeds, for the person's own pitcher or a game watched; at the plate
-	# the person is not told (the user, 2026-11-23).
-	_pitch_chips(Rect2(Vector2(x0, body.position.y + 168.0), Vector2(body.end.x - 12.0 - x0, 64.0)), p, not scene.human_bats())
+	# His pitches and their speeds for the person's own pitcher only; an opposing pitcher's are
+	# not told (the user, 2026-11-23: "at the plate I am not shown his pitches"). His season
+	# instead, as a broadcast shows it.
+	if scene.human_pitches():
+		_pitch_chips(Rect2(Vector2(x0, body.position.y + 168.0), Vector2(body.end.x - 12.0 - x0, 64.0)), p, true)
+	else:
+		_season_strip(Rect2(Vector2(x0, body.position.y + 172.0), Vector2(body.end.x - 12.0 - x0, 26.0)), p)
 
 
 ## The card's plate and its header band in the club's colours (emblem, name, a tag at the
@@ -190,8 +198,9 @@ func _detail_head(rect: Rect2, side: int, name: String, tag: String) -> Rect2:
 
 
 ## The man's shape on a pentagon: rings at a quarter, a half, three quarters and the top, the
-## shape in his club's colour, each spoke's name and number (in its grade's colour) outside.
-func _radar(centre: Vector2, radius: float, labels: Array, values: Array, tint: Color) -> void:
+## shape in one colour for every man (UiTheme.RADAR; the card carries the club's), each
+## spoke's name and number (in its tier's colour) outside.
+func _radar(centre: Vector2, radius: float, labels: Array, values: Array) -> void:
 	var n := labels.size()
 	var outer := PackedVector2Array()
 	for i: int in n:
@@ -207,12 +216,10 @@ func _radar(centre: Vector2, radius: float, labels: Array, values: Array, tint: 
 	var shape := PackedVector2Array()
 	for i: int in n:
 		shape.append(_spoke(centre, radius, i, n, maxf(UiTheme.shown(float(values[i])), 4.0) / 99.0))
-	# (The club's hue, made vivid: a navy or a maroon would sink into the dark.)
-	var bright := Color.from_hsv(tint.h, clampf(tint.s, 0.45, 0.8), maxf(tint.v, 0.92))
-	draw_colored_polygon(shape, Color(bright, 0.5))
+	draw_colored_polygon(shape, Color(UiTheme.RADAR, 0.34))
 	var edge := shape.duplicate()
 	edge.append(shape[0])
-	draw_polyline(edge, bright, 2.0, true)
+	draw_polyline(edge, UiTheme.RADAR, 2.0, true)
 	for i: int in n:
 		draw_circle(shape[i], 3.2, Color.WHITE)
 	for i: int in n:
@@ -246,9 +253,9 @@ func _rating_row(at: Vector2, width: float, label: String, value: float) -> void
 	figure(Vector2(cell.end.x - 42.0, at.y + 23.0), UiTheme.shown_text(value), 23, colour, HORIZONTAL_ALIGNMENT_CENTER, 40.0, true)
 
 
-## What a starter or a reliever has left, on the same bar: green, then orange, then red.
+## What a starter or a reliever has left, on the same bar, in its one colour (UiTheme.STAMINA).
 func _stamina_row(at: Vector2, width: float, left: float) -> void:
-	var colour := UiTheme.GREEN if left > 0.35 else (UiTheme.ORANGE if left > 0.15 else UiTheme.RED)
+	var colour := UiTheme.STAMINA
 	var cell := Rect2(at, Vector2(width, 28.0))
 	draw_rect(cell, Color(1.0, 1.0, 1.0, 0.05))
 	draw_rect(Rect2(cell.position, Vector2(3.0, cell.size.y)), colour)
@@ -268,6 +275,9 @@ func _meter(rect: Rect2, fraction: float, colour: Color) -> void:
 		draw_polygon(PackedVector2Array([fill.position, Vector2(fill.end.x, fill.position.y), fill.end, Vector2(fill.position.x, fill.end.y)]),
 			PackedColorArray([deep, colour, colour, deep]))
 		draw_rect(Rect2(fill.position, Vector2(fill.size.x, fill.size.y * 0.45)), Color(1.0, 1.0, 1.0, 0.2))
+		# (A black bar is outlined, or it would be lost in its track.)
+		if UiTheme.ink_edge(colour).a > 0.0:
+			draw_rect(fill, Color(1.0, 1.0, 1.0, 0.4), false, 1.0)
 	for i: int in range(1, 10):
 		var x := rect.position.x + rect.size.x * i / 10.0
 		draw_line(Vector2(x, rect.position.y), Vector2(x, rect.end.y), Color(0.0, 0.0, 0.0, 0.5), 1.5)
@@ -290,8 +300,9 @@ func _tiles(rect: Rect2, items: Array, columns: int = 2) -> void:
 		text(cell.position + Vector2(0.0, h - 5.0), str(item[0]), 12, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, w, 500)
 
 
-## A batter's season in one strip (the game's season, else his real one): "시즌" on a tab, then
-## four figures; nothing when he has neither.
+## A man's season in one strip (the game's season, else his real one): "시즌" on a tab, then
+## four figures (a batter's average, home runs …; a pitcher's ERA, record …); nothing when he
+## has neither.
 func _season_strip(rect: Rect2, p: Player) -> void:
 	var figures := scene.season_figures(p)
 	if figures.is_empty() or str(figures[0][0]) == "OVR":

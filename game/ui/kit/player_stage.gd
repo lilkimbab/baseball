@@ -1,6 +1,6 @@
 class_name PlayerStage
 extends SubViewportContainer
-## A player standing in the menus (docs/05 section 5; the reference's player screens): the game's
+## A player standing in the menus (docs/04 section 5; the reference's player screens): the game's
 ## own figure — his height and build, his face, his club's uniform and number — lit as in a
 ## studio, turning slowly, on a clear background so the ballpark shows behind him.
 
@@ -10,6 +10,17 @@ enum Framing { FULL, BUST, HEAD }
 
 var framing: Framing = Framing.FULL
 var turning := true
+## Swinging instead of standing (the title's cover player): the batter's own recorded swing
+## (MotionLibrary), round and round — set, the swing slowed for show, the finish held — or the
+## game's key poses without the motion pack.
+var swinging := false
+var _swing: JointClip
+var _launch := 0.0
+var _contact := 0.0
+var _finish := 0.0
+## Which way the swinging batter is turned toward the viewer (radians; the capture tool tries
+## others).
+static var swing_turn := PI
 var _viewport: SubViewport
 var _puppet: SkinnedPuppet
 var _camera: Camera3D
@@ -97,10 +108,29 @@ func _show() -> void:
 		_puppet.set_logo(style.cap_letter, style.cap_ink())
 	_puppet.repaint()
 	_puppet.apply(PuppetClips.standing())
+	if swinging:
+		# Both hands round the bat, as a batter in a game holds it (else the fingers stay open
+		# and the bat floats off the palms).
+		_puppet.show_bat = true
+		_puppet.left_grip = Puppet.Grip.BAT
+		_puppet.right_grip = Puppet.Grip.BAT
+		var form := FormCatalog.swing_form(p, &"R")
+		_swing = MotionLibrary.find(&"swing", StringName(form) if form != "" else &"default")
+		if _swing == null:
+			_swing = MotionLibrary.find(&"swing")
+		if _swing != null:
+			_contact = _swing.event(&"contact", _swing.duration * 0.8)
+			_launch = _swing.event(&"launch", _contact - 0.13)
+			_finish = minf(_swing.duration, _contact + 0.55)
 	_frame(p.height_cm / 100.0)
 
 
 func _frame(height: float) -> void:
+	if swinging:
+		# A little wider and lower than standing, for the bat's sweep.
+		_camera.fov = 30.0
+		_camera.look_at_from_position(Vector3(0.0, height * 0.5, 4.9), Vector3(0.0, height * 0.5, 0.0))
+		return
 	if framing == Framing.HEAD:
 		_camera.fov = 16.0
 		_camera.look_at_from_position(Vector3(0.0, height - 0.1, 1.45), Vector3(0.0, height - 0.15, 0.0))
@@ -116,8 +146,50 @@ func _process(delta: float) -> void:
 	if _puppet == null:
 		return
 	_clock += delta
+	if swinging:
+		_swing_pose()
+		return
 	# He turns a little one way and the other, never his back to the viewer.
 	if turning:
 		_angle = 0.28 * sin(_clock * 0.4) - 0.12
 	# The figure faces away from the camera at rest: turned to face it.
 	_puppet.rotation.y = PI + _angle
+
+
+## One turn of the swing (s): the stance held (SET), the load and the swing at SLOW of its speed,
+## the finish held (HOLD), then back into the stance (BACK).
+const SET := 0.9
+const SLOW := 0.55
+const HOLD := 1.1
+const BACK := 0.45
+
+
+## The swing at this moment of its turn, the batter seen from the third-base side and in front,
+## as a cover shot has him.
+func _swing_pose() -> void:
+	# (From behind the plate's side: his name and number in the finish, his chest at the set —
+	# the user's pick of four, 2026-11-23.)
+	_puppet.rotation.y = swing_turn
+	if _swing == null:
+		# Without the motion pack: the game's own key poses.
+		var u := fmod(_clock, 3.2) / 3.2
+		_puppet.apply(PuppetClips.swing(clampf((u - 0.3) * 2.2, 0.0, 1.0), 0.0, 0.8))
+		return
+	var start := maxf(_launch - 0.45, 0.0)
+	var through := (_finish - start) / SLOW
+	var turn := SET + through + HOLD + BACK
+	var t := fmod(_clock, turn)
+	var at := start
+	if t >= SET and t < SET + through:
+		at = start + (t - SET) * SLOW
+	elif t >= SET + through:
+		at = _finish
+	var frame := _swing.sample(at)
+	if t >= SET + through + HOLD:
+		# Back into the stance: from the finish to the set position.
+		var k := ease((t - SET - through - HOLD) / BACK, -1.8)
+		var rest := _swing.sample(start)
+		for joint: StringName in frame:
+			if rest.has(joint):
+				frame[joint] = frame[joint].lerp(rest[joint], k)
+	_puppet.apply_joints(frame, _swing)

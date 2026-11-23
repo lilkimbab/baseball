@@ -1,6 +1,6 @@
 class_name Scouting
 extends RefCounted
-## The daily scouting report (docs/02 section 5.3): five candidates a day, better ones in a
+## The daily scouting report: five candidates a day, better ones in a
 ## higher division and with a better scout. Candidates are made by the league generator, so
 ## they are built like every other player (and named the same way).
 

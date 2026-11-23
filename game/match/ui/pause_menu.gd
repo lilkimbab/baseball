@@ -1,6 +1,6 @@
 class_name PauseMenu
 extends CenteredPanel
-## The pause menu (docs/13 S6-9, docs/05 2.5): Esc stops the game. Resume, the manager's
+## The pause menu (docs/04 2.5): Esc stops the game. Resume, the manager's
 ## menu, the settings that matter in a game (pitch clock, whether the computer makes our
 ## changes, fielding by hand, slow motion), and leaving the game.
 

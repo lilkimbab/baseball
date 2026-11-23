@@ -49,7 +49,8 @@ func set_value(name: StringName, value: Variant) -> void:
 func _apply() -> void:
 	# Everything a look may leave out goes back to nothing first (a hover's glow must not stay).
 	var look := {"radius": 3.0, "cut": 0.0, "skew": 0.0, "head": 0.0, "gloss": 0.0, "hatch": 0.0, "glow": 0.0, "shadow": 0.0,
-		"bar_height": 0.0, "border_width": 1.0, "inner": Color(0, 0, 0, 0), "border": Color(1, 1, 1, 0.14)}
+		"bar_height": 0.0, "border_width": 1.0, "inner": Color(0, 0, 0, 0), "border": Color(1, 1, 1, 0.14),
+		"fill": 0.0, "fill_color": Color(1, 1, 1, 0), "shine": -1.0, "accent_width": 0.0, "accent_color": Color(1, 1, 1, 0)}
 	look.merge(UiTheme.PLATES.get(style, {}) as Dictionary, true)
 	look.merge(overrides, true)
 	for key: String in look:

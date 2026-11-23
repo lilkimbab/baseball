@@ -1,6 +1,6 @@
 class_name PracticeScreen
 extends Screen
-## The practice field (docs/02; docs/13 S9): batting practice against a pitcher throwing what
+## The practice field: batting practice against a pitcher throwing what
 ## is asked for, pitching practice with the path of each pitch shown, or watching the two
 ## computers. The park and the hour are chosen here; the field itself is match/duel.tscn.
 

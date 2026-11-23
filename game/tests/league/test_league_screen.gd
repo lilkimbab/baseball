@@ -1,5 +1,5 @@
 extends GutTest
-## The league screen and a season played through it (docs/13 S7 completion: a 36-game season
+## The league screen and a season played through it ( completion: a 36-game season
 ## from the start to the promotion verdict; a managed game whose result goes back to the
 ## season).
 
@@ -24,7 +24,7 @@ func _screen() -> LeagueScreen:
 
 
 func test_a_season_with_one_club_ends_with_its_reward_and_a_new_choice() -> void:
-	# docs/08 R8-1 (the user: one club, one season, rewards, then a new one): ten clubs in one
+	# (the user: one club, one season, rewards, then a new one): ten clubs in one
 	# league, no second teams' league but second teams to call up, the reward paid once.
 	var screen := _screen()
 	var clubs := LeagueSession.league_clubs()
@@ -136,10 +136,54 @@ func test_a_managed_league_game_reports_its_result_to_the_season() -> void:
 	assert_null(LeagueSession.pending)
 	assert_eq(s.standings[s.division_of(s.my_team)].row(s.my_team).games(), 1)
 	assert_string_contains(scene.post_game_hint(), "리그")
+	assert_eq(scene._title_side(), -1, "a regular-season game wins no title")
+
+
+func test_the_game_that_wins_the_final_is_known_after_its_result_is_in() -> void:
+	# The championship scene (FieldScenes.plan_champion) is for the clinching game only, though a
+	# league game's result reaches the series the moment it ends.
+	var clubs := RosterIO.load_pack(LeagueSession.PACK)
+	var s := LeagueSession.start(clubs[7].id, 36, 9)
+	s.play_regular_season()
+	var post: Postseason = s.postseasons[0]
+	var guard := 0
+	while s.phase == Season.Phase.POSTSEASON and post.current < post.format.size() - 1 and guard < 60:
+		s.play_day(true)
+		s.advance()
+		guard += 1
+	assert_eq(post.current, post.format.size() - 1, "on to the final")
+	var series := post.series()
+	s.my_team = series.high
+	series.high_wins = series.wins_needed - 1
+	series.low_wins = series.wins_needed - 1
+	var g: ScheduledGame = null
+	for i: int in 10:
+		g = s.my_game_today()
+		if g != null and not g.played:
+			break
+		s.advance()
+	assert_not_null(g, "the deciding game")
+	LeagueSession.pending = g
+	var scene := MATCH.instantiate() as ManagerMatch
+	scene.use_motion = false
+	add_child_autofree(scene)
+	guard = 0
+	while not scene.game.over and guard < 300:
+		scene.skip(true)
+		for i: int in 3:
+			scene.step(1.0 / 60.0)
+		guard += 1
+	assert_true(scene.game.over)
+	assert_true(g.played, "the result is in the series already")
+	if scene.game.winner >= 0:
+		assert_true(series.finished())
+		assert_eq(scene._title_side(), scene.game.winner, "the winner of the deciding game is champion")
+	else:
+		assert_eq(scene._title_side(), -1, "a tie wins nothing")
 
 
 func test_the_manager_sets_the_order_and_the_rotation_on_the_line_up_tab() -> void:
-	# docs/08 R5: two rows picked one after the other trade places; the plan is the club's.
+	# two rows picked one after the other trade places; the plan is the club's.
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
 	screen.begin(clubs[4].id, 36)
@@ -231,7 +275,7 @@ func test_cards_dragged_on_the_diamond_and_the_staff() -> void:
 
 
 func test_two_men_are_compared_from_the_picked_panel() -> void:
-	# docs/08 R5: pin one, pick another, the two side by side; batters with batters only.
+	# pin one, pick another, the two side by side; batters with batters only.
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
 	screen.begin(clubs[6].id, 36)
@@ -303,7 +347,7 @@ func test_the_records_room_lists_the_leaders_and_the_clubs() -> void:
 
 
 func test_the_second_team_tab_shows_its_men_its_table_and_the_winter() -> void:
-	# docs/08 R6, in an old league of three divisions (a new league has no second teams' league).
+	# in an old league of three divisions (a new league has no second teams' league).
 	var screen := _screen()
 	var clubs := RosterIO.load_pack(LeagueSession.PACK)
 	LeagueSession.start(clubs[5].id, 36, 3, clubs)

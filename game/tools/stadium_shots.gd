@@ -1,5 +1,5 @@
 extends SceneTree
-## Photographs each ballpark (docs/13 S13) from the views that matter: the batting view toward
+## Photographs each ballpark from the views that matter: the batting view toward
 ## centre field, the pitching view toward home, high behind home, and from the outfield.
 ##
 ##   ./dev tool-win stadium_shots build/stadium/park [--park harbor_field]

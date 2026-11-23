@@ -1,6 +1,6 @@
 class_name CheerSequencer
 extends RefCounted
-## The batting side's cheering (docs/11 section 3.1): drums, thunder sticks, a whistle and
+## The batting side's cheering: drums, thunder sticks, a whistle and
 ## shouted calls on the beat the visible crowd moves to (Crowd.BEATS_PER_SECOND), one of
 ## twelve patterns of eight beats, quieter ones when the fans are calm and busier ones as
 ## they warm up, special ones for a full count and for runners in scoring position. It goes

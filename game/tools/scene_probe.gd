@@ -11,7 +11,8 @@ extends SceneTree
 ##   ./dev tool-win scene_probe build/probe/stage --what stage
 ##       the broadcast's look at the cheering stages (home, then away: the cheerleaders and
 ##       the fans behind them) and at the scoreboard introducing the batter: a frame every
-##       0.7 s of each.
+##       0.7 s of each. With --rush: a walk-off's mob, the benches clearing and an injury
+##       instead; with --champion: the title won, the pile at the mound and the manager tossed.
 ##   ./dev tool-win scene_probe build/probe/catch --what catch [--pitches 3]
 ##       the person pitching (the pitching camera): frames around each pitch's arrival in
 ##       the catcher's mitt, every 1/30 s from 0.15 s before to 0.4 s after.
@@ -36,6 +37,7 @@ var _last_state := -1
 
 func _initialize() -> void:
 	_args = CmdArgs.parse(OS.get_cmdline_user_args())
+	HudCanvas.style = StringName(str(_args.get("hud-style", String(HudCanvas.style))))
 	_prefix = _args.get("out", _prefix)
 	_what = str(_args.get("what", "trot"))
 	_want = int(str(_args.get("pitches", "3")))
@@ -221,7 +223,16 @@ func _stage_frames(delta: float) -> bool:
 		var board := Broadcast.segment(Broadcast.Kind.BOARD)
 		board.shots = [_scene.board_shot()]
 		b.push(board)
-		if _args.has("rush"):
+		if _args.has("champion"):
+			# --champion: the home side wins the title (FieldScenes.plan_champion).
+			b.queue.clear()
+			b.current = null
+			_scene._field_scenes().plan_champion(GameState.HOME)
+			var party := Broadcast.segment(Broadcast.Kind.CHAMPION)
+			party.shots = _scene._field_scenes().champion_shots()
+			party.data = {"side": GameState.HOME, "round": "한국시리즈", "year": 2026}
+			b.push(party)
+		elif _args.has("rush"):
 			# --rush: a walk-off's mob and the benches clearing (planned when each starts).
 			b.queue.clear()
 			var mob := Broadcast.segment(Broadcast.Kind.WALK_OFF)

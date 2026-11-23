@@ -1,6 +1,6 @@
 class_name Tactics
 extends RefCounted
-## A manager's orders to his team (docs/02 section 4.4, docs/03 section 9). One order for the
+## A manager's orders to his team (docs/02 section 9). One order for the
 ## coming plate appearance, cleared when it ends; the defence, the baserunning and the
 ## pitcher's approach stay until changed. The computer manager's own choices (bunts,
 ## intentional walks, steals, positioning) apply whenever no order says otherwise.

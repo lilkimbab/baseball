@@ -1,6 +1,6 @@
 class_name PlayHighlight
 extends RefCounted
-## A moment of a play shown slowly and close up (docs/05 3.4): the bat meeting a ball hit out
+## A moment of a play shown slowly and close up (docs/04 3.4): the bat meeting a ball hit out
 ## of the park or to the wall, and a catch that could have gone either way, made or missed.
 ## They are for the player at bat watching the other side field, and they are rare by design:
 ## only a ball that really was crushed, only a chance that really was in doubt, and not one

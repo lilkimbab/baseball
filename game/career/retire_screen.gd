@@ -1,6 +1,6 @@
 class_name RetireScreen
 extends Screen
-## His retirement ceremony (queue stage 5): the man in his uniform on the left; in the middle
+## His retirement ceremony: the man in his uniform on the left; in the middle
 ## his career — seasons, clubs, his first-team totals, each season's line; on the right the
 ## hall of fame: in or not, by which marks, and what the marks are. The career is closed.
 

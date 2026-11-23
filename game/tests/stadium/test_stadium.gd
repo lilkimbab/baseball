@@ -1,5 +1,5 @@
 extends GutTest
-## Ballparks (docs/13 S13): four made-up parks from their definitions, built to match their
+## Ballparks: four made-up parks from their definitions, built to match their
 ## physics, with the sun where parks are built to have it and the light of the time of day.
 
 

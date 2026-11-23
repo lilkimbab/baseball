@@ -1,6 +1,6 @@
 class_name Excitement
 extends RefCounted
-## How worked up each side's fans are (docs/11 section 2), 0 to 1: a base from the game (how
+## How worked up each side's fans are, 0 to 1: a base from the game (how
 ## full the park is, how much the moment matters, the late innings, runners in scoring
 ## position, a full count) and jolts from what happens, fading over a few seconds. The home
 ## and away fans are apart: the same home run lifts one side and quiets the other.

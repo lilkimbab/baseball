@@ -1,6 +1,6 @@
 class_name PhysicalResolver
 extends Resolver
-## Plays a game pitch by pitch with the physics (docs/03 section 7, docs/13 S5-9). Every pitch
+## Plays a game pitch by pitch with the physics (docs/02 section 7). Every pitch
 ## is flown and every swing met with the contact model; balls in play go through PlaySim. It
 ## sends the same events as the stat resolver, so GameFlow and the Scorer are shared.
 ##
@@ -12,7 +12,7 @@ const DT := 1.0 / 240.0
 const PASSED_CLEAN := 0.0018
 ## Spread of the time on a steal: the pitcher's delivery, the catcher's throw, the tag (s).
 const STEAL_SPREAD := 0.13
-## Rating points a batter gains at home (docs/12 8.1: the home side wins about 53 %).
+## Rating points a batter gains at home (docs/09 8.1: the home side wins about 53 %).
 const HOME_EDGE := 5.0
 ## How much of the computer batter's misread of the pitch becomes a bat-ball offset. A person's
 ## small aiming errors are forgiven (DuelSettings.aim_scale); the computer's are its whole skill.
@@ -103,10 +103,10 @@ static func ssw_scale_for(pitcher: Player) -> float:
 		for a: ArsenalPitch in pitcher.pitching.arsenal:
 			total += a.movement
 		rating = total / pitcher.pitching.arsenal.size()
-	return clampf(lerpf(0.65, 1.35, clampf(rating / 99.0, 0.0, 1.0)) + (own - 0.5) * 0.3, 0.5, 1.5)
+	return clampf(lerpf(0.65, 1.35, RatingScale.norm(rating)) + (own - 0.5) * 0.3, 0.5, 1.5)
 
 
-## Plays the game in this park: its fence and foul ground for every ball (docs/13 S13).
+## Plays the game in this park: its fence and foul ground for every ball.
 func use_park(def: StadiumDef) -> void:
 	fence = def.fence()
 	field = def.analytic()
@@ -309,7 +309,7 @@ func _steal(state: GameState) -> GameEvent:
 
 ## The player's runner stealing from `base` on a pitch the catcher caught: `jump` (s) is how
 ## much better or worse his start was than a computer runner's, from when he let go of the
-## key against the pitcher's first move (docs/05 2.4).
+## key against the pitcher's first move (docs/04 2.4).
 func human_steal_event(state: GameState, base: int, jump: float) -> GameEvent:
 	if not _can_steal(state, base):
 		return null
@@ -539,7 +539,7 @@ func after_pitch(state: GameState, duel: PitchDuel) -> Array[GameEvent]:
 
 
 ## The ball just put in play, played again from the same moment with the player's choices
-## (docs/05 2.3, 2.4): where the fielder throws and how hard, whether the runners go. The
+## (docs/04 2.3, 2.4): where the fielder throws and how hard, whether the runners go. The
 ## random draws are the same up to the choice, so what has been shown so far still happened.
 ## The events replace those after_pitch gave for it.
 func replay_ball(state: GameState, duel: PitchDuel, choice: PlayChoice) -> Array[GameEvent]:

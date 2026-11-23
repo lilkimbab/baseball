@@ -1,6 +1,6 @@
 """A KBO season from the Kaggle dataset "KBO Player Stats 1982–2026" (netsong, CC BY-NC-SA
 4.0; its values are the KBO records site's) into the roster builder's four tables and a season
-pack (docs/13 S17, R7). Everything it writes goes into the local content pack, out of git:
+pack. Everything it writes goes into the local content pack, out of git:
 
     content-local/raw/kbo-<season>/{teams,players,batting,pitching}.csv  (tools/build_roster.gd)
     content-local/seasons/kbo-<season>.json                                (SeasonPack)

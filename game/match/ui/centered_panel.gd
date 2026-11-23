@@ -1,6 +1,6 @@
 class_name CenteredPanel
 extends PanelContainer
-## A menu panel in the middle of the screen in the menus' look (docs/05 section 5, docs/08 R5):
+## A menu panel in the middle of the screen in the menus' look (docs/04 section 5):
 ## the graphite plate with two corners cut (PlateFace "panel"), a head row — a slanted stroke
 ## in the accent, the title, a small Latin caption, a grey note on the right — over a thin
 ## rule; the panel's rows go into `body`. Scaled with the window like the HUD (sizes are for a

@@ -29,7 +29,6 @@ facade_night:Facade011:Color
 container:CorrugatedSteel007A:Color,NormalGL
 forest:Ground068:Color,NormalGL
 bricks:Bricks105:Color,NormalGL
-tiles:RoofingTiles013A:Color,NormalGL
 rock:Rock064:Color,NormalGL
 sand:Ground054:Color,NormalGL
 asphalt:Asphalt033:Color,NormalGL"
@@ -56,7 +55,7 @@ Surface textures: ambientCG (ambientcg.com), Creative Commons CC0 1.0.
   grass Grass001, dirt Ground103, gravel Gravel041, concrete Concrete034, leather Leather037,
   plastic Plastic010, metal PaintedMetal004, fence Fence007A; building fronts Facade018A,
   Facade006, Facade019A, Facade013, Facade005 and (lit windows at night) Facade011; containers
-  CorrugatedSteel007A; forested hills Ground068; Bricks105, RoofingTiles013A, Rock064,
+  CorrugatedSteel007A; forested hills Ground068; Bricks105, Rock064,
   sand Ground054, Asphalt033.
 Skies (../sky): Poly Haven (polyhaven.com), CC0: kloofendal_48d_partly_cloudy_puresky (day),
   kloppenheim_06_puresky (dusk), kloppenheim_02_puresky (night).

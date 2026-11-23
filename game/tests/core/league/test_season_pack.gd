@@ -1,5 +1,5 @@
 extends GutTest
-## Seasons of the past (docs/08 R7): a pack gives the clubs, that year's rules and what really
+## Seasons of the past: a pack gives the clubs, that year's rules and what really
 ## happened; a season started from it is played with them in one league, its scenario sets
 ## the club and the goal, and the end compares this season with the real one.
 
@@ -86,7 +86,7 @@ func _real_packs() -> Array[SeasonPack]:
 
 
 func test_every_real_season_in_the_local_pack_is_whole() -> void:
-	# docs/13 S17: the seasons chosen in content-local/kbo/history.json, built from the Kaggle
+	# the seasons chosen in content-local/kbo/history.json, built from the Kaggle
 	# records: the clubs as they were called, the real table, that year's rules and postseason.
 	var packs := _real_packs()
 	if packs.is_empty():

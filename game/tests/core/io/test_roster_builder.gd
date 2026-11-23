@@ -1,5 +1,5 @@
 extends GutTest
-## Records into ratings (docs/07 4.3, docs/13 S17): the builder runs the engine's formula
+## Records into ratings (docs/06 4.3): the builder runs the engine's formula
 ## backwards, so a man's rating gives back his rate; a small sample is pulled to the average;
 ## a club built from tables has its men with their numbers, positions and ratings.
 

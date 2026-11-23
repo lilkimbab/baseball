@@ -1,6 +1,6 @@
 class_name AiBatter
 extends RefCounted
-## The computer batter (docs/03 section 8.2, docs/13 S5-8). He reads where the pitch will
+## The computer batter (docs/02 section 8.2). He reads where the pitch will
 ## cross the plate with an error that depends on his eye and the kind of pitch, decides to
 ## swing by what it looks like and the count, and times his swing with an error that grows
 ## when a slower pitch fools him.
@@ -75,19 +75,19 @@ static func decide(duel: PitchDuel, balls: int, strikes: int, weak: PackedInt32A
 	if not rng.chance(swing_chance):
 		return
 	var power_share := 0.12 if s == 2 else (0.50 if b > s else 0.36)
-	power_share *= lerpf(0.6, 1.4, clampf(settings.power / 99.0, 0.0, 1.0))
+	power_share *= lerpf(0.6, 1.4, RatingScale.norm(settings.power))
 	var kind := SwingAttempt.Kind.POWER if rng.chance(power_share) else SwingAttempt.Kind.CONTACT
 	var window := SwingModel.timing_window(settings, kind)
 	# Positive: slower than he expected, so he is early; negative: quicker, so he is late.
 	var fooled := (expect_kmh - duel.decision.type.speed_kmh * duel.decision.effort) / 10.0 \
-		* FOOLED_PER_10KMH * lerpf(1.3, 0.6, clampf(settings.eye / 99.0, 0.0, 1.0))
+		* FOOLED_PER_10KMH * lerpf(1.3, 0.6, RatingScale.norm(settings.eye))
 	var spread := TIMING_SPREAD * (WEAK_TIMING if in_weak else 1.0)
 	var contact_time := duel.ideal_contact_time + (rng.next_normal() * spread - fooled - EARLY) * window
 	var aim := Vector2(duel.ideal_contact_pos.x, duel.ideal_contact_pos.z) + misread
 	if not duel.swing_at(contact_time, kind, aim, true):
 		return
 	if duel.decision.type.family != &"fastball":
-		var drop := (FOOLED_DROP + rng.next_normal() * FOOLED_DROP_SPREAD) * lerpf(1.4, 0.6, clampf(settings.eye / 99.0, 0.0, 1.0))
+		var drop := (FOOLED_DROP + rng.next_normal() * FOOLED_DROP_SPREAD) * lerpf(1.4, 0.6, RatingScale.norm(settings.eye))
 		duel.swing.offset_bias = -drop
 
 

@@ -1,6 +1,6 @@
 class_name Broadcast
 extends RefCounted
-## The broadcast's own moments between the pitches (docs/11 section 6, docs/13 S16): the
+## The broadcast's own moments between the pitches: the
 ## introduction before the first pitch, the inning's card with the half just over, the batter
 ## coming up, the pitching change, the replay of a home run. Each is a segment of a few
 ## seconds with its camera shots and its card; most hold the game while they show, all can be
@@ -11,10 +11,10 @@ extends RefCounted
 ## WALK_OFF: the home side mobbing its hero at the plate; BENCH_CLEAR: both benches out after a
 ## pitch at a man's head or a beanball (MatchScene's rush of extra figures); INJURY: a hurt man
 ## helped off by the trainer and a teammate.
-enum Kind { PREGAME, HALF, BATTER, PITCHER_CHANGE, REPLAY, GAME_END, BOARD, FANS, WALK_OFF, BENCH_CLEAR, INJURY }
+enum Kind { PREGAME, HALF, BATTER, PITCHER_CHANGE, REPLAY, GAME_END, BOARD, FANS, WALK_OFF, BENCH_CLEAR, INJURY, CHAMPION }
 
 ## How long each kind lasts (s).
-const LENGTH := {Kind.PREGAME: 21.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5, Kind.BOARD: 3.2, Kind.FANS: 2.8, Kind.WALK_OFF: 5.5, Kind.BENCH_CLEAR: 8.5, Kind.INJURY: 12.0}
+const LENGTH := {Kind.PREGAME: 21.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5, Kind.BOARD: 3.2, Kind.FANS: 2.8, Kind.WALK_OFF: 5.5, Kind.BENCH_CLEAR: 8.5, Kind.INJURY: 12.0, Kind.CHAMPION: 13.0}
 
 
 ## A camera shot: from `at` seconds into its segment, moving from (from, to, fov) to (from2,

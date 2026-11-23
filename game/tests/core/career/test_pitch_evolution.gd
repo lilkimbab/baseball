@@ -1,5 +1,5 @@
 extends GutTest
-## Pitches that evolve and pitches learned (docs/13 S8-6).
+## Pitches that evolve and pitches learned.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

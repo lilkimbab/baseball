@@ -4,7 +4,7 @@ extends RefCounted
 ##
 ## The ball is not an engine rigid body: drag and Magnus force are integrated here so the
 ## same code runs headless and can fast-forward a whole trajectory for prediction.
-## Model and constants: docs/04-physics.md.
+## Model and constants: docs/03-physics.md.
 
 ## After a bounce on the ground, normal speed below this (m/s) switches the ball to rolling.
 const ROLL_ENTER_SPEED := 0.5

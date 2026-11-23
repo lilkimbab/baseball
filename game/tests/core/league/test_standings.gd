@@ -1,5 +1,5 @@
 extends GutTest
-## The division table (docs/13 S7-2).
+## The division table.
 
 
 func _game(away: String, home: String, a: int, h: int) -> ScheduledGame:

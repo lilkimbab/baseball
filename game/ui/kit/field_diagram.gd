@@ -1,6 +1,6 @@
 class_name FieldDiagram
 extends Control
-## A small ballpark seen from above with a number at each position (docs/05 section 5): how
+## A small ballpark seen from above with a number at each position (docs/04 section 5): how
 ## well a player plays each one (the player card), or who stands there (a line-up).
 
 ## Position.Kind -> text shown there; `strong` positions are drawn in the accent.

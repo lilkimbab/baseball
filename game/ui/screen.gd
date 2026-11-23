@@ -1,6 +1,6 @@
 class_name Screen
 extends Control
-## A menu screen (docs/05 section 5): the ballpark behind (MenuBackdrop); a bar along the top
+## A menu screen (docs/04 section 5): the ballpark behind (MenuBackdrop); a bar along the top
 ## with the game's mark, the parts of the game as tabs, the points and three small buttons
 ## (load, settings, quit); under it the screen's own title row — the way back, its name in
 ## the colour of its part of the game, its own tabs — and its content; along the foot the keys.

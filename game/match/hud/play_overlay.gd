@@ -1,6 +1,6 @@
 class_name PlayOverlay
 extends HudCanvas
-## What the screen shows while a ball is in play (docs/13 S6-6, S6-7): the bases marked on
+## What the screen shows while a ball is in play: the bases marked on
 ## the field, where a fly ball will come down, an edge that lights up toward a ball off the
 ## screen, the runners on a small diamond, and the umpire's call on a close play. When the
 ## player's team is in the field, the throw keys and the gauge, and a gold ring under the fielder

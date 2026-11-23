@@ -1,4 +1,4 @@
-"""What the pitch table says, to set beside tools/pitch_data_report.gd (queue stage 3): the
+"""What the pitch table says, to set beside tools/pitch_data_report.gd: the
 league's OPS against the same and the other hand, and the pitchers' fastball share when the
 count is even, when they are ahead and when behind (each pitcher counted once).
 

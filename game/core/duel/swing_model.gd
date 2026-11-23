@@ -1,7 +1,7 @@
 class_name SwingModel
 extends RefCounted
 ## Turns a swing (when, what kind, where aimed) into the contact parameters of ContactModel
-## (docs/05, section 2.2).
+## (docs/04, section 2.2).
 
 ## Distance in front of home plate's apex where a square swing meets the ball.
 const CONTACT_PLANE_Y := 0.75
@@ -69,7 +69,7 @@ static func yaw_for(tau: float) -> float:
 	return deg_to_rad(-tau * MAX_YAW_DEG)
 
 
-## A bunt meets the ball with the bat nearly still (2-4 m/s, docs/13 S5-1).
+## A bunt meets the ball with the bat nearly still (2-4 m/s).
 const BUNT_BAT_SPEED := 3.0
 
 

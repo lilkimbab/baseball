@@ -1,6 +1,6 @@
 extends SceneTree
 ## Prints how ground balls travel with the current surface constants, for tuning
-## data/physics.json against the targets in docs/04 section 8.2.
+## data/physics.json against the targets in docs/03 section 8.2.
 ##
 ##   godot --headless --path game --script res://tools/ground_ball_report.gd
 

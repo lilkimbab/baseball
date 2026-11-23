@@ -1,5 +1,5 @@
 extends GutTest
-## A season played a day at a time (docs/13 S7-3 to S7-5).
+## A season played a day at a time.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

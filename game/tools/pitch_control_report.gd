@@ -1,5 +1,5 @@
 extends SceneTree
-## How near the player's pitches come to where he aims (docs/04 5.2): plays the match scene
+## How near the player's pitches come to where he aims (docs/03 5.2): plays the match scene
 ## with the player pitching, aims every pitch at a spot, lets go of the accuracy ring a set
 ## time off its best moment, and prints how far from the spot the ball crossed the plate.
 ##

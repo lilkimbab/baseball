@@ -1,6 +1,6 @@
 class_name CareerRules
 extends RefCounted
-## The numbers of the career mode (data/career.ko.json, docs/02 section 6). Read by CareerIO.
+## The numbers of the career mode (data/career.ko.json). Read by CareerIO.
 
 
 class PlayerType:

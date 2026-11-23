@@ -1,6 +1,6 @@
 class_name UniformStyle
 extends RefCounted
-## What a team's uniform looks like, plus the player's own name and number (docs/13 S11-9).
+## What a team's uniform looks like, plus the player's own name and number.
 ## The kinds of lettering and trim are those of real uniforms: a nickname in script with a tail
 ## under it or in arched block capitals, block or Tuscan numbers with an outline in a second
 ## colour, piping or bands at the sleeves, a club patch on one sleeve and a sponsor's on the other.
@@ -44,7 +44,7 @@ var chest_sponsor: Dictionary = {}
 var number := 0
 var player_name := ""
 ## An umpire's dress: a polo shirt with a chest pocket and the league's badge, his number on
-## the sleeve, plain black shoes (docs/13 S11-8).
+## the sleeve, plain black shoes.
 var official := false
 ## The league's initials, on umpires' caps and badges.
 const LEAGUE := "PBL"
@@ -98,7 +98,7 @@ func copy() -> UniformStyle:
 	return s
 
 
-## A club's uniform (docs/13 S11-9), as KBO clubs dress: at home white with the club colour and
+## A club's uniform, as KBO clubs dress: at home white with the club colour and
 ## the nickname in English across the chest; away the club colour if it is dark enough to carry
 ## white lettering, otherwise road gray, with the town's name. The kind of lettering, the trim
 ## and the sponsors are the club's own (from its id), the same every game.

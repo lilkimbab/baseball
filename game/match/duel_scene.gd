@@ -9,7 +9,7 @@ enum State { PRE_PITCH, CHARGE, ACCURACY, WINDUP, LIVE, RESULT }
 
 const TICK := 1.0 / 240.0
 const AI_PITCH_DELAY := 1.3
-## The pitch gauge (docs/05 2.2): the button is held while a ring closes on the target's
+## The pitch gauge (docs/04 2.2): the button is held while a ring closes on the target's
 ## circle and let go when the two meet; that is the pitch. GAUGE_TIME s from the button going
 ## down to the ring closing altogether; it is on the circle at ACCURACY_SWEET of the way. Let
 ## go early the pitch is short of his full speed and off; late, at full speed and off.
@@ -57,10 +57,10 @@ const PITCH_CAMERA := [Vector3(-7.2, 79.2, 4.6), Vector3(0.17, 3.37, 0.9), 3.6]
 var cfg: PhysicsConfig
 var catalog: Dictionary[StringName, PitchType]
 var field_model: AnalyticField
-## The ballpark (docs/13 S13): the practice park unless a full game picks the home club's.
+## The ballpark: the practice park unless a full game picks the home club's.
 var stadium: StadiumDef
 var park: StadiumBuilder
-## Day, dusk or night (docs/13 S13-7); a dome has its own light.
+## Day, dusk or night; a dome has its own light.
 var time_of_day: StringName = &"day"
 var lighting: ParkLighting
 var settings := DuelSettings.new()
@@ -168,7 +168,7 @@ func _ready() -> void:
 	_new_duel()
 	target = duel.zone.center()
 	aim_point = duel.zone.center()
-	# The sound of it (docs/11): no music under a game, the crowd and the ball instead.
+	# The sound of it: no music under a game, the crowd and the ball instead.
 	MenuMusic.stop()
 	sound = MatchSound.new()
 	sound.scene = self
@@ -284,7 +284,7 @@ func selected_type() -> PitchType:
 	return catalog[pitch_ids[selected_pitch]]
 
 
-# --- The pitch wheel (docs/05 2.2; the user: "a circle with six directions, as in 2K14: the
+# --- The pitch wheel (docs/04 2.2; the user: "a circle with six directions, as in 2K14: the
 # pitch is chosen by the way the mouse goes") ---
 
 ## A pitcher throws six pitches at most: one to each of six directions round a circle, the
@@ -512,7 +512,7 @@ func _process(delta: float) -> void:
 	refresh(delta)
 
 
-## The player's aim shown as the things themselves (docs/05 2.1, 2.2): at bat, a wooden bat
+## The player's aim shown as the things themselves (docs/04 2.1, 2.2): at bat, a wooden bat
 ## lying across the plate where the swing will pass, its sweet spot on the pointer and the
 ## ball visible through it; pitching, a ball in the zone where the pitch is aimed. Both are
 ## real size, in the plane of the plate's front edge.
@@ -794,7 +794,7 @@ static func goes_straight(type: PitchType) -> bool:
 
 
 ## Works out where the pitch the player would throw to the target now arrives, and how it
-## comes in (docs/05 2.2): from his release point, his pitch type, its spin, without the miss
+## comes in (docs/04 2.2): from his release point, his pitch type, its spin, without the miss
 ## of execution.
 func _update_preview() -> void:
 	if not human_pitches() or not (state == State.PRE_PITCH or state == State.CHARGE or state == State.ACCURACY):
@@ -1008,7 +1008,7 @@ func _build_fielders() -> void:
 		fielder.apply(PuppetClips.fielder_ready())
 
 
-## Dresses an umpire (docs/13 S11-8): the polo shirt and charcoal trousers, his number on
+## Dresses an umpire: the polo shirt and charcoal trousers, his number on
 ## the sleeve; behind the plate his mask and ball bags too, and a thicker trunk for the chest
 ## protector he wears under the shirt.
 func dress_umpire(puppet: Puppet, number: int, at_the_plate: bool) -> void:

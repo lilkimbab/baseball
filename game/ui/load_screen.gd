@@ -1,6 +1,6 @@
 class_name LoadScreen
 extends Screen
-## Saved games (docs/07 section 7), as the reference games lay out their save slots: a card
+## Saved games (docs/06 section 7), as the reference games lay out their save slots: a card
 ## for each, the picture of its mode across the top with the club's emblem and name over it,
 ## then where it stands (the season, the day, the record) and when it was saved; load, or
 ## delete (a second press confirms).
@@ -154,7 +154,7 @@ func _slot_card(m: Dictionary) -> Control:
 			return
 		_armed = ""
 		SaveIO.delete_slot(slot)
-		refresh(), "trash"))
+		refresh(), "trash", "danger"))
 	return card
 
 

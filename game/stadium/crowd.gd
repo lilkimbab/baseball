@@ -1,6 +1,6 @@
 class_name Crowd
 extends Node3D
-## The people in the stands (docs/06 7, docs/13 S14): one in a seat the stadium builder laid
+## The people in the stands (docs/05 7): one in a seat the stadium builder laid
 ## out, each a picture of a real-looking person on a card facing the field
 ## (assets/crowd/crowd_atlas.png, rendered by tools/blender/make_crowd.py from Microsoft
 ## Rocketbox's people, MIT licence), seated, standing, arms up or clapping as the crowd shader

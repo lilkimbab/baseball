@@ -1,6 +1,6 @@
 class_name GameRating
 extends RefCounted
-## The game rating and its reward (docs/02 section 6.3): 0 to 10 from what the player did,
+## The game rating and its reward: 0 to 10 from what the player did,
 ## with his game goal and clutch scenes counting; bronze, silver or gold by the rating; and a
 ## reward box for the medal holding points, growth points or a piece of gear (gear adds a point
 ## to one rating, once per piece).

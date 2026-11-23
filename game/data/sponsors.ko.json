@@ -1,5 +1,5 @@
 {
-  "note": "Made-up sponsors for the boards round the park and the patches on the uniforms (docs/06 6.2-8, docs/13 S11-9): the name, the name in Latin letters (boards and patches carry it large, as real ones do), the board's colours, the kind of mark drawn beside the name and the brand's own lettering (face: heavy, square, round, script, slab or plain). A local pack can replace this file.",
+  "note": "Made-up sponsors for the boards round the park and the patches on the uniforms (docs/05 6.2-8): the name, the name in Latin letters (boards and patches carry it large, as real ones do), the board's colours, the kind of mark drawn beside the name and the brand's own lettering (face: heavy, square, round, script, slab or plain). A local pack can replace this file.",
   "sponsors": [
     {"name": "한빛전자", "bg": "#1a3f8f", "fg": "#ffffff", "latin": "HANBIT", "mark": "ring", "face": "round"},
     {"name": "푸른우유", "bg": "#ffffff", "fg": "#1d6fb8", "latin": "PUREUN MILK", "mark": "bars", "face": "script"},

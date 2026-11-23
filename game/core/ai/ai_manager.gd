@@ -1,7 +1,7 @@
 class_name AiManager
 extends RefCounted
 ## The computer manager: line-ups, pitching changes, pinch hitters and runners, bunts and
-## intentional walks (docs/13 S4-10). Limits come from the "manager" section of
+## intentional walks. Limits come from the "manager" section of
 ## data/league_env.json.
 
 var env: LeagueEnv
@@ -359,7 +359,7 @@ func _pitching_change(state: GameState, t: int) -> GameEvent:
 	return GameEvent.substitution(t, GameEvent.Change.PITCHER, current, reliever, Position.Kind.P)
 
 
-# --- The bullpen (docs/08 R4) ---
+# --- The bullpen ---
 
 
 ## Who team t's bullpen should have throwing now: the man who would come in if the pitcher

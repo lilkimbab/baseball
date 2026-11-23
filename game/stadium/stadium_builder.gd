@@ -1,6 +1,6 @@
 class_name StadiumBuilder
 extends Node3D
-## Builds a ballpark from its definition (docs/06 6.2, docs/13 S13): the playing surface and
+## Builds a ballpark from its definition (docs/05 6.2): the playing surface and
 ## its markings, the infield, the fence with its padding, yellow line and distance signs, the
 ## foul poles and their screens, the backstop and its net, the dugouts, the bullpens, the
 ## batter's eye and the stands. The physics' collision model comes from the same definition,
@@ -55,18 +55,18 @@ var _lamp: StandardMaterial3D
 var _glass: StandardMaterial3D
 ## The world beyond the stands (null under a dome).
 var backdrop: Backdrop
-## Where the relievers throw (docs/08 R4): per bullpen mound, [side (-1 left field, 1 right
+## Where the relievers throw: per bullpen mound, [side (-1 left field, 1 right
 ## field), lane, centre (field x, y), facing (radians: the way he throws, field bearing)].
 var bullpen_spots: Array[Array] = []
 var _flags: ShaderMaterial
 var _flag_spots: Array[Vector3] = []
 var _flag_cloths: MultiMesh
 ## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
-## the game on it, docs/13 S13-6).
+## the game on it).
 var scoreboard: SubViewport
 ## The middle of the scoreboard's screen (field coordinates), for a camera to look at.
 var scoreboard_at := Vector3.ZERO
-## Every seat, as the stands are laid out (for the crowd, docs/13 S14): where it is (world),
+## Every seat, as the stands are laid out (for the crowd): where it is (world),
 ## its azimuth, row, tier (0 lower, 1 upper) and zone (Crowd.Zone).
 var seat_pos := PackedVector3Array()
 var seat_az := PackedFloat32Array()
@@ -329,7 +329,7 @@ static func pad_texture(colour: Color) -> ImageTexture:
 
 
 ## The outfield fence: padded panels 1.5 m wide, the yellow home-run line along the top, and
-## the distance to it in metres at the lines, the alleys and centre (docs/13 S13-3).
+## the distance to it in metres at the lines, the alleys and centre.
 func _build_fence() -> void:
 	const STEPS := 180
 	var face := SurfaceTool.new()
@@ -541,7 +541,7 @@ func _build_bullpens() -> void:
 
 
 ## The batter's eye: a dark, plain face behind centre field, so the hitter sees the pitch
-## against something that does not move (docs/13 S13-5).
+## against something that does not move.
 func _build_batters_eye() -> void:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -761,7 +761,7 @@ static func seat_picture() -> ImageTexture:
 static var _seat_picture: ImageTexture
 
 
-## Flags along the top of the outfield stands (docs/13 S13): a pole every few sections, the
+## Flags along the top of the outfield stands: a pole every few sections, the
 ## cloths waving together in the wind (stadium/flag.gdshader; `wind` 0 slack to 2 a gale).
 func _build_flags() -> void:
 	if _flag_spots.is_empty():
@@ -825,7 +825,7 @@ func set_wind(strength: float) -> void:
 		_flags.set_shader_parameter(&"wind", clampf(strength, 0.0, 2.0))
 
 
-## The day's wind on the flags (docs/08 R3): every flag flies the way it blows (field m/s:
+## The day's wind on the flags: every flag flies the way it blows (field m/s:
 ## x toward first base, y toward centre field), harder the stronger it is. The way the flags
 ## fly is how the player sees the wind.
 func show_wind(wind: Vector3) -> void:
@@ -845,7 +845,7 @@ func show_wind(wind: Vector3) -> void:
 # --- Around the park ---
 
 
-## What lies beyond the stands (docs/13 S13-8): one of thirteen kinds of place, built by
+## What lies beyond the stands: one of thirteen kinds of place, built by
 ## Backdrop from the park's `backdrop`.
 func _build_surroundings() -> void:
 	_build_landmark()

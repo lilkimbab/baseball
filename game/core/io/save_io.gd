@@ -1,6 +1,6 @@
 class_name SaveIO
 extends RefCounted
-## Save games (docs/07 section 7, docs/13 S9): a slot is a folder under user://saves with
+## Save games (docs/06 section 7): a slot is a folder under user://saves with
 ## meta.json (what the slot holds, for the load screen) and league.json or career.json (the
 ## whole season: clubs and players as they are now, schedules and results, books, pitcher
 ## use, condition, the player's club or career). Files are gzip-compressed JSON with a
@@ -10,7 +10,7 @@ extends RefCounted
 ## The standings and the postseason's wins are not stored: they are worked out again from the
 ## games' scores.
 ##
-## Adding something to a save (queue stage 1, 2026-11-23): write it in season_to / career_to,
+## Adding something to a save (2026-11-23): write it in season_to / career_to,
 ## read it with a default in season_from / career_from, raise FORMAT, and list it with its
 ## default under the new format in ADDED. Loading an older save fills in each format's
 ## additions in turn (migrate). A test (test_save_formats) fails when a saved key is in no
@@ -31,14 +31,14 @@ const ADDED := {
 		# school league (R8-3).
 		"season": {"level_games": [0, 0, 0, 0], "difficulty": 1, "level_days": [0, 0, 0, 0], "involvement": [0.0, 0], "rewarded": false, "injuries": {"out": {}}, "school": false},
 		# The pro career over seasons (R8-3, R8-4).
-		"career": {"recent_futures": [], "recent_first": [], "futures_days": 0, "drafted": "", "signing_bonus": 0, "pro_games": 144, "pro_years": 0, "money": 0, "salary": 3000, "first_days": [], "fa_years": 8, "free_agent_done": false, "seasons": [], "season_first_days": 0, "events_seen": [], "salary_paid": 0.0, "released": false, "winter_lines": [], "fa_offers": [], "release_team": ""},
+		"career": {"recent_futures": [], "recent_first": [], "futures_days": 0, "drafted": "", "signing_bonus": 0, "pro_games": 144, "pro_years": 0, "money": 0, "salary": 3000, "first_days": [], "fa_years": 8, "free_agent_done": false, "seasons": [], "milestones": [], "season_first_days": 0, "events_seen": [], "salary_paid": 0.0, "released": false, "winter_lines": [], "fa_offers": [], "release_team": ""},
 	},
 	3: {
-		# The league's all-star break (queue stage 4).
+		# The league's all-star break.
 		"season": {"all_star": {}},
 	},
 	4: {
-		# Each game's line of the men followed (queue stage 5); a career's whole record.
+		# Each game's line of the men followed; a career's whole record.
 		"season": {"game_logs": {}},
 		"career": {"game_log": [], "retired": false},
 	},
@@ -600,7 +600,7 @@ static func career_to(cs: CareerSeason) -> Dictionary:
 		"popularity": c.popularity, "pitch_uses": uses, "points": c.points, "gear": c.gear.duplicate(),
 		"drafted": c.drafted, "signing_bonus": c.signing_bonus, "pro_games": cs.pro_games,
 		"pro_years": c.pro_years, "money": c.money, "salary": c.salary, "first_days": Array(c.first_days),
-		"fa_years": c.fa_years, "free_agent_done": c.free_agent_done, "seasons": c.seasons.duplicate(true),
+		"fa_years": c.fa_years, "free_agent_done": c.free_agent_done, "seasons": c.seasons.duplicate(true), "milestones": c.milestones.duplicate(true),
 		"season_first_days": cs.first_team_days, "events_seen": cs.events_seen.duplicate(), "salary_paid": cs.salary_paid,
 		"released": c.released, "game_log": c.game_log.duplicate(true), "retired": c.retired, "winter_lines": Array(cs.winter_lines), "fa_offers": cs.fa_offers.duplicate(true), "release_team": cs.release_team,
 		"ratings": Array(c.ratings),
@@ -645,6 +645,7 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 	c.fa_years = int(d.get("fa_years", 8))
 	c.free_agent_done = bool(d.get("free_agent_done", false))
 	c.seasons = (d.get("seasons", []) as Array).duplicate(true)
+	c.milestones = (d.get("milestones", []) as Array).duplicate(true)
 	var cs := CareerSeason.new()
 	cs.season = season
 	cs.career = c

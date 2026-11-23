@@ -1,6 +1,6 @@
 class_name ManualFielding
 extends RefCounted
-## The player's own fielder during a ball in play (docs/05 2.3): moved by the player at the
+## The player's own fielder during a ball in play (docs/04 2.3): moved by the player at the
 ## fielder's own speed, he takes the ball when it is within his reach and the player has put
 ## the glove up for it (the catch key, C: the glove stays up CATCH_HOLD s, so the key may come
 ## a little early; a ball he does not reach for goes by). A dive (or a leap for one over his
@@ -64,10 +64,10 @@ static func make(f: PlayFielder, m: MotionModel, analytic: AnalyticField = null)
 	mf.kind = f.kind
 	mf.pos = f.pos
 	mf.top_speed = m.top_speed_for(f.speed)
-	mf.quickness = lerpf(9.0, 15.0, clampf(f.reach / 99.0, 0.0, 1.0))
+	mf.quickness = lerpf(9.0, 15.0, RatingScale.norm(f.reach))
 	mf.backward = m.backward
 	# Sure hands take a ball a little further off.
-	mf.reach = m.reach_running * lerpf(0.92, 1.08, clampf(f.hands / 99.0, 0.0, 1.0))
+	mf.reach = m.reach_running * lerpf(0.92, 1.08, RatingScale.norm(f.hands))
 	mf.high = m.reach_high
 	mf.dive_reach = m.reach_diving - m.reach_running
 	mf.leap = m.reach_jump

@@ -1,5 +1,5 @@
 {
-  "note": "Club management (docs/02 section 5, docs/13 S7-9). Grades and costs, the first-team cost cap per division (top division first), condition, scouting, training, points, traits and team colours. Numbers marked A in the docs are assumptions to tune by play.",
+  "note": "Club management. Grades and costs, the first-team cost cap per division (top division first), condition, scouting, training, points, traits and team colours. Numbers marked A in the docs are assumptions to tune by play.",
   "grades": [
     {"grade": "S", "min": 85, "cost": 7},
     {"grade": "A", "min": 75, "cost": 5},

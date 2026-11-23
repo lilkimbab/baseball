@@ -1,6 +1,6 @@
 class_name Weather
 extends RefCounted
-## The weather of a game (docs/08 R3): the sky, how warm and damp it is, and the wind — its
+## The weather of a game: the sky, how warm and damp it is, and the wind — its
 ## speed and where it blows from. Warm, damp air is thinner and carries a ball farther (Air);
 ## the wind carries it with it (BallSim, PhysicsConfig.wind). Under a dome there is no wind
 ## and the air is the dome's.

@@ -1,6 +1,6 @@
 class_name Switch
 extends Button
-## An on/off switch (docs/05 section 6): a pill with a knob that slides across, in the accent
+## An on/off switch (docs/04 section 6): a pill with a knob that slides across, in the accent
 ## when on.
 
 var _slide := 0.0

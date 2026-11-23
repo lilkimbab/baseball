@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Makes the pictures on the menus' mode cards from the game's own captures (docs/05 section 5):
+# Makes the pictures on the menus' mode cards from the game's own captures (docs/04 section 5):
 # run the capture tools first (they write under build/), then this crops them to cards.
 #   ./dev tool-win closeup_shot build/look2/body.png
 #   ./dev tool-win closeup_shot build/look2/catcher2.png --subject catcher

@@ -1,6 +1,6 @@
 class_name Umpire
 extends RefCounted
-## Calls on a batted ball (docs/13 S5-7, Official Baseball Rules 2.00 "fair ball" and "foul
+## Calls on a batted ball (Official Baseball Rules 2.00 "fair ball" and "foul
 ## ball", 5.05(a), 5.06(b)(4)).
 ##
 ## - A ball that first lands beyond first or third base is fair or foul by where it lands.

@@ -1,7 +1,7 @@
 class_name Trade
 extends RefCounted
 ## Trades between clubs in the regular season (the user, 2026-11-23: "in the league, call up
-## second-team men or trade them myself"; docs/08 R8-1). Up to three men a side, until the
+## second-team men or trade them myself"). Up to three men a side, until the
 ## deadline (the KBO's is July 31, about seven tenths of the way through the season). The
 ## other club weighs what it gives and gets: a man's worth rises steeply with his rating (a
 ## star is worth several regulars), youth with room to grow adds to it, age past 32 takes from

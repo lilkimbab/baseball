@@ -8,7 +8,7 @@ position, the point it looks at and its vertical field of view that put them the
     python3 tools/reference/fit_camera.py tools/reference/pitch_view.json
 
 The JSON file gives the picture size and a list of [field x, y, z] -> [pixel x, pixel y] pairs
-in field coordinates (docs/04: +x first-base side, +y toward centre field, +z up, metres).
+in field coordinates (docs/03: +x first-base side, +y toward centre field, +z up, metres).
 Pure Python; no packages needed.
 """
 import json

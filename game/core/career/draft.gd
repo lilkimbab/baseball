@@ -1,6 +1,6 @@
 class_name Draft
 extends RefCounted
-## The KBO's draft of new players (신인 드래프트; docs/08 R8-3), the day a high-school career
+## The KBO's draft of new players (신인 드래프트), the day a high-school career
 ## becomes a pro one. Since 2023 one draft for the whole country: ten clubs, eleven rounds, each
 ## round in the same order, the weakest club of the last season first (here: the clubs by their
 ## strength, weakest first). Clubs cannot be chosen: he goes where he is picked.

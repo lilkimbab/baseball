@@ -1,5 +1,5 @@
 extends GutTest
-## The postseason ladder, promotion and relegation (docs/13 S7-7, S7-8).
+## The postseason ladder, promotion and relegation.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

@@ -1,6 +1,6 @@
 class_name Ceremony
 extends CanvasLayer
-## A cutscene away from the field (queue stage 6; the user, 2026-11-23: "a contract with the
+## A cutscene away from the field (the user, 2026-11-23: "a contract with the
 ## club, the championship ceremony after the season, the awards ... as close to the real KBO as
 ## can be; outside the games, put together to suit"). One stage for all of them, dressed by the
 ## kind: the club's colours and emblem behind, the man in his uniform under the lights, what the
@@ -12,10 +12,10 @@ extends CanvasLayer
 ##
 ##   Ceremony.play(self, Ceremony.Kind.AWARD, player, club, "2027 KBO 시상식", "홈런왕", ["42홈런"], func() -> void: ...)
 
-enum Kind { DRAFT, CONTRACT, AWARD, CHAMPION, TRADE, CALL_UP }
+enum Kind { DRAFT, CONTRACT, AWARD, CHAMPION, TRADE, CALL_UP, MILESTONE }
 
 ## How long each kind lasts (s).
-const LENGTH := {Kind.DRAFT: 7.5, Kind.CONTRACT: 6.5, Kind.AWARD: 7.5, Kind.CHAMPION: 8.0, Kind.TRADE: 6.5, Kind.CALL_UP: 4.5}
+const LENGTH := {Kind.DRAFT: 7.5, Kind.CONTRACT: 6.5, Kind.AWARD: 7.5, Kind.CHAMPION: 8.0, Kind.TRADE: 6.5, Kind.CALL_UP: 4.5, Kind.MILESTONE: 5.5}
 const FADE := 0.5
 const GOLD := Color(1.0, 0.8, 0.32)
 
@@ -37,6 +37,8 @@ var _camera: Camera3D
 var _puppet: SkinnedPuppet
 var _jersey: Node3D
 var _trophy: Node3D
+## A milestone's ball (Milestones), held out to the cameras.
+var _ball: Node3D
 var _flashes: Array = []
 var _confetti: Array = []
 var _rng := Rng.new(7)
@@ -45,7 +47,7 @@ var _sound: AudioStreamPlayer
 
 
 ## The kinds by the names the career's cues use (CareerSeason.cue).
-const KINDS := {&"draft": Kind.DRAFT, &"contract": Kind.CONTRACT, &"award": Kind.AWARD, &"champion": Kind.CHAMPION, &"trade": Kind.TRADE, &"call_up": Kind.CALL_UP}
+const KINDS := {&"draft": Kind.DRAFT, &"contract": Kind.CONTRACT, &"award": Kind.AWARD, &"champion": Kind.CHAMPION, &"trade": Kind.TRADE, &"call_up": Kind.CALL_UP, &"milestone": Kind.MILESTONE}
 
 ## Somewhere one is showing (a screen waits for it before the next).
 static var showing := false
@@ -60,6 +62,12 @@ static func play_all(holder: Node, cues: Array, on_done: Callable = Callable()) 
 		return
 	var c: Array = cues[0]
 	var rest := cues.slice(1)
+	if c[0] == &"all_star_vote":
+		# The fans' vote has a show of its own.
+		var s: Season = CareerSession.career_season.season if CareerSession.career_season != null else LeagueSession.season
+		AllStarVote.play(holder, str(c[1]), PackedStringArray(c[3]), str(c[2]), s, func() -> void:
+			play_all(holder, rest, on_done))
+		return
 	play(holder, KINDS.get(c[0], Kind.CONTRACT), c[6], c[4], str(c[1]), str(c[2]), c[3], func() -> void:
 		play_all(holder, rest, on_done), c[5])
 
@@ -192,6 +200,9 @@ func _build_stage() -> void:
 		elif kind in [Kind.AWARD, Kind.CHAMPION]:
 			_trophy = _make_trophy(kind == Kind.CHAMPION)
 			_viewport.add_child(_trophy)
+		elif kind == Kind.MILESTONE:
+			_ball = _make_ball()
+			_viewport.add_child(_ball)
 
 
 ## The club's jersey with his name and number, as it is held up for the cameras.
@@ -244,6 +255,25 @@ func _make_jersey(style: UniformStyle) -> Node3D:
 
 ## A trophy in gold: a dark base, a stem, a cup with two handles (the championship's taller,
 ## the award's a smaller cup).
+## The ball, a little larger than life so it reads at the waist-up shot, on a clear stand.
+func _make_ball() -> Node3D:
+	var root := Node3D.new()
+	var ball := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.055
+	sphere.height = 0.11
+	ball.mesh = sphere
+	var cover := StandardMaterial3D.new()
+	cover.albedo_color = Color(0.97, 0.96, 0.92)
+	cover.roughness = 0.55
+	if ResourceLoader.exists(BallActor.COVER):
+		cover.albedo_texture = load(BallActor.COVER) as Texture2D
+	ball.material_override = cover
+	ball.rotation_degrees = Vector3(20.0, 35.0, 0.0)
+	root.add_child(ball)
+	return root
+
+
 func _make_trophy(big: bool) -> Node3D:
 	var root := Node3D.new()
 	var gold := StandardMaterial3D.new()
@@ -310,6 +340,8 @@ func _raise_at() -> float:
 			return 3.6
 		Kind.CALL_UP:
 			return 1.4
+		Kind.MILESTONE:
+			return 0.9
 	return 3.0
 
 
@@ -338,6 +370,9 @@ func _pose_and_props() -> void:
 				to = PuppetClips.hold(1.08, 0.26, 0.3) if time < up + 1.6 else PuppetClips.hold(1.08, 0.26, 0.3).blend(PuppetClips.hold(2.0, 0.26, 0.12), smoothstep(up + 1.6, up + 2.1, time))
 			Kind.CHAMPION:
 				to = PuppetClips.hold(2.02, 0.3, 0.1) if fmod(time - up, 1.6) < 1.2 else PuppetClips.fist_pump()
+			Kind.MILESTONE:
+				# The ball held out in both hands at the chest, then raised once for the crowd.
+				to = PuppetClips.hold(1.38, 0.1, 0.36) if time < up + 2.6 else PuppetClips.hold(1.38, 0.1, 0.36).blend(PuppetClips.hold(1.9, 0.08, 0.26), smoothstep(up + 2.6, up + 3.0, time))
 			_:
 				to = PuppetClips.fist_pump() if time < up + 1.6 else PuppetClips.wave(time)
 		pose = pose.blend(to, k)
@@ -353,6 +388,9 @@ func _pose_and_props() -> void:
 	if _trophy != null:
 		_trophy.visible = shown
 		_trophy.position = mid + Vector3(0.0, 0.17 if kind == Kind.CHAMPION else 0.12, 0.04)
+	if _ball != null:
+		_ball.visible = shown
+		_ball.position = mid + Vector3(0.0, 0.06, 0.07)
 
 
 func _move_camera() -> void:
@@ -366,6 +404,10 @@ func _move_camera() -> void:
 	var look_to := Vector3(-0.42, h * 0.68, 0.0)
 	if kind == Kind.CHAMPION or kind == Kind.AWARD:
 		look_to.y = h * 0.78
+	if kind == Kind.MILESTONE:
+		# Closer: the ball is the picture (with room over his head for it raised).
+		to = Vector3(-0.3, h * 0.8, 3.3)
+		look_to.y = h * 0.82
 	_camera.fov = lerpf(30.0, 27.0, k)
 	_camera.look_at_from_position(from.lerp(to, k), look_from.lerp(look_to, k))
 

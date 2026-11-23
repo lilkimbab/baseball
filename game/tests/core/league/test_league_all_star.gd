@@ -1,5 +1,5 @@
 extends GutTest
-## The league's all-star break (queue stage 4): at the season's middle, the picked, the game,
+## The league's all-star break: at the season's middle, the picked, the game,
 ## the derby, what it pays, and its place in a save.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

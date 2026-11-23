@@ -1,6 +1,6 @@
 class_name AllStarMatch
 extends MatchScene
-## The league's all-star game played by the manager himself (queue stage 4): the two all-star
+## The league's all-star game played by the manager himself: the two all-star
 ## teams (LeagueAllStar), he on the side with more of his men; nine innings (or the settings');
 ## what it pays goes to him at the end, and back to the league screen.
 

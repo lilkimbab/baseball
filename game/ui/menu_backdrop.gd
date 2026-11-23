@@ -1,6 +1,6 @@
 class_name MenuBackdrop
 extends CanvasLayer
-## What is behind the menus (docs/05 section 5): the ballpark itself, live — stands, crowd,
+## What is behind the menus (docs/04 section 5): the ballpark itself, live — stands, crowd,
 ## lights — seen by a camera that drifts slowly and moves to another vantage as the screen
 ## changes (behind the plate for the hub, the outfield for a quick game, the mound for the
 ## practice field). It sits under every menu screen and stays through the changes between

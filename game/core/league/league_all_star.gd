@@ -1,8 +1,8 @@
 class_name LeagueAllStar
 extends RefCounted
-## The all-star break of a league season (queue stage 4, 2026-11-23: "the career has it, the
+## The all-star break of a league season (2026-11-23: "the career has it, the
 ## league should too"): at the season's middle (the career's own share, data/career.ko.json
-## all_star.at_share) the league's twenty-two most voted players make two teams (드림·나눔, the
+## all_star.at_share) the league's twenty-two most voted players make two teams (청팀·백팀, the
 ## first five clubs against the other five: AllStar), and the four with the most home runs meet
 ## in a derby. The manager may play the game himself (his men's side), let it be settled, and
 ## send one of his hitters in the derby to swing himself or have it settled. Then the season
@@ -83,16 +83,12 @@ static func my_derby_man(s: Season) -> String:
 	return ""
 
 
-## The two teams (드림, 나눔).
+## The two teams (청팀, 백팀: AllStar.TEAM_COLOURS).
 static func teams(s: Season) -> Array[Team]:
 	var selected: Array[String] = []
 	selected.assign(s.all_star.get("selected", []))
 	var out := AllStar.teams(s, 0, selected, null)
-	var colours: Array = [[Color("#1f4e9c"), Color("#f2f2f2"), Color("#7fb2ff")], [Color("#c0392b"), Color("#f2f2f2"), Color("#ffb36b")]]
 	for i: int in out.size():
-		out[i].primary = colours[i][0]
-		out[i].secondary = colours[i][1]
-		out[i].accent = colours[i][2]
 		out[i].stadium = s.teams[s.divisions[0][0]].stadium
 		for p: Player in out[i].players:
 			out[i].registered.append(p.id)

@@ -1,6 +1,6 @@
 class_name CareerMatch
 extends ManagerMatch
-## A career game (docs/02 section 6.2, docs/13 S8-3): only the player's scenes are played —
+## A career game: only the player's scenes are played —
 ## his turns at bat, and on the mound the batters that matter (runners in scoring position,
 ## the heart of the order, the first batter of an inning; "전부 직접" plays them all). The rest
 ## goes by on the situation board. Before each scene a card shows the score, the situation and
@@ -14,6 +14,14 @@ var pitch_all := false
 const POSITION_BACK := 3.5
 const POSITION_HEIGHT := 2.1
 var me := ""
+## His first-team totals before this game and as of the last play (Milestones: a milestone
+## reached in the game is called as it happens).
+var _totals_before: Array = []
+var _totals_now: Array = []
+## The milestone calls waiting (each a little after the play's own line, so both are heard).
+var _milestone_lines := PackedStringArray()
+var _milestone_wait := 0.0
+const MILESTONE_AFTER := 2.6
 var goal: SceneGoal
 var game_goal: GameGoal
 ## Growth points from scene goals in this game, per field; clutch scenes won.
@@ -60,6 +68,9 @@ func _start_game() -> void:
 	if today != null:
 		_play_at_home(today.home, today.day, cs.side_team(today.home))
 	me = cs.career.player.id
+	if cs.career.first_team and cs.season.phase == Season.Phase.REGULAR:
+		_totals_before = CareerContract.totals(cs.career, cs)
+		_totals_now = _totals_before
 	Settings.ensure_loaded()
 	pitch_all = Settings.pitch_all
 	game_goal = GameGoal.for_player(cs.career, cs.rules)
@@ -71,7 +82,7 @@ func _start_game() -> void:
 
 func _ready() -> void:
 	# The board goes faster than in the manager mode: a plate appearance in a second or so
-	# (docs/05 section 3.5).
+	# (docs/04 section 3.5).
 	summary_gap = 0.05
 	summary_pitch_time = 0.12
 	summary_result_time = 1.1
@@ -173,7 +184,7 @@ func _situation() -> String:
 	return "%d회%s %d사 %s · %d-%d" % [game.inning, "초" if game.top else "말", game.outs, on, game.score[0], game.score[1]]
 
 
-## Only balls hit his way are shown (docs/02 section 6.2): his fielding chances.
+## Only balls hit his way are shown: his fielding chances.
 func show_in_summary(play: PlayResult) -> bool:
 	if game.fielding() != my_team or CareerSession.career_season == null:
 		return false
@@ -186,7 +197,7 @@ func show_in_summary(play: PlayResult) -> bool:
 	return play.direction == int(number)
 
 
-## A ball hit his way is watched from where he plays (docs/02 section 6.2, docs/13 S8-4): just
+## A ball hit his way is watched from where he plays: just
 ## behind and above him, turning with the ball. He fields it automatically until the fielding
 ## controls come (S12).
 func _move_camera_play(delta: float) -> void:
@@ -225,12 +236,22 @@ func step(delta: float) -> void:
 		if c.x - c.y > _best_count.x - _best_count.y:
 			_best_count = c
 	super.step(delta)
+	if not _milestone_lines.is_empty():
+		_milestone_wait -= delta
+		if _milestone_wait <= 0.0:
+			var line := _milestone_lines[0]
+			_milestone_lines.remove_at(0)
+			log.append(line)
+			last_text = line
+			last_mood = &"hot"
+			_milestone_wait = MILESTONE_AFTER
 
 
 func _apply(e: GameEvent) -> void:
 	var fielding := game.fielding()
 	var was_mine := intervening
 	super._apply(e)
+	_call_milestones()
 	if fielding == my_team and CareerSession.career_season != null:
 		var credit := CareerSession.career_season.fielding_credit(e)
 		chances += credit.x
@@ -246,6 +267,20 @@ func _apply(e: GameEvent) -> void:
 		banner = "목표 %s: %s" % ["달성" if met else "실패", goal.label()]
 		banner_time = 2.4
 		goal = null
+
+
+## A milestone of his reached on this play: the caster calls it (the ball is kept, and its
+## ceremony comes after the game: CareerSeason).
+func _call_milestones() -> void:
+	if _totals_before.is_empty() or scorer == null:
+		return
+	var now := Milestones.with_game(_totals_before, scorer.book.batting.get(me), scorer.book.pitching.get(me))
+	var cs := CareerSession.career_season
+	for m: Array in Milestones.crossed(_totals_now, now, cs != null and cs.career.is_pitcher()):
+		var who := cs.career.player.name if cs != null else ""
+		_milestone_lines.append("%s! %s, 기념구를 챙깁니다" % [str(m[1]), who])
+		_milestone_wait = maxf(_milestone_wait, MILESTONE_AFTER)
+	_totals_now = now
 
 
 ## The result goes to the career once the game is over.

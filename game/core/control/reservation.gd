@@ -1,6 +1,6 @@
 class_name Reservation
 extends RefCounted
-## A standing instruction for the manager mode (docs/03 section 9, docs/02 section 4.3): when
+## A standing instruction for the manager mode (docs/02 section 9): when
 ## the situation at the start of a plate appearance matches, tell the player, take over the
 ## plate appearance, or give an order. "주자 득점권에 나가면 알려 줘", "7회 이후 동점이면 개입".
 ##

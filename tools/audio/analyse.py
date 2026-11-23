@@ -1,6 +1,6 @@
 """Looks at a recorded game (tools/sound_record.gd): its loudness second by second, its peak
 (clipping?), and a spectrogram written as a PNG (through Blender's image writer, since the
-Python here has numpy but no imaging library). docs/11 section 9.
+Python here has numpy but no imaging library)..
 
     blender --background --python tools/audio/analyse.py -- build/sound/game.wav build/sound/game.png
 """

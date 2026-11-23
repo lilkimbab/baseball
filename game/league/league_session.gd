@@ -15,7 +15,7 @@ static var slot := ""
 
 
 ## A new season: the league's ten clubs (league_clubs) in one league, no promotion or
-## relegation (docs/08 R8-1). The player takes `team_id`. A later season passes its clubs in
+## relegation. The player takes `team_id`. A later season passes its clubs in
 ## `teams` (an old save of three divisions keeps its thirty, in their division order).
 static func start(team_id: String, games: int, seed_value: int, teams: Array[Team] = [], year: int = -1, carry: Club = null) -> Season:
 	var clubs := teams if not teams.is_empty() else league_clubs()
@@ -66,7 +66,7 @@ static func league_title() -> String:
 	return "1군 리그"
 
 
-## A season of the past played again (docs/08 R7): the pack's clubs in one league, that
+## A season of the past played again: the pack's clubs in one league, that
 ## year's rules and calendar, the club the scenario names (or the one chosen). Ends with the
 ## comparison to what really happened; there is no next season.
 static func start_history(pack: SeasonPack, scenario_id: String, team_id: String, seed_value: int) -> Season:
@@ -96,7 +96,7 @@ static func start_history(pack: SeasonPack, scenario_id: String, team_id: String
 ## Next season: the same clubs and players, rearranged by promotion and relegation, a year on.
 static func next_season(seed_value: int) -> Season:
 	var old := season
-	# The winter (docs/08 R6): retirements, rookies, a year older, the first teams made up again.
+	# The winter: retirements, rookies, a year older, the first teams made up again.
 	var winter := Development.winter(old)
 	var order: Array[Team] = []
 	for ids: PackedStringArray in old.next_divisions():
@@ -107,7 +107,7 @@ static func next_season(seed_value: int) -> Season:
 	return next
 
 
-## Saves the season to its slot (after every day and game, docs/07 section 7).
+## Saves the season to its slot (after every day and game, docs/06 section 7).
 static func autosave() -> void:
 	if season == null or slot == "":
 		return

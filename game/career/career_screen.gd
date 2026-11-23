@@ -1,6 +1,6 @@
 class_name CareerScreen
 extends Screen
-## The career's screen between games (docs/02 section 6, docs/13 S8-3, S8-5). Its tabs: today
+## The career's screen between games. Its tabs: today
 ## (the player standing beside the day's game — played on screen with only his scenes, or at
 ## once — the last game's report and his numbers on both teams), growth (each field's points
 ## spent on its ratings; a pitcher's pitches) and his division's table.
@@ -212,7 +212,7 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 				var id := str(offer[0])
 				row.add_child(UiKit.button("계약", func() -> void:
 					CareerSession.next_season(id)
-					refresh(), "handshake"))
+					refresh(), "handshake", "gold"))
 				p.body.add_child(row)
 		else:
 			var go_on := UiKit.button("다음 시즌", func() -> void:
@@ -221,7 +221,7 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 			go_on.add_theme_font_size_override("font_size", 22)
 			actions.add_child(go_on)
 		# He may hang up his spikes in any winter (a second press: no going back).
-		var retire := UiKit.button("은퇴", func() -> void: pass, "flag-pennant")
+		var retire := UiKit.button("은퇴", func() -> void: pass, "flag-pennant", "danger")
 		retire.pressed.connect(func() -> void:
 			if retire.text == "은퇴":
 				retire.text = "정말 은퇴합니다 (되돌릴 수 없음)"
@@ -463,7 +463,7 @@ func _build_pitches(parent: Control, cs: CareerSeason) -> void:
 			row.add_child(lesson)
 
 
-## His records (queue stage 5): each season's line (first team and second), his first-team
+## His records: each season's line (first team and second), his first-team
 ## totals, and this season's games one by one.
 func _build_records(cs: CareerSeason) -> void:
 	var c := cs.career
@@ -494,6 +494,13 @@ func _build_records(cs: CareerSeason) -> void:
 		var t := UiKit.tile(str(f[0]), str(f[1]), 0.0, 26)
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		tiles.add_child(t)
+	# The commemorative balls (Milestones): a first hit, 100 hits, a first win …
+	if c.first_team or not c.milestones.is_empty():
+		left.body.add_child(UiKit.caption("기념구  %d개" % c.milestones.size()))
+		var shelf := BallShelf.new()
+		shelf.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		left.body.add_child(shelf)
+		shelf.fill(c, sum)
 	var right := panel("경기별 기록", "list-numbers", columns, 620.0, "GAME LOG")
 	var log: Array = cs.season.game_logs.get(c.player.id, [])
 	if log.is_empty():

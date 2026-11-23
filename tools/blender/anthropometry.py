@@ -1,5 +1,5 @@
 """Measures the generated body the way a tailor or an anthropometric survey would
-(docs/12 section 4): heights, breadths and girths, in metres, so the model can be held against
+(docs/09 section 4): heights, breadths and girths, in metres, so the model can be held against
 published tables (US Army ANSUR II, men) and against what a ballplayer looks like.
 
 Used by make_player.py (which prints the numbers and writes them next to the model) and by

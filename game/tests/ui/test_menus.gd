@@ -1,5 +1,5 @@
 extends GutTest
-## The title, hub and menus (docs/13 S9): every screen within three clicks, a quick game set up
+## The title, hub and menus: every screen within three clicks, a quick game set up
 ## from the menu, settings kept, a save loaded from the hub.
 
 const TITLE := preload("res://ui/title_screen.tscn")
@@ -40,7 +40,10 @@ func test_the_hub_reaches_every_part_in_one_click() -> void:
 		assert_true(labels.has(want), want)
 	var title := TITLE.instantiate() as TitleScreen
 	add_child_autofree(title)
-	assert_true(_buttons(title).has("게임 시작"))
+	assert_false(_buttons(title).has("게임 시작"), "the title waits for a key first")
+	title._open()
+	for want: String in ["게임 시작", "환경 설정", "게임 종료"]:
+		assert_true(_buttons(title).has(want), want)
 	for path: String in [Screen.QUICK, Screen.LOAD, Screen.SETTINGS, Screen.PRACTICE, Screen.SHOP, LeagueSession.SCREEN, CareerSession.CREATE, CareerSession.HUB]:
 		assert_true(ResourceLoader.exists(path), path)
 	# Every part of the game opens a screen that builds.

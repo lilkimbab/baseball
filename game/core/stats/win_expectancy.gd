@@ -2,7 +2,7 @@ class_name WinExpectancy
 extends RefCounted
 ## The home team's chance of winning from any moment of a game, and how much the coming plate
 ## appearance matters (leverage index), for the "승부처" mark and the win-probability line
-## (docs/03 section 9, docs/05 section 3.1).
+## (docs/02 section 9, docs/04 section 3.1).
 ##
 ## Worked out, not looked up: plate-appearance outcomes at the league's rates (LeagueEnv)
 ## drive a base-out Markov chain, which gives the runs still to come in a half-inning from

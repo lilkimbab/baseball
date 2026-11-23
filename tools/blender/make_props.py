@@ -127,7 +127,7 @@ def make_glove():
 
 
 def make_outfield_glove():
-    """An outfielder's glove (docs/13 S11-8): 12.75 inches, longer finger stalls and a deeper
+    """An outfielder's glove: 12.75 inches, longer finger stalls and a deeper
     web than an infielder's 12 inch one, for reach."""
     bm = bmesh.new()
     blob(bm, (0.0, -0.045, 0.0), (0.078, 0.072, 0.03))

@@ -1,6 +1,6 @@
 shader_type spatial;
 render_mode cull_disabled, world_vertex_coords;
-// The crowd (docs/06 7, docs/13 S14): every fan is a picture of a real-looking person
+// The crowd (docs/05 7): every fan is a picture of a real-looking person
 // (tools/blender/make_crowd.py renders them from Microsoft Rocketbox's people, MIT licence)
 // on a card. Eight pictures a person — four ways of sitting, four of standing — and the
 // zone's state, the beat of the cheering and the person's own number pick which one shows,

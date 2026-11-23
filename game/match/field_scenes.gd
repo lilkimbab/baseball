@@ -20,6 +20,8 @@ extends RefCounted
 ## ambulance and it drives off, the crowd applauding.
 
 const BRAWL_LENGTH := 8.5
+## The title won: the pile at the mound, then the manager tossed (헹가래).
+const CHAMPION_LENGTH := 13.0
 const MEDICAL_LENGTH := 12.0
 ## Where the benches meet (field coordinates): between the plate and the mound.
 const BRAWL_AT := Vector2(0.0, 6.5)
@@ -28,7 +30,7 @@ const MEDIC_VEST := Color(0.88, 0.95, 0.18)
 const MEDIC_PANTS := Color(0.12, 0.13, 0.16)
 
 var scene: MatchScene
-## &"brawl" or &"medical" while one is planned.
+## &"brawl", &"medical" or &"champion" while one is planned.
 var kind := &""
 ## Each figure: {side, from, slot, delay, role, speed, face}.
 var plan: Array[Dictionary] = []
@@ -126,8 +128,9 @@ func _prepare_figures() -> void:
 			scene._dress(scene._rush[i], e["style"], 0, "", false)
 			var model := scene._rush[i] as SkinnedPuppet
 			if model != null:
-				model.set_body(1.75, &"standard")
-				model.set_face("medic%d" % i, 35)
+				var boss: bool = e["role"] == &"manager"
+				model.set_body(1.76 if boss else 1.75, &"solid" if boss else &"standard")
+				model.set_face("manager" if boss else "medic%d" % i, 57 if boss else 35)
 				model.set_hair(1 + i % 4, Color(0.06, 0.05, 0.045))
 		else:
 			scene._dress_rush(scene._rush[i], int(e["side"]), p)
@@ -471,6 +474,161 @@ func _show_medical(t: float) -> void:
 					fig.apply(PuppetClips.hold(0.9, 0.5, 0.3))
 
 
+# --- The title won: the pile at the mound and the manager tossed ---
+# (the user, 2026-11-23: "the championship clinch — the pile, 헹가래"). As a KBO title is won:
+# the last out, the pitcher's arms go up and the catcher runs out to leap on him; the fielders
+# and both benches of the winners pour onto the mound and jump in a ring; then they lift their
+# manager and toss him three times. The other side has gone.
+
+## Where it all happens (field coordinates): the mound.
+const MOUND := Vector3(0.0, Field.RUBBER_Y - 0.4, 0.0)
+## When the tossing starts, how long each toss takes, how high he goes (m).
+const TOSS_FROM := 6.6
+const TOSS_EVERY := 1.55
+const TOSS_HEIGHT := 1.35
+## How high the manager lies on their hands between tosses.
+const TOSS_REST := 1.9
+
+
+func plan_champion(side: int) -> void:
+	kind = &"champion"
+	plan.clear()
+	var g := scene.game
+	var rng := Rng.new(hash("title:%d" % scene.seed_value))
+	var team := g.teams[side]
+	var taken: Dictionary[String, bool] = {}
+	var fielding := g.fielding() == side
+	# The battery and the fielders from where they stand (when the winners were in the field
+	# for the last out; after a walk-off they come from the dugout like the rest).
+	if fielding:
+		var pitcher_id := g.pitcher_id()
+		_add(side, team.player(pitcher_id), MOUND, MOUND, 0.0, &"pitcher", 2.0, MOUND + Vector3(0.0, -3.0, 0.0))
+		taken[pitcher_id] = true
+		for kind_on: Position.Kind in [Position.Kind.C, Position.Kind.B1, Position.Kind.B2, Position.Kind.B3, Position.Kind.SS, Position.Kind.LF, Position.Kind.CF, Position.Kind.RF]:
+			var id := team.fielder_at(kind_on)
+			if id == "" or taken.has(id):
+				continue
+			taken[id] = true
+			var at: Vector3 = Field.to_field(scene.fielders[kind_on].position) if scene.fielders.has(kind_on) else (Vector3(0.0, -1.2, 0.0) if kind_on == Position.Kind.C else Vector3(0.0, 30.0, 0.0))
+			var delay := 0.15 if kind_on == Position.Kind.C else 0.3 + rng.next_float() * 0.5
+			_add(side, team.player(id), Vector3(at.x, at.y, 0.0), _round_mound(rng, 0.7, 1.6), delay, &"pile", 7.5, MOUND)
+	# The bench pours out.
+	var dugout := scene._dugout(side)
+	var men := 0
+	for id: String in team.players:
+		if taken.has(id) or team.removed.has(id) or men >= 10:
+			continue
+		taken[id] = true
+		men += 1
+		var from := dugout + Vector3(rng.next_range(-2.5, 2.5), rng.next_range(-1.5, 1.5), 0.0)
+		_add(side, team.players[id], from, _round_mound(rng, 1.2, 2.6), 0.6 + rng.next_float() * 1.6, &"pile", 7.0, MOUND)
+	# The manager: in the club's jacket, out last, tossed in the middle.
+	var style := UniformStyle.for_team(scene.club(side), side == 1)
+	var boss := Player.new()
+	boss.id = "manager_%s" % team.team_id
+	boss.name = "감독"
+	plan.append({"side": side, "player": boss, "from": dugout, "slot": MOUND + Vector3(0.0, -0.6, 0.0), "delay": 2.4, "role": &"manager", "speed": 4.0, "face": MOUND + Vector3(0.0, -3.0, 0.0),
+		"style": UniformStyle.make(style.cap.darkened(0.2), Color(0.12, 0.13, 0.16), style.cap, style.cap, style.cap_letter)})
+	_prepare_figures()
+
+
+## A place round the mound, `inner` to `outer` from its middle, all the way round.
+func _round_mound(rng: Rng, inner: float, outer: float) -> Vector3:
+	var ang := rng.next_range(0.0, TAU)
+	var r := rng.next_range(inner, outer)
+	return MOUND + Vector3(cos(ang) * r, sin(ang) * r * 0.85, 0.0)
+
+
+func champion_shots() -> Array[Broadcast.Shot]:
+	var c := MOUND
+	return [
+		# On the mound from in front as the last out is made: the pitcher, arms up.
+		Broadcast.Shot.make(0.0, c + Vector3(1.6, -7.0, 1.6), c + Vector3(0.0, 0.0, 1.6), 30.0, c + Vector3(1.0, -5.6, 1.6), c + Vector3(0.0, 0.0, 1.5), 32.0),
+		# Wide and high from in front of the backstop (its net is not in the way): everyone
+		# pours onto the field.
+		Broadcast.Shot.make(2.6, Vector3(0.0, -11.5, 10.5), c + Vector3(0.0, 4.0, 0.0), 52.0, Vector3(0.0, -9.0, 8.5), c + Vector3(0.0, 1.0, 0.0), 46.0),
+		# Close and low on the pile, from the first-base side.
+		Broadcast.Shot.make(4.6, c + Vector3(7.0, -2.0, 1.4), c + Vector3(0.0, 0.0, 1.4), 34.0, c + Vector3(5.8, -0.6, 1.5), c + Vector3(0.0, 0.0, 1.6), 32.0),
+		# The toss, from low in front, looking up.
+		Broadcast.Shot.make(TOSS_FROM - 0.4, c + Vector3(-1.5, -7.5, 1.0), c + Vector3(0.0, -0.6, 2.4), 38.0, c + Vector3(-0.8, -6.2, 0.9), c + Vector3(0.0, -0.6, 2.7), 36.0),
+	]
+
+
+func _show_champion(t: float) -> void:
+	var toss := t >= TOSS_FROM
+	for i: int in scene._rush.size():
+		var fig := scene._rush[i]
+		if i >= plan.size():
+			fig.visible = false
+			continue
+		var e := plan[i]
+		var role: StringName = e["role"]
+		var from: Vector3 = e["from"]
+		var slot: Vector3 = e["slot"]
+		# For the toss the men close in round the manager.
+		if toss and role == &"pile":
+			var off := Vector2(slot.x - MOUND.x, slot.y - MOUND.y)
+			var ring := (MOUND + Vector3(0.0, -0.6, 0.0)) + Vector3(off.normalized().x, off.normalized().y, 0.0) * (0.75 if i % 2 == 0 else 1.25)
+			slot = slot.lerp(ring, smoothstep(TOSS_FROM, TOSS_FROM + 0.6, t))
+		var delay: float = e["delay"]
+		var run_time := maxf(Vector2(slot.x - from.x, slot.y - from.y).length() / float(e["speed"]), 0.01)
+		var u := clampf((t - delay) / run_time, 0.0, 1.0)
+		var at := from.lerp(slot, u)
+		var face: Vector3 = e["face"]
+		var pose := PuppetClips.standing()
+		var height := 0.0
+		if role == &"pitcher":
+			# Arms up on the mound; the catcher reaches him and they jump together.
+			pose = PuppetClips.hold(2.05, 0.5, 0.15)
+			height = 0.3 * maxf(sin((t - 0.6) * 7.0), 0.0) if t > 0.6 and not toss else 0.0
+			if toss:
+				pose = PuppetClips.hold(1.95, 0.3, 0.25)
+		elif role == &"manager":
+			if t < delay:
+				pose = PuppetClips.standing()
+			elif u < 1.0:
+				pose = PuppetClips.run_at((t - delay) * 2.6, 0.6)
+				face = slot
+			elif toss:
+				# On his back on their hands, up and down three times, across the camera's view
+				# (FieldScenes.champion_shots' last), arms and legs flung out.
+				var k := fmod(t - TOSS_FROM, TOSS_EVERY) / TOSS_EVERY
+				var lift := TOSS_HEIGHT * sin(k * PI) if t < TOSS_FROM + TOSS_EVERY * 3.0 else 0.0
+				var yaw := MatchScene._yaw_toward(Vector2(at.x, at.y), Vector2(at.x + 1.0, at.y))
+				fig.visible = true
+				# (The figure's feet are its origin: lying, its middle is 0.9 m along its facing.)
+				fig.position = Field.to_world(Vector3(at.x, at.y, Field.ground_height(at.x, at.y) + TOSS_REST + lift)) - Basis(Vector3.UP, yaw) * Vector3(0.0, 0.0, 0.9)
+				fig.rotation = Vector3(PI / 2.0, yaw, 0.0)
+				fig.apply(PuppetClips.tossed(t, k))
+				continue
+			else:
+				pose = PuppetClips.wave(t)
+		else:
+			if t < delay:
+				pose = PuppetClips.standing()
+			elif u < 1.0:
+				pose = PuppetClips.run_at((t - delay) * 3.2, 1.0)
+				face = slot
+			elif toss:
+				# Hands up under him, rising and falling with each toss.
+				var k := fmod(t - TOSS_FROM, TOSS_EVERY) / TOSS_EVERY
+				pose = PuppetClips.hold(1.75 + 0.35 * sin(k * PI), 0.35, 0.3)
+				face = MOUND + Vector3(0.0, -0.6, 0.0)
+			else:
+				# Jumping in the ring, arms up, a fist now and then.
+				height = 0.28 * maxf(sin(t * 6.0 + i * 1.3), 0.0)
+				pose = PuppetClips.hold(2.0, 0.45, 0.15) if fmod(t * 0.9 + i * 0.31, 1.6) < 1.1 else PuppetClips.fist_pump()
+				face = MOUND
+		fig.visible = true
+		# (On the mound's slope, not in it: it stands ten inches high at the rubber.)
+		fig.position = Field.to_world(Vector3(at.x, at.y, height + Field.ground_height(at.x, at.y)))
+		var yaw := MatchScene._yaw_toward(Vector2(at.x, at.y), Vector2(face.x, face.y)) if Vector2(face.x - at.x, face.y - at.y).length() > 0.05 else fig.rotation.y
+		fig.rotation = Vector3(0.0, yaw, 0.0)
+		fig.apply(pose)
+	# The umpires walk off.
+	scene.umpire.visible = t < 2.0
+
+
 # --- Shared ---
 
 
@@ -485,6 +643,8 @@ func show(t: float) -> void:
 		_show_brawl(t)
 	elif kind == &"medical":
 		_show_medical(t)
+	elif kind == &"champion":
+		_show_champion(t)
 
 
 func _hide_cast() -> void:
@@ -509,6 +669,8 @@ func _restore() -> void:
 	_hidden.clear()
 	for fig: Puppet in scene._rush:
 		fig.visible = false
+	if scene.umpire != null:
+		scene.umpire.visible = true
 	if _stretcher != null:
 		_stretcher.visible = false
 	if _ambulance != null:

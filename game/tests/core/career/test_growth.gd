@@ -1,5 +1,5 @@
 extends GutTest
-## Scene goals, game goals and growth points (docs/13 S8-2, S8-5).
+## Scene goals, game goals and growth points.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

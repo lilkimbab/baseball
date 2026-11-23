@@ -1,5 +1,5 @@
 extends GutTest
-## Club management (docs/13 S7-9): grades and costs, condition, traits, training, scouting,
+## Club management: grades and costs, condition, traits, training, scouting,
 ## team colours and points.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

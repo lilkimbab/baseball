@@ -1,5 +1,5 @@
 shader_type spatial;
-// The sea beside a park (docs/13 S13-8): deep water whose small waves — two layers of ripples
+// The sea beside a park: deep water whose small waves — two layers of ripples
 // sliding across each other — catch the sky and the sun.
 
 uniform sampler2D ripples : hint_normal, repeat_enable, filter_linear_mipmap_anisotropic;

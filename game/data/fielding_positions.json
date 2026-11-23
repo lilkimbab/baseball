@@ -1,5 +1,5 @@
 {
-  "note": "Where fielders stand before the pitch, as distance from the apex of home plate (m) and direction (degrees, 0 = centre field, + = first-base side). Basis A: close to MLB average starting positions (docs/13 S5-2). Variants move players from the normal spots.",
+  "note": "Where fielders stand before the pitch, as distance from the apex of home plate (m) and direction (degrees, 0 = centre field, + = first-base side). Basis A: close to MLB average starting positions. Variants move players from the normal spots.",
   "normal": {
     "P":  [18.2, 0.0],
     "C":  [-1.1, 0.0],

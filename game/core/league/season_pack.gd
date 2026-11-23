@@ -1,6 +1,6 @@
 class_name SeasonPack
 extends RefCounted
-## A season of the past to play again (docs/08 R7, IDEAS 8): its clubs and their players as
+## A season of the past to play again (IDEAS 8): its clubs and their players as
 ## they were, that year's rules, and what really happened — the final table, the champion,
 ## the title holders — with scenarios that set the player a goal ("win it with the team that
 ## finished sixth"). One JSON file:

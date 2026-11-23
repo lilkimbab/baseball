@@ -2,7 +2,7 @@
   "name": "physics-check",
   "private": true,
   "type": "module",
-  "description": "Validates the ball-flight / collision constants used in docs/04-physics.md",
+  "description": "Validates the ball-flight / collision constants used in docs/03-physics.md",
   "scripts": { "check": "node check.mjs" },
   "dependencies": { "@dimforge/rapier3d-compat": "0.21.0" }
 }

@@ -1,5 +1,5 @@
 extends GutTest
-## The stat resolver, the computer manager and the league generator (docs/13 S4-9 to S4-12).
+## The stat resolver, the computer manager and the league generator.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

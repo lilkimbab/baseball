@@ -1,5 +1,5 @@
 extends SceneTree
-## How the game's numbers follow the pitch table (queue stage 3): plays many games between a
+## How the game's numbers follow the pitch table: plays many games between a
 ## season pack's clubs with the stat resolver and prints the league's OPS against the same and
 ## the other hand, and the batters with the biggest and smallest own splits as the game plays
 ## them; then the computer pitchers' fastball share by the count (AiPitcher with each man's own

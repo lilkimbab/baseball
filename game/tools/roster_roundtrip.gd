@@ -1,9 +1,9 @@
 extends SceneTree
-## Checks the records-to-ratings builder without real records (docs/13 S17): a division of the
+## Checks the records-to-ratings builder without real records: a division of the
 ## fictional league plays a season; its numbers go through RosterBuilder as if they were a
 ## real season's; the league built from them plays the season again several times; each
 ## qualified hitter's average OPS is compared with what he did in the "real" season, and the
-## clubs' winning percentages likewise (docs/07 4.3: OPS correlation 0.85 or more, winning
+## clubs' winning percentages likewise (docs/06 4.3: OPS correlation 0.85 or more, winning
 ## percentage 0.7 or more). Also how close the built ratings come to the true ones.
 ##
 ##   godot --headless --path game --script res://tools/roster_roundtrip.gd -- [--games 144] [--replays 8]

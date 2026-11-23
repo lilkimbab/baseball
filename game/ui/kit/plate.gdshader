@@ -1,5 +1,5 @@
 shader_type canvas_item;
-// A panel, a button, a tab or an orb of the menus (docs/05 section 5, the third look): one
+// A panel, a button, a tab or an orb of the menus (docs/04 section 5, the third look): one
 // rounded (or slanted, or round) shape with a top-to-bottom gradient, a border with a light
 // line inside it, a glossy band over its upper part, an optional heading strip, fine diagonal
 // stripes, and a soft shadow round it. Drawn on a rectangle `pad` pixels larger on every side
@@ -25,6 +25,13 @@ uniform vec4 glow_color : source_color = vec4(1.0, 0.8, 0.3, 1.0);
 uniform float cut = 0.0;                  // top-left and bottom-right corners cut off, pixels
 uniform float bar_height = 0.0;           // a line of `bar` along the foot (the chosen tab)
 uniform vec4 bar : source_color = vec4(0.88, 0.13, 0.17, 1.0);
+// Effects of a button (GameButton): a fill coming in from the left on a slant (hover), a streak of
+// light passing across (0..1 where it is, below 0 none), a stripe down the left edge.
+uniform float fill = 0.0;
+uniform vec4 fill_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
+uniform float shine = -1.0;
+uniform float accent_width = 0.0;
+uniform vec4 accent_color : source_color = vec4(1.0, 1.0, 1.0, 0.0);
 
 float shape(vec2 p) {
 	vec2 c = p - size * 0.5;
@@ -62,6 +69,22 @@ void fragment() {
 	col.rgb += vec3(hatch * 0.05) * stripes;
 	if (bar_height > 0.0 && p.y > size.y - bar_height) {
 		col = bar;
+	}
+	if (fill > 0.0) {
+		// The fill's leading edge leans as the shape does.
+		float lean = (size.y - p.y) * 0.45;
+		float edge_x = mix(-size.y, size.x + size.y * 0.5, fill);
+		float f = 1.0 - smoothstep(edge_x - 1.5, edge_x + 1.5, p.x + lean);
+		col = mix(col, fill_color, f * fill_color.a);
+	}
+	if (accent_width > 0.0) {
+		float left = p.x + (p.y - size.y * 0.5) / max(size.y, 1.0) * skew;
+		col = mix(col, accent_color, (1.0 - smoothstep(accent_width - 0.5, accent_width + 0.5, left - abs(skew) * 0.5)) * accent_color.a);
+	}
+	if (shine >= 0.0) {
+		float sx = mix(-size.y, size.x + size.y, shine);
+		float dist = abs(p.x + (size.y - p.y) * 0.6 - sx);
+		col.rgb += vec3(0.42) * (1.0 - smoothstep(0.0, size.y * 0.32, dist)) * col.a;
 	}
 	// The border and the light line just inside it.
 	float edge = smoothstep(-border_width - 1.0, -border_width, d);

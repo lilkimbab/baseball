@@ -1,6 +1,6 @@
 class_name UiKit
 extends RefCounted
-## The parts the menus are built from (docs/05 section 5): labelled glass panels, buttons with
+## The parts the menus are built from (docs/04 section 5): labelled glass panels, buttons with
 ## icons, rows of choices, tabs, switches, badges. One place, so every screen looks alike.
 
 
@@ -10,6 +10,7 @@ static func label(text: String, font_size: int = 20, colour: Color = UiTheme.INK
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", colour)
 	l.add_theme_font_override("font", UiTheme.font(weight))
+	_edge(l, colour)
 	return l
 
 
@@ -48,7 +49,16 @@ static func latin(text: String, font_size: int = 16, colour: Color = UiTheme.DIM
 	l.add_theme_font_override("font", UiTheme.numeric(italic, true))
 	l.add_theme_font_size_override("font_size", font_size)
 	l.add_theme_color_override("font_color", colour)
+	_edge(l, colour)
 	return l
+
+
+## Dark ink (a rating's black tier) gets a light edge to be read on a dark plate.
+static func _edge(l: Label, colour: Color) -> void:
+	var edge := UiTheme.ink_edge(colour)
+	if edge.a > 0.0:
+		l.add_theme_color_override("font_outline_color", edge)
+		l.add_theme_constant_override("outline_size", 4)
 
 
 ## A big number (a rating, an average) in the slanted condensed face.
@@ -73,10 +83,13 @@ static func slash(colour: Color, height: float = 28.0) -> Control:
 	return mark
 
 
-## A button: "button" (quiet), "primary" (the brand red: a screen's main action), or the old
-## names for those ("PrimaryButton").
+## A button (GameButton.LOOKS): "button" (an outline that fills with its screen's colour),
+## "primary" (the brand red: a screen's main action), "gold" (a reward, a purchase), "danger"
+## (cannot be undone), "menu" (a line of the title's menu); "PrimaryButton" is the old name.
 static func button(text: String, action: Callable, icon_name: String = "", variation: String = "", width: float = 0.0) -> GameButton:
-	var look := "primary" if variation == "PrimaryButton" or variation == "primary" else "button"
+	var look := "primary" if variation == "PrimaryButton" else variation
+	if not GameButton.LOOKS.has(look):
+		look = "button"
 	return GameButton.make(text, action, icon_name, look, width)
 
 

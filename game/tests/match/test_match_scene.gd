@@ -1,5 +1,5 @@
 extends GutTest
-## The match scene headless (docs/13 S5-10): a three-inning game between two computer teams
+## The match scene headless: a three-inning game between two computer teams
 ## plays to the end, and its books add up.
 
 const MATCH := preload("res://match/match.tscn")
@@ -189,7 +189,7 @@ func test_with_manual_changes_the_computer_leaves_the_player_s_pitcher_in() -> v
 
 
 func test_the_catcher_s_mitt_takes_the_pitch_where_it_arrives() -> void:
-	# docs/13 S12-4, S12-8: the pocket of the mitt is on the ball as it is caught.
+	# the pocket of the mitt is on the ball as it is caught.
 	var scene := _start(13)
 	var checked := 0
 	var ticks := 0
@@ -210,7 +210,7 @@ func test_the_catcher_s_mitt_takes_the_pitch_where_it_arrives() -> void:
 
 
 func test_the_player_s_throw_or_running_call_is_taken_when_the_fielder_has_the_ball() -> void:
-	# docs/05 2.3, 2.4: keys pressed while the ball is on its way count once it is fielded.
+	# docs/04 2.3, 2.4: keys pressed while the ball is on its way count once it is fielded.
 	var scene := MATCH.instantiate() as MatchScene
 	scene.human_team = 1
 	scene.innings = 3
@@ -256,7 +256,7 @@ func test_the_player_s_throw_or_running_call_is_taken_when_the_fielder_has_the_b
 
 
 func test_the_player_steals_second_by_letting_go_as_the_pitcher_moves() -> void:
-	# docs/05 2.4: hold Shift, let go with the pitcher's first move.
+	# docs/04 2.4: hold Shift, let go with the pitcher's first move.
 	var scene := MATCH.instantiate() as MatchScene
 	scene.human_team = 0
 	scene.innings = 3
@@ -369,7 +369,7 @@ func test_the_catcher_stays_put_while_the_pitcher_aims() -> void:
 		assert_lt(scene.catcher.position.distance_to(middle), 0.001, "he does not move to the target")
 
 
-# --- The player's own fielding and the slow-motion moments (docs/05 2.3, 3.4) ---
+# --- The player's own fielding and the slow-motion moments (docs/04 2.3, 3.4) ---
 
 
 func _human(team: int, seed_value: int) -> MatchScene:
@@ -557,7 +557,7 @@ func test_a_highlight_slows_the_play_and_brings_the_camera_close() -> void:
 
 
 func test_the_game_is_played_in_its_weather() -> void:
-	# docs/08 R3: the air and the wind of the day are the ones the ball flies through, in the
+	# the air and the wind of the day are the ones the ball flies through, in the
 	# resolver and in the scene alike; the flags fly with the wind; the first line says it.
 	var scene := _start(31)
 	var w := scene.weather
@@ -599,7 +599,7 @@ func test_outfielders_play_deeper_with_the_wind_blowing_out() -> void:
 
 
 func test_the_hud_key_line_splits_into_keys_and_actions() -> void:
-	# docs/08 R5: the HUD shows its keys as caps, as the menus' bottom bar does.
+	# the HUD shows its keys as caps, as the menus' bottom bar does.
 	var items := HudCanvas.key_items("Space 번트   F 작전·교체   Shift+→ 이닝 넘기기  1·2·4 속도")
 	assert_eq(items.size(), 4)
 	assert_eq(items[0], PackedStringArray(["Space", "번트"]))

@@ -1,6 +1,6 @@
 class_name LeagueScreen
 extends Screen
-## The league mode (docs/02 sections 4 and 5, docs/13 S7): start a season with a club in the
+## The league mode: start a season with a club in the
 ## third division, then go day by day. Its tabs: today (the day's game as a match-up — played
 ## on screen as a managed game or settled at once — beside the division table, the postseason
 ## ladder or the season's end), the first team, the second team, scouting and traits. In the
@@ -33,18 +33,18 @@ var _picked := ""
 var _picked_trait := -1
 ## The trait shown beside the badge case (its index in ClubRules.traits).
 var _trait_view := -1
-## The line-up tab (docs/08 R5): the row picked first ("L3" the fourth batter, "B<id>" a man
+## The line-up tab: the row picked first ("L3" the fourth batter, "B<id>" a man
 ## on the bench, "R2" the third starter), and whether two batters trade order or positions.
 var _lineup_pick := ""
-## The man pinned to be compared with the next one picked (his id; docs/08 R5).
+## The man pinned to be compared with the next one picked (his id).
 var _compare_id := ""
 ## The records room: which board (batting leaders, pitching leaders, the clubs) and which
 ## division (-1: the player's own).
 var _records_view := "batting"
 var _records_division := -1
-## The second-team tab (docs/08 R6): its players or its league's table.
+## The second-team tab: its players or its league's table.
 var _farm_view := "players"
-## A new season (docs/08 R7): the fictional league or a season of the past; for the latter
+## A new season: the fictional league or a season of the past; for the latter
 ## the pack and the scenario chosen ("" for a club of one's own choice).
 var _setup_mode := "league"
 var _pack_id := ""
@@ -128,7 +128,7 @@ func _build_setup() -> void:
 		_build_history_setup()
 		return
 	set_heading("리그 모드")
-	# The league's ten clubs (docs/08 R8-1), each a card: emblem, name, strength.
+	# The league's ten clubs, each a card: emblem, name, strength.
 	var clubs := _league_clubs()
 	var columns := UiKit.hbox(16)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -397,6 +397,7 @@ func _build_today(parent: Control, s: Season) -> void:
 	# The all-star break (LeagueAllStar): its panel first while the game or the derby is on.
 	if LeagueAllStar.due(s):
 		LeagueAllStar.hold(s)
+		_announce_all_stars(s)
 	if LeagueAllStar.on(s):
 		_build_all_star(parent, s)
 	var p := panel(title, "calendar-blank", parent, 0.0, "DAY %d" % ((ahead.day if ahead != null else s.day) + 1))
@@ -788,10 +789,10 @@ func _build_one_season_end(parent: Control, s: Season) -> void:
 		refresh(), "play", "primary"))
 
 
-# --- Seasons of the past (docs/08 R7) ---
+# --- Seasons of the past ---
 
 
-## The clubs that made history (docs/08 R7): each a club in one season of the past — 2016 두림
+## The clubs that made history: each a club in one season of the past — 2016 두림
 ## 그리즐리스, 93 wins — played through that season with the league around it as it was. Laid out
 ## as a real game's team page (the user: "too much empty space, the text crammed small in one
 ## corner"): left, the clubs as rows of colour, emblem, year and line; right, the club picked —
@@ -1333,7 +1334,7 @@ func _build_picked(parent: Control, kind: String, p: Player, s: Season, team: Te
 	figures.add_child(UiKit.figure(UiTheme.shown_text(ovr), "OVR", UiTheme.rating_color(ovr), 44))
 	figures.add_child(UiKit.figure(s.club_rules.grade_of(ovr).name, "등급", UiTheme.ACCENT, 44))
 	words.add_child(figures)
-	# The room the scouts see in him (docs/08 R6), and his second-team numbers.
+	# The room the scouts see in him, and his second-team numbers.
 	if s.season_year - p.born <= 27 and p.potential >= 0.0:
 		words.add_child(UiKit.label("잠재력 %s" % Development.stars_text(Development.stars(p, s.club.scout_level if s.club != null else 1)), 17, UiTheme.ACCENT, 600))
 	if kind == "farm" and s.farm != null:
@@ -1385,7 +1386,7 @@ func _build_picked(parent: Control, kind: String, p: Player, s: Season, team: Te
 			actions.add_child(sign)
 
 
-# --- The second team (docs/08 R6) ---
+# --- The second team ---
 
 
 ## The second team: its men with their age, the room the scouts see in them, their numbers in
@@ -1528,7 +1529,7 @@ func _build_farm_table(s: Season, team: Team) -> void:
 			right.body.add_child(UiKit.label("%s (%s)  +%.1f" % [p.name, club.short_name, float(r[2])], 16, UiTheme.GREEN if club.id == team.id else UiTheme.INK, 500))
 
 
-# --- The records room (docs/08 R5) ---
+# --- The records room ---
 
 
 ## The division's leaders in each category (the first five, qualifying men only for rates)
@@ -1626,7 +1627,7 @@ func _build_club_records(parent: Control, s: Season, d: int) -> void:
 	parent.add_child(card)
 
 
-## Comparing two men (docs/08 R5): pin one, pick another, open the two side by side. While
+## Comparing two men: pin one, pick another, open the two side by side. While
 ## one is pinned his name stays in the panel with a way to let him go.
 func _compare_buttons(parent: Control, p: Player, s: Season) -> void:
 	var pinned := find_player(s, _compare_id)
@@ -1665,7 +1666,7 @@ static func find_player(s: Season, id: String) -> Player:
 	return null
 
 
-# --- The line-up and the rotation (docs/08 R5) ---
+# --- The line-up and the rotation ---
 
 
 ## The line-up as a manager sets it (the user: "a big ballpark, the line-up small beside it,
@@ -2028,13 +2029,13 @@ func _lineup_pressed(tag: String, s: Season, team: Team) -> void:
 	refresh()
 
 
-## A league of one season with a club (docs/08 R8-1; the user: "one club, one season, then the
+## A league of one season with a club (the user: "one club, one season, then the
 ## rewards and a new one"): the clubs' first and second teams, no second teams' league.
 static func one_season(s: Season) -> bool:
 	return s.farm == null and s.history == null and s.divisions.size() == 1
 
 
-# --- Trades (docs/08 R8-1; Trade) ---
+# --- Trades (Trade) ---
 
 
 var _trade_club := ""
@@ -2461,8 +2462,17 @@ func play_on_screen() -> void:
 	var d := s.division_of(s.my_team)
 	var post := s.postseason_of(g)
 	var title := league_name(s, d) if post == null else "%s %d차전" % [post.round_name(), g.game_in_series]
-	go(LeagueSession.MATCH, {"away": s.teams[g.away], "home": s.teams[g.home], "title": title,
-		"line": "%d년 시즌 %d일차 · %s" % [s.season_year, s.day + 1, MatchScene.home_def(s.teams[g.home]).name]})
+	var info := {"away": s.teams[g.away], "home": s.teams[g.home], "title": title,
+		"line": "%d년 시즌 %d일차 · %s" % [s.season_year, s.day + 1, MatchScene.home_def(s.teams[g.home]).name]}
+	# Each club's record so far, under its name on the loading screen.
+	for side: int in 2:
+		var id: String = g.away if side == 0 else g.home
+		var division := s.division_of(id)
+		if division >= 0:
+			var r := s.standings[division].row(id)
+			if r != null:
+				info["record%d" % side] = "%d승 %d패 %d무" % [r.wins, r.losses, r.ties]
+	go(LeagueSession.MATCH, info)
 
 
 ## Settles today's game at once.
@@ -2500,7 +2510,7 @@ func _build_all_star(parent: Control, s: Season) -> void:
 			LeagueSession.autosave()
 			refresh(), "fast-forward"))
 	else:
-		var sides := ["드림", "나눔"]
+		var sides := ["청팀", "백팀"]
 		p.body.add_child(UiKit.label("올스타전: %s %d : %d %s" % [sides[0], int(game[0]), int(game[1]), sides[1]], 17, UiTheme.INK, 600))
 	if not LeagueAllStar.derby_over(s):
 		var his := LeagueAllStar.my_derby_man(s)
@@ -2517,6 +2527,18 @@ func _build_all_star(parent: Control, s: Season) -> void:
 		var best := LeagueAllStar.winner(s)
 		var who := LeagueAllStar._find(s, best)
 		p.body.add_child(UiKit.label("홈런 더비 우승: %s (%d개)" % [who.name if who != null else best, int((s.all_star["derby"] as Dictionary).get(best, 0))], 17, UiTheme.INK, 600))
+
+
+## The fans' vote announced as the break begins (AllStarVote): both teams' best twelve, his
+## club's men lit.
+func _announce_all_stars(s: Season) -> void:
+	if DisplayServer.get_name() == "headless" or not is_inside_tree():
+		return
+	var selected: Array[String] = []
+	selected.assign(s.all_star.get("selected", []))
+	var mine := LeagueAllStar.of_my_club(s)
+	var said := "우리 구단 %d명 선정 · 구단 포인트 +%d" % [mine.size(), LeagueAllStar.CLUB_PER_MAN * mine.size()] if not mine.is_empty() else "이번 올스타에는 우리 구단 선수가 뽑히지 못했습니다"
+	AllStarVote.play(self, "%d 올스타 팬 투표 최종 결과" % s.season_year, AllStar.board(s, 0, selected, null, s.my_team), said, s)
 
 
 const ALL_STAR_MATCH := "res://league/all_star_match.tscn"

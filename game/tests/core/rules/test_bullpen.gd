@@ -1,5 +1,5 @@
 extends GutTest
-## The bullpen (docs/08 R4): relievers get ready by throwing while the game goes on, cool off
+## The bullpen: relievers get ready by throwing while the game goes on, cool off
 ## when they stop, and one who comes in before he is ready is wild and a little slow for his
 ## first batters. The computer manager warms the right man before he needs him.
 

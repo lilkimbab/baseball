@@ -1,6 +1,6 @@
 extends SceneTree
 ## Loads every save slot there is and plays each a few days on, in memory only (nothing is
-## written back): do the person's own saves of older games still load and play? (queue stage 1)
+## written back): do the person's own saves of older games still load and play?
 ##
 ##   ./dev tool-win save_check build/saves/check [--days 5]
 

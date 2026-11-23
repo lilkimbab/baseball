@@ -1,6 +1,6 @@
 class_name CareerEvents
 extends RefCounted
-## What happens to a pro career in the season besides the games (docs/08 R8-3; the user, 2026-
+## What happens to a pro career in the season besides the games (the user, 2026-
 ## 11-23): a long stay in the second team brings a talk with the club (a cut in pay coming); a
 ## trade to another club before the deadline (Trade.deadline; never in his first season); a
 ## pitcher picks up a new pitch by himself after a fine outing now and then ("suddenly learned

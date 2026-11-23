@@ -1,5 +1,5 @@
 extends GutTest
-## The player's body against the tables (docs/12 section 4). tools/blender/anthropometry.py
+## The player's body against the tables (docs/09 section 4). tools/blender/anthropometry.py
 ## measures every build as it is made and leaves the numbers beside the model; these tests hold
 ## them to what a ballplayer measures (US Army ANSUR II men, the upper part of its range for
 ## girths). The user: "the head and the body look out of proportion ... the neck looks short".

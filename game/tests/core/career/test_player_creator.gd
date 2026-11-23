@@ -1,5 +1,5 @@
 extends GutTest
-## Making the career player (docs/13 S8-1).
+## Making the career player.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

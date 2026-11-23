@@ -1,6 +1,6 @@
 class_name PlayerCreator
 extends RefCounted
-## Makes the career player from the choices on the creation screen (docs/02 section 6.1):
+## Makes the career player from the choices on the creation screen:
 ## name, number, hands, body and looks, position and type. He starts at second-team level:
 ## every rating at the base, his type's strengths higher and its weak side lower.
 

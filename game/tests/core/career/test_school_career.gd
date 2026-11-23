@@ -1,5 +1,5 @@
 extends GutTest
-## A career begun in high school (docs/08 R8-3): his school's weekend league, its playoff, the
+## A career begun in high school: his school's weekend league, its playoff, the
 ## draft, and into the pros with the club that picked him.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

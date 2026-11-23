@@ -1,6 +1,6 @@
 class_name Commentary
 extends RefCounted
-## The one-line play-by-play (docs/13 S6-7) from templates in data/commentary.ko.json.
+## The one-line play-by-play from templates in data/commentary.ko.json.
 ## Lines use the scorebook's words and, since 2026-11-23, the shapes of real KBO calls (the
 ## user: "more lines, more varied, after real KBO broadcasts, not made up"): where the ball
 ## went and which fielder went back for it, pulled or pushed, the pitch of the at-bat, the
@@ -216,6 +216,11 @@ static func key_for(result: PaResult.Kind, last_call: PitchDuel.Result) -> Strin
 ## lead taken shouted ("hot"); a strikeout, a double play, a jam escaped, a run in lifted
 ## ("warm"); the rest said ("calm").
 static func mood_of(key: String) -> StringName:
+	# (A catch nobody expected is shouted as a home run is; a fly run down at the wall lifted.)
+	if key.begins_with("great_"):
+		return &"hot"
+	if key.begins_with("fly_out_deep"):
+		return &"warm"
 	for hot: String in ["home_run", "walk_off", "grand_slam", "go_ahead", "double", "triple"]:
 		if key.contains(hot) and not key.begins_with("double_play"):
 			return &"hot"

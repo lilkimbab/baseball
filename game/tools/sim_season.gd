@@ -2,7 +2,7 @@ extends SceneTree
 ## Plays a regular season of the roster pack's league (three divisions of ten) with the stat
 ## resolver, as the manager league does it (Season: schedule, rotations, bullpen rest, days
 ## off), and prints for one division the spread of team records and the league leaders next to
-## the S7 targets and the KBO's 2025 figures (docs/13 S7).
+## the S7 targets and the KBO's 2025 figures.
 ##
 ##   godot --headless --path game --script res://tools/sim_season.gd -- --division 2
 ##

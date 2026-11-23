@@ -1,6 +1,6 @@
 class_name HubScreen
 extends Screen
-## Home (docs/05 section 5): the club's best player standing in the park on the left, his
+## Home (docs/04 section 5): the club's best player standing in the park on the left, his
 ## number huge behind him and his name under him; on the right the next game as a match-up
 ## with the way into it, and the four ways to play as picture cards. Everything else is in
 ## the bar along the top.

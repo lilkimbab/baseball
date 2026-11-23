@@ -1,7 +1,7 @@
 class_name StatResolver
 extends Resolver
 ## Plays a game a plate appearance at a time by drawing outcomes from probabilities
-## (docs/03 section 6). Used for games nobody watches and for quick simulation.
+## (docs/02 section 6). Used for games nobody watches and for quick simulation.
 
 var env: LeagueEnv
 var catalog: Dictionary[StringName, PitchType]
@@ -10,7 +10,7 @@ var rng: Rng
 
 ## The running play before this plate appearance has been considered.
 var _running_checked := false
-## The park's effect on this game (docs/13 S17): outcome key ("HR", "1B", "2B", "3B") →
+## The park's effect on this game: outcome key ("HR", "1B", "2B", "3B") →
 ## multiplier, the same for both clubs; empty for a neutral park. A real season's parks give it
 ## (SeasonPack.parks: 잠실 home runs ×0.78, 대구의 새 구장 ×1.40).
 var park: Dictionary = {}
@@ -111,7 +111,7 @@ func _plate_appearance(state: GameState) -> GameEvent:
 
 ## Chance of each LeagueEnv.Outcome for the batter now up against the pitcher now pitching.
 ## Batter and pitcher are combined by odds ratio: each scales the league rate by his own
-## ratings, so two average players give the league average (docs/03 section 6.1).
+## ratings, so two average players give the league average (docs/02 section 6.1).
 func outcome_probabilities(state: GameState) -> PackedFloat64Array:
 	var batting := state.batting_team()
 	var fielding := state.fielding_team()

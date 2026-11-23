@@ -1,5 +1,5 @@
 shader_type spatial;
-// The buildings beyond the park (docs/13 S13-8): boxes wearing photographs of real building
+// The buildings beyond the park: boxes wearing photographs of real building
 // fronts (CC0, ambientCG "Facade" sets), one picture every `tile` metres, tinted a little per
 // building; flat roofs of concrete. When the park's lights are on, windows glow (a
 // photograph of a front at night). Per instance: COLOR the tint, INSTANCE_CUSTOM.xyz the

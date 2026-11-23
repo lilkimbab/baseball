@@ -1,6 +1,6 @@
 class_name PitcherUsage
 extends RefCounted
-## Who pitched when, and so who can pitch today (docs/13 S7-4).
+## Who pitched when, and so who can pitch today.
 ##
 ## - Starters work every fifth or sixth day: they need STARTER_REST days off between starts.
 ## - Relievers: a second day in a row costs them (TIRED, ratings × TIRED_FORM); a third day in

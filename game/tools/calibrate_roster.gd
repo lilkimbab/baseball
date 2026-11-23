@@ -1,5 +1,5 @@
 extends SceneTree
-## Brings a real season's roster pack level with that season (docs/07 4.3 step 3, docs/13 S17).
+## Brings a real season's roster pack level with that season (docs/06 4.3 step 3).
 ##
 ## The league: the builder's ratings are relative to the season's averages, but the engine adds
 ## its own (calibration multipliers, platoon, fatigue, who the managers play), so a league of

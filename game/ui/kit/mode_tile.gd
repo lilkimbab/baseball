@@ -1,6 +1,6 @@
 class_name ModeTile
 extends Button
-## A part of the game as a card (docs/05 section 5): a picture from the game itself, darker
+## A part of the game as a card (docs/04 section 5): a picture from the game itself, darker
 ## toward the foot where its Latin caption (in the part's own colour), its name and a line
 ## about it stand; a tag when something is in progress there. Under the pointer the card
 ## lifts, its edge turns white and the picture brightens. Without a picture (ui/art not made

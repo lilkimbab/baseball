@@ -26,9 +26,9 @@ var forms: Dictionary[String, String] = {}
 ## so, outs. Empty for made-up players.
 var record: Dictionary = {}
 ## &"" for a local player, &"foreign" for one of the club's foreign players, &"asia" for its
-## Asia-quota player (docs/13 S7).
+## Asia-quota player.
 var origin: StringName = &""
-## Room left to grow, in rating points on his main ratings (docs/08 R6, Development): hidden;
+## Room left to grow, in rating points on his main ratings (Development): hidden;
 ## scouts see it as stars. Below zero: not yet given one (an old pack or save).
 var potential := -1.0
 
@@ -100,7 +100,7 @@ func is_foreign() -> bool:
 
 
 ## A copy for one game with his ratings scaled by `factor` (1 as he is; 0.94 for a bad day,
-## 1.06 for a good one, docs/02 section 5.4) and then moved by `deltas` (rating name → points:
+## 1.06 for a good one) and then moved by `deltas` (rating name → points:
 ## contact, power, eye, speed, baserunning, clutch, range, hands, arm, accuracy, control,
 ## composure, stamina, movement, command; velocity in km/h), for traits and team colours.
 ## Pitch speeds drop or rise far less than the ratings: a tired arm loses a km/h or two, not 6%.
@@ -118,7 +118,7 @@ func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	p.forms = forms.duplicate()
 	p.origin = origin
 	p.potential = potential
-	var s := func(v: float, key: String) -> float: return clampf(v * factor + float(deltas.get(key, 0.0)), 1.0, 99.0)
+	var s := func(v: float, key: String) -> float: return clampf(v * factor + float(deltas.get(key, 0.0)), 1.0, maxf(RatingScale.NATURAL, v))
 	var b := BattingRatings.new()
 	b.contact_r = s.call(batting.contact_r, "contact")
 	b.contact_l = s.call(batting.contact_l, "contact")
@@ -128,7 +128,7 @@ func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	b.speed = s.call(batting.speed, "speed")
 	b.baserunning = s.call(batting.baserunning, "baserunning")
 	b.bunt = s.call(batting.bunt, "bunt")
-	b.clutch = clampf(batting.clutch + float(deltas.get("clutch", 0.0)), 1.0, 99.0)
+	b.clutch = clampf(batting.clutch + float(deltas.get("clutch", 0.0)), 1.0, maxf(RatingScale.NATURAL, batting.clutch))
 	p.batting = b
 	var f := FieldingRatings.new()
 	f.range = s.call(fielding.range, "range")
@@ -138,9 +138,9 @@ func with_form(factor: float, deltas: Dictionary[String, float] = {}) -> Player:
 	p.fielding = f
 	if pitching != null:
 		var r := PitchingRatings.new()
-		r.stamina = clampf(pitching.stamina + float(deltas.get("stamina", 0.0)), 1.0, 99.0)
+		r.stamina = clampf(pitching.stamina + float(deltas.get("stamina", 0.0)), 1.0, maxf(RatingScale.NATURAL, pitching.stamina))
 		r.control = s.call(pitching.control, "control")
-		r.composure = clampf(pitching.composure + float(deltas.get("composure", 0.0)), 1.0, 99.0)
+		r.composure = clampf(pitching.composure + float(deltas.get("composure", 0.0)), 1.0, maxf(RatingScale.NATURAL, pitching.composure))
 		r.hold = pitching.hold
 		r.fielding = s.call(pitching.fielding, "fielding")
 		var kmh := (factor - 1.0) * 25.0 + float(deltas.get("velocity", 0.0))

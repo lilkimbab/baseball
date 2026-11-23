@@ -1,5 +1,5 @@
 {
-  "note": "What goes on the uniforms of the made-up league (docs/13 S11-9): each club's nickname and town in Latin letters (KBO clubs wear their nicknames in English at home and their town's or owner's name on the road). The sponsors whose patches the clubs wear are in sponsors.ko.json. A local pack can give a club its own uniform (S18).",
+  "note": "What goes on the uniforms of the made-up league: each club's nickname and town in Latin letters (KBO clubs wear their nicknames in English at home and their town's or owner's name on the road). The sponsors whose patches the clubs wear are in sponsors.ko.json. A local pack can give a club its own uniform (S18).",
   "marks": {
     "시걸스": "Seagulls", "코메츠": "Comets", "팰컨스": "Falcons", "머스탱스": "Mustangs", "스톰즈": "Storms",
     "파이어버즈": "Firebirds", "웨이브스": "Waves", "레드폭스": "Red Foxes", "바이슨스": "Bisons", "크레인즈": "Cranes",

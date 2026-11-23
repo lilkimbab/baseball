@@ -1,5 +1,5 @@
 extends PhysicsTest
-## Pitch flight (docs/04 section 5.3). Expected values are the engine-independent reference
+## Pitch flight (docs/03 section 5.3). Expected values are the engine-independent reference
 ## calculation in prototypes/physics-check (with the seam-shifted wake of the sinker, changeup
 ## and splitter since the approved proposal 1, 2026-11-21: the totals were kept, the spin's
 ## share lowered).

@@ -1,6 +1,6 @@
 class_name Overall
 extends RefCounted
-## One overall number per player (docs/07 section 4.2). Position players are weighted by what
+## One overall number per player (docs/06 section 4.2). Position players are weighted by what
 ## their position asks for; pitchers by stuff, control, speed, breaking balls and staying power.
 
 const ABILITIES: Array[String] = ["contact", "power", "eye", "speed", "baserunning", "range", "hands", "arm", "accuracy"]

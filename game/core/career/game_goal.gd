@@ -1,6 +1,6 @@
 class_name GameGoal
 extends RefCounted
-## The goal for a whole game (docs/02 section 6.3): two hits, an extra-base hit, six innings with
+## The goal for a whole game: two hits, an extra-base hit, six innings with
 ## two runs or fewer, no runs in relief. Set by the player's type (or pitching role) in
 ## data/career.ko.json; worth CareerRules.game_goal_gp in the field it belongs to.
 

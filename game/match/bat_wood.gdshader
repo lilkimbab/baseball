@@ -1,6 +1,6 @@
 shader_type spatial;
 // SEE_THROUGH
-// A bat turned from a billet of ash (docs/12): pale wood whose growth rings run its length,
+// A bat turned from a billet of ash (docs/09): pale wood whose growth rings run its length,
 // showing as long dark lines close together on one side (the edge grain) and broad flames on
 // the face; fine pores along the grain; a satin lacquer; pine tar worked into the handle
 // above the grip. The mesh lies along its y axis, centred, the knob at the bottom

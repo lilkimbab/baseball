@@ -1,5 +1,5 @@
 extends GutTest
-## Game ratings, medals and reward boxes (docs/13 S8-7).
+## Game ratings, medals and reward boxes.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

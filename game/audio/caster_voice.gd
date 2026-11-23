@@ -55,8 +55,8 @@ func _ready() -> void:
 	_thread.start(_work)
 
 
-## Says a line ("hot" for a home run or a long hit, "warm" for a strikeout or a double play
-## out of a jam, "calm" otherwise).
+## Says a line (the mood is passed on; the voice server speaks every line in the one voice the
+## user chose, tools/audio/voice_server.py).
 func say(text: String, mood: StringName = &"calm") -> void:
 	asked.append([text, mood])
 	if url == "" or _thread == null or text.strip_edges() == "":
@@ -114,10 +114,22 @@ func _work() -> void:
 		_mutex.unlock()
 		if item.is_empty():
 			continue
-		_count += 1
-		var file := _dir.path_join("line_%d.ogg" % (_count % 8))
-		var code := OS.execute(_curl(), ["-s", "-f", "-m", "15", "-o", file, "%s/say?mood=%s&text=%s" % [url, item[1], str(item[0]).uri_encode()]])
-		if code == 0 and not _quitting():
+		_fetch(str(item[0]), str(item[1]), "")
+
+
+## Asks for a line (or a part of it) and hands what came to the main thread; nothing came for a
+## part that is empty.
+func _fetch(text: String, mood: String, part: String) -> void:
+	_count += 1
+	var file := _dir.path_join("line_%d.ogg" % (_count % 8))
+	DirAccess.remove_absolute(file)
+	var code := OS.execute(_curl(), ["-s", "-f", "-m", "15", "-o", file, "%s/say?mood=%s%s&text=%s" % [url, mood, part, text.uri_encode()]])
+	if code == 0 and not _quitting() and FileAccess.file_exists(file):
+		var f := FileAccess.open(file, FileAccess.READ)
+		var size := f.get_length() if f != null else 0
+		if f != null:
+			f.close()
+		if size > 0:
 			_loaded.call_deferred(file)
 
 

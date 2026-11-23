@@ -1,5 +1,5 @@
 extends GutTest
-## Save games (docs/13 S9-1): a league season and a career saved mid-way load back and go on
+## Save games: a league season and a career saved mid-way load back and go on
 ## exactly as they would have.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

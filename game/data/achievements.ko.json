@@ -64,6 +64,8 @@
     {"id": "big_game", "name": "인생 경기", "about": "경기 평점 9.0 이상", "category": "career", "tier": 1, "key": "big_game", "target": 1},
     {"id": "evolve", "name": "진화", "about": "구종 진화", "category": "career", "tier": 1, "key": "evolve", "target": 1},
     {"id": "ovr_80", "name": "프랜차이즈 스타", "about": "커리어 선수 OVR 80", "category": "career", "tier": 2, "key": "ovr_80", "target": 1},
+    {"id": "first_ball", "name": "첫 기념구", "about": "커리어 선수의 1군 첫 기념구 받기", "category": "career", "tier": 0, "key": "milestone_balls", "target": 1},
+    {"id": "ball_shelf", "name": "기념구 진열장", "about": "커리어 선수의 기념구 10개 모으기", "category": "career", "tier": 2, "key": "milestone_balls", "target": 10},
 
     {"id": "first_buy", "name": "첫 쇼핑", "about": "상점에서 처음 구매", "category": "shop", "tier": 0, "key": "bought", "target": 1},
     {"id": "elite_gear", "name": "엘리트", "about": "엘리트 장비 갖추기", "category": "shop", "tier": 1, "key": "elite", "target": 1},

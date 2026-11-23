@@ -1,15 +1,14 @@
-"""The play-by-play caster's voice for the game, served on this machine (the user, 2026-11-23:
-the M3 voice, a male caster with the tension of a KBO broadcast, numbers read as a broadcast
-reads them). The game sends a line and how excited it is; this speaks it with Supertonic 3
-(M3), reads its numbers as a KBO caster would (korean_numbers.py), lifts it by the moment
-(hype.py: faster, higher, louder toward the end on a home run or a long hit), gives it a
-broadcast microphone's sound, and answers with an OGG. Lines already spoken are kept
-(content-local/audio/voice_cache/) and answered at once.
+"""The play-by-play caster's voice for the game, served on this machine. The voice is the
+"남자_M3" sample the user chose (2026-11-23: "M3 is best, it sounds least like an AI — fix only
+the reading of numbers, never touch the voice, and use it for every line"): Supertonic 3's M3,
+ten steps at speed 1.18; a line with "!" a touch faster (×1.08) and higher (3%, +1.6 dB), as that
+sample had; the broadcast microphone's band after it. Numbers are read as a KBO broadcast reads
+them (korean_numbers.py). Lines already spoken are kept (content-local/audio/voice_cache/).
 
     .tools/supertonic-src/py/.venv/bin/python tools/audio/voice_server.py [--port 8765]
 
     GET /ping                         -> "ok"
-    GET /say?text=...&mood=hot|warm|calm  -> audio/ogg
+    GET /say?text=...&mood=...        -> audio/ogg (the mood is not used: one voice for all)
 """
 import hashlib
 import io
@@ -27,12 +26,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 FFMPEG = os.path.join(ROOT, ".tools", "ffmpeg", "node_modules", "ffmpeg-static", "ffmpeg")
 CACHE = os.path.join(ROOT, "content-local", "audio", "voice_cache")
 VOICE = "M3"
+## As the chosen sample: the model's steps, its speed, and for a line with "!" the touch faster
+## and higher it was given there.
+STEPS = 10
 SPEED = 1.18
-STEPS = 6
-# Semitones up, tempo, the voice's edge, by how excited the line is (as announcer_voice.py).
-MOODS = {"hot": (3.0, 1.12, "equalizer=f=3200:t=q:w=1.2:g=5,asoftclip=type=tanh:threshold=0.7,"),
-         "warm": (1.5, 1.07, "equalizer=f=3000:t=q:w=1.2:g=3,"),
-         "calm": (0.5, 1.03, "")}
+EXCITED_SPEED = 1.08
+EXCITED_LIFT = 1.03
+EXCITED_GAIN_DB = 1.6
+# Version of the sound, in the cache key: a change to it makes the lines again.
+SOUND = 4
 CAST = "highpass=f=120,lowpass=f=7500,acompressor=threshold=-22dB:ratio=4:attack=4:release=90:makeup=5,aecho=0.7:0.5:22|41:0.12|0.07"
 
 _lock = threading.Lock()
@@ -47,42 +49,42 @@ def _load():
     _style = load_voice_style([os.path.join(ST, "assets", "voice_styles", VOICE + ".json")])
 
 
-def speak(text, mood):
-    """The line as an OGG (bytes), from the cache or made now."""
+def speak(text, mood="calm", part=None):
+    """The line as an OGG (bytes), from the cache or made now. (`mood` and `part` are what older
+    games ask with; one voice serves every line, and part 1 is always empty.)"""
     import numpy as np
     import soundfile as sf
     from korean_numbers import say
-    mood = mood if mood in MOODS else "calm"
-    key = hashlib.md5(("%s|%s|%s|%.2f" % (VOICE, mood, text, SPEED)).encode("utf-8")).hexdigest()
+    if part == 1:
+        return b""
+    key = hashlib.md5(("%s|%s|%d" % (VOICE, text, SOUND)).encode("utf-8")).hexdigest()
     path = os.path.join(CACHE, key + ".ogg")
     if os.path.exists(path):
         with open(path, "rb") as f:
             return f.read()
-    steps_up, tempo, edge = MOODS[mood]
+    excited = "!" in text
     with _lock:
-        wav, _ = _tts(say(text), "ko", _style, STEPS, SPEED)
+        np.random.seed(int(hashlib.md5(text.encode("utf-8")).hexdigest()[:8], 16))
+        wav, _ = _tts(say(text), "ko", _style, STEPS, SPEED * (EXCITED_SPEED if excited else 1.0))
     y = np.asarray(wav[0] if getattr(wav, "ndim", 1) > 1 else wav, dtype=np.float32)
     sr = _tts.sample_rate
-    y = y * (0.95 / (np.max(np.abs(y)) or 1.0))
     buf = io.BytesIO()
     sf.write(buf, y, sr, format="WAV")
     os.makedirs(CACHE, exist_ok=True)
-    # Higher and faster by the moment (the rate raises the pitch; the tempo puts the pace right),
-    # louder toward the end on an excited line, then the broadcast's sound.
-    rate = 2.0 ** (steps_up / 12.0)
-    lift = "asetrate=%d,aresample=%d,atempo=%.4f," % (int(sr * rate), sr, tempo / rate)
-    swell = "volume='0.8+0.35*t/%.2f':eval=frame," % max(len(y) / sr / tempo, 0.5) if steps_up >= 1.5 else ""
-    out = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-f", "wav", "-i", "pipe:0", "-af", "%s%s%s%s,aresample=44100,apad=pad_dur=0.25" % (lift, swell, edge, CAST),
-                          "-ac", "1", "-c:a", "libvorbis", "-q:a", "5", "-f", "ogg", path], input=buf.getvalue(), capture_output=True)
+    lift = "asetrate=%d,aresample=%d,volume=%.1fdB," % (int(sr * EXCITED_LIFT), sr, EXCITED_GAIN_DB) if excited else ""
+    made = "%s.%d.tmp" % (path, threading.get_ident())
+    out = subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-f", "wav", "-i", "pipe:0", "-af", "%s%s,aresample=44100,apad=pad_dur=0.25" % (lift, CAST),
+                          "-ac", "1", "-c:a", "libvorbis", "-q:a", "5", "-f", "ogg", made], input=buf.getvalue(), capture_output=True)
     if out.returncode != 0:
         raise RuntimeError(out.stderr.decode("utf-8", "replace"))
+    os.replace(made, path)
     with open(path, "rb") as f:
         return f.read()
 
 
 COMMENTARY = os.path.join(ROOT, "game", "data", "commentary.ko.json")
 POSITIONS = ["투수", "포수", "1루수", "2루수", "3루수", "유격수", "좌익수", "중견수", "우익수"]
-CALL_MOODS = {"call_deep": "hot", "call_gap": "hot", "call_single": "warm", "call_infield": "warm"}
+CALL_MOODS = {"call_deep": "build", "call_gap": "build", "call_single": "warm", "call_infield": "warm"}
 
 
 def direction_slots(direction, bats_left):
@@ -143,7 +145,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(400, b"no text", "text/plain")
                 return
             try:
-                self._send(200, speak(text, (q.get("mood") or ["calm"])[0]), "audio/ogg")
+                part = (q.get("part") or [""])[0]
+                self._send(200, speak(text, (q.get("mood") or ["calm"])[0], int(part) if part in ("0", "1") else None), "audio/ogg")
             except Exception as e:  # noqa: BLE001  (the game falls back to silence)
                 self._send(500, str(e).encode("utf-8"), "text/plain")
             return
@@ -164,14 +167,15 @@ def main():
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
     _load()
-    # The calls the game makes as a ball goes (the call_* lines of the commentary file, for every
-    # direction and either side of the plate), ready before they are asked.
+    # Ready before they are asked: the calls the game makes as a ball goes (the call_* lines of
+    # the commentary file, for every direction and either side of the plate).
     def warm():
-        for text, mood in calls():
-            try:
+        try:
+            for text, mood in calls():
                 speak(text, mood)
-            except Exception as e:  # noqa: BLE001
-                print("voice_server: warm-up:", e, flush=True)
+            print("voice_server: calls ready", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print("voice_server: warm-up:", e, flush=True)
     threading.Thread(target=warm, daemon=True).start()
     print("voice_server: %s on 127.0.0.1:%d" % (VOICE, port), flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

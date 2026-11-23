@@ -1,7 +1,7 @@
 class_name PhysicsTest
 extends GutTest
 ## Shared helpers for the physics regression tests. Target ranges are the verification table
-## in docs/04-physics.md, section 12.
+## in docs/03-physics.md, section 12.
 
 const RELEASE := Vector3(-0.55, 16.76, 1.80)
 const PLATE_TARGET := Vector3(0.0, Field.PLATE_FRONT_Y, 0.75)

@@ -1,6 +1,6 @@
 class_name RunningPlay
 extends RefCounted
-## Steals and pickoffs laid out as plays to show (docs/13 S12). The game settles them between
+## Steals and pickoffs laid out as plays to show. The game settles them between
 ## pitches (PhysicalResolver.before_pitch); this says who goes where and when, so the match
 ## scene can play them like a batted ball: the pitch or the pickoff throw, the catcher's throw,
 ## the man covering the bag, the runner's slide and the umpire's call.

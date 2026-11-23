@@ -1,6 +1,6 @@
 class_name ManagerMatch
 extends MatchScene
-## 감독 지휘 (docs/02 sections 3 and 4.3–4.4, docs/05 sections 2.5 and 3.5, docs/13 S7-6): the
+## 감독 지휘 (–4.4, docs/04 sections 2.5 and 3.5): the
 ## computer plays both sides while the player manages one.
 ##
 ## - Plate appearances go by in summary on the situation board: pitches that decide nothing

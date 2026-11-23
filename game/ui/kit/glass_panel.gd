@@ -1,6 +1,6 @@
 class_name GlassPanel
 extends PanelContainer
-## A panel of the menus (docs/05 section 5): graphite glass with two corners cut on the slant
+## A panel of the menus (docs/04 section 5): graphite glass with two corners cut on the slant
 ## (ui/kit/plate.gdshader). With a title it has a head row — an icon in the colour of the part
 ## of the game it belongs to, the title, a small Latin caption, room on the right for buttons —
 ## over a thin rule. Screens put their rows into `body`.

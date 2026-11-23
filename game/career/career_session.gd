@@ -36,7 +36,7 @@ static func start(c: CareerPlayer, team_id: String, games: int, seed_value: int,
 	slot = "career_%s" % c.player.id
 
 
-## A new career from high school (docs/08 R8-3): his third year at `school_id` in its weekend
+## A new career from high school: his third year at `school_id` in its weekend
 ## league; after it the draft decides his club. `games` is the length of his pro seasons.
 static func start_school(c: CareerPlayer, school_id: String, games: int, seed_value: int) -> void:
 	season = SchoolLeague.season_for(c, school_id, LeagueSession.league_year(), seed_value)
@@ -201,7 +201,7 @@ static func next_season(fa_club: String = "") -> void:
 	last_report = null
 
 
-## He retires (queue stage 5; in a winter, after the winter's business): his last season into
+## He retires (in a winter, after the winter's business): his last season into
 ## his record, the hall of fame's marks checked (he goes in or not), the career closed. Returns
 ## [first-team batting, pitching, the marks met, titles].
 static func retire() -> Array:

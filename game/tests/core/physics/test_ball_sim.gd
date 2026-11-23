@@ -1,5 +1,5 @@
 extends PhysicsTest
-## Free flight and bounces (docs/04 sections 4 and 8).
+## Free flight and bounces (docs/03 sections 4 and 8).
 
 
 ## Flies a batted ball until it comes down. Returns (carry m, hang time s).

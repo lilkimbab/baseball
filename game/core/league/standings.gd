@@ -1,6 +1,6 @@
 class_name Standings
 extends RefCounted
-## A division's table (docs/13 S7-2). Ranked by winning percentage with ties left out (wins
+## A division's table. Ranked by winning percentage with ties left out (wins
 ## over wins and losses, the KBO way); clubs level on percentage are split by their games
 ## against each other, then run difference, then by name so the order is always the same.
 

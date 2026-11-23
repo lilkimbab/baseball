@@ -1,5 +1,5 @@
 extends PhysicsTest
-## Bat-ball collision (docs/04 section 7.3): pitch 128 km/h at the plate descending 6 degrees,
+## Bat-ball collision (docs/03 section 7.3): pitch 128 km/h at the plate descending 6 degrees,
 ## bat 115 km/h, attack angle +8 degrees, contact at the sweet spot.
 
 const ATTACK := deg_to_rad(8.0)

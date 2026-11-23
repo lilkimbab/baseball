@@ -1,6 +1,6 @@
 class_name PostGame
 extends HudCanvas
-## After the game (docs/13 S6-10; the user, 2026-11-23: "too plain: richer, and show what the
+## After the game (the user, 2026-11-23: "too plain: richer, and show what the
 ## game paid"): the final score large between the two clubs with the result for the person's
 ## side, the line score with runs, hits, errors and walks, the player of the game on a card
 ## with his face, the winning, losing and saving pitchers with their lines, each side's best

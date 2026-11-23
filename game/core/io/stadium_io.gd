@@ -1,6 +1,6 @@
 class_name StadiumIO
 extends RefCounted
-## Reads ballpark definitions from data/stadiums (docs/13 S13-1).
+## Reads ballpark definitions from data/stadiums.
 
 const DIR := "res://data/stadiums"
 ## The park used when none is named: the large symmetric one.

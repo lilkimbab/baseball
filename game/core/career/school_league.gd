@@ -1,6 +1,6 @@
 class_name SchoolLeague
 extends RefCounted
-## The high-school league a career begins in (docs/08 R8-3; the user, 2026-11-23: "a third
+## The high-school league a career begins in (the user, 2026-11-23: "a third
 ## tier, a high-school league: real school names, students made up with common names, below the
 ## pros in skill, the user's player too"). His school's weekend league (주말리그: the schools of
 ## his region, data/schools.ko.json) is a short season, then its best play off for the

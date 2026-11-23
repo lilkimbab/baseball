@@ -1,6 +1,6 @@
 class_name HallOfFame
 extends RefCounted
-## The hall of fame of the person's own careers (queue stage 5): a retired career player goes
+## The hall of fame of the person's own careers: a retired career player goes
 ## in when his first-team career meets one of the marks below; the list outlives each career
 ## (kept beside the profile, user://hall_of_fame.json).
 ##

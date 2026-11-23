@@ -1,7 +1,7 @@
 extends SceneTree
 ## Photographs a player standing, turned to several angles side by side without perspective:
 ## a tailor's view of the figure, for checking proportions and the cut of the uniform against
-## photographs (docs/12 section 4, docs/13 S11).
+## photographs (docs/09 section 4).
 ##
 ##   ./dev tool-win figure_shots build/figure/now [--build standard] [--team 22] [--away]
 ##       [--headgear cap|helmet|none] [--height 1.83] [--views 0,35,90,180] [--pose standing|stance|ready]

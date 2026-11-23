@@ -1,5 +1,5 @@
 extends PlayTest
-## The player's choices in a ball in play (docs/05 2.3, 2.4; docs/13 S12): the base the
+## The player's choices in a ball in play (docs/04 2.3, 2.4): the base the
 ## fielder throws to and how hard, and the runners going or holding.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")

@@ -1,5 +1,5 @@
 extends GutTest
-## The manager mode headless (docs/13 S7-6): summary plate appearances, key moments played out,
+## The manager mode headless: summary plate appearances, key moments played out,
 ## orders, reservations, interventions and skipping.
 
 const SCENE := preload("res://match/manager_match.tscn")

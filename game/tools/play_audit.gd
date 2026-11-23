@@ -1,5 +1,5 @@
 extends SceneTree
-## Looks for faults in how balls in play are shown (docs/13 S12): plays the match scene frame
+## Looks for faults in how balls in play are shown: plays the match scene frame
 ## by frame, as it is drawn, and counts the things that should never be seen. Each is listed
 ## with how often it happened and a few of the places (play number, who, when), so it can be
 ## found again with the same seed.

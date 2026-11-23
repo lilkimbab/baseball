@@ -1,5 +1,5 @@
 extends GutTest
-## The crowd (docs/13 S14): in the seats the park lays out, three levels of detail, the club
+## The crowd: in the seats the park lays out, three levels of detail, the club
 ## colours in the cheering sections, and only the batting side's section on its feet.
 
 const MATCH := preload("res://match/match.tscn")

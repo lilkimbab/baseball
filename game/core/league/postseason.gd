@@ -1,6 +1,6 @@
 class_name Postseason
 extends RefCounted
-## A league's postseason: a ladder (docs/02 section 4.1, docs/13 S7-7, S17). The lowest two
+## A league's postseason: a ladder. The lowest two
 ## seeds play the first round, the winner goes up a rung to the next seed, and so on to the
 ## final against the first seed. What the rounds are is a format:
 ##

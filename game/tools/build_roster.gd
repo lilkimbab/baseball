@@ -1,5 +1,5 @@
 extends SceneTree
-## Builds a roster pack from a season's records in CSV files (docs/13 S17): RosterBuilder runs
+## Builds a roster pack from a season's records in CSV files: RosterBuilder runs
 ## the match engine's formula backwards so that the pack plays that season again. The files
 ## (UTF-8, a header row, columns in any order; columns in brackets may be left out):
 ##

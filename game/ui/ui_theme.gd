@@ -1,13 +1,13 @@
 class_name UiTheme
 extends RefCounted
-## The look of every screen (docs/05 section 3.1, docs/13 S6-1): one place for the fonts,
+## The look of every screen (docs/04 section 3.1): one place for the fonts,
 ## colours and sizes, so the HUD and the menus agree. Sizes are given for a 1080-line
 ## screen and scaled to the window, so 720p shows the same layout smaller.
 ##
 ## Fonts: Paperlogy (text and headings) and Barlow Condensed (numbers, Latin), both SIL Open
 ## Font License 1.1; licence texts in ui/fonts/.
 
-## The HUD's plates: the menus' graphite (docs/05 section 5), a little more see-through over
+## The HUD's plates: the menus' graphite (docs/04 section 5), a little more see-through over
 ## the field.
 const PANEL := Color(0.085, 0.09, 0.11, 0.88)
 const PANEL_DARK := Color(0.045, 0.048, 0.06, 0.92)
@@ -87,7 +87,7 @@ static func font(weight: int = 600) -> Font:
 	return loaded
 
 
-## A face for a place in the game (docs/05 section 5; the user: "the same font is used
+## A face for a place in the game (docs/04 section 5; the user: "the same font is used
 ## everywhere: find the right one for each situation"). Real broadcasts, scoreboards and
 ## advertising each have their own lettering, and the game reads as one flat layer without it:
 ##   &"menu"       the menus (NEXON Lv.2 Gothic, headings in Giants Bold)
@@ -153,7 +153,7 @@ static func pitch_color(family: StringName) -> Color:
 	return FASTBALL
 
 
-# --- Menus (docs/05 section 5; the fourth look: graphite over the ballpark, one brand red,
+# --- Menus (docs/04 section 5; the fourth look: graphite over the ballpark, one brand red,
 # white type, corners cut on the slant — colour comes from the clubs and the pictures) ---
 
 ## The brand colour: main actions, what is chosen, small marks. Gold stays for points and grades.
@@ -184,14 +184,35 @@ const MARGIN := 48.0
 const PLATES := {
 	"panel": {"cut": 14.0, "top": Color(0.105, 0.112, 0.135, 0.9), "bottom": Color(0.055, 0.06, 0.075, 0.93), "border": Color(1.0, 1.0, 1.0, 0.13), "shadow": 0.5},
 	"well": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.05), "bottom": Color(1.0, 1.0, 1.0, 0.03), "border": Color(1.0, 1.0, 1.0, 0.07)},
-	"button": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.11), "bottom": Color(1.0, 1.0, 1.0, 0.06), "border": Color(1.0, 1.0, 1.0, 0.24)},
-	"button_hover": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.97), "bottom": Color(0.9, 0.9, 0.92, 0.97), "border": Color(1.0, 1.0, 1.0, 1.0), "dark": 1.0},
-	"button_down": {"radius": 2.0, "top": Color(0.72, 0.72, 0.75, 0.97), "bottom": Color(0.82, 0.82, 0.85, 0.97), "border": Color(1.0, 1.0, 1.0, 1.0), "dark": 1.0},
-	"button_off": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.04), "bottom": Color(1.0, 1.0, 1.0, 0.03), "border": Color(1.0, 1.0, 1.0, 0.08)},
-	"primary": {"radius": 2.0, "cut": 10.0, "top": Color(0.93, 0.17, 0.2, 1.0), "bottom": Color(0.74, 0.08, 0.12, 1.0), "border": Color(1.0, 0.45, 0.45, 0.55), "shadow": 0.35},
-	"primary_hover": {"radius": 2.0, "cut": 10.0, "top": Color(1.0, 0.3, 0.32, 1.0), "bottom": Color(0.86, 0.13, 0.17, 1.0), "border": Color(1.0, 1.0, 1.0, 0.95), "border_width": 2.0, "shadow": 0.35},
-	"primary_down": {"radius": 2.0, "cut": 10.0, "top": Color(0.62, 0.06, 0.1, 1.0), "bottom": Color(0.78, 0.1, 0.14, 1.0), "border": Color(1.0, 0.45, 0.45, 0.55)},
-	"primary_off": {"radius": 2.0, "cut": 10.0, "top": Color(0.36, 0.2, 0.21, 0.8), "bottom": Color(0.28, 0.15, 0.16, 0.8), "border": Color(1.0, 1.0, 1.0, 0.1)},
+	# An ordinary button: an outline on a slant; under the pointer its screen's colour sweeps in
+	# from the left (GameButton), a press darkens it.
+	"button": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.075), "bottom": Color(1.0, 1.0, 1.0, 0.03), "border": Color(1.0, 1.0, 1.0, 0.32), "border_width": 1.2, "gloss": 0.2},
+	"button_hover": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.1), "bottom": Color(1.0, 1.0, 1.0, 0.05), "border": Color(1.0, 1.0, 1.0, 0.95), "border_width": 1.6, "gloss": 0.3, "glow": 0.12, "glow_color": Color(1.0, 1.0, 1.0, 1.0)},
+	"button_down": {"radius": 1.0, "skew": 10.0, "top": Color(0.0, 0.0, 0.0, 0.3), "bottom": Color(0.0, 0.0, 0.0, 0.2), "border": Color(1.0, 1.0, 1.0, 0.8), "border_width": 1.6},
+	"button_off": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.03), "bottom": Color(1.0, 1.0, 1.0, 0.02), "border": Color(1.0, 1.0, 1.0, 0.1), "border_width": 1.0},
+	# A screen's main action: the brand red on a steeper slant, glossed; light passes over it
+	# under the pointer.
+	"primary": {"radius": 1.0, "skew": 16.0, "top": Color(0.95, 0.19, 0.22, 1.0), "bottom": Color(0.72, 0.07, 0.11, 1.0), "border": Color(1.0, 0.5, 0.5, 0.6), "shadow": 0.4, "gloss": 0.5},
+	"primary_hover": {"radius": 1.0, "skew": 16.0, "top": Color(1.0, 0.3, 0.32, 1.0), "bottom": Color(0.84, 0.12, 0.16, 1.0), "border": Color(1.0, 1.0, 1.0, 0.95), "border_width": 2.0, "shadow": 0.4, "gloss": 0.55, "glow": 0.3, "glow_color": Color(1.0, 0.25, 0.25, 1.0)},
+	"primary_down": {"radius": 1.0, "skew": 16.0, "top": Color(0.6, 0.06, 0.1, 1.0), "bottom": Color(0.76, 0.1, 0.14, 1.0), "border": Color(1.0, 0.45, 0.45, 0.55)},
+	"primary_off": {"radius": 1.0, "skew": 16.0, "top": Color(0.36, 0.2, 0.21, 0.8), "bottom": Color(0.28, 0.15, 0.16, 0.8), "border": Color(1.0, 1.0, 1.0, 0.1)},
+	# A reward or a purchase: gold, dark words, light passing over it.
+	"gold": {"radius": 1.0, "skew": 16.0, "top": Color(1.0, 0.87, 0.45, 1.0), "bottom": Color(0.86, 0.6, 0.14, 1.0), "border": Color(1.0, 0.96, 0.75, 0.85), "shadow": 0.4, "gloss": 0.6, "dark": 1.0},
+	"gold_hover": {"radius": 1.0, "skew": 16.0, "top": Color(1.0, 0.93, 0.6, 1.0), "bottom": Color(0.95, 0.7, 0.2, 1.0), "border": Color(1.0, 1.0, 1.0, 1.0), "border_width": 2.0, "shadow": 0.4, "gloss": 0.65, "glow": 0.3, "glow_color": Color(1.0, 0.8, 0.3, 1.0), "dark": 1.0},
+	"gold_down": {"radius": 1.0, "skew": 16.0, "top": Color(0.78, 0.55, 0.12, 1.0), "bottom": Color(0.9, 0.66, 0.2, 1.0), "border": Color(1.0, 0.9, 0.6, 0.8), "dark": 1.0},
+	"gold_off": {"radius": 1.0, "skew": 16.0, "top": Color(0.4, 0.34, 0.2, 0.8), "bottom": Color(0.32, 0.27, 0.16, 0.8), "border": Color(1.0, 1.0, 1.0, 0.1)},
+	# Something that cannot be undone (leave the game, delete, retire): an outline that turns
+	# red under the pointer.
+	"danger": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.05), "bottom": Color(1.0, 1.0, 1.0, 0.02), "border": Color(1.0, 0.55, 0.55, 0.35), "border_width": 1.2},
+	"danger_hover": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.05), "bottom": Color(1.0, 1.0, 1.0, 0.02), "border": Color(1.0, 0.6, 0.6, 1.0), "border_width": 1.6, "glow": 0.18, "glow_color": Color(1.0, 0.2, 0.2, 1.0)},
+	"danger_down": {"radius": 1.0, "skew": 10.0, "top": Color(0.4, 0.0, 0.0, 0.5), "bottom": Color(0.3, 0.0, 0.0, 0.4), "border": Color(1.0, 0.6, 0.6, 0.9), "border_width": 1.6},
+	"danger_off": {"radius": 1.0, "skew": 10.0, "top": Color(1.0, 1.0, 1.0, 0.03), "bottom": Color(1.0, 1.0, 1.0, 0.02), "border": Color(1.0, 1.0, 1.0, 0.1)},
+	# A line of a big menu (the title): words on a dark slant with a light stripe at its left;
+	# under the pointer the red sweeps in and the words step right.
+	"menu": {"radius": 0.0, "skew": 22.0, "top": Color(0.0, 0.0, 0.0, 0.42), "bottom": Color(0.0, 0.0, 0.0, 0.3), "border": Color(1.0, 1.0, 1.0, 0.0), "border_width": 0.0, "accent_width": 5.0, "accent_color": Color(1.0, 1.0, 1.0, 0.4)},
+	"menu_hover": {"radius": 0.0, "skew": 22.0, "top": Color(0.0, 0.0, 0.0, 0.5), "bottom": Color(0.0, 0.0, 0.0, 0.4), "border": Color(1.0, 1.0, 1.0, 0.0), "border_width": 0.0, "accent_width": 7.0, "accent_color": Color(1.0, 1.0, 1.0, 1.0), "glow": 0.15, "glow_color": Color(0.9, 0.15, 0.2, 1.0)},
+	"menu_down": {"radius": 0.0, "skew": 22.0, "top": Color(0.4, 0.04, 0.07, 0.9), "bottom": Color(0.3, 0.03, 0.05, 0.9), "border": Color(1.0, 1.0, 1.0, 0.0), "border_width": 0.0, "accent_width": 7.0, "accent_color": Color(1.0, 1.0, 1.0, 1.0)},
+	"menu_off": {"radius": 0.0, "skew": 22.0, "top": Color(0.0, 0.0, 0.0, 0.25), "bottom": Color(0.0, 0.0, 0.0, 0.2), "border": Color(1.0, 1.0, 1.0, 0.0), "border_width": 0.0},
 	"segment": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.04), "bottom": Color(1.0, 1.0, 1.0, 0.04), "border": Color(1.0, 1.0, 1.0, 0.2)},
 	"segment_hover": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.16), "bottom": Color(1.0, 1.0, 1.0, 0.12), "border": Color(1.0, 1.0, 1.0, 0.6)},
 	"segment_on": {"radius": 2.0, "top": Color(1.0, 1.0, 1.0, 0.98), "bottom": Color(0.9, 0.9, 0.92, 0.98), "border": Color(1.0, 1.0, 1.0, 1.0), "dark": 1.0},
@@ -207,7 +228,6 @@ const PLATES := {
 }
 
 
-## A rating's colour, by tier: below 50 plain, 50 green, 65 blue, 80 gold, 90 red.
 ## A rating as the screens show it (the user: "OVR is too low on average; compare with 2K14,
 ## but not the same"). The engine's ratings run 20..99 with the league's average at 50; shown,
 ## the average player reads 68, a good one in the 70s and low 80s, a star the high 80s and
@@ -216,6 +236,9 @@ const PLATES := {
 static func shown(value: float) -> float:
 	if value <= 65.0:
 		return maxf(value + 18.0, 1.0)
+	if value > RatingScale.NATURAL:
+		# Past the natural top (a special man, a career built to the limit): one for one, to 130.
+		return minf(value, RatingScale.MAX)
 	return minf(83.0 + (value - 65.0) * 16.0 / 34.0, 99.0)
 
 
@@ -223,16 +246,31 @@ static func shown_text(value: float) -> String:
 	return "%d" % roundi(shown(value))
 
 
+## A rating's colour by the tier of the number shown, each stat its own (the user,
+## 2026-11-23: "the lowest a dark black, up to gold and diamond, red, green and blue between"):
+## below 60 black, 60s red, 70s green, 80s blue, 90s gold, 100 and over diamond (only a
+## special man or a career built to the limit gets there: MAX_SHOWN). Takes the engine's value,
+## like `shown`. A black number carries a light edge (`ink_edge`) to be read on the dark plates.
+const TIERS: Array = [[100.0, Color(0.62, 0.95, 1.0)], [90.0, Color(1.0, 0.78, 0.22)], [80.0, Color(0.32, 0.6, 1.0)], [70.0, Color(0.34, 0.82, 0.4)], [60.0, Color(0.93, 0.29, 0.29)], [0.0, Color(0.1, 0.105, 0.12)]]
+## The radar's shape, the same for every man whatever his club (the user, 2026-11-23).
+const RADAR := Color(0.92, 0.95, 1.0)
+## What a pitcher has left, in one colour however much (the user, 2026-11-23: "one fitting
+## solid colour, kept"): a silver-white apart from the ratings' tiers.
+const STAMINA := Color(0.86, 0.89, 0.94)
+
+
+## The edge for ink too dark to read on the menus' and the broadcast's dark plates (the
+## black tier), or clear.
+static func ink_edge(colour: Color) -> Color:
+	return Color(0.86, 0.88, 0.92, 0.9 * colour.a) if colour.get_luminance() < 0.2 else Color(0.0, 0.0, 0.0, 0.0)
+
+
 static func rating_color(value: float) -> Color:
-	if value >= 90.0:
-		return Color(1.0, 0.42, 0.4)
-	if value >= 80.0:
-		return Color(1.0, 0.8, 0.28)
-	if value >= 65.0:
-		return Color(0.4, 0.8, 1.0)
-	if value >= 50.0:
-		return Color(0.5, 0.9, 0.55)
-	return Color(0.72, 0.78, 0.88)
+	var s := shown(value)
+	for tier: Array in TIERS:
+		if s >= float(tier[0]):
+			return tier[1]
+	return TIERS[-1][1]
 
 
 ## The heading face: Paperlogy ExtraBold (titles, buttons, names).

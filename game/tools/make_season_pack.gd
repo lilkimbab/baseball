@@ -1,5 +1,5 @@
 extends SceneTree
-## Makes the game's example season pack (docs/08 R7): the fictional top division played out
+## Makes the game's example season pack: the fictional top division played out
 ## once as "what really happened", written in the season pack format with three scenarios.
 ## Real seasons come from S17's collector into content-local/seasons/; this one only shows the
 ## format and lets the mode be played without them.

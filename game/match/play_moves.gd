@@ -1,6 +1,6 @@
 class_name PlayMoves
 extends RefCounted
-## What each fielder and runner does at each moment of a play (docs/13 S12), read off the
+## What each fielder and runner does at each moment of a play, read off the
 ## play's timeline: who first gets to the ball and at what height, who throws when and where
 ## to, who receives each throw, which runner slides into which base. MatchScene turns these
 ## into poses.

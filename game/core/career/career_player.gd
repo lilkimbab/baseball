@@ -1,6 +1,6 @@
 class_name CareerPlayer
 extends RefCounted
-## The player of the career mode (docs/02 section 6): the Player himself and what the career
+## The player of the career mode: the Player himself and what the career
 ## keeps about him — his position and type, his club and whether he is on its first team,
 ## growth points per field, popularity, how he looks, and how often he has thrown each pitch.
 
@@ -35,6 +35,8 @@ var free_agent_done := false
 ## Not kept by his club this winter (CareerContract): another club signs him.
 var released := false
 var seasons: Array = []
+## His commemorative balls (Milestones): [id, year, day, the opponent], in the order reached.
+var milestones: Array = []
 ## His games of the seasons gone, each [year, day, opponent, home, result, kind, numbers,
 ## where] (GameLog with the year in front); this season's are on the season.
 var game_log: Array = []

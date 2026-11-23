@@ -1,6 +1,6 @@
 class_name SurfaceParams
 extends RefCounted
-## How the ball reacts to one kind of surface (docs/04, section 8.2).
+## How the ball reacts to one kind of surface (docs/03, section 8.2).
 
 ## Normal restitution: fraction of the approach speed kept after a bounce.
 var restitution := 0.45

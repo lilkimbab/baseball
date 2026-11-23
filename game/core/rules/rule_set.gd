@@ -1,6 +1,6 @@
 class_name RuleSet
 extends RefCounted
-## Rules a game is played under. Defaults are the KBO's for 2026 (docs/12 section 5).
+## Rules a game is played under. Defaults are the KBO's for 2026 (docs/09 section 5).
 
 var innings := 9
 ## Last inning played before a tie is called. 0 = play until someone wins.

@@ -1,6 +1,6 @@
 extends GutTest
 ## The physical resolver: pitch-by-pitch games, the extra pitch results and the pitcher and
-## batter AI (docs/13 S5-1, S5-8, S5-9).
+## batter AI.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

@@ -1,5 +1,5 @@
 extends SceneTree
-## Photographs the menu screens (docs/05 section 5), for checking their look.
+## Photographs the menu screens (docs/04 section 5), for checking their look.
 ##
 ##   ./dev tool-win menu_shots build/menus/menu [--only hub,settings] [--league] [--career]
 ##       [--school | --school-done | --season-done] [--draft-at mine|end]
@@ -47,6 +47,8 @@ func _initialize() -> void:
 	if _args.has("group"):
 		SettingsScreen.group = str(_args["group"])
 	# --setup: the league screen's club choice (no league started).
+	if _args.has("swing-turn"):
+		PlayerStage.swing_turn = float(str(_args["swing-turn"]))
 	if (_args.has("league") or _names.has("league")) and not _args.has("history") and not _args.has("setup"):
 		var clubs := LeagueSession.league_clubs()
 		LeagueSession.start(clubs[2].id, 36, 4)
@@ -134,6 +136,60 @@ func _next() -> void:
 		quit()
 		return
 	var name := _names[_index]
+	# The opening's notice, the title with its menu open, the loading screens (a game's
+	# match-up and the league's).
+	if name == "splash_notice":
+		_scene = (load(SCREENS["splash"]) as PackedScene).instantiate()
+		_scene.set("_part", 2)
+		root.add_child(_scene)
+		current_scene = _scene
+		return
+	if name == "buttons":
+		# Every look of button, as it stands and lit, an ordinary one in each part's colour.
+		_scene = Control.new()
+		_scene.set_anchors_preset(Control.PRESET_FULL_RECT)
+		root.add_child(_scene)
+		var back := ColorRect.new()
+		back.color = Color(0.06, 0.065, 0.08)
+		back.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_scene.add_child(back)
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.position = Vector2(80, 60)
+		grid.add_theme_constant_override("h_separation", 60)
+		grid.add_theme_constant_override("v_separation", 22)
+		_scene.add_child(grid)
+		var rows: Array = [["게임 시작", "play", "menu", UiTheme.BRAND], ["경기 시작", "play", "primary", UiTheme.BRAND], ["구매 · 400 P", "shopping-cart", "gold", UiTheme.BRAND],
+			["삭제", "trash", "danger", UiTheme.BRAND], ["리그 · 다음 날", "caret-right", "button", UiTheme.MODE_COLOURS["league"]], ["전설의 시작 · 훈련", "barbell", "button", UiTheme.MODE_COLOURS["career"]],
+			["연습 · 다시", "arrows-clockwise", "button", UiTheme.MODE_COLOURS["practice"]], ["상점 · 장비", "storefront", "button", UiTheme.MODE_COLOURS["shop"]]]
+		for row: Array in rows:
+			for lit: bool in [false, true]:
+				var b := UiKit.button(str(row[0]), Callable(), str(row[1]), str(row[2]), 400.0)
+				b.tint = row[3]
+				b.preview_lit = lit
+				grid.add_child(b)
+		current_scene = _scene
+		return
+	if name == "title_open":
+		_scene = (load(SCREENS["title"]) as PackedScene).instantiate()
+		root.add_child(_scene)
+		current_scene = _scene
+		return
+	if name == "loading_match" or name == "loading_place":
+		_scene = Node.new()
+		root.add_child(_scene)
+		var veil := Loading.new()
+		if name == "loading_match":
+			var clubs := RosterIO.load_pack("res://data/rosters/fiction-2026.json")
+			veil.set("_info", {"away": clubs[0], "home": clubs[1], "title": "친선 경기", "line": "등대 파크 · 야간 · 9이닝", "record0": "12승 8패 1무", "record1": "10승 11패 0무"})
+			veil.set("_target", "res://match/match.tscn")
+		else:
+			veil.set("_info", {"title": "리그로 이동 중"})
+			veil.set("_target", LeagueSession.SCREEN)
+		veil.set("_stage", 2)
+		veil.set("_progress", 1.0)
+		_scene.add_child(veil)
+		return
 	if name == "card":
 		_scene = (load(SCREENS["hub"]) as PackedScene).instantiate()
 		root.add_child(_scene)
@@ -205,7 +261,24 @@ func _process(_delta: float) -> bool:
 			if not p.is_pitcher():
 				hitters.append(p)
 		PlayerCompare.open_for(_scene, hitters[0], hitters[3], s)
-	if _frames < 150:
+	# --frames 40,80,120: several pictures of the screen as it moves (the title's swing).
+	if _args.has("frames"):
+		var marks := PackedInt32Array(Array(str(_args["frames"]).split(",")).map(func(x: String) -> int: return int(x)))
+		if marks.has(_frames):
+			var shot := "%s_%s_f%03d.png" % [_prefix, _names[_index], _frames]
+			root.get_texture().get_image().save_png(shot)
+			print("menu_shots: ", shot)
+		if _frames >= marks[marks.size() - 1]:
+			_next()
+		return false
+	if _names[_index] == "title_open" and _frames == 20:
+		_scene.call("_open")
+	var shoot_at := 50 if _names[_index].begins_with("loading_") else (90 if _names[_index] == "splash_notice" else 150)
+	# (The opening's ident by its own clock: at the moment the name has been drawn.)
+	if _names[_index] == "splash" or _names[_index] == "splash_notice":
+		if float(_scene.get("_t" if _names[_index] == "splash" else "_part_t")) < (1.9 if _names[_index] == "splash" else 1.2):
+			return false
+	elif _frames < shoot_at:
 		return false
 	var path := "%s_%s.png" % [_prefix, _names[_index]]
 	root.get_texture().get_image().save_png(path)

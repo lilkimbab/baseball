@@ -1,6 +1,6 @@
 class_name RosterIO
 extends RefCounted
-## Reads and writes roster packs (docs/07 section 5) and the name table.
+## Reads and writes roster packs (docs/06 section 5) and the name table.
 
 const NAMES_PATH := "res://data/names.ko.json"
 

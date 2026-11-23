@@ -1,7 +1,7 @@
 class_name StrikeZone
 extends RefCounted
 ## Automatic strike zone scaled to the batter's height, as the KBO's ABS calls it (2026 rules,
-## docs/12 section 5): the top is 55.75% of the batter's height and the bottom 27.04%, the
+## docs/09 section 5): the top is 55.75% of the batter's height and the bottom 27.04%, the
 ## width is the plate plus 2 cm on each side, width is judged at the middle of the plate, and
 ## height at both the middle and the back of the plate.
 

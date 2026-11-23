@@ -1,6 +1,6 @@
 class_name MenuMusic
 extends RefCounted
-## The menus' music (docs/11 section 4): one loop that goes on from screen to screen without a
+## The menus' music: one loop that goes on from screen to screen without a
 ## break, and stops for a game (a game has its crowd instead). A menu song in the local content
 ## pack (content-local/audio/music/menu.ogg) plays instead of the game's own.
 

@@ -1,10 +1,10 @@
 class_name MatchScene
 extends DuelScene
-## Stage S5: a whole game (docs/13 S5-10). Each pitch is played out as in the duel, by the
+## Stage S5: a whole game. Each pitch is played out as in the duel, by the
 ## player or the computer; a ball in play is run by PlaySim and shown from its key frames;
 ## GameFlow and the Scorer keep the game. The player controls one team: he bats when it bats
 ## and pitches when it fields. Fielding and running are automatic for now (the throw and
-## running controls of docs/05 2.3-2.4 come with stage S12's fielding motion).
+## running controls of docs/04 2.3-2.4 come with stage S12's fielding motion).
 
 ## Seconds a finished play stays on screen before the result is applied.
 const PLAY_TAIL := 0.9
@@ -74,7 +74,7 @@ const SPRINT := 8.0
 
 ## Advances a puppet's running stride by this frame at `speed` m/s and returns where in the
 ## stride he is: one step per unit, steps lengthening from about a metre at a jog to two at a
-## sprint, so the feet keep pace with the ground (docs/13 S12: no foot sliding).
+## sprint, so the feet keep pace with the ground (no foot sliding).
 func _stride(p: Puppet, speed: float) -> float:
 	var step := lerpf(1.0, 2.0, clampf(speed / SPRINT, 0.0, 1.0))
 	_strides[p] = _strides.get(p, 0.0) + speed * _frame_time / step
@@ -145,7 +145,7 @@ var landing_point := Vector3.ZERO
 var landing_time := 0.0
 var commentary: Commentary
 var _last_pitch_result: PitchDuel.Result = PitchDuel.Result.NONE
-## The small second view (docs/13 S6-5).
+## The small second view.
 var pip_viewport: SubViewport
 var pip_camera: Camera3D
 var pip_rect: TextureRect
@@ -177,7 +177,7 @@ var on_deck: Puppet
 
 var _clubs: Array[Team] = []
 var _club_cache: Array[Team] = []
-## The broadcast's moments between pitches (docs/13 S16) and their cards.
+## The broadcast's moments between pitches and their cards.
 var broadcast := Broadcast.new()
 var broadcast_cards: BroadcastCards
 var _seen_batter := ""
@@ -369,7 +369,7 @@ func _start_game() -> void:
 	strikes = 0
 
 
-## When a season's game is played (docs/13 S13): weekday games at 18:30 under the lights,
+## When a season's game is played: weekday games at 18:30 under the lights,
 ## Saturday's at 17:00, Sunday's at 14:00. The week runs Tuesday to Sunday, Monday off.
 static func time_for(game_day: int) -> StringName:
 	match Schedule.calendar_day(game_day) % 7:
@@ -380,7 +380,7 @@ static func time_for(game_day: int) -> StringName:
 	return &"night"
 
 
-# --- The crowd (docs/13 S14) ---
+# --- The crowd ---
 
 
 ## How full the park is: night games on weekdays draw fewer than weekend ones.
@@ -441,7 +441,7 @@ func _play_at_home(home_club: String, game_day: int, club: Team = null) -> void:
 	game_day_of_season = game_day
 
 
-# --- The weather (docs/08 R3) ---
+# --- The weather ---
 
 
 ## The day of the season this game is played on (a quick game: one drawn from its seed).
@@ -612,7 +612,7 @@ func _menu_key(code: Key) -> void:
 		pause_menu.open()
 
 
-# --- The player's throw and running during a play (docs/05 2.3, 2.4; docs/13 S12) ---
+# --- The player's throw and running during a play (docs/04 2.3, 2.4) ---
 
 
 ## Seconds to fill the throw gauge to the top of its green zone.
@@ -631,7 +631,7 @@ var _charge := -1.0
 var _charge_base := 0
 
 
-# --- Highlights and the player's own fielding (docs/05 2.3, 3.4) ---
+# --- Highlights and the player's own fielding (docs/04 2.3, 3.4) ---
 
 ## The slow-motion moments of the play being shown (PlayHighlight), the player's balls in play
 ## since the last one, real seconds the picture still stands, how fast the play ran in the
@@ -864,7 +864,7 @@ func _replay() -> void:
 	_pending = events
 
 
-# --- The player's steal (docs/05 2.4) ---
+# --- The player's steal (docs/04 2.4) ---
 
 
 ## The jump a runner gets by letting go of the key against the pitcher's first move (the
@@ -1093,7 +1093,7 @@ func _pay_profile() -> void:
 
 ## A look away from the play (the cheering stage, the scoreboard): the small views give way.
 func cutaway_showing() -> bool:
-	return broadcast != null and broadcast.current != null and broadcast.current.kind in [Broadcast.Kind.BOARD, Broadcast.Kind.FANS, Broadcast.Kind.WALK_OFF, Broadcast.Kind.BENCH_CLEAR, Broadcast.Kind.INJURY]
+	return broadcast != null and broadcast.current != null and broadcast.current.kind in [Broadcast.Kind.BOARD, Broadcast.Kind.FANS, Broadcast.Kind.WALK_OFF, Broadcast.Kind.BENCH_CLEAR, Broadcast.Kind.INJURY, Broadcast.Kind.CHAMPION]
 
 
 ## The broadcast's introduction is on (the match-up, the line-ups): it has the screen alone.
@@ -1370,7 +1370,7 @@ func substitute(event: GameEvent) -> void:
 	_place_cast()
 
 
-## Squares to bunt at the pitch on its way (the player's Space key, docs/05 2.2).
+## Squares to bunt at the pitch on its way (the player's Space key, docs/04 2.2).
 func bunt() -> void:
 	if not human_bats() or state != State.LIVE or duel.phase != PitchDuel.Phase.FLIGHT:
 		return
@@ -1413,7 +1413,7 @@ var _form_key := ""
 var _people_key := ""
 
 
-## A figure takes the player's height and build (docs/13 S11-1).
+## A figure takes the player's height and build.
 func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 	var model := puppet as SkinnedPuppet
 	if model == null or p == null:
@@ -1441,7 +1441,7 @@ static func hair_color_of(p: Player) -> Color:
 	return shades[absi(hash(p.id + ":hair")) % shades.size()]
 
 
-## The pitcher's and the batter's own forms (docs/13 S10-5): recorded deliveries and swings
+## The pitcher's and the batter's own forms: recorded deliveries and swings
 ## from the local pack, chosen per player (FormCatalog). With runners on, the delivery is from
 ## the set position.
 func _apply_forms() -> void:
@@ -1648,11 +1648,29 @@ func step(delta: float) -> void:
 	if pause_menu != null and pause_menu.visible:
 		return
 	if broadcast.holding():
-		broadcast.step(delta)
+		# (Not while the loading screen still covers the game: the line-ups' faces are drawn
+		# behind it, and the show starts as it lifts.)
+		if not Loading.covering():
+			broadcast.step(delta)
 		return
 	_run_pitch_clock(delta)
 	if game.over and broadcast.enabled and not _end_shown:
 		_end_shown = true
+		# The game that wins the title: the pile at the mound and the manager tossed, the
+		# caster's call (FieldScenes.plan_champion), before the end card.
+		var won := _title_side()
+		if won >= 0 and park != null:
+			_rush_plan.clear()
+			_field_scenes().plan_champion(won)
+			var party := Broadcast.segment(Broadcast.Kind.CHAMPION)
+			party.shots = _field_scenes().champion_shots()
+			var s := _season()
+			party.data = {"side": won, "round": _final_round, "year": s.season_year if s != null else 2026}
+			broadcast.push(party)
+			var line := "우승! %s, %d 시즌 챔피언입니다!" % [club(won).name if club(won) != null else game.teams[won].short_name, s.season_year if s != null else 2026]
+			log.append(line)
+			last_text = line
+			last_mood = &"hot"
 		var seg := Broadcast.segment(Broadcast.Kind.GAME_END)
 		seg.shots = [Broadcast.Shot.make(0.0, Vector3(0.0, -30.0, 14.0), Vector3(0.0, 20.0, 1.0), 50.0, Vector3(0.0, -42.0, 22.0), Vector3(0.0, 30.0, 0.0), 54.0)]
 		broadcast.push(seg)
@@ -1701,8 +1719,9 @@ func _end_play() -> void:
 	_pending.clear()
 	if _play != null and not _play.foul:
 		show_play_line(2.6)
-	if last_outcome != null and last_outcome.walk_off and broadcast.enabled and park != null:
-		# A walk-off: his side pours out to mob him at the plate.
+	if last_outcome != null and last_outcome.walk_off and broadcast.enabled and park != null and _title_side() < 0:
+		# A walk-off: his side pours out to mob him at the plate (one that wins the title goes
+		# straight to the title's celebration).
 		_plan_walk_off(last_outcome.batter_id)
 		var mob := Broadcast.segment(Broadcast.Kind.WALK_OFF)
 		mob.shots = [Broadcast.Shot.make(0.0, Vector3(9.0, -5.0, 2.6), Vector3(0.0, 0.8, 1.1), 36.0, Vector3(7.0, -4.0, 2.2), Vector3(0.0, 0.8, 1.2), 30.0)]
@@ -1723,6 +1742,7 @@ func _end_play() -> void:
 
 ## Applies an event to the game and the books.
 func _apply(e: GameEvent) -> void:
+	_note_final()
 	var batter := game.batter_id()
 	var out := GameFlow.apply(game, e)
 	last_outcome = out
@@ -1776,7 +1796,7 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 		GameEvent.Kind.PLATE_APPEARANCE:
 			var p := team.player(batter_id)
 			var key := Commentary.key_for(e.result, _last_pitch_result)
-			# The wind is part of the story of a long fly (docs/08 R3): carried out by it, or
+			# The wind is part of the story of a long fly: carried out by it, or
 			# held up by it at the wall.
 			var wind: float = resolver.wind_out if resolver != null else 0.0
 			var deep: bool = duel != null and duel.contact != null and duel.contact.exit_speed_kmh() > 150.0
@@ -1977,7 +1997,7 @@ func _drain() -> bool:
 	return false
 
 
-## Shows a steal or a pickoff as a play (docs/13 S12) before it counts: the pitch or the
+## Shows a steal or a pickoff as a play before it counts: the pitch or the
 ## pickoff throw, the catcher's throw, the cover man, the slide and the call. A double steal
 ## and a throw that gets away are only reported.
 func _show_running(e: GameEvent) -> bool:
@@ -2038,7 +2058,7 @@ func _build_fielders() -> void:
 		runner_puppets.append(r)
 
 
-# --- The bullpens (docs/08 R4) ---
+# --- The bullpens ---
 
 ## The player's own pitch is made as tired, and as cold, as his pitcher is (the computer's
 ## pitches are, in _ai_pitch_decision).
@@ -2165,7 +2185,7 @@ func _build_officials() -> void:
 ## the batting side at bat, on the bases and in the coaching boxes.
 func _dress_for_half() -> void:
 	# Each club in its own uniform: the home side in white, the visitors in their road
-	# uniform (docs/13 S11-9). Without the clubs (a test game) the plain pair.
+	# uniform. Without the clubs (a test game) the plain pair.
 	var away := _club(0)
 	var home := _club(1)
 	if away != null and home != null:
@@ -2226,7 +2246,7 @@ func _club(side: int) -> Team:
 	return null
 
 
-## Fielders' and runners' part in each pitch (docs/13 S12): as the pitcher delivers, the
+## Fielders' and runners' part in each pitch: as the pitcher delivers, the
 ## fielders take two steps in and drop into their crouch, and the runners shuffle out to a
 ## secondary lead. Poses change only while they move.
 func _pose_cast() -> void:
@@ -2320,7 +2340,7 @@ func _place_cast() -> void:
 	on_deck.visible = next_up.lineup.size() > 0
 
 
-## The catcher's part in each pitch (docs/13 S12-4). He puts down the sign, then sets up
+## The catcher's part in each pitch. He puts down the sign, then sets up
 ## where the pitch is meant to go (his body shifts toward the side and his mitt shows the
 ## height). As the ball comes in his mitt goes to where it really arrives, and once it is in he
 ## draws it a little toward the zone (framing). A pitch in the dirt he drops to his knees to
@@ -2446,7 +2466,7 @@ func refresh(delta: float) -> void:
 	if broadcast.current != null and not broadcast.holding():
 		broadcast.step(delta)
 	broadcast_cards.queue_redraw()
-	var rushing := broadcast.showing(Broadcast.Kind.WALK_OFF) or broadcast.showing(Broadcast.Kind.BENCH_CLEAR) or broadcast.showing(Broadcast.Kind.INJURY)
+	var rushing := broadcast.showing(Broadcast.Kind.WALK_OFF) or broadcast.showing(Broadcast.Kind.BENCH_CLEAR) or broadcast.showing(Broadcast.Kind.INJURY) or broadcast.showing(Broadcast.Kind.CHAMPION)
 	if rushing or _rush_shown:
 		_show_rush(broadcast.time if rushing else -1.0)
 	if broadcast.showing(Broadcast.Kind.REPLAY) and _replay_play != null:
@@ -2522,7 +2542,7 @@ func _track_pitch() -> void:
 	pitcher_cells[id] = cells
 
 
-# --- Picture in picture (docs/13 S6-5) ---
+# --- Picture in picture ---
 
 
 const PIP_SIZE := Vector2(384.0, 216.0)
@@ -2776,7 +2796,7 @@ func _umpire_signals(t: float) -> void:
 		signal_call(u, calls.get(u) as PuppetPose)
 
 
-## Moves a puppet along its track: throwing, catching or sliding at its moments (docs/13
+## Moves a puppet along its track: throwing, catching or sliding at its moments (
 ## S12), otherwise running at its pace facing the way it goes, or ready facing the ball.
 func _move_puppet(p: Puppet, tl: PlayTimeline, key: String, t: float) -> void:
 	_ease_change(p, _pose_on_track(p, tl, key, t))
@@ -2905,7 +2925,7 @@ func _pose_on_track(p: Puppet, tl: PlayTimeline, key: String, t: float) -> Strin
 
 ## Poses a fielder catching the ball at `ball` (field coordinates), dt seconds from the
 ## moment it arrives: a ground ball, a chest-high or an overhead catch, or a dive for one wide
-## of him. The glove hand is then drawn to the ball itself (catch IK, docs/13 S12-8): from just
+## of him. The glove hand is then drawn to the ball itself (catch IK): from just
 ## before the ball arrives till just after, the glove's pocket is where the ball is.
 static func catch(p: Puppet, ball: Vector3, dt: float, legs: PuppetPose = null) -> void:
 	var local := p.to_local(Field.to_world(ball))
@@ -3002,7 +3022,7 @@ func _move_camera_play(delta: float) -> void:
 var _cut := false
 
 
-## A home run's trot (queue stage 6, 2026-11-23: "a short scene of him going round, close on
+## A home run's trot (2026-11-23: "a short scene of him going round, close on
 ## him, just touching the bases"): once the ball is out, the jog round the bases at
 ## HR_TROT_PACE with the camera beside him a few metres off the base paths, a fist pumped as
 ## he comes home. Space skips it.
@@ -3187,7 +3207,7 @@ func _camera_preset() -> Array:
 	return PITCH_CAMERA if human_pitches() else bat_camera()
 
 
-# --- The broadcast's moments (docs/11 section 6, docs/13 S16) ---
+# --- The broadcast's moments ---
 
 
 ## A broadcast moment that holds the game is skipped with Space, Enter or a click (before the
@@ -3246,6 +3266,55 @@ func _push_pregame() -> void:
 			PortraitStudio.request(self, game.teams[side].player(slot.player_id), club(side), func(_t: Texture2D) -> void: pass)
 		PortraitStudio.request(self, game.teams[side].player(game.teams[side].pitcher_id), club(side), func(_t: Texture2D) -> void: pass)
 	broadcast.push(seg)
+
+
+## The side whose win this was the title's last (the postseason's final round, the win its
+## series needed), or −1: in a league's or a career's game, not an exhibition. Read from the
+## series as the game began (_note_final): a league game's result goes to the season the
+## moment it ends.
+func _title_side() -> int:
+	if game == null or not game.over or game.winner < 0 or _final_series.is_empty():
+		return -1
+	return game.winner if int(_final_series[game.winner]) + 1 >= int(_final_series[2]) else -1
+
+
+## The final series as this game began: each side's wins and the wins needed, or [] outside a
+## final. Taken at the game's first play, before anything of it reaches the season.
+var _final_series: Array = []
+var _final_round := ""
+var _final_noted := false
+
+
+func _note_final() -> void:
+	if _final_noted or game == null:
+		return
+	_final_noted = true
+	var s := _season()
+	var g := _scheduled_game()
+	if s == null or g == null:
+		return
+	var post := s.postseason_of(g)
+	if post == null or post.current < post.format.size() - 1:
+		return
+	var series := post.series()
+	if series == null:
+		return
+	var out: Array = []
+	for side: int in 2:
+		var id := game.teams[side].team_id
+		out.append(series.high_wins if id == series.high else (series.low_wins if id == series.low else -99))
+	out.append(series.wins_needed)
+	_final_series = out
+	_final_round = post.format[post.current].name
+
+
+## Today's game of the league or the career this is, or null.
+func _scheduled_game() -> ScheduledGame:
+	if get("league_game") != null:
+		return get("league_game") as ScheduledGame
+	if self is CareerMatch and CareerSession.career_season != null:
+		return CareerSession.career_season.club_game()
+	return null
 
 
 ## A club's record this season ("12승 8패 1무"), or "" outside a season.

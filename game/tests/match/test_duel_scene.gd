@@ -86,7 +86,7 @@ func test_holding_the_button_too_long_still_throws_but_badly() -> void:
 
 
 func test_the_player_s_pitch_goes_where_he_aimed_when_he_times_it() -> void:
-	# docs/04 5.2: the miss follows his timing far more closely than a computer pitcher's draw.
+	# docs/03 5.2: the miss follows his timing far more closely than a computer pitcher's draw.
 	assert_almost_eq(PitchDuel.player_scatter(1.0), PitchDuel.PLAYER_BEST, 1e-6)
 	assert_almost_eq(PitchDuel.player_scatter(0.0), PitchDuel.PLAYER_WORST, 1e-6)
 	assert_lt(PitchDuel.player_scatter(0.75), 0.5, "a twentieth of a second off, half his usual miss")

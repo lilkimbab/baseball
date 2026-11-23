@@ -1,6 +1,6 @@
 class_name PlayChoice
 extends RefCounted
-## What the player decided during a ball in play (docs/05 2.3, 2.4): the base the fielder
+## What the player decided during a ball in play (docs/04 2.3, 2.4): the base the fielder
 ## throws to and how hard (a gauge held and let go), and whether the runners go or hold.
 ## Without a choice the computer decides, as for a computer team.
 

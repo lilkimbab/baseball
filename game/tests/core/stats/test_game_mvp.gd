@@ -1,5 +1,5 @@
 extends GutTest
-## The player of the game (docs/13 S6-10).
+## The player of the game.
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 

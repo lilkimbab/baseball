@@ -1,6 +1,6 @@
 extends GutTest
 ## Official scoring: runs batted in, earned runs, and the winning, losing, saving and holding
-## pitchers (docs/12 section 5.3, docs/13 S4-7).
+## pitchers (docs/09 section 5.3).
 
 const F := preload("res://tests/core/rules/rules_fixture.gd")
 const FORCE := RunnerMove.OutKind.FORCE

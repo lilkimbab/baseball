@@ -1,6 +1,6 @@
 shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx, sss_mode_skin;
-// Skin (docs/13 S11-3, S14): the painted MakeHuman skin, with what makes it read as a
+// Skin: the painted MakeHuman skin, with what makes it read as a
 // person's and not a doll's, on the face and the arms, hands and neck alike. The maps are
 // baked by tools/blender/make_player.py (bake_skin_maps):
 //  - relief: the painted skin's grain and creases and the tendons of the hands and wrists

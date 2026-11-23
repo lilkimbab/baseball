@@ -1,6 +1,6 @@
 class_name ShopScreen
 extends Screen
-## The shop (docs/02): points earned by playing buy things that the modes in progress use —
+## The shop: points earned by playing buy things that the modes in progress use —
 ## gear for the career's player (each piece raises one rating, as the gear from reward boxes
 ## does), special training (growth points in one field), and funds for the league club.
 ## Laid out as a store (the user: "real 3D models, a little flashy, so it feels like buying the
@@ -305,7 +305,7 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 		side.body.add_child(UiKit.label(message, 18, UiTheme.ACCENT, 600))
 	var b := UiKit.button("구매  ·  %d P" % int(chosen["price"]) if int(chosen["grade"]) != SIGNATURE else "받기", func() -> void:
 		message = buy(str(chosen["id"]))
-		refresh(), "shopping-cart", "primary")
+		refresh(), "shopping-cart", "gold")
 	b.add_theme_font_size_override("font_size", 26)
 	b.disabled = why != ""
 	side.body.add_child(b)

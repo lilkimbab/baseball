@@ -8,7 +8,7 @@ seated, standing, standing with both arms up (cheering), seated clapping — and
 from in front against nothing. The pictures go side by side into crowd_atlas.png (8 columns:
 two people a row, their four poses each) with a second atlas, crowd_mask.png, white where the
 person wears his top: the game dyes that part in the club's colour for the cheering sections
-(docs/13 S14). Pictures are FRAME_W x FRAME_H pixels and cover FRAME_HEIGHT_M metres.
+. Pictures are FRAME_W x FRAME_H pixels and cover FRAME_HEIGHT_M metres.
 """
 import math
 import os

@@ -1,6 +1,6 @@
 class_name RosterBuilder
 extends RefCounted
-## Real records into ratings (docs/07 section 4.3, docs/09 section 5, docs/13 S17): ratings are
+## Real records into ratings (docs/06 section 4.3, docs/07 section 5): ratings are
 ## not made up; they are worked out from what each man did, by running the match engine's own
 ## formula backwards — the statistical resolver draws an outcome at the league's rate times
 ## exp(k × (rating − 50) / 15) — so that a league made from a season plays that season again.
@@ -13,11 +13,11 @@ extends RefCounted
 ## his id, and is then set from the records where they speak.
 ##
 ## Input: rows (Dictionaries) as read from CSV files (tools/build_roster.gd; columns in
-## docs/13 S17). Output: teams for RosterIO.save_pack.
+## ). Output: teams for RosterIO.save_pack.
 
-## Sample sizes at which each rate is half the man's and half the league's (docs/07 4.3).
+## Sample sizes at which each rate is half the man's and half the league's (docs/06 4.3).
 const REGRESS := {"K": 100.0, "BB": 170.0, "HR": 250.0, "2B": 400.0, "1B": 600.0, "3B": 300.0, "SB": 300.0, "P_K": 150.0, "P_HR": 400.0, "P_BB": 200.0}
-## How much of power comes from home runs (the rest from doubles: docs/07 4.3, home runs 60%
+## How much of power comes from home runs (the rest from doubles: docs/06 4.3, home runs 60%
 ## and isolated power 40%), and of contact from strikeouts (the rest from singles, heavily
 ## regressed). On the fictional league's round trip singles lowered the OPS correlation (0.85
 ## to 0.82 with a fifth: there a man's singles are only luck); on the real seasons they raise
@@ -279,7 +279,7 @@ static func own_split(row: Dictionary, bats: StringName) -> float:
 ## positions "SS/2B", role "SP"/"RP" for pitchers, origin, registered 1/0), batting (id, pa,
 ## ab, h, 2b, 3b, hr, bb, hbp, so, sb, cs), pitching (id, g, gs, outs, bf, so, bb, hr).
 static func build(teams: Array, players: Array, batting: Array, pitching: Array, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], names: NameTable, pitches: Array = [], splits: Array = []) -> Array[Team]:
-	# Each batter's own split against left- and right-handed pitchers (queue stage 3): how much
+	# Each batter's own split against left- and right-handed pitchers: how much
 	# more (or less) he does against the other hand than the league does, pulled toward it by
 	# how few plate appearances there are (SPLIT_PRIOR).
 	var split_of: Dictionary = {}
@@ -402,7 +402,7 @@ static func park_effects(teams: Array) -> Dictionary:
 	return out
 
 
-## A record with the parks taken out (docs/13 S17): home runs and other hits divided by what
+## A record with the parks taken out: home runs and other hits divided by what
 ## the parks did to them, so a 잠실 hitter is read as the hitter he would be anywhere (the
 ## resolver puts 잠실 back for the games he plays there).
 static func neutral(row: Dictionary, effect: Dictionary) -> Dictionary:

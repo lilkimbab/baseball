@@ -1,6 +1,6 @@
 class_name SubstitutionPanel
 extends CenteredPanel
-## The manager's menu (docs/13 S5-11, docs/05 2.5): opening it stops the game. Pitching
+## The manager's menu (docs/04 2.5): opening it stops the game. Pitching
 ## change and defensive changes while the player's team is in the field; pinch hitter and
 ## pinch runners while it bats. Only players who can still come in are listed, and a change
 ## is made only if the line-up stays legal (SubstitutionOptions).
@@ -87,7 +87,7 @@ func _rebuild(message: String) -> void:
 				_button("%s  주력 %d" % [p.name, roundi(p.batting.speed)], _apply.bind(SubstitutionOptions.pinch_runner(g, base, id)))
 
 
-## The bullpen (docs/08 R4): who is throwing out there, how ready each man is, and a button
+## The bullpen: who is throwing out there, how ready each man is, and a button
 ## to start or stop him. Two at a time.
 func _bullpen(g: GameState, mine: int, team: TeamInGame) -> void:
 	_header("불펜 몸풀기 (두 명까지 · 몸을 덜 푼 투수는 첫 타자에게 제구가 흔들립니다)")

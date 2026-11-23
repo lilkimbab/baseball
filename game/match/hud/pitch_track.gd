@@ -1,6 +1,6 @@
 class_name PitchTrack
 extends HudCanvas
-## The pitch track (docs/13 S6-4): where each pitch of this plate appearance crossed the
+## The pitch track: where each pitch of this plate appearance crossed the
 ## plate, numbered in order and coloured by kind (fastball red, breaking blue, change-up
 ## green), drawn from the catcher's side as a broadcast does. C switches to how often this
 ## pitcher has thrown to each of the nine cells today.

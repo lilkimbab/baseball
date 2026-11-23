@@ -1,6 +1,6 @@
 class_name Scorebug
 extends HudCanvas
-## The score bug at the top left, as a broadcast has it (docs/13 S6-2, docs/08 R5: the menus'
+## The score bug at the top left, as a broadcast has it (the menus'
 ## plates): the two clubs one over the other — their colour down the edge, the emblem, the
 ## name, the score, a ball beside the side at bat — then the inning (▲ top, ▼ bottom), the
 ## bases and the count in B-S-O order (three ball lamps, two strike, two out). Under it a thin
@@ -32,7 +32,7 @@ func _draw() -> void:
 	begin()
 	var g := scene.game
 	# Each club's row in its own colours; the inning, the bases and the count on the broadcast's
-	# red (the user, 2026-11-23: "less black, more to look at").
+	# plate (HudCanvas.STYLES; the user, 2026-11-23: "less black, more to look at").
 	brand_plate(Rect2(AT + Vector2(TEAMS - 6.0, 0.0), Vector2(INNING + SITUATION + 6.0, HEIGHT)), 0.0)
 	for t: int in 2:
 		_team_row(Rect2(AT + Vector2(0.0, ROW * t), Vector2(TEAMS, ROW)), t, g)
@@ -127,7 +127,7 @@ func _draw_count(at: Vector2, g: GameState) -> void:
 
 ## Under the bug: the pitcher's pitch count on the left; on the right the sky and the
 ## temperature, and the wind as an arrow the way it blows as seen from behind home plate (up
-## is out toward centre field) with its speed (docs/08 R3: the player can tell which way the
+## is out toward centre field) with its speed (the player can tell which way the
 ## wind goes).
 func _strip(r: Rect2, g: GameState) -> void:
 	panel(r, UiTheme.PANEL_DARK, 0.0)

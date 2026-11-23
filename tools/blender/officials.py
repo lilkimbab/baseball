@@ -1,4 +1,4 @@
-"""What an umpire wears that a player does not (docs/13 S11-8; the user: "the umpires are
+"""What an umpire wears that a player does not (the user: "the umpires are
 roughly done; design them in detail, like real umpires"). Fitted to the body like the gear:
 
   mask ("Mask"): the plate umpire's traditional mask, worn over his cap. A frame of steel wire

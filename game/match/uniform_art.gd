@@ -1,6 +1,6 @@
 class_name UniformArt
 extends Control
-## Paints one garment's texture (docs/13 S11-9): cloth colour, pinstripes, trim, lettering and
+## Paints one garment's texture: cloth colour, pinstripes, trim, lettering and
 ## patches, laid out at the sizes of a real uniform. The garment's UVs put the front on the
 ## left half and the back on the right half (mirrored, so lettering reads from behind), with
 ## the top of the texture at the top of the garment, so everything is placed in metres from the

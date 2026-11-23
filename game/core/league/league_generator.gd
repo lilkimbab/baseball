@@ -1,7 +1,7 @@
 class_name LeagueGenerator
 extends RefCounted
 ## Makes up a fictional league: clubs and 28-man rosters with ratings, bodies, handedness and
-## pitch mixes in realistic proportions (docs/13 S4-11). Same seed, same league.
+## pitch mixes in realistic proportions. Same seed, same league.
 
 ## Average talent per division, top division first.
 const DIVISION_MEANS: Array[float] = [56.0, 50.0, 44.0]
@@ -28,7 +28,7 @@ const ROSTER: Array[String] = [
 ## The second team (2군): prospects and fringe players, further below the regulars (A).
 const FARM: Array[String] = ["SP", "SP", "RP", "RP", "RP", "RP", "C", "2B/SS", "3B/1B", "CF/RF", "LF/1B"]
 const FARM_GAP := 13.0
-## Foreign players (docs/13 S7, A). KBO clubs carry three, usually two starters and a hitter,
+## Foreign players (A). KBO clubs carry three, usually two starters and a hitter,
 ## plus one Asia-quota player; most of the league's home run leaders are the foreign hitters.
 ## Starters get more talent, the hitter more power, the Asia-quota reliever a little more.
 const FOREIGN_STARTER := 7.0
@@ -38,9 +38,9 @@ const ASIA_TALENT := 4.0
 const FOREIGN_HITTER_SPOTS: Array[String] = ["+1B", "+3B", "+LF", "+RF", "+1B/DH"]
 ## The local players are drawn this much lower so that a club still averages 50 over the
 ## plate appearances and batters faced (power over nine regulars, talent over a staff whose
-## starters pitch about 60% of the innings). Measured with ./dev sim, see docs/13 S7.
+## starters pitch about 60% of the innings). Measured with ./dev sim, see.
 const LOCAL_POWER_SHIFT := -1.1
-## Power above the knee counts for this share (A: measured with ./dev sim season, docs/13 S7).
+## Power above the knee counts for this share (A: measured with ./dev sim season).
 const POWER_KNEE := 76.0
 const POWER_ABOVE_KNEE := 0.5
 const LOCAL_PITCHER_SHIFT := -1.7
@@ -49,7 +49,7 @@ const BACKUP_GAP := 8.0
 ## Talent offsets so that a club made around 50 averages 50 where it counts: over the plate
 ## appearances its hitters take and the batters its pitchers face. Managers play their best
 ## hitters, so hitters are drawn a little lower; pitching is spread over the whole staff,
-## so pitchers a little higher. Measured with tools (see docs/13 S4-12).
+## so pitchers a little higher. Measured with tools (see ).
 const HITTER_OFFSET := -4.0
 const PITCHER_OFFSET := 2.5
 ## Breaking and off-speed pitches by how often pitchers have them (A).
@@ -271,7 +271,7 @@ func _pitcher(p: Player, role: String, talent: float) -> void:
 	p.bats = p.throws if rng.chance(0.85) else (&"R" if p.throws == &"L" else &"L")
 
 
-## Height and weight by position (A: docs/13 S4-11).
+## Height and weight by position (A: ).
 func _body(p: Player, main: String) -> void:
 	var mean := {"P": 186.0, "C": 180.0, "1B": 183.0, "DH": 183.0, "LF": 182.0, "CF": 181.0, "RF": 182.0}.get(main, 180.0) as float
 	p.height_cm = roundf(clampf(mean + rng.next_normal() * 5.0, 168.0, 200.0))

@@ -1,6 +1,6 @@
 class_name PitchEvolution
 extends RefCounted
-## A career pitcher's pitches change (docs/02 section 6.3): one he has thrown enough, with the
+## A career pitcher's pitches change: one he has thrown enough, with the
 ## rating that matters high enough, turns into the next one up — a changeup into a circle
 ## changeup, a slider into a sweeper or a hard slider, a curve into a power curve, a four-seam
 ## into a rising fastball. He can also learn new pitches with pitching points, up to six.

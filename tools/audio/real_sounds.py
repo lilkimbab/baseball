@@ -1,4 +1,4 @@
-"""Makes the game's sounds from real recordings (queue stage 6, 2026-11-23: "the sound is like a
+"""Makes the game's sounds from real recordings (2026-11-23: "the sound is like a
 made-up thing; find real recordings — it may stay off git"): the bat, the mitt, the gloves and
 tags, steps, and the crowd's beds and cheers, cut from the recordings in
 content-local/audio/raw/ and written over the game's own names in content-local/audio/

@@ -1,6 +1,6 @@
 class_name AdStrip
 extends Control
-## A strip of sponsors' boards (docs/06 6.2-8), drawn once into a viewport that the ad bands
+## A strip of sponsors' boards (docs/05 6.2-8), drawn once into a viewport that the ad bands
 ## round the park show: each a coloured board with the sponsor's mark and name.
 
 const SPONSORS := "res://data/sponsors.ko.json"
