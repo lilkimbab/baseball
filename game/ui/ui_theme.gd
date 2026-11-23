@@ -36,6 +36,10 @@ static var _theme: Theme
 ## user suggested (github.com/hurss/fonts, MIT; cut to Korean and Latin in ui/fonts/dos/).
 ## Each: [text at 500, 600, 700], heading.
 const MENU_FAMILIES := {
+	# NEXON Lv.2 Gothic (Nexon's game face) for the text, headings in Giants Bold (the Lotte
+	# Giants' club face), as the broadcast graphics: the user, 2026-11-23, "game fonts, not ones
+	# that look made by an AI". Both free to bundle unmodified.
+	"nexon_lv2": [["nexon_lv2/NEXONLv2Gothic-Regular.woff", "nexon_lv2/NEXONLv2Gothic-Bold.woff", "nexon_lv2/NEXONLv2Gothic-Bold.woff"], "giants/Giants-Bold.woff2"],
 	"paperlogy": [["Paperlogy-Medium.woff2", "Paperlogy-SemiBold.woff2", "Paperlogy-Bold.woff2"], "Paperlogy-ExtraBold.woff2"],
 	# NEXON Football Gothic: drawn for a football game (FIFA Online 4); free to bundle unmodified.
 	"football": [["football/NEXONFootballGothic-L.otf", "football/NEXONFootballGothic-B.otf", "football/NEXONFootballGothic-B.otf"], "football/NEXONFootballGothic-B.otf"],
@@ -47,7 +51,7 @@ const MENU_FAMILIES := {
 	"dos_saemmul": [["dos/DOSSaemmul.ttf", "dos/DOSSaemmul.ttf", "dos/DOSIyagiBoldface.ttf"], "dos/DOSIyagiBoldface.ttf"],
 	"sam3": [["dos/Sam3KRFont.ttf", "dos/Sam3KRFont.ttf", "dos/Sam3KRFont.ttf"], "dos/Sam3KRFont.ttf"],
 }
-static var menu_family := "football"
+static var menu_family := "nexon_lv2"
 
 
 ## Changes the menus' family; screens built after this use it.
@@ -86,19 +90,19 @@ static func font(weight: int = 600) -> Font:
 ## A face for a place in the game (docs/05 section 5; the user: "the same font is used
 ## everywhere: find the right one for each situation"). Real broadcasts, scoreboards and
 ## advertising each have their own lettering, and the game reads as one flat layer without it:
-##   &"menu"       the menus (Paperlogy)
+##   &"menu"       the menus (NEXON Lv.2 Gothic, headings in Giants Bold)
 ##   &"broadcast"  the graphics a broadcast lays over a game: the score bug, the bottom bar,
-##                 the pitch panel, the commentary line (S-Core Dream, a television gothic)
+##                 the pitch panel, the commentary line (Giants, a KBO club's own face)
 ##   &"impact"     what is shouted: an umpire's call, a judgment on a swing or a pitch
-##                 (Black Han Sans, heavy and tight)
+##                 (Giants Inline, the club face with a line cut through it)
 ##   &"board"      the stadium's scoreboard: lamps, so a dot-matrix face (Galmuri)
 ##   &"wall"       painted on the park: distances on the fence (College Block)
 ##   &"ad_*"       sponsors' boards, each brand its own: ad_heavy, ad_square, ad_round,
 ##                 ad_script, ad_slab, ad_plain
 ## Figures and Latin capitals everywhere are numeric() (Barlow Condensed).
 const FACES := {
-	&"broadcast": ["res://ui/fonts/SCoreDream-Medium.woff", "res://ui/fonts/SCoreDream-Bold.woff", "res://ui/fonts/SCoreDream-Heavy.woff"],
-	&"impact": ["res://assets/fonts/uniform/BlackHanSans-Regular.ttf"],
+	&"broadcast": ["res://ui/fonts/giants/Giants-Regular.woff2", "res://ui/fonts/giants/Giants-Bold.woff2", "res://ui/fonts/giants/Giants-Bold.woff2"],
+	&"impact": ["res://ui/fonts/giants/Giants-Inline.woff2"],
 	&"board": ["res://ui/fonts/Galmuri11-Bold.ttf"],
 	&"wall": ["res://assets/fonts/uniform/CollegeBlock-Bold.ttf"],
 	&"ad_heavy": ["res://assets/fonts/uniform/BlackHanSans-Regular.ttf"],

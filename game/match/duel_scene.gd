@@ -627,6 +627,13 @@ func _new_duel() -> void:
 	_swing_shown = false
 
 
+## A person's pitch's speed against the pitch's average, by the power he let it go at: full
+## power a little over his average, toward his best (ArsenalPitch.velo_max); the computer's
+## spread round the average (AiPitcher.EFFORT_LOW..EFFORT_HIGH).
+static func effort_for(power: float) -> float:
+	return lerpf(0.94, 1.02, clampf(power, 0.0, 1.0))
+
+
 func _begin_windup() -> void:
 	if human_pitches():
 		decision = PitchDecision.new()
@@ -634,7 +641,7 @@ func _begin_windup() -> void:
 		decision.target = target
 		decision.quality = accuracy
 		decision.by_hand = true
-		decision.effort = lerpf(0.93, 1.0, power)
+		decision.effort = effort_for(power)
 	_pitch_clock = 0.0
 	_enter(State.WINDUP)
 

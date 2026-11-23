@@ -1,30 +1,117 @@
 class_name Commentary
 extends RefCounted
 ## The one-line play-by-play (docs/13 S6-7) from templates in data/commentary.ko.json.
-## Lines use the scorebook's words; `pick` chooses among a situation's lines so the same
-## kind of play reads differently through a game without random numbers.
+## Lines use the scorebook's words and, since 2026-11-23, the shapes of real KBO calls (the
+## user: "more lines, more varied, after real KBO broadcasts, not made up"): where the ball
+## went and which fielder went back for it, pulled or pushed, the pitch of the at-bat, the
+## score, the club, the inning, a season's home run count. `pick` chooses among the lines a
+## situation has whose slots are known, so the same kind of play reads differently through a
+## game without random numbers.
+
+## Slots a line may use beyond the play's own; a line with one that is not known (no fielder
+## on a walk, no season in an exhibition) is passed over.
+const SLOTS: Array[String] = ["pitch", "field", "side", "wall", "swing", "score", "team", "inning", "pitcher", "hr", "k", "out", "homer"]
+## Slots that may be followed by a particle in a template ("{field}이", "{side}으로").
+const NAMED: Array[String] = ["name", "runner", "pitcher", "team", "field", "out", "pitch", "side", "wall"]
+## The calls made as a ball is hit (MatchSound), by the kind of ball: a long fly (a home run,
+## a fly caught at the wall), a ball into the gap, a single to the outfield, one in the infield.
+const CALL_KEYS: Array[String] = ["call_deep", "call_gap", "call_single", "call_infield"]
 
 var templates: Dictionary[String, PackedStringArray] = {}
 
 
-func line(key: String, pick: int, name: String = "", play: String = "", fielders: String = "", runs: int = 0, runner: String = "", base: int = 0) -> String:
-	var options: PackedStringArray = templates.get(key, PackedStringArray(["{name}, {play}"]))
+func line(key: String, pick: int, name: String = "", play: String = "", fielders: String = "", runs: int = 0, runner: String = "", base: int = 0, more: Dictionary = {}) -> String:
+	var all: PackedStringArray = templates.get(key, PackedStringArray(["{name}, {play}"]))
+	var options := PackedStringArray()
+	for t: String in all:
+		if fits(t, more):
+			options.append(t)
+	if options.is_empty():
+		options.append(all[0])
 	var out := options[posmod(pick, options.size())]
-	# A line that tells its runs itself gets no tail.
-	var told := out.contains("{runs}") or key.contains("walk_off")
-	out = _particles(out, "{name}", name)
-	out = _particles(out, "{runner}", runner)
-	out = out.replace("{name}", name).replace("{play}", play).replace("{fielders}", fielders)
-	out = out.replace("{runner}", runner).replace("{base}", str(base)).replace("{runs}", str(runs))
+	# A line that tells its runs or the score itself gets no tail.
+	var told := key.contains("walk_off")
+	for said: String in ["{runs}", "{score}", "한 점", "득점", "네 점"]:
+		told = told or out.contains(said)
+	var values := more.duplicate()
+	values.merge({"name": name, "play": play, "fielders": fielders, "runner": runner, "base": str(base), "runs": str(runs)}, true)
+	out = fill(out, values)
 	if runs > 0 and not told and not key.begins_with("home_run") and templates.has("runs"):
-		var tail: PackedStringArray = templates["runs"]
-		out += tail[posmod(pick, tail.size())].replace("{runs}", str(runs))
+		var tails := PackedStringArray()
+		for t: String in templates["runs"]:
+			if fits(t, more):
+				tails.append(t)
+		if not tails.is_empty():
+			# (A long line takes the shortest tail, so it stays one line on screen.)
+			out += fill(tails[posmod(pick, tails.size())] if out.length() <= 24 else tails[0], values)
 	return out
 
 
+## A call as a ball is hit (no names: the voice has them ready). `group` is one of CALL_KEYS.
+func call_line(group: String, pick: int, more: Dictionary) -> String:
+	if not templates.has(group):
+		return ""
+	return line(group, pick, "", "", "", 0, "", 0, more)
+
+
+## Every slot the template uses is known.
+static func fits(template: String, more: Dictionary) -> bool:
+	for slot: String in SLOTS:
+		if template.contains("{%s}" % slot) and str(more.get(slot, "")) == "":
+			return false
+	return true
+
+
+## The template with its slots filled, each particle after a name as the name ends.
+static func fill(template: String, values: Dictionary) -> String:
+	var out := template
+	for slot: String in NAMED:
+		if values.has(slot):
+			out = _particles(out, "{%s}" % slot, str(values[slot]))
+	for slot: Variant in values:
+		out = out.replace("{%s}" % slot, str(values[slot]))
+	return out
+
+
+## Where a ball went as a caster says it: the fielder (좌익수), the side (왼쪽), the wall in
+## the outfield (좌측 담장), and pulled or pushed by the batter's side (잡아당겼습니다,
+## 밀어쳤습니다; 받아쳤습니다 up the middle). `direction` is the fielder's number (1..9).
+static func direction_slots(direction: int, bats_left: bool) -> Dictionary:
+	if direction < 1 or direction > 9:
+		return {}
+	var out := {"field": Position.name_of(direction - 1 as Position.Kind)}
+	var left_side := direction in [5, 6, 7]
+	var right_side := direction in [3, 4, 9]
+	if left_side:
+		out["side"] = "왼쪽"
+	elif right_side:
+		out["side"] = "오른쪽"
+	elif direction != 2:
+		out["side"] = "가운데"
+	if direction >= 7:
+		out["wall"] = ["좌측 담장", "가운데 담장", "우측 담장"][direction - 7]
+	if direction == 8 or direction == 1:
+		out["swing"] = "받아쳤습니다"
+	elif left_side or right_side:
+		out["swing"] = "잡아당겼습니다" if left_side != bats_left else "밀어쳤습니다"
+	return out
+
+
+## "초구", "2구째": the pitch of an at-bat as a caster counts it.
+static func pitch_word(n: int) -> String:
+	if n <= 0:
+		return ""
+	return "초구" if n == 1 else "%d구째" % n
+
+
 ## A Korean particle after a name in a template, as the name ends: "{name}을" is 을 after a
-## final consonant and 를 after a vowel (이/가, 은/는 likewise).
+## final consonant and 를 after a vowel (이/가, 은/는 likewise; 으로 after a final consonant
+## but ㄹ, 로 after a vowel or ㄹ).
 static func _particles(text: String, slot: String, word: String) -> String:
+	if text.contains(slot + "으로"):
+		var c := word.unicode_at(word.length() - 1) if not word.is_empty() else 0
+		var plain := c >= 0xAC00 and c <= 0xD7A3 and ((c - 0xAC00) % 28 == 0 or (c - 0xAC00) % 28 == 8)
+		text = text.replace(slot + "으로", word + ("로" if plain else "으로"))
 	for pair: Array in [["을", "를"], ["이", "가"], ["은", "는"]]:
 		text = text.replace(slot + str(pair[0]), word + josa(word, str(pair[0]), str(pair[1])))
 	return text

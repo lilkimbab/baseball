@@ -52,7 +52,7 @@ func build() -> void:
 			_pick(main, "감독 지휘 중 직접 플레이 횟수", "리그 감독 경기에서 결정적인 순간 직접 타석·마운드에 설 수 있는 횟수", ["0", "3", "5", "-1"], ["0", "3", "5", "무제한"], str(Settings.interventions), func(v: String) -> void: Settings.interventions = int(v))
 			_pick(main, "수비 방식", "수동: 땅볼과 몸을 날려야 하는 타구는 야수를 W A S D로 직접 움직이고 Space로 몸을 날립니다(평범한 뜬공과 확실한 안타는 자동). 송구는 두 방식 모두 방향 키", ["0", "1"], ["자동", "수동"], "1" if Settings.manual_fielding else "0", func(v: String) -> void: Settings.manual_fielding = v == "1")
 			_pick(main, "직접 수비 시점", "직접 수비할 때의 카메라: 선수의 눈높이 또는 어깨 뒤", ["eyes", "shoulder"], ["선수 눈(1인칭)", "어깨 뒤"], Settings.fielding_view, func(v: String) -> void: Settings.fielding_view = v)
-			_switch(main, "커리어 투수: 전 타자 상대", "커리어 투수로 등판하면 모든 타자를 직접 상대합니다(끄면 중요한 장면만)", Settings.pitch_all, func(on: bool) -> void: Settings.pitch_all = on)
+			_switch(main, "전설의 시작 투수: 전 타자 상대", "전설의 시작에서 투수로 등판하면 모든 타자를 직접 상대합니다(끄면 중요한 장면만)", Settings.pitch_all, func(on: bool) -> void: Settings.pitch_all = on)
 		"screen":
 			_switch(main, "전체 화면", "끄면 창 모드", Settings.fullscreen, func(on: bool) -> void: Settings.fullscreen = on)
 			var res_ids: Array = []
@@ -64,7 +64,7 @@ func build() -> void:
 			_pick(main, "품질", "그림자·관중·건물의 세밀함. 낮을수록 빠릅니다", ["0", "1", "2"], ["낮음", "보통", "높음"], str(Settings.quality), func(v: String) -> void: Settings.quality = int(v))
 			_pick(main, "업스케일링 (FSR 2)", "작게 그린 뒤 키워서 프레임을 올립니다", ["0", "1", "2", "3"], ["끄기", "품질", "균형", "원본 크기"], str(Settings.upscale), func(v: String) -> void: Settings.upscale = int(v))
 			_pick(main, "프레임 제한", "초당 최대 프레임. 노트북은 60을 권장합니다", ["30", "60", "0"], ["30", "60", "없음"], str(Settings.fps_limit), func(v: String) -> void: Settings.fps_limit = int(v))
-			_pick(main, "글꼴", "메뉴와 경기 화면의 글꼴(바꾸면 화면을 다시 불러옵니다)", ["paperlogy", "football", "nanum_neo", "score", "dos_gothic", "dos_saemmul", "sam3"], ["페이퍼로지", "풋볼고딕", "나눔스퀘어", "에스코어", "도스고딕", "도스샘물", "삼국지3"], Settings.menu_font, func(v: String) -> void:
+			_pick(main, "글꼴", "메뉴와 경기 화면의 글꼴(바꾸면 화면을 다시 불러옵니다)", ["nexon_lv2", "paperlogy", "football", "nanum_neo", "score", "dos_gothic", "dos_saemmul", "sam3"], ["넥슨 Lv.2", "페이퍼로지", "풋볼고딕", "나눔스퀘어", "에스코어", "도스고딕", "도스샘물", "삼국지3"], Settings.menu_font, func(v: String) -> void:
 				Settings.menu_font = v
 				UiTheme.set_menu_family(v)
 				# Everything on screen was drawn in the old face.

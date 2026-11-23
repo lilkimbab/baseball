@@ -62,10 +62,6 @@ var played: Dictionary[String, int] = {}
 var caster: CasterVoice
 var _log_seen := 0
 var _called_play: Object = null
-## The caster's calls as the ball goes (said before the play is over, kept ready by the server).
-const CALLS := {PaResult.Kind.HOME_RUN: ["큽니다, 큽니다, 넘어갑니다!", "넘어갔습니다!", "맞는 순간 홈런!"],
-	PaResult.Kind.DOUBLE: ["빠졌습니다! 장타!", "외야를 가릅니다!"], PaResult.Kind.TRIPLE: ["빠졌습니다! 장타!", "펜스까지 굴러갑니다!"],
-	PaResult.Kind.SINGLE: ["안타!", "빠져나갑니다!"]}
 
 
 func _ready() -> void:
@@ -153,13 +149,41 @@ func _cast() -> void:
 		return
 	if m._play != null and m._play != _called_play and not m._play.foul:
 		_called_play = m._play
-		var calls: Array = CALLS.get(m._play.result, [])
-		if not calls.is_empty():
-			caster.say(str(calls[_rng.next_int(calls.size())]), &"hot" if m._play.result != PaResult.Kind.SINGLE else &"warm")
+		# A call as the ball goes, as a KBO caster builds one (the user, 2026-11-23): the fielder
+		# going back, the wall, pulled or pushed; the line after it tells how it ended.
+		var group := call_group(m._play)
+		if group != "" and m.commentary != null:
+			var g := m.game
+			var batter := g.batting_team().player(g.batter_id())
+			var pitcher := g.fielding_team().player(g.pitcher_id())
+			var left := batter != null and batter.batting_side(pitcher.throws if pitcher != null else &"R") == &"L"
+			# (Outfield words for a ball to the outfield, infield ones in the infield: the voice
+			# server has those ready.)
+			var outfield := m._play.direction >= 7
+			var slots := Commentary.direction_slots(m._play.direction, left) if outfield == (group != "call_infield") else {}
+			var line := m.commentary.call_line(group, _rng.next_int(1000), slots)
+			if line != "":
+				caster.say(line, &"warm" if group == "call_single" or group == "call_infield" else &"hot")
 	if m.log.size() > _log_seen:
 		if _log_seen > 0 or m.log.size() == 1:
 			caster.say(m.log[m.log.size() - 1], m.last_mood)
 		_log_seen = m.log.size()
+
+
+## Which of Commentary.CALL_KEYS fits a ball in play: a home run or a fly caught near the
+## wall the long build ("좌익수 뒤로!"), an extra-base hit off the wall too; one into the gap,
+## a single to the outfield, one in the infield; nothing for an ordinary out.
+static func call_group(play: PlayResult) -> String:
+	match play.result:
+		PaResult.Kind.HOME_RUN:
+			return "call_deep"
+		PaResult.Kind.FLY_OUT, PaResult.Kind.SAC_FLY:
+			return "call_deep" if play.short_of_fence < 12.0 else ""
+		PaResult.Kind.DOUBLE, PaResult.Kind.TRIPLE:
+			return "call_deep" if play.short_of_fence < 6.0 else "call_gap"
+		PaResult.Kind.SINGLE:
+			return "call_single" if play.direction >= 7 else "call_infield"
+	return ""
 
 
 func _game() -> GameState:

@@ -932,8 +932,7 @@ func _finish_steal() -> bool:
 		return false
 	if e.fielders == "E2":
 		_apply(e)
-		banner = last_text
-		banner_time = 2.2
+		show_play_line(2.2)
 		return false
 	var m := e.moves[0]
 	var cover := Position.Kind.SS if _steal_from == 1 else Position.Kind.B3
@@ -1618,6 +1617,15 @@ func _id_on(base: int) -> String:
 	return r.player_id if r != null else ""
 
 
+## How a play went, over the field in big letters: only with the commentary line off, as the
+## line at the foot of the screen (and the caster) already tell it (the user, 2026-11-23).
+func show_play_line(seconds: float) -> void:
+	if Settings.commentary:
+		return
+	banner = last_text
+	banner_time = seconds
+
+
 func _pitch_banner(events: Array[GameEvent]) -> String:
 	for e: GameEvent in events:
 		if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
@@ -1692,8 +1700,7 @@ func _end_play() -> void:
 		_apply(e)
 	_pending.clear()
 	if _play != null and not _play.foul:
-		banner = last_text
-		banner_time = 2.6
+		show_play_line(2.6)
 	if last_outcome != null and last_outcome.walk_off and broadcast.enabled and park != null:
 		# A walk-off: his side pours out to mob him at the plate.
 		_plan_walk_off(last_outcome.batter_id)
@@ -1780,38 +1787,91 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 			var lead_after := game.score[side] - game.score[1 - side]
 			var runs := out.scored.size()
 			key = commentary.best_key(key, runs, out.walk_off, lead_before <= 0 and lead_after > 0, lead_before < 0 and lead_after == 0, out.half_over and out.left_on_base >= 2)
+			var play := _play if _play != null and _play.result == e.result else null
 			if key == "home_run" and wind > 2.5:
 				key = "home_run_wind"
 			elif key == "fly_out" and wind < -2.5 and deep:
 				key = "fly_out_wind"
+			elif play != null and play.hard_made and play.hard_air and (key.begins_with("fly_out") or key.begins_with("line_out")):
+				# A ball a fielder got to with no time to spare and held: in the air a great
+				# catch, on the ground a diving stop (before a jam escaped: the catch is the story).
+				key = "great_catch"
+			elif play != null and play.hard_made and not play.hard_air and key.begins_with("ground_out"):
+				key = "great_stop"
+			elif key == "fly_out" and play != null and play.short_of_fence < 12.0:
+				key = "fly_out_deep"
+			elif key == "single" and e.direction >= 1 and e.direction <= 6:
+				key = "single_infield"
 			last_mood = Commentary.mood_of(key)
-			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, runs)
+			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, runs, "", 0, _line_slots(e, out, p, key))
 		GameEvent.Kind.STEAL, GameEvent.Kind.PICKOFF:
 			var m := e.moves[0]
 			var runner := team.player(out.runner_ids[0]) if not out.runner_ids.is_empty() else null
 			var who := runner.name if runner != null else ""
 			var base := m.out_at if m.is_out() else m.to
+			var slots := _line_slots(e, out, null, "")
 			if e.kind == GameEvent.Kind.PICKOFF:
-				return commentary.line("pickoff", pick, "", "", "", 0, who, base)
-			return commentary.line("caught_stealing" if m.is_out() else "steal", pick, "", "", "", out.scored.size(), who, mini(base, 4))
+				return commentary.line("pickoff", pick, "", "", "", 0, who, base, slots)
+			return commentary.line("caught_stealing" if m.is_out() else "steal", pick, "", "", "", out.scored.size(), who, mini(base, 4), slots)
 		GameEvent.Kind.WILD_PITCH:
-			return commentary.line("wild_pitch", pick, "", "", "", out.scored.size())
+			return commentary.line("wild_pitch", pick, "", "", "", out.scored.size(), "", 0, _line_slots(e, out, null, ""))
 		GameEvent.Kind.PASSED_BALL:
-			return commentary.line("passed_ball", pick, "", "", "", out.scored.size())
+			return commentary.line("passed_ball", pick, "", "", "", out.scored.size(), "", 0, _line_slots(e, out, null, ""))
 		GameEvent.Kind.SUBSTITUTION:
 			var t := game.teams[e.team]
 			var who := t.player(e.in_id)
+			var gone := t.player(e.out_id)
+			var slots := {"team": t.short_name, "out": gone.name if gone != null else ""}
+			var key := "substitution"
+			match e.change:
+				GameEvent.Change.PITCHER:
+					key = "pitching_change"
+				GameEvent.Change.PINCH_HITTER:
+					key = "pinch_hitter"
+				GameEvent.Change.PINCH_RUNNER:
+					key = "pinch_runner"
+			var line := commentary.line(key, pick, who.name if who != null else e.in_id, "", "", 0, "", 0, slots)
 			if e.change == GameEvent.Change.PITCHER:
-				var line := "%s 투수 교체: %s" % [t.short_name, who.name if who != null else e.in_id]
 				# (The event is applied by now: how warm he came in is known.)
 				var warm := float(game.entered_warmth.get(e.in_id, 1.0))
+				# (How warm he is: always when he is not, when he is only on a short line.)
 				if warm < 0.6:
-					line += " — 몸을 다 풀지 못하고 올라옵니다"
-				elif warm >= 0.95:
-					line += " — 불펜에서 충분히 몸을 풀었습니다"
-				return line
-			return "%s 교체: %s" % [t.short_name, who.name if who != null else e.in_id]
+					line += " — 몸이 덜 풀린 채 올라옵니다"
+				elif warm >= 0.95 and line.length() <= 20:
+					line += " — 충분히 몸을 풀었습니다"
+			return line
 	return ""
+
+
+## What a line of play-by-play may tell beyond the play (Commentary.SLOTS): where the ball went
+## and how it was hit, the pitch of the at-bat that ended it, the score with the batting side
+## first, the club, the inning, the pitcher, his strikeouts today (from three), and on a home
+## run the man's count for the season (in a league or a career).
+func _line_slots(e: GameEvent, out: FlowOutcome, batter: Player, key: String) -> Dictionary:
+	var side := out.batting_before
+	var team := game.teams[side]
+	var slots := {}
+	if batter != null:
+		var hand := game.teams[1 - side].player(out.pitcher_id)
+		slots = Commentary.direction_slots(e.direction, batter.batting_side(hand.throws if hand != null else &"R") == &"L")
+	slots["pitch"] = Commentary.pitch_word(e.pitches if e.kind == GameEvent.Kind.PLATE_APPEARANCE else 0)
+	# (The leading side's runs first, as a caster says the score.)
+	slots["score"] = "%d대 %d" % [maxi(game.score[0], game.score[1]), mini(game.score[0], game.score[1])]
+	slots["team"] = team.short_name
+	slots["inning"] = "%d회%s" % [out.inning_before, "초" if out.top_before else "말"]
+	var pitcher := game.teams[1 - side].player(out.pitcher_id)
+	slots["pitcher"] = pitcher.name if pitcher != null else ""
+	if key.begins_with("strikeout") and scorer != null:
+		var k := scorer.book.pitch(out.pitcher_id).strikeouts
+		slots["k"] = str(k) if k >= 3 else ""
+	if key.begins_with("home_run"):
+		slots["homer"] = ["솔로", "투런", "쓰리런", "만루"][clampi(out.scored.size(), 1, 4) - 1]
+	if key.begins_with("home_run") and batter != null:
+		var s := _season()
+		if s != null and scorer != null:
+			var before: BattingLine = s.book.batting.get(batter.id)
+			slots["hr"] = str((before.home_runs if before != null else 0) + scorer.book.bat(batter.id).home_runs)
+	return slots
 
 
 ## The duel HUD's mode follows the player's role this half-inning.
@@ -1913,8 +1973,7 @@ func _drain() -> bool:
 		if e.kind == GameEvent.Kind.SUBSTITUTION:
 			_time_called = 0.0
 		elif not game.over:
-			banner = last_text
-			banner_time = 2.2
+			show_play_line(2.2)
 	return false
 
 

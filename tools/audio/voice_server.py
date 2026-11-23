@@ -80,6 +80,53 @@ def speak(text, mood):
         return f.read()
 
 
+COMMENTARY = os.path.join(ROOT, "game", "data", "commentary.ko.json")
+POSITIONS = ["투수", "포수", "1루수", "2루수", "3루수", "유격수", "좌익수", "중견수", "우익수"]
+CALL_MOODS = {"call_deep": "hot", "call_gap": "hot", "call_single": "warm", "call_infield": "warm"}
+
+
+def direction_slots(direction, bats_left):
+    """As Commentary.direction_slots in the game: the fielder, the side, the wall, the swing."""
+    out = {"field": POSITIONS[direction - 1]}
+    left_side, right_side = direction in (5, 6, 7), direction in (3, 4, 9)
+    if left_side:
+        out["side"] = "왼쪽"
+    elif right_side:
+        out["side"] = "오른쪽"
+    elif direction != 2:
+        out["side"] = "가운데"
+    if direction >= 7:
+        out["wall"] = ["좌측 담장", "가운데 담장", "우측 담장"][direction - 7]
+    if direction in (1, 8):
+        out["swing"] = "받아쳤습니다"
+    elif left_side or right_side:
+        out["swing"] = "잡아당겼습니다" if left_side != bats_left else "밀어쳤습니다"
+    return out
+
+
+def calls():
+    """Every call the game can make, filled for each direction and side: [(text, mood)]."""
+    import json
+    import re
+    with open(COMMENTARY, encoding="utf-8") as f:
+        lines = json.load(f)
+    out = []
+    for key, mood in CALL_MOODS.items():
+        for template in lines.get(key, []):
+            slots = set(re.findall(r"{(\w+)}", template))
+            for direction in (range(1, 7) if key == "call_infield" else range(7, 10)):
+                for bats_left in (False, True):
+                    fill = direction_slots(direction, bats_left)
+                    if not slots <= set(fill):
+                        continue
+                    text = template
+                    for k in slots:
+                        text = text.replace("{%s}" % k, fill[k])
+                    if (text, mood) not in out:
+                        out.append((text, mood))
+    return out
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -117,11 +164,14 @@ def main():
     if "--port" in sys.argv:
         port = int(sys.argv[sys.argv.index("--port") + 1])
     _load()
-    # The calls the game makes as a ball goes (MatchSound.CALLS), ready before they are asked.
+    # The calls the game makes as a ball goes (the call_* lines of the commentary file, for every
+    # direction and either side of the plate), ready before they are asked.
     def warm():
-        for text, mood in [("큽니다, 큽니다, 넘어갑니다!", "hot"), ("넘어갔습니다!", "hot"), ("맞는 순간 홈런!", "hot"), ("빠졌습니다! 장타!", "hot"),
-                           ("외야를 가릅니다!", "hot"), ("펜스까지 굴러갑니다!", "hot"), ("안타!", "warm"), ("빠져나갑니다!", "warm")]:
-            speak(text, mood)
+        for text, mood in calls():
+            try:
+                speak(text, mood)
+            except Exception as e:  # noqa: BLE001
+                print("voice_server: warm-up:", e, flush=True)
     threading.Thread(target=warm, daemon=True).start()
     print("voice_server: %s on 127.0.0.1:%d" % (VOICE, port), flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

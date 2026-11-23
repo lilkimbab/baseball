@@ -64,7 +64,7 @@ func test_pitching_mode_waits_for_the_player_then_runs_the_gauge() -> void:
 	assert_eq(scene.decision.type.id, &"slider")
 	_advance(scene, roundi(PuppetClips.PITCH_RELEASE * 120.0) + 20)
 	assert_eq(scene.state, DuelScene.State.LIVE, "the ball is released at the end of the delivery")
-	assert_almost_eq(scene.duel.pitch.release_speed_kmh(), 132.0 * lerpf(0.93, 1.0, scene.power), 1.0)
+	assert_almost_eq(scene.duel.pitch.release_speed_kmh(), 132.0 * DuelScene.effort_for(scene.power), 1.0)
 
 
 func test_holding_the_button_too_long_still_throws_but_badly() -> void:

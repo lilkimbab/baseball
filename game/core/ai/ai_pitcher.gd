@@ -12,6 +12,10 @@ const ZONE_INTENT := [
 	[0.73, 0.67, 0.55],
 	[0.94, 0.90, 0.82],
 ]
+## A pitch's speed against the pitch's average (ArsenalPitch.velo_avg): from 2% under to 2%
+## over, so the average is the average.
+const EFFORT_LOW := 0.98
+const EFFORT_HIGH := 1.02
 ## Fastballs are thrown this much more often when behind, breaking balls when ahead.
 const BEHIND_FASTBALL := 1.8
 const AHEAD_BREAKING := 1.5
@@ -115,7 +119,9 @@ static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes
 	choice.type = pick.type
 	choice.target = target
 	choice.quality = clampf(QUALITY_BASE + QUALITY_BY_COMMAND * pick.command / 99.0 + rng.next_normal() * QUALITY_SPREAD, 0.0, 1.0)
-	choice.effort = rng.next_range(0.97, 1.0)
+	# Each pitch a little faster or slower than his average (a 147 fastball from 144 to 150, as a
+	# real one spreads): the average shown on his card is what his pitches come to.
+	choice.effort = rng.next_range(EFFORT_LOW, EFFORT_HIGH)
 	return choice
 
 
@@ -127,7 +133,7 @@ static func choose(catalog: Dictionary[StringName, PitchType], zone: StrikeZone,
 	choice.type = catalog[ids[rng.pick_weighted(weights)]]
 	choice.target = _zone_target(zone, PackedInt32Array(), 0, rng) if rng.chance(0.6) else _chase_target(zone, choice.type.family, false, rng)
 	choice.quality = rng.next_range(0.55, 1.0)
-	choice.effort = rng.next_range(0.97, 1.0)
+	choice.effort = rng.next_range(EFFORT_LOW, EFFORT_HIGH)
 	return choice
 
 

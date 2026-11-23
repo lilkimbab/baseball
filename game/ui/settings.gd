@@ -51,7 +51,7 @@ static var pitch_marker := true
 ## Slow-motion close-ups of a crushed ball and of a catch in doubt (PlayHighlight).
 static var highlights := true
 ## The menus' font family (UiTheme.MENU_FAMILIES).
-static var menu_font := "football"
+static var menu_font := "nexon_lv2"
 ## How hard batting and pitching are for the person (Difficulty.IDS).
 static var difficulty := "pro"
 static var _loaded := false
@@ -94,14 +94,16 @@ static func load_file() -> void:
 	landing_spot = bool(s.get("landing_spot", landing_spot))
 	commentary = bool(s.get("commentary", commentary))
 	pitch_marker = bool(s.get("pitch_marker", pitch_marker))
-	menu_font = str(s.get("menu_font", menu_font))
+	# (Files from before format 2 kept the old default face; the game faces replace it.)
+	if int(s.get("format", 1)) >= 2:
+		menu_font = str(s.get("menu_font", menu_font))
 	difficulty = str(s.get("difficulty", difficulty))
 	UiTheme.set_menu_family(menu_font)
 
 
 static func save_file() -> Error:
 	var d := {
-		"format": 1, "innings": innings, "pitch_clock": pitch_clock, "auto_changes": auto_changes,
+		"format": 2, "innings": innings, "pitch_clock": pitch_clock, "auto_changes": auto_changes,
 		"interventions": interventions, "pitch_all": pitch_all, "manual_fielding": manual_fielding, "fielding_view": fielding_view,
 		"highlights": highlights, "fullscreen": fullscreen,
 		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,

@@ -428,8 +428,7 @@ func apply_orders_now() -> void:
 		_apply(e)
 		changed = true
 		if e.kind != GameEvent.Kind.SUBSTITUTION and not game.over:
-			banner = last_text
-			banner_time = 2.2
+			show_play_line(2.2)
 	if changed and not game.over:
 		_dress_for_half()
 		_new_duel()
