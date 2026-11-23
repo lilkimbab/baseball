@@ -38,6 +38,10 @@ var _leaving := -1.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# An exported game finds its local content pack beside the executable.
+	if OS.has_feature("template"):
+		LocalContent.root = OS.get_executable_path().get_base_dir().path_join("content-local")
+	print("Moneyball %s · local content: %s" % [ProjectSettings.get_setting("application/config/version", ""), LocalContent.dir() if DirAccess.dir_exists_absolute(LocalContent.dir()) else "none"])
 	Settings.ensure_loaded()
 	Settings.apply(get_tree())
 	for path: String in WARM:

@@ -38,7 +38,7 @@ var _count := 0
 
 func _ready() -> void:
 	var path := MotionLibrary.pack_root().path_join(CONFIG)
-	if not FileAccess.file_exists(path) or DisplayServer.get_name() == "headless":
+	if not FileAccess.file_exists(path) or DisplayServer.get_name() == "headless" or AudioServer.get_driver_name() == "Dummy":
 		return
 	var cfg := JsonIO.read_object(path)
 	url = str(cfg.get("url", "")).trim_suffix("/")

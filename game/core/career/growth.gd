@@ -39,7 +39,10 @@ static func add(c: CareerPlayer, points: Dictionary[String, float]) -> void:
 
 
 ## Current value of a rating as growth sees it (a pitcher's velocity on the same scale: 140
-## km/h is 40, each km/h two points).
+## km/h is 40 and 162 km/h, about the fastest a man's fastball averages, is 99 — the user,
+## 2026-11-23: "even within 99 the velocity must get quite fast").
+const VELOCITY_ZERO := 140.0
+const VELOCITY_TOP := 162.0
 static func value(p: Player, rating: String) -> float:
 	match rating:
 		"contact":
@@ -65,7 +68,7 @@ static func value(p: Player, rating: String) -> float:
 		"stamina":
 			return p.pitching.stamina if p.pitching != null else 0.0
 		"velocity":
-			return 40.0 + (p.pitching.fastball_speed() - 140.0) * 2.0 if p.pitching != null else 0.0
+			return 40.0 + (p.pitching.fastball_speed() - VELOCITY_ZERO) * 59.0 / (VELOCITY_TOP - VELOCITY_ZERO) if p.pitching != null else 0.0
 		"movement":
 			return p.pitching.arsenal[0].movement if p.pitching != null and not p.pitching.arsenal.is_empty() else 0.0
 		"command":
@@ -73,16 +76,45 @@ static func value(p: Player, rating: String) -> float:
 	return 0.0
 
 
-## Past 99 (RatingScale.NATURAL) each point costs twice as much again every BEYOND_DOUBLING
-## points: the way to 130 is there for a career really worked at, and long.
-const BEYOND_DOUBLING := 10.0
+## High up a point is dearer (the user, 2026-11-23: "the top stays 130 for what comes later; for
+## now 99 must be very hard to pass, and 90 hard too"; a soak's pitcher had reached 130 at 35).
+## Harder by degrees the higher he goes (the user: "gradually harder as it rises — look at other
+## games"; The Show's Road to the Show asks more tokens each level up, NBA 2K's MyCAREER more VC
+## for each point near the top): from SOFT_WALL — 65 on the engine's scale, 83 as the screens show
+## it (RatingScale.shown), where the shown scale begins to squeeze — each point costs twice as
+## much again every SOFT_DOUBLING points, so that a shown point costs about 4 at 80, 20 at 85,
+## 76 at 90, 247 at 95 and 690 at 99 (in cost_base): from 85 to 90 twice the whole way from 63
+## to 85, from 90 to 99 some twenty-five times it. Past 99 (RatingScale.NATURAL) twice again
+## every BEYOND_DOUBLING (for later: TOP keeps a career at 99 for now).
+const SOFT_WALL := 65.0
+const SOFT_DOUBLING := 8.0
+const BEYOND_DOUBLING := 1.0
+## The highest a career's own work takes a rating, for now: 99 (the user, 2026-11-23: "every
+## rating to 99 for now; past it later, with a balance patch"). RatingScale.MAX stays 130 for
+## that, and the price past 99 above is kept for it.
+const TOP := RatingScale.NATURAL
+## A pitcher's points all go to a handful of ratings that make up his overall, a hitter's are
+## spread over batting, running and fielding: a pitcher's point costs this much more, so that the
+## two reach about the same heights (soaks, 2026-11-23: a starter at 90 by 25 and 94 at his peak
+## against a hitter's 85 with points as dear; at 1.5 times still 90 by 26).
+const PITCHING_SHARE := 2.2
+
+
+static func steepness(v: float) -> float:
+	var k := 1.0
+	if v >= SOFT_WALL:
+		k *= pow(2.0, (minf(v, RatingScale.NATURAL) - SOFT_WALL + 1.0) / SOFT_DOUBLING)
+	if v >= RatingScale.NATURAL:
+		k *= pow(2.0, (v - RatingScale.NATURAL + 1.0) / BEYOND_DOUBLING)
+	return k
 
 
 static func cost(c: CareerPlayer, rating: String, rules: CareerRules) -> float:
 	var v := value(c.player, rating)
 	var price := rules.cost_base * pow(1.0 + (v - 40.0) / 20.0, 2.0)
-	if v >= RatingScale.NATURAL:
-		price *= pow(2.0, (v - RatingScale.NATURAL + 1.0) / BEYOND_DOUBLING)
+	price *= steepness(v)
+	if rules.field_of(rating) == "pitching":
+		price *= PITCHING_SHARE
 	var type := rules.type_by_id(c.type_id)
 	if type != null and (type.strengths.has(rating) or (rating == "movement" and type.strengths.has("stuff"))):
 		price *= 1.0 - rules.type_discount
@@ -95,16 +127,22 @@ static func raise(c: CareerPlayer, rating: String, rules: CareerRules) -> bool:
 	var field := rules.field_of(rating)
 	if field == "" or (field == "pitching") != c.is_pitcher():
 		return false
-	if value(c.player, rating) >= RatingScale.MAX:
+	if value(c.player, rating) >= TOP:
 		return false
 	var price := cost(c, rating, rules)
 	if float(c.gp.get(field, 0.0)) < price:
 		return false
 	c.gp[field] = float(c.gp[field]) - price
 	if rating == "stamina":
-		c.player.pitching.stamina = minf(c.player.pitching.stamina + 1.0, RatingScale.MAX)
+		c.player.pitching.stamina = minf(c.player.pitching.stamina + 1.0, TOP)
 	elif rating == "velocity":
-		Training.grow(c.player, PackedStringArray(["velocity"]), 2.5, RatingScale.MAX)
+		Training.grow(c.player, PackedStringArray(["velocity"]), 2.5, TOP)
+		# (No faster than VELOCITY_TOP.)
+		var over := c.player.pitching.fastball_speed() - VELOCITY_TOP
+		if over > 0.0:
+			for a: ArsenalPitch in c.player.pitching.arsenal:
+				a.velo_avg -= over
+				a.velo_max -= over
 	else:
 		# The person raises one rating where the engine keeps two (the user: "not too many
 		# ratings"): 주력 is speed and base-running sense, 제구 the control of every pitch.
@@ -113,5 +151,5 @@ static func raise(c: CareerPlayer, rating: String, rules: CareerRules) -> bool:
 			keys.append("baserunning")
 		elif rating == "control":
 			keys.append("command")
-		Training.grow(c.player, keys, 1.0, RatingScale.MAX)
+		Training.grow(c.player, keys, 1.0, TOP)
 	return true

@@ -48,7 +48,7 @@ func test_the_tiers_run_from_black_to_diamond() -> void:
 	assert_gt(seen[5].b, 0.9, "past 99 diamond")
 
 
-func test_training_stops_at_99_and_a_career_goes_on_to_130() -> void:
+func test_training_and_a_career_stop_at_99_for_now() -> void:
 	var c := _career()
 	var p := c.player
 	p.batting.contact_r = 98.0
@@ -57,18 +57,22 @@ func test_training_stops_at_99_and_a_career_goes_on_to_130() -> void:
 	assert_eq(p.batting.contact_r, 99.0, "a club's training keeps to 99")
 	var rules := CareerIO.load_default()
 	var curve := func(v: float) -> float: return rules.cost_base * pow(1.0 + (v - 40.0) / 20.0, 2.0) * (1.0 - rules.type_discount)
-	assert_almost_eq(Growth.cost(c, "contact", rules), curve.call(99.0) * pow(2.0, 0.1), 1e-3)
-	p.batting.contact_r = 109.0
-	p.batting.contact_l = 109.0
-	assert_almost_eq(Growth.cost(c, "contact", rules), curve.call(109.0) * pow(2.0, 1.1), 1e-3, "past 99 the price doubles every ten")
-	p.batting.contact_r = 99.0
-	p.batting.contact_l = 99.0
+	var soft := pow(2.0, (99.0 - Growth.SOFT_WALL + 1.0) / Growth.SOFT_DOUBLING)
+	assert_almost_eq(Growth.cost(c, "contact", rules), curve.call(99.0) * soft * pow(2.0, 1.0 / Growth.BEYOND_DOUBLING), 1e-3)
+	p.batting.contact_r = 104.0
+	p.batting.contact_l = 104.0
+	assert_almost_eq(Growth.cost(c, "contact", rules), curve.call(104.0) * soft * pow(2.0, 6.0 / Growth.BEYOND_DOUBLING), 1e-3, "past 99 the price doubles every BEYOND_DOUBLING")
+	assert_gt(Growth.steepness(99.0), 20.0, "90 as shown is hard to pass, 99 harder (the user, 2026-11-23)")
+	assert_eq(Growth.steepness(Growth.SOFT_WALL - 1.0), 1.0, "below the wall the old curve")
+	p.batting.contact_r = 98.0
+	p.batting.contact_l = 98.0
 	c.gp["batting"] = 1e9
-	assert_true(Growth.raise(c, "contact", rules), "his own work takes him past 99")
-	assert_almost_eq(p.batting.contact_r, 100.0, 1e-6)
+	assert_true(Growth.raise(c, "contact", rules))
+	assert_almost_eq(p.batting.contact_r, 99.0, 1e-6)
+	assert_false(Growth.raise(c, "contact", rules), "for now his own work stops at 99 too (the user, 2026-11-23: past it later)")
 	p.batting.contact_r = 130.0
 	p.batting.contact_l = 130.0
-	assert_false(Growth.raise(c, "contact", rules), "but not past 130")
+	assert_false(Growth.raise(c, "contact", rules), "and never past 130")
 	# A day's form does not cut a 120 down to 99.
 	p.batting.power_r = 120.0
 	var today := p.with_form(1.0, {})

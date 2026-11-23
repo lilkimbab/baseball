@@ -8,8 +8,10 @@ extends RefCounted
 
 ## Of a regular season's days: so many in the second team for the talk.
 const LONG_STAY_SHARE := 0.4
-## A week's chance of a trade (from his second season), more for a regular who is not a star.
-const TRADE_WEEKLY := 0.012
+## A week's chance of a trade (from his second season), more for a regular who is not a star;
+## a star is seldom traded, and one a club has just signed to a deal of years not at all in its
+## first season and half as often after (a soak, 2026-11-23: stars moved every few years).
+const TRADE_WEEKLY := 0.004
 const TRADE_WEEKLY_REGULAR := 0.025
 ## A pitcher's chance, after a game rated this high, to pick up a pitch by himself.
 const PICK_UP_RATING := 8.0
@@ -23,11 +25,16 @@ static func day(cs: CareerSeason) -> void:
 	var days := maxi(cs.season.total_days(), 1)
 	if not cs.career.first_team and float(cs.futures_days) / days >= LONG_STAY_SHARE and not cs.events_seen.has("long_stay"):
 		cs.events_seen.append("long_stay")
-		cs.log.append("%d일: 구단 면담 — 2군 생활이 길어지고 있습니다. 이대로면 연봉 삭감이 예상됩니다." % (cs.season.day + 1))
-	if cs.season.day % 7 == 0 and cs.career.pro_years >= 1 and Trade.open(cs.season):
-		var regular := cs.career.first_team and CareerContract.performance(cs) < 1.4
-		var rng := Rng.new(hash("trade:%s:%d:%d" % [cs.career.player.id, cs.season.season_year, cs.season.day]))
-		if rng.chance(TRADE_WEEKLY_REGULAR if regular else TRADE_WEEKLY):
+		cs.log.append("%d일: 구단 면담. 2군 생활이 길어지면 연봉이 깎일 수 있습니다." % (cs.season.day + 1))
+	var c := cs.career
+	var just_signed := c.contract_years > 0 and c.contract_years >= c.contract_length
+	if cs.season.day % 7 == 0 and c.pro_years >= 1 and not just_signed and Trade.open(cs.season):
+		var regular := c.first_team and CareerContract.performance(cs) < 1.4
+		var rng := Rng.new(hash("trade:%s:%d:%d" % [c.player.id, cs.season.season_year, cs.season.day]))
+		var chance := TRADE_WEEKLY_REGULAR if regular else TRADE_WEEKLY
+		if c.contract_years > 0:
+			chance *= 0.5
+		if rng.chance(chance):
 			trade(cs, rng)
 
 
@@ -67,7 +74,7 @@ static func trade(cs: CareerSeason, rng: Rng) -> String:
 	RosterMoves.refill(s, from)
 	c.team_id = to.id
 	s.my_team = to.id
-	var line := "%d일: 트레이드 — %s에서 %s로%s" % [s.day + 1, from.name, to.name, " (상대: %s)" % back.name if back != null else ""]
+	var line := "%d일: 트레이드로 %s에서 %s로 이적%s" % [s.day + 1, from.name, to.name, " (상대: %s)" % back.name if back != null else ""]
 	cs.log.append(line)
 	cs.events_seen.append("trade:%d" % s.season_year)
 	CareerLegacy.note(cs.career, s.season_year, "trade", "%s 이적" % to.name, "%s에서 트레이드" % from.name, to.id)
@@ -92,5 +99,5 @@ static func after_game(cs: CareerSeason, report: CareerSeason.Report) -> String:
 		return ""
 	var t: PitchType = cs.season.catalog.get(id)
 	var name := t.label if t != null else String(id)
-	cs.log.append("%d일: 새 구종 습득 — 던지다 보니 %s의 감을 잡았습니다" % [cs.season.day + 1, name])
+	cs.log.append("%d일: 던지다 보니 %s 감을 잡았습니다" % [cs.season.day + 1, name])
 	return "새 구종: %s" % name

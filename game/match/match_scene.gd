@@ -239,6 +239,9 @@ var _box := Vector3(-1.05, 0.25, 0.0)
 func _ready() -> void:
 	_read_arguments()
 	_start_game()
+	_warm_motions()
+	if use_models and SkinnedPuppet.available():
+		SkinnedPuppet.warm()
 	super._ready()
 	_apply_weather()
 	_box = Field.to_field(batter.position)
@@ -335,6 +338,29 @@ func _read_arguments() -> void:
 		away_index = int(str(args["away"]))
 	if args.has("home"):
 		home_index = int(str(args["home"]))
+
+
+## Every man's recorded motions read now, on a worker thread while the game loads, not when he
+## first comes up (that stalled the game: the user, 2026-11-23).
+func _warm_motions() -> void:
+	if game == null:
+		return
+	var keys: Array = []
+	for side: int in 2:
+		for p: Player in game.teams[side].players.values():
+			if p.is_pitcher():
+				var pf := FormCatalog.pitch_form(p)
+				if pf != "":
+					keys.append([&"pitch", pf])
+			for throws: StringName in [&"R", &"L"]:
+				var sf := FormCatalog.swing_form(p, throws)
+				if sf != "":
+					keys.append([&"swing", sf])
+					keys.append([&"swing", sf + "_high"])
+					keys.append([&"swing", sf + "_low"])
+	keys.append([&"pitch", &"default"])
+	keys.append([&"swing", &"default"])
+	MotionLibrary.warm(keys)
 
 
 func _start_game() -> void:
@@ -1519,7 +1545,7 @@ func _finish_pitch() -> void:
 		var who := game.fielding_team().player(game.pitcher_id())
 		var said := resolver.last_call
 		if said.ends_with("퇴장") and who != null:
-			said = "%s — %s" % [said, who.name]
+			said = "%s %s" % [who.name, said]
 		banner = said if banner == "" else "%s · %s" % [banner, said]
 		banner_time = 3.4
 		last_text = "주심 %s" % said
@@ -1856,9 +1882,9 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 				var warm := float(game.entered_warmth.get(e.in_id, 1.0))
 				# (How warm he is: always when he is not, when he is only on a short line.)
 				if warm < 0.6:
-					line += " — 몸이 덜 풀린 채 올라옵니다"
+					line += ". 몸이 덜 풀린 채 올라옵니다"
 				elif warm >= 0.95 and line.length() <= 20:
-					line += " — 충분히 몸을 풀었습니다"
+					line += ". 충분히 몸을 풀었습니다"
 			return line
 	return ""
 

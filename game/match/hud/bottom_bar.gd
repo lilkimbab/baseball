@@ -90,13 +90,13 @@ func _card(rect: Rect2, side: int, head: String, p: Player, ovr: int, note: Stri
 	# writes them (the user, 2026-11-23: no gold here).
 	var number := str(p.number)
 	var digits := UiTheme.numeric(true, true)
-	var chip := Rect2(Vector2(x, rect.position.y + 36.0), Vector2(digits.get_string_size(number, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26).x + 16.0, 32.0))
+	var chip := Rect2(Vector2(x, rect.position.y + 36.0), Vector2(shaped(digits, number, 26).get_line_width() + 16.0, 32.0))
 	draw_colored_polygon(plate_shape(chip, 6.0), Color(1.0, 1.0, 1.0, 0.94))
 	var ink := HudCanvas.club_colour(club)
 	if ink.get_luminance() > 0.55:
 		ink = ink.darkened(0.55)
 	var f := digits
-	draw_string(f, Vector2(chip.position.x, chip.position.y + 26.0), number, HORIZONTAL_ALIGNMENT_CENTER, chip.size.x, 26, ink)
+	line_at(f, Vector2(chip.position.x, chip.position.y + 26.0), number, HORIZONTAL_ALIGNMENT_CENTER, chip.size.x, 26, ink)
 	var nx := chip.end.x + 10.0
 	var size := 28
 	while size > 20 and text_width(p.name, size, 800) > right - nx:

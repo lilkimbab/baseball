@@ -277,7 +277,7 @@ baseball/
                   # 목표 장면 촬영: Godot으로 res://tools/closeup_shot.gd 실행 (Windows GPU 권장)
 ```
 
-헤드리스 도구 스크립트는 `--` 뒤의 인자를 `OS.get_cmdline_user_args()`로 읽는다(`tools/cmd_args.gd`).
+헤드리스 도구 스크립트는 `--` 뒤의 인자를 `OS.get_cmdline_user_args()`로 읽는다(`core/io/cmd_args.gd`, 게임의 경기 장면도 쓴다).
 
 ## 9. 작업 흐름
 

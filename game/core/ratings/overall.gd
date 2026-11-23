@@ -31,7 +31,9 @@ static func pitcher(player: Player, catalog: Dictionary[StringName, PitchType]) 
 	var r := player.pitching
 	if r == null:
 		return 0.0
-	var speed := 50.0 + 15.0 * (r.fastball_speed() - FASTBALL_MEAN) / FASTBALL_SD
+	# (At most 99, as every other part: 159 km/h; a career's fastball grown past it must not
+	# carry the overall past 99 by itself.)
+	var speed := minf(50.0 + 15.0 * (r.fastball_speed() - FASTBALL_MEAN) / FASTBALL_SD, RatingScale.NATURAL)
 	var lasting := r.stamina if player.role() == &"SP" else r.composure
 	var variety := clampf(50.0 + 10.0 * (r.arsenal.size() - 3), 30.0, 80.0)
 	return 0.30 * r.stuff(catalog) + 0.25 * r.control + 0.15 * speed + 0.10 * r.breaking(catalog) + 0.10 * lasting + 0.10 * variety

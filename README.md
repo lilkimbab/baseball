@@ -8,6 +8,7 @@
 
 🏟️ KBO를 닮은 리그에서 펼쳐지는 진짜 야구 🏟️
 
+![Version](https://img.shields.io/badge/버전-1.0.0-C8102E)
 ![Godot](https://img.shields.io/badge/Godot-4.7-478CBF?logo=godotengine&logoColor=white)
 ![Platform](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
 
@@ -51,12 +52,21 @@
 
 ---
 
-## ▶️ 실행
+## 📦 다운로드
+
+[Releases](../../releases/latest)에서 `Moneyball-1.0.0-windows.zip`을 받아 압축을 풀고 `Moneyball.exe`를 실행하세요.
+
+- Windows 10/11 64비트, Vulkan을 지원하는 그래픽 카드 (GTX 1060급이면 1080p 60fps)
+- 긴 연출은 스페이스바로 건너뛸 수 있습니다.
+- 저장 데이터는 `%APPDATA%\Godot\app_userdata\Moneyball\`에 남습니다.
+
+## ▶️ 소스로 실행
 
 ```bash
-./dev play
+./dev play      # 게임 실행
+./dev release   # 배포판 만들기 (build/release/)
 ```
 
 [게임 구성](docs/01-game-design.md) · [기술 문서](docs/) · [개발 기록](docs/10-history.md)
 
-<sub>넥슨에서 서비스했던 온라인 야구 게임 「프로야구 2K14」(서비스 종료)를 참고해 만든 개인 비상업 프로젝트입니다. 참고작의 이름·화면·에셋은 사용하지 않았습니다. 게임 속 선수·구단·구장은 가상이며, 외부 자료의 출처와 이용 조건은 각 폴더의 LICENSE와 `game/assets/CREDITS.md`에 있습니다.</sub>
+<sub>넥슨에서 서비스했던 온라인 야구 게임 「프로야구 2K14」(서비스 종료)를 참고해 만든 개인 비상업 프로젝트입니다. 참고작의 이름·화면·에셋은 사용하지 않았습니다. 게임 속 선수·구단은 가상이며, 실제 시즌 팩의 구단·선수 이름도 실제와 다르게 바꾼 이름입니다. 외부 자료의 출처와 이용 조건은 배포판의 `CREDITS.txt`, 각 폴더의 LICENSE와 `game/assets/CREDITS.md`에 있습니다. 비상업 조건(CC BY-NC-SA 4.0)의 자료가 들어 있어 판매할 수 없습니다.</sub>

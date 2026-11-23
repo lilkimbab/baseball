@@ -100,7 +100,32 @@ func _build_options(parent: Control) -> void:
 	p.body.add_child(UiKit.selector("시간", ["day", "dusk", "night"], ["주간", "석양", "야간"], time, func(v: String) -> void:
 		time = v
 		refresh()))
-	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	# Today's starters, as a broadcast's pre-game card; then the park in a picture, so the column
+	# is not left empty above the button (the user, 2026-11-23).
+	p.body.add_child(UiKit.rule())
+	p.body.add_child(UiKit.caption("예고 선발"))
+	var catalog := PitchCatalogIO.load_default()
+	for t: Team in [_clubs[away_index], _clubs[home_index]]:
+		var who := t.starter_ahead(0)
+		if who == null:
+			continue
+		var row := UiKit.hbox(10)
+		p.body.add_child(row)
+		row.add_child(UiKit.club_mark(t, 34.0))
+		var name := UiKit.label(who.name, 20, Color.WHITE, 700)
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name)
+		var raw := Overall.pitcher(who, catalog)
+		row.add_child(UiKit.number(UiTheme.shown_text(raw), 24, UiTheme.rating_color(raw)))
+	var art := TextureRect.new()
+	art.texture = load(Loading.ART_DEFAULT) as Texture2D
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	art.custom_minimum_size.y = 60.0
+	art.clip_contents = true
+	art.modulate = Color(1.0, 1.0, 1.0, 0.85)
+	p.body.add_child(art)
 	var start_button := UiKit.button("경기 시작", start, "play", "primary")
 	start_button.add_theme_font_size_override("font_size", 28)
 	start_button.disabled = away_index == home_index

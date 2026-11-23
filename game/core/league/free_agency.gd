@@ -19,6 +19,8 @@ extends RefCounted
 ## tests/core/league/test_free_agency.gd).
 
 const MINIMUM := 3000
+## The most a man is paid in a year (10,000 won): about the KBO's best, 25억.
+const MOST := 250000
 ## The salary cap (the KBO's 경쟁균형세 line, by year: 137억 1,165만 in 2025, then 5% more each
 ## year to 2028), on the annual values of a club's CAP_PLAYERS best-paid local men. A club over
 ## it pays OVER_TAX of what is over; the computer's clubs keep under it.
@@ -90,7 +92,7 @@ static func market_value(z: float, age: int) -> int:
 	var v := 3000.0 * exp(2.0 + 1.25 * z)
 	if age >= 32:
 		v *= maxf(1.0 - 0.09 * float(age - 31), 0.35)
-	return clampi(roundi(v / 100.0) * 100, MINIMUM, 250000)
+	return clampi(roundi(v / 100.0) * 100, MINIMUM, MOST)
 
 
 ## How many years a club offers him: four for the best, fewer for the rest and the old; six for a
@@ -154,10 +156,17 @@ static func _grouped(n: int) -> String:
 
 
 ## A man signed year by year before free agency: a share of what he would be worth on the market,
-## more with each season counted — half of it by the eighth (A: the KBO's young stars before
-## free agency earn a third to a half of what they sign for after it).
+## growing by about half with each season counted, to at most RESERVE_MOST. As the KBO's young
+## stars: the best second-year man about 1억, the fourth 3.9억 and the fifth 5.5억 (이정후,
+## 강백호), the seventh 11억 — beside a market top of 25억 (a soak, 2026-11-23, had a fourth-year
+## man at 8.9억 with a share growing by a fixed step).
+const RESERVE_FIRST := 0.045
+const RESERVE_GROWTH := 1.46
+const RESERVE_MOST := 0.55
+
+
 static func reserve_salary(z: float, service: int) -> int:
-	var share := clampf(0.15 + 0.05 * float(service), 0.15, 0.55)
+	var share := clampf(RESERVE_FIRST * pow(RESERVE_GROWTH, float(service)), RESERVE_FIRST, RESERVE_MOST)
 	return maxi(MINIMUM, roundi(market_value(z, 27) * share / 100.0) * 100)
 
 
@@ -188,13 +197,15 @@ static func _first_contract(p: Player, season: Season) -> void:
 		return
 	var quality := clampf(0.85 + 0.2 * z, 0.5, 1.0)
 	var seasons := clampi(roundi(float(age - 20) * quality) + jitter, 0, 18)
-	if seasons <= FIRST_FA:
+	# (One year's men come of age each winter, as in a league that has run for years: a man with
+	# his eight seasons in has filed already, so the first winter does not bring them all at once.)
+	if seasons < FIRST_FA:
 		p.fa_count = 0
 		p.service = seasons
 	else:
 		var after := seasons - FIRST_FA
-		p.fa_count = 1 + (after - 1) / NEXT_FA
-		p.service = after - NEXT_FA * (p.fa_count - 1)
+		p.fa_count = 1 + after / NEXT_FA
+		p.service = after % NEXT_FA
 	p.contract_years = 0
 	if p.fa_count > 0:
 		var years := market_years(z, age - p.service)

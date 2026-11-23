@@ -43,31 +43,67 @@ func from_screen(p: Vector2) -> Vector2:
 	return p / k
 
 
+## Shaped lines kept between frames (the user, 2026-11-23: "the game stutters a little"). The HUD
+## is redrawn every frame and a font keeps only a few dozen shaped strings, so its Korean was
+## shaped again every frame: a manager's game ran at 42 fps with 70 ms hitches, and at 69 fps
+## with the HUD hidden. Each string is shaped once per face and size into a TextLine and drawn
+## from it (cleared when LINES_MOST pile up).
+static var _lines: Dictionary = {}
+const LINES_MOST := 4000
+
+
+static func shaped(f: Font, line: String, font_size: int) -> TextLine:
+	var key := "%d|%d|%s" % [f.get_instance_id(), font_size, line]
+	var t: TextLine = _lines.get(key)
+	if t == null:
+		if _lines.size() >= LINES_MOST:
+			_lines.clear()
+		t = TextLine.new()
+		t.add_string(line, f, font_size)
+		_lines[key] = t
+	return t
+
+
+## Draws a shaped line as draw_string would (`at` on the baseline, aligned within `width`), with
+## an outline under it when `outline` > 0.
+func line_at(f: Font, at: Vector2, line: String, align: HorizontalAlignment, width: float, font_size: int, color: Color, outline: int = 0, outline_color: Color = Color.BLACK) -> void:
+	if line == "":
+		return
+	var t := shaped(f, line, font_size)
+	var x := at.x
+	if width > 0.0:
+		if align == HORIZONTAL_ALIGNMENT_CENTER:
+			x += (width - t.get_line_width()) * 0.5
+		elif align == HORIZONTAL_ALIGNMENT_RIGHT:
+			x += width - t.get_line_width()
+	var top := Vector2(x, at.y - t.get_line_ascent())
+	if outline > 0 and outline_color.a > 0.0:
+		t.draw_outline(get_canvas_item(), top, outline, outline_color)
+	t.draw(get_canvas_item(), top, color)
+
+
 ## Text of the broadcast graphics (the score bug, the bars, the panels): the television face.
 func text(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, weight: int = 600) -> void:
 	var f := UiTheme.face(&"broadcast", weight)
 	var edge := UiTheme.ink_edge(color)
-	draw_string_outline(f, at, line, align, width, font_size, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
-	draw_string(f, at, line, align, width, font_size, color)
+	line_at(f, at, line, align, width, font_size, color, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
 
 
 func text_width(line: String, font_size: int, weight: int = 600) -> float:
-	return UiTheme.face(&"broadcast", weight).get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	return shaped(UiTheme.face(&"broadcast", weight), line, font_size).get_line_width()
 
 
 ## A figure or Latin capitals (a speed, a count, a score): the condensed face.
 func figure(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0, slanted: bool = false) -> void:
 	var f := UiTheme.numeric(slanted, true)
 	var edge := UiTheme.ink_edge(color)
-	draw_string_outline(f, at, line, align, width, font_size, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
-	draw_string(f, at, line, align, width, font_size, color)
+	line_at(f, at, line, align, width, font_size, color, 4, edge if edge.a > 0.0 else Color(UiTheme.SHADOW, UiTheme.SHADOW.a * color.a))
 
 
 ## What is shouted (an umpire's call, a judgment): the heavy face, with a dark edge.
 func shout(at: Vector2, line: String, font_size: int, color: Color, align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT, width: float = -1.0) -> void:
 	var f := UiTheme.face(&"impact")
-	draw_string_outline(f, at, line, align, width, font_size, maxi(font_size / 6, 4), Color(0.03, 0.03, 0.05, 0.9 * color.a))
-	draw_string(f, at, line, align, width, font_size, color)
+	line_at(f, at, line, align, width, font_size, color, maxi(font_size / 6, 4), Color(0.03, 0.03, 0.05, 0.9 * color.a))
 
 
 ## A plate of the menus (docs/04 section 5) drawn with plain draw calls (no shader, so a dozen
@@ -191,11 +227,11 @@ func club_band(rect: Rect2, colour: Color, cut: float = 0.0) -> void:
 func keycap(at: Vector2, key: String, label: String, font_size: int = 15) -> float:
 	var f := UiTheme.numeric(false, true)
 	var key_size := font_size + 1
-	var kw := maxf(f.get_string_size(key, HORIZONTAL_ALIGNMENT_LEFT, -1, key_size).x + 16.0, 26.0)
+	var kw := maxf(shaped(f, key, key_size).get_line_width() + 16.0, 26.0)
 	var cap := Rect2(at + Vector2(0.0, -font_size - 1.0), Vector2(kw, font_size + 8.0))
 	draw_rect(cap, Color(1.0, 1.0, 1.0, 0.13))
 	draw_rect(cap, Color(1.0, 1.0, 1.0, 0.42), false, 1.0)
-	draw_string(f, Vector2(cap.position.x, at.y + 1.0), key, HORIZONTAL_ALIGNMENT_CENTER, kw, key_size, Color.WHITE)
+	line_at(f, Vector2(cap.position.x, at.y + 1.0), key, HORIZONTAL_ALIGNMENT_CENTER, kw, key_size, Color.WHITE)
 	text(at + Vector2(kw + 8.0, 0.0), label, font_size, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
 	return kw + 8.0 + text_width(label, font_size, 500) + 22.0
 
@@ -219,7 +255,7 @@ func _keycaps_width(items: Array[PackedStringArray], font_size: int) -> float:
 	var f := UiTheme.numeric(false, true)
 	var total := 0.0
 	for item: PackedStringArray in items:
-		total += maxf(f.get_string_size(item[0], HORIZONTAL_ALIGNMENT_LEFT, -1, font_size + 1).x + 16.0, 26.0) + 8.0 + text_width(item[1], font_size, 500) + 22.0
+		total += maxf(shaped(f, item[0], font_size + 1).get_line_width() + 16.0, 26.0) + 8.0 + text_width(item[1], font_size, 500) + 22.0
 	return total
 
 

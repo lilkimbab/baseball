@@ -200,12 +200,22 @@ func set_body(height_m: float, b: StringName) -> void:
 		build = b
 		return
 	if b != build or model_for(b) != model_for(build):
+		var was := model_for(build)
 		build = b
 		height = height_m
 		var old := _model
 		remove_child(old)
-		old.queue_free()
-		_load_model()
+		var again: Node3D = null
+		if keep_worn:
+			_worn[was] = old
+			again = _worn.get(model_for(b))
+			_worn.erase(model_for(b))
+		else:
+			old.queue_free()
+		if again != null:
+			_adopt_model(again)
+		else:
+			_load_model()
 		_measure()
 		_measure_fingers()
 		_curls_for = -1
@@ -213,6 +223,8 @@ func set_body(height_m: float, b: StringName) -> void:
 		_dir_last.clear()
 		_wrist_last.clear()
 		_paint()
+		if logo != "":
+			set_logo(logo, _logo_colour)
 	elif not is_equal_approx(height_m, height):
 		height = height_m
 		_model.scale = Vector3.ONE * (height / mesh_top(_mesh.mesh))
@@ -241,7 +253,21 @@ var _mirrored := false
 var _mirror_only: Array[Array] = []
 
 
+## Keep the models this figure has worn (by model file), hidden, for when a man of that build comes
+## up again (the batter: a model loaded and painted anew for each batter of another build stalled
+## the game some 70 ms — the user, 2026-11-23: "it stutters a little"). Off for the rest: a field
+## of figures each keeping four would cost too much memory.
+var keep_worn := false
+var _worn: Dictionary = {}
+
+
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		for kept: Variant in _worn.values():
+			if is_instance_valid(kept):
+				(kept as Node).free()
+		_worn.clear()
+		return
 	if what == NOTIFICATION_LOCAL_TRANSFORM_CHANGED and _model != null and _mesh != null:
 		if (transform.basis.determinant() < 0.0) != _mirrored:
 			_paint()
@@ -257,10 +283,34 @@ func _recompute_frames() -> void:
 	_to_skeleton = _to_puppet.affine_inverse()
 
 
+## The body models, kept loaded once read: when the last figure of a build let go of its
+## model the engine dropped it, and the next batter of that build read the 13 MB file again,
+## stalling the game for a second or more at a change of sides (the user, 2026-11-23).
+static var _scenes: Dictionary = {}
+
+
+static func scene_for(b: StringName) -> PackedScene:
+	var path := model_for(b)
+	if not _scenes.has(path):
+		_scenes[path] = load(path) as PackedScene
+	return _scenes[path]
+
+
+## Every build's model read now (a game, as it loads).
+static func warm() -> void:
+	for b: StringName in [&"standard", &"lean", &"solid", &"heavy"]:
+		scene_for(b)
+
+
 func _load_model() -> void:
-	var model := (load(model_for(build)) as PackedScene).instantiate() as Node3D
+	var model := scene_for(build).instantiate() as Node3D
 	# glTF characters face +Z; the puppet's space faces -Z.
 	model.rotation.y = PI
+	_adopt_model(model)
+
+
+## Puts a model on the figure (one just loaded, or one it wore before) and finds its parts.
+func _adopt_model(model: Node3D) -> void:
 	add_child(model)
 	_model = model
 	_skeleton = model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
@@ -1008,29 +1058,33 @@ func _paint() -> void:
 	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
 		for surface: int in part.mesh.get_surface_count():
 			var original := part.mesh.surface_get_material(surface)
-			var source := original.resource_name
-			if source == "Jersey" or source == "Pants":
-				part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
-			elif source == "Hands":
-				part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original, build, _has_limbs(part)))
-			elif source == "Skin":
-				part.set_surface_override_material(surface, _skin(original, build, _has_limbs(part)))
-			elif part.name == &"Eyes":
-				part.set_surface_override_material(surface, _eyes(original))
-			elif String(part.name).begins_with("Hair"):
-				part.set_surface_override_material(surface, _hair_material(original))
-				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			elif String(part.name).begins_with("Eyebrows") or part.name == &"Eyelashes":
-				part.set_surface_override_material(surface, _brow_material(original, part.name == &"Eyelashes"))
-				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			elif plain.has(source):
-				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
+			_paint_one(part, surface, original, original.resource_name, plain)
 		if part.name == &"PantsStripe":
 			# (Not with the trousers pulled up to the knee: the strip runs to the ankle.)
 			part.visible = uniform.pants_stripe and not high_socks
 	_wear_sleeves()
 	if _mirrored:
 		_light_mirror_image()
+
+
+## One surface of the model in its material for the uniform, the skin, the hair...
+func _paint_one(part: MeshInstance3D, surface: int, original: Material, source: String, plain: Dictionary) -> void:
+	if source == "Jersey" or source == "Pants":
+		part.set_surface_override_material(surface, _garment_material(part, source == "Jersey"))
+	elif source == "Hands":
+		part.set_surface_override_material(surface, _glove_material() if gloves else _skin(original, build, _has_limbs(part)))
+	elif source == "Skin":
+		part.set_surface_override_material(surface, _skin(original, build, _has_limbs(part)))
+	elif part.name == &"Eyes":
+		part.set_surface_override_material(surface, _eyes(original))
+	elif String(part.name).begins_with("Hair"):
+		part.set_surface_override_material(surface, _hair_material(original))
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	elif String(part.name).begins_with("Eyebrows") or part.name == &"Eyelashes":
+		part.set_surface_override_material(surface, _brow_material(original, part.name == &"Eyelashes"))
+		part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	elif plain.has(source):
+		part.set_surface_override_material(surface, _plain_material(source, plain[source]))
 
 
 ## On a mirror image, a surface drawn from both sides becomes two drawn from one side each:
@@ -1046,17 +1100,31 @@ func _light_mirror_image() -> void:
 				continue
 			var key := m.get_instance_id()
 			if not copies.has(key):
-				var outside := m.duplicate() as BaseMaterial3D
-				outside.cull_mode = BaseMaterial3D.CULL_BACK
-				var inside := m.duplicate() as BaseMaterial3D
-				inside.cull_mode = BaseMaterial3D.CULL_FRONT
-				outside.next_pass = inside
+				# Kept on the material: made anew at every repaint, the two copies' shaders were
+				# compiled again each time — 1.2 to 1.9 s for each left-handed batter (the user,
+				# 2026-11-23: "it stutters").
+				var outside := m.get_meta(&"mirror_copy") as BaseMaterial3D if m.has_meta(&"mirror_copy") else null
+				if outside == null:
+					outside = m.duplicate() as BaseMaterial3D
+					outside.cull_mode = BaseMaterial3D.CULL_BACK
+					var inside := m.duplicate() as BaseMaterial3D
+					inside.cull_mode = BaseMaterial3D.CULL_FRONT
+					outside.next_pass = inside
+					m.set_meta(&"mirror_copy", outside)
+					# (The last copies held besides, so that the two shaders they need stay
+					# compiled when the garments they were made for are thrown away: a shader is
+					# dropped with the last material using it, and compiling it again took the
+					# second and more.)
+					_mirror_keep.append(outside)
+					if _mirror_keep.size() > 64:
+						_mirror_keep.pop_front()
 				copies[key] = outside
 			if part.get_surface_override_material(surface) == null:
 				_mirror_only.append([part, surface])
 			part.set_surface_override_material(surface, copies[key])
 
 
+static var _mirror_keep: Array[BaseMaterial3D] = []
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
 static var _skin_copies: Dictionary[int, ShaderMaterial] = {}
 static var _pores: NoiseTexture2D
@@ -1437,7 +1505,21 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	var bounds := part.mesh.get_aabb().size
 	var half_size := Vector2(bounds.x, bounds.y)
 	var pixels_per_metre := 1100.0 if is_jersey else 560.0
-	var old := part.get_node_or_null("Art")
+	var old := part.get_node_or_null("Art") as SubViewport
+	# The same uniform on him again with only the name and number changed (the next batter, in
+	# the same half): the garment's painting is drawn again where it is, not built anew. A new
+	# viewport and material for every man at the plate stalled the game about 70 ms each time
+	# (the user, 2026-11-23: "it stutters a little").
+	var look := "%d|%s|%s|%s" % [uniform.get_instance_id(), _mirrored, high_socks, gloves]
+	if old != null and str(old.get_meta(&"look", "")) == look and old.has_meta(&"material"):
+		for art: Node in old.find_children("*", "", true, false):
+			if art is UniformArt:
+				(art as UniformArt).style = uniform
+				if is_jersey:
+					_place_lettering(art as UniformArt, part.mesh.get_aabb())
+				(art as UniformArt).queue_redraw()
+		old.render_target_update_mode = SubViewport.UPDATE_ONCE
+		return old.get_meta(&"material") as StandardMaterial3D
 	if old != null:
 		old.free()
 	var viewport := SubViewport.new()
@@ -1515,6 +1597,8 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 		material.ao_texture = load(stem + "_shade.png") as Texture2D
 		material.ao_light_affect = 0.35
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	viewport.set_meta(&"look", look)
+	viewport.set_meta(&"material", material)
 	return material
 
 

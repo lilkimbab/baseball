@@ -960,6 +960,8 @@ func _build_players() -> void:
 	# Stage S3b: the pitcher and the batter use the player model; everyone else is still a mannequin.
 	pitcher = _add_puppet(Vector3(0.0, Field.RUBBER_Y, Field.MOUND_HEIGHT), PI, home, Color(0.1, 0.15, 0.35), use_models)
 	batter = _add_puppet(Vector3(-1.05, 0.25, 0.0), -PI / 2.0, away, Color(0.75, 0.12, 0.12), use_models)
+	if batter is SkinnedPuppet:
+		(batter as SkinnedPuppet).keep_worn = true
 	batter.show_bat = true
 	batter.show_glove = false
 	batter.headgear = &"helmet"

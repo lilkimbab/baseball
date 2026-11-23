@@ -155,11 +155,11 @@ static func _short(label: String, letters: int) -> String:
 
 ## Text and figures without the dark edge the HUD's text has (inside a filled segment).
 func _plain(at: Vector2, line: String, font_size: int, colour: Color, width: float) -> void:
-	draw_string(UiTheme.face(&"broadcast", 700), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
+	line_at(UiTheme.face(&"broadcast", 700), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
 
 
 func _plain_figure(at: Vector2, line: String, font_size: int, colour: Color, width: float) -> void:
-	draw_string(UiTheme.numeric(false, true), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
+	line_at(UiTheme.numeric(false, true), at, line, HORIZONTAL_ALIGNMENT_CENTER, width, font_size, colour)
 
 
 ## Ring drawn around the pitch target: fills while charging power, then closes in while the

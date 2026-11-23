@@ -333,6 +333,56 @@ case "$cmd" in
     "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution 1920x1080 --audio-driver Dummy \
       --script res://tools/screenshot.gd -- --scene "$scene" --out "$(wslpath -w "$out")"
     ;;
+  release)
+    # ./dev release   The Windows release, from game/export_presets.cfg, in build/release/:
+    # Moneyball-<version>/ (the game, the shareable part of the local content pack, the credits
+    # and licences) zipped as Moneyball-<version>-windows.zip, and a -full zip for one's own
+    # machines that also carries the personal-use uniform faces (never to be shared: their
+    # makers allow private use only). Needs the 4.7.2 export templates in
+    # ~/.local/share/godot/export_templates/4.7.2.stable/.
+    version="$(sed -n 's/^config\/version="\(.*\)"/\1/p' "$GAME/project.godot")"
+    name="Moneyball-$version"
+    rel="$ROOT/build/release"
+    out="$rel/$name"
+    rm -rf "$out" "$rel/$name"-windows*.zip
+    mkdir -p "$out/LICENSES/fonts"
+    "$GODOT" --headless --path "$GAME" --export-release "Windows Desktop" "$out/Moneyball.exe" 2>&1 | grep -E "^ERROR|SCRIPT ERROR" || true
+    [ -f "$out/Moneyball.pck" ] || { echo "release: the export failed"; exit 1; }
+    # The local pack's shareable part (docs/07): motions, recorded sounds and music, forms, the
+    # renamed real seasons. Not the raw downloads, the Rocketbox source, the caster's cache or
+    # the personal-use uniform faces.
+    pack="$ROOT/content-local"
+    if [ -d "$pack" ]; then
+      mkdir -p "$out/content-local/audio"
+      for d in animations forms rosters seasons; do [ -d "$pack/$d" ] && cp -r "$pack/$d" "$out/content-local/"; done
+      for d in crowd music sfx; do [ -d "$pack/audio/$d" ] && cp -r "$pack/audio/$d" "$out/content-local/audio/"; done
+    fi
+    for f in 읽어주세요.txt CREDITS.txt; do sed "s/{VERSION}/$version/g" "$ROOT/tools/release/$f" > "$out/$f"; done
+    "$GODOT" --headless --path "$GAME" --script res://tools/engine_licence.gd -- --out "$out/LICENSES/GODOT-LICENSE.txt" >/dev/null 2>&1
+    cp "$ROOT/.tools/godot-cpp/LICENSE.md" "$out/LICENSES/godot-cpp-LICENSE.txt" 2>/dev/null || true
+    cp "$GAME/ui/icons/LICENSE-phosphor.txt" "$out/LICENSES/Phosphor-Icons.txt"
+    cp "$GAME/assets/materials/LICENSE.txt" "$out/LICENSES/textures-and-skies.txt"
+    cp "$GAME/ui/art/emblems/LICENSE.md" "$out/LICENSES/emblems.txt"
+    f="$out/LICENSES/fonts"
+    cp "$GAME/ui/fonts/giants/LICENSE-Giants.txt" "$f/Giants.txt"
+    cp "$GAME/ui/fonts/nexon_lv2/LICENSE-NEXON.txt" "$f/NEXON.txt"
+    cp "$GAME/ui/fonts/Paperlogy-LICENSE.txt" "$f/Paperlogy.txt"
+    cp "$GAME/ui/fonts/BarlowCondensed-OFL.txt" "$f/BarlowCondensed.txt"
+    cp "$GAME/ui/fonts/nanum/LICENSE.txt" "$f/NanumSquareNeo.txt"
+    cp "$GAME/ui/fonts/dos/LICENSE.txt" "$f/DOS-fonts.txt"
+    cp "$GAME/assets/fonts/uniform/CollegeBlock-LICENSE.txt" "$f/CollegeBlock.txt"
+    for x in "$GAME"/assets/fonts/uniform/*-OFL.txt; do b="$(basename "$x" -OFL.txt)"; cp "$x" "$f/$b.txt"; done
+    { printf 'S-Core Dream: Copyright (c) S-Core Co., Ltd.\nGmarket Sans: Copyright (c) Gmarket Inc.\nGalmuri11: Copyright (c) Minseo Lee (quiple)\n\n'
+      sed -n '3,$p' "$GAME/ui/fonts/BarlowCondensed-OFL.txt"; } > "$f/SCoreDream-GmarketSans-Galmuri.txt"
+    cd "$rel"
+    zip -qr "$name-windows.zip" "$name"
+    if [ -d "$pack/fonts/uniform" ]; then
+      mkdir -p "$out/content-local/fonts" && cp -r "$pack/fonts/uniform" "$out/content-local/fonts/"
+      zip -qr "$name-windows-full.zip" "$name"
+      rm -rf "$out/content-local/fonts"
+    fi
+    ls -la "$rel"/"$name"-windows*.zip
+    ;;
   help|*)
     cat <<'EOF'
 Usage: ./dev <command>
@@ -353,6 +403,7 @@ Usage: ./dev <command>
   shot-win    save a GPU-rendered screenshot on Windows        [out.png] [scene]
   video       record a scripted batting and pitching demo      [out.mp4] [--bat n] [--pitch n]
   tool-win    run a script from game/tools on Windows (GPU)    <tool> <out prefix> [args]
+  release     export the Windows build and zip it with the shareable local content, credits, licences
 EOF
     ;;
 esac

@@ -75,7 +75,7 @@ static func save_pack(path: String, pack_id: String, pack_name: String, season: 
 ## The roster packs in the local content pack (content-local/rosters/: real seasons built by
 ## ./dev kbo, never in git), as [path, name] pairs, newest season first.
 static func local_packs() -> Array:
-	var dir := ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("content-local").path_join("rosters")
+	var dir := LocalContent.dir().path_join("rosters")
 	var out: Array = []
 	var d := DirAccess.open(dir)
 	if d == null:

@@ -88,6 +88,9 @@ func build() -> void:
 		for pair: Array in CAREER_TABS:
 			ids.append(pair[0])
 			labels.append(pair[1])
+			if pair[0] == "growth" and c.is_pitcher():
+				ids.append("pitches")
+				labels.append("구종 상점")
 		var tabs := UiKit.tabs(ids, labels, _tab, func(id: String) -> void:
 			_tab = id
 			refresh())
@@ -97,6 +100,8 @@ func build() -> void:
 	match _tab:
 		"growth":
 			_build_growth(cs)
+		"pitches":
+			_build_pitch_shop(cs)
 		"money":
 			_build_money(cs)
 		"records":
@@ -216,6 +221,7 @@ func _build_today(parent: Control, cs: CareerSeason, team: Team) -> void:
 		elif not _fa_hub_active(cs):
 			var go_on := UiKit.button("다음 시즌", func() -> void:
 				CareerSession.next_season()
+				message = ""
 				refresh(), "caret-right", "primary", 240.0)
 			go_on.add_theme_font_size_override("font_size", 22)
 			actions.add_child(go_on)
@@ -264,9 +270,18 @@ func _build_schedule(p: GlassPanel, cs: CareerSeason, team: Team) -> void:
 	p.body.add_child(UiKit.rule())
 	var row := UiKit.hbox(8)
 	p.body.add_child(row)
-	for g: ScheduledGame in ahead.slice(0, 5):
+	# A starter's turns marked (CareerSeason.on_turn): today's game, if still to play, is the first.
+	var starter := cs.career.is_pitcher() and cs.career.position == "SP"
+	var first := 1 if cs.has_game() else 0
+	var shown := ahead.slice(0, 5)
+	for i: int in shown.size():
+		var g: ScheduledGame = shown[i]
 		var other: Team = s.teams[g.opponent_of(team.id)]
-		var cell := UiKit.well(8.0)
+		var turn := starter and cs.on_turn(first + i)
+		var cell: PanelContainer = UiKit.well(8.0)
+		if turn:
+			cell = PanelContainer.new()
+			cell.add_theme_stylebox_override(&"panel", UiTheme.flat(Color(UiTheme.ACCENT, 0.14), 6, Color(UiTheme.ACCENT, 0.9), 2, 8.0))
 		cell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(cell)
 		var box := UiKit.vbox(2)
@@ -279,13 +294,18 @@ func _build_schedule(p: GlassPanel, cs: CareerSeason, team: Team) -> void:
 		var day := UiKit.latin("DAY %d" % (g.day + 1), 14, UiTheme.DIM, true)
 		day.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(day)
+		if turn:
+			var mine := UiKit.label("선발 등판", 14, UiTheme.ACCENT, 700)
+			mine.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			box.add_child(mine)
 
 
 ## The last game: his line, the goal, the rating and medal, what he earned.
 func _build_report(parent: Control, cs: CareerSeason) -> void:
 	var p := panel("지난 경기", "article", parent, 0.0, "LAST GAME")
-	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var r := CareerSession.last_report
+	# (Before his first game there is nothing to fill it: as tall as its line then.)
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL if r != null or not cs.log.is_empty() else Control.SIZE_SHRINK_BEGIN
 	if r == null:
 		p.body.add_child(UiKit.label("아직 치른 경기가 없습니다.", 18, UiTheme.DIM, 500))
 	else:
@@ -300,7 +320,7 @@ func _build_report(parent: Control, cs: CareerSeason) -> void:
 		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		words.add_child(UiKit.label(r.line, 19, UiTheme.INK, 600))
-		words.add_child(UiKit.label("목표: %s  —  %s" % [r.goal, "달성" if r.goal_met else "실패"], 17, UiTheme.GREEN if r.goal_met else UiTheme.DIM, 600))
+		words.add_child(UiKit.label("목표 %s · %s" % [r.goal, "달성" if r.goal_met else "실패"], 17, UiTheme.GREEN if r.goal_met else UiTheme.DIM, 600))
 		if r.reward != "":
 			words.add_child(UiKit.label("보상: " + r.reward, 17, UiTheme.ACCENT, 600))
 		top.add_child(words)
@@ -318,12 +338,20 @@ func _build_report(parent: Control, cs: CareerSeason) -> void:
 	if not cs.log.is_empty():
 		p.body.add_child(UiKit.rule())
 		var scroll := UiKit.scroll()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		p.body.add_child(scroll)
 		var lines := UiKit.vbox(2)
 		lines.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		scroll.add_child(lines)
-		for entry: String in cs.log:
-			lines.add_child(UiKit.label(entry, 15, UiTheme.DIM, 500))
+		# The newest first, and wrapped: a long line (a free agent's deal) must not push the
+		# columns off the screen (the user, 2026-11-23).
+		var recent := Array(cs.log).slice(maxi(cs.log.size() - 40, 0))
+		recent.reverse()
+		for entry: String in recent:
+			var l := UiKit.label(entry, 15, UiTheme.DIM, 500)
+			l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			lines.add_child(l)
 
 
 ## His standing (popularity, points, average rating), growth points, and his numbers.
@@ -403,13 +431,23 @@ func _build_growth(cs: CareerSeason) -> void:
 	var columns := UiKit.hbox(20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
+	_growth_card(columns, cs)
 	var fields: Array[String] = ["batting", "running", "fielding"]
 	if c.is_pitcher():
 		fields = ["pitching"]
+	# One panel, a section a field (three thin panels were left mostly empty: the user, 2026-11-23).
+	var p := panel("능력치 성장" if not c.is_pitcher() else FIELD_NAMES["pitching"], "chart-line-up" if not c.is_pitcher() else FIELD_ICONS["pitching"], columns, 0.0, "GROWTH")
+	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for field: String in fields:
 		var have := float(c.gp.get(field, 0.0))
-		var p := panel(FIELD_NAMES[field], FIELD_ICONS[field], columns, 0.0, "%d GP" % roundi(have))
-		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if not c.is_pitcher():
+			if field != "batting":
+				p.body.add_child(UiKit.rule())
+			var head := UiKit.hbox(8)
+			p.body.add_child(head)
+			head.add_child(UiKit.icon(FIELD_ICONS[field], 22.0, tint))
+			head.add_child(UiKit.label(FIELD_NAMES[field], 19, Color.WHITE, 700))
+			head.add_child(UiKit.latin("%d GP" % roundi(have), 18, tint, true))
 		var ratings: PackedStringArray = cs.rules.ratings[field] if cs.rules.ratings.has(field) else PackedStringArray()
 		for rating: String in ratings:
 			var row := UiKit.hbox(10)
@@ -424,56 +462,204 @@ func _build_growth(cs: CareerSeason) -> void:
 				row.add_child(v)
 			else:
 				row.add_child(StatBar.make(str(RATING_NAMES.get(rating, rating)), value))
+			var top := value >= Growth.TOP
 			var price := Growth.cost(c, rating, cs.rules)
-			var up := UiKit.button("+ %d" % ceili(price), func() -> void:
+			var up := UiKit.button("최고" if top else "+ %d" % ceili(price), func() -> void:
 				Growth.raise(c, rating, cs.rules)
-				refresh(), "", "primary" if have >= price else "")
-			up.disabled = have < price
-			up.custom_minimum_size.x = 96.0
-			up.tooltip_text = "성장 포인트 %d 사용" % ceili(price)
+				refresh(), "", "primary" if have >= price and not top else "")
+			up.disabled = top or have < price
+			up.custom_minimum_size = Vector2(96.0, 46.0)
+			up.add_theme_font_size_override("font_size", 20)
+			up.tooltip_text = "이미 최고치입니다" if top else "성장 포인트 %d 사용" % ceili(price)
 			row.add_child(up)
+		if c.is_pitcher():
+			p.body.add_child(UiKit.rule())
+			p.body.add_child(UiKit.caption("보유 구종"))
+			_arsenal_grid(p.body, cs)
+
+
+## The man as a card beside his ratings: his overall in its tier's colour, his shape on the radar,
+## what his points buy now (so neither column is left half empty: the user, 2026-11-23).
+func _growth_card(parent: Control, cs: CareerSeason) -> void:
+	var c := cs.career
+	var p := panel("선수", "user-circle", parent, 400.0, "PLAYER")
+	var raw := ClubRules.player_ovr(c.player, cs.season.ovr, cs.season.catalog)
+	var top := UiKit.hbox(14)
+	p.body.add_child(top)
+	var ovr := UiKit.number("%d" % roundi(UiTheme.shown(raw)), 72, UiTheme.rating_color(raw))
+	top.add_child(ovr)
+	var who := UiKit.vbox(2)
+	who.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(who)
+	who.add_child(UiKit.latin("OVERALL", 16, UiTheme.DIM, true))
+	var type := cs.rules.type_by_id(c.type_id)
+	who.add_child(UiKit.label("%s · %s" % [cs.rules.position_names.get(c.position, c.position), type.name if type != null else ""], 19, Color.WHITE, 700))
+	var radar: RadarChart
+	var p2 := c.player
 	if c.is_pitcher():
-		_build_pitches(columns, cs)
+		radar = RadarChart.make(PackedStringArray(["구위", "제구", "체력", "위기관리", "변화구"]), PackedFloat32Array([p2.pitching.stuff(cs.season.catalog), p2.pitching.control, p2.pitching.stamina, p2.pitching.composure, p2.pitching.breaking(cs.season.catalog)]), 320.0)
+	else:
+		radar = RadarChart.make(PackedStringArray(["컨택트", "파워", "선구안", "주력", "수비"]), PackedFloat32Array([p2.batting.contact(), p2.batting.power(), p2.batting.eye, (p2.batting.speed + p2.batting.baserunning) * 0.5, p2.fielding.overall()]), 320.0)
+	radar.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	p.body.add_child(radar)
+	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	var tiles := UiKit.hbox(8)
+	p.body.add_child(tiles)
+	var bonus := roundi((CareerMoney.growth_share(cs) - 1.0) * 100.0)
+	var points := 0.0
+	for field: String in c.gp:
+		points += float(c.gp[field])
+	for pair: Array in [["%d" % roundi(points), "보유 GP"], ["+%d%%" % bonus if bonus > 0 else "없음", "트레이닝"]]:
+		var t := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 24)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tiles.add_child(t)
+	var tip := UiKit.label("높이 올라갈수록 비용이 커집니다. 최고치는 99입니다.", 15, UiTheme.DIM, 500)
+	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	p.body.add_child(tip)
 
 
-## A pitcher's pitches, how often he has thrown each (they evolve with use), and new ones to
-## learn with pitching points.
-func _build_pitches(parent: Control, cs: CareerSeason) -> void:
+## A pitcher's pitches as cards: speed, how often thrown (they evolve with use), movement and
+## command; new ones are learned in the pitch shop (its own tab).
+func _arsenal_grid(parent: Control, cs: CareerSeason) -> void:
 	var c := cs.career
 	var catalog := cs.season.catalog
-	var p := panel("구종", "baseball", parent, 0.0, "PITCHES")
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	parent.add_child(grid)
 	for a: ArsenalPitch in c.player.pitching.arsenal:
 		var t: PitchType = catalog.get(a.type)
 		var well := UiKit.well(10.0)
-		p.body.add_child(well)
-		var box := UiKit.vbox(2)
+		well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(well)
+		var box := UiKit.vbox(4)
 		well.add_child(box)
-		var head_row := UiKit.hbox(10)
+		var head_row := UiKit.hbox(8)
 		box.add_child(head_row)
 		var name := UiKit.heading(t.label if t != null else String(a.type), 20)
 		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		head_row.add_child(name)
-		head_row.add_child(UiKit.latin("%d km/h  ·  %d구" % [roundi(a.velo_avg), int(c.pitch_uses.get(a.type, 0))], 18, UiTheme.DIM))
+		head_row.add_child(UiKit.latin("%d km/h · %d구" % [roundi(a.velo_avg), int(c.pitch_uses.get(a.type, 0))], 16, UiTheme.DIM))
+		if t != null:
+			head_row.add_child(UiKit.badge(str(FAMILY_NAMES.get(t.family, "")), FAMILY_COLOURS.get(t.family, UiTheme.DIM)))
 		box.add_child(StatBar.make("변화", a.movement, -1.0, 90.0))
 		box.add_child(StatBar.make("제구", a.command, -1.0, 90.0))
-	for id: StringName in PitchEvolution.learnable(c, cs.rules):
+	parent.add_child(UiKit.spacer(0.0, 0.0, true))
+	var learn := PitchEvolution.learnable(c, cs.rules)
+	if not learn.is_empty():
+		parent.add_child(UiKit.button("구종 상점 (%d종)" % learn.size(), func() -> void:
+			_tab = "pitches"
+			refresh(), "storefront"))
+
+
+const FAMILY_NAMES := {&"fastball": "패스트볼", &"breaking": "브레이킹", &"offspeed": "오프스피드"}
+const FAMILY_COLOURS := {&"fastball": Color(0.93, 0.36, 0.32), &"breaking": Color(0.35, 0.62, 1.0), &"offspeed": Color(0.4, 0.8, 0.5)}
+## A line on each pitch for the shop.
+const PITCH_NOTES := {
+	&"four_seam": "가장 빠르고 곧은 직구입니다.",
+	&"two_seam": "팔 쪽으로 휘며 가라앉는 빠른 공. 땅볼을 끌어냅니다.",
+	&"cutter": "빠르게 오다 끝에서 짧게 꺾입니다. 배트 중심을 피합니다.",
+	&"slider": "가장 많이 쓰는 옆으로 휘는 변화구. 헛스윙을 부릅니다.",
+	&"sweeper": "옆으로 크게 쓸고 나가는 슬라이더입니다.",
+	&"curve": "크게 떨어지는 느린 변화구. 타이밍을 빼앗습니다.",
+	&"changeup": "직구처럼 던지지만 느리게 가라앉습니다.",
+	&"splitter": "직구처럼 오다 홈 앞에서 뚝 떨어집니다.",
+	&"rising_fastball": "회전이 많아 떠오르는 듯한 직구입니다.",
+	&"hard_slider": "빠르고 짧게 꺾이는 고속 슬라이더입니다.",
+	&"power_curve": "빠르고 날카롭게 떨어지는 커브입니다.",
+	&"circle_change": "팔 쪽으로 휘며 떨어지는 체인지업입니다.",
+	&"sinker": "무겁게 가라앉는 빠른 공. 땅볼이 늘어납니다.",
+	&"forkball": "회전이 거의 없이 크게 떨어지는 공입니다.",
+	&"knuckle_curve": "손끝으로 채어 던지는 날카로운 커브입니다.",
+	&"slurve": "슬라이더와 커브의 중간, 옆으로 크게 떨어집니다.",
+	&"screwball": "팔 쪽으로 휘며 떨어지는 보기 드문 공입니다.",
+	&"knuckleball": "회전 없이 흔들리며 들어옵니다. 예측이 어렵습니다.",
+}
+
+
+## The pitch shop (the user, 2026-11-23: "the new pitches crowd the growth page — make it a shop"):
+## every pitch he can still learn as a card — its kind, the speed it would have from his arm, its
+## spin and a line on it — bought with pitching points, or, for a pro, with a course of lessons.
+func _build_pitch_shop(cs: CareerSeason) -> void:
+	var c := cs.career
+	var catalog := cs.season.catalog
+	var p := panel("구종 상점", "storefront", content, 0.0, "PITCH SHOP")
+	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var head := UiKit.hbox(8)
+	p.body.add_child(head)
+	var gp := float(c.gp.get("pitching", 0.0))
+	var tiles: Array = [["%d GP" % roundi(gp), "보유 투구 포인트"], ["%d / %d" % [c.player.pitching.arsenal.size(), cs.rules.max_pitches], "보유 구종"]]
+	if not cs.season.school:
+		tiles.append([FreeAgency.money(c.money) + " 원", "보유 금액"])
+	for pair: Array in tiles:
+		var t := UiKit.tile(str(pair[0]), str(pair[1]), 0.0, 24)
+		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		head.add_child(t)
+	var about := UiKit.label("새 구종은 처음엔 조금 약하고, 많이 던질수록 좋아집니다.", 15, UiTheme.DIM, 500)
+	about.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	p.body.add_child(about)
+	if message != "":
+		p.body.add_child(UiKit.label(message, 16, UiTheme.ACCENT, 700))
+	var learn := PitchEvolution.learnable(c, cs.rules)
+	if learn.is_empty():
+		p.body.add_child(UiKit.heading("구종을 최대 %d개까지 익혔습니다" % cs.rules.max_pitches, 22, UiTheme.DIM))
+		return
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	p.body.add_child(scroll)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	scroll.add_child(grid)
+	var fastball := c.player.pitching.fastball_speed()
+	for id: StringName in learn:
 		var t: PitchType = catalog.get(id)
-		var row := UiKit.hbox(8)
-		p.body.add_child(row)
-		var b := UiKit.button("새 구종: %s (%d GP)" % [t.label if t != null else String(id), roundi(cs.rules.new_pitch_gp)], func() -> void:
-			PitchEvolution.learn(c, id, cs.rules, catalog)
-			refresh(), "plus")
-		b.disabled = float(c.gp.get("pitching", 0.0)) < cs.rules.new_pitch_gp
-		row.add_child(b)
-		# A pro may pay for lessons at a pitching academy instead (the user, 2026-11-23).
+		var well := UiKit.well(12.0)
+		well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		grid.add_child(well)
+		var box := UiKit.vbox(6)
+		well.add_child(box)
+		var top := UiKit.hbox(8)
+		box.add_child(top)
+		var name := UiKit.heading(t.label if t != null else String(id), 22)
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		top.add_child(name)
+		if t != null:
+			top.add_child(UiKit.badge(str(FAMILY_NAMES.get(t.family, "")), FAMILY_COLOURS.get(t.family, UiTheme.DIM)))
+			var speed := t.speed_kmh + (fastball - 145.0) * 0.8
+			box.add_child(UiKit.latin("예상 %d km/h  ·  %s rpm" % [roundi(speed), str(roundi(t.spin_rpm))], 16, UiTheme.INK))
+		var note := UiKit.label(str(PITCH_NOTES.get(id, "")), 14, UiTheme.DIM, 500)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size.y = 40.0
+		box.add_child(note)
+		var buy := UiKit.hbox(8)
+		box.add_child(buy)
+		var label := t.label if t != null else String(id)
+		var with_points := UiKit.button("%d GP" % roundi(cs.rules.new_pitch_gp), func() -> void:
+			if PitchEvolution.learn(c, id, cs.rules, catalog):
+				message = "%s을(를) 익혔습니다." % label
+			refresh(), "", "")
+		with_points.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		with_points.custom_minimum_size.y = 42.0
+		with_points.add_theme_font_size_override("font_size", 18)
+		with_points.disabled = gp < cs.rules.new_pitch_gp
+		with_points.tooltip_text = "투구 포인트가 부족합니다" if with_points.disabled else "투구 포인트로 익힙니다"
+		buy.add_child(with_points)
 		if not cs.season.school:
-			var lesson := UiKit.button("레슨 (%s)" % Draft.money_text(CareerContract.LESSON_PRICE), func() -> void:
+			var lesson := UiKit.button("%s 원" % FreeAgency.money(CareerContract.LESSON_PRICE), func() -> void:
 				if CareerContract.lesson(cs, id):
-					message = "%s 레슨을 받아 새 구종을 익혔습니다." % (t.label if t != null else String(id))
-				refresh(), "graduation-cap")
+					message = "%s 레슨을 받아 새 구종을 익혔습니다." % label
+				refresh(), "", "gold")
+			lesson.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			lesson.custom_minimum_size.y = 42.0
+			lesson.add_theme_font_size_override("font_size", 18)
 			lesson.disabled = c.money < CareerContract.LESSON_PRICE
-			row.add_child(lesson)
+			lesson.tooltip_text = "보유 금액이 부족합니다" if lesson.disabled else "투구 아카데미 레슨을 받습니다"
+			buy.add_child(lesson)
 
 
 ## His records: each season's line (first team and second), his first-team
@@ -624,7 +810,11 @@ func quick() -> void:
 
 
 func next_day() -> void:
-	CareerSession.career_season.next_day()
+	var cs := CareerSession.career_season
+	cs.next_day()
+	# A starter's days between his turns go by on their own (the user, 2026-11-23).
+	var skipped := cs.skip_rest_days()
+	message = "선발 로테이션: 등판하지 않는 %d일을 진행했습니다." % skipped if skipped > 0 else ""
 	refresh()
 
 
@@ -664,6 +854,7 @@ func _build_fa_hub(parent: Control, cs: CareerSeason) -> void:
 	var s := cs.season
 	var p := panel("%d 스토브리그" % (s.season_year + 1), "handshake", parent, 0.0, "FREE AGENCY")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	p.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	# The head: grade, price, agent.
 	var head := UiKit.hbox(10)
 	p.body.add_child(head)
@@ -734,13 +925,13 @@ func _build_fa_choice(body: Control, cs: CareerSeason) -> void:
 	var row := UiKit.hbox(14)
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_child(row)
-	row.add_child(_choice_card("handshake", "FA 신청", "여러 구단의 제안을 받아 비교하고, 재협상으로 조건을 끌어올릴 수 있습니다. 원소속 구단도 제안합니다.", "FA 신청", "primary", func() -> void:
+	row.add_child(_choice_card("handshake", "FA 신청", "여러 구단의 제안을 비교하고 재협상할 수 있습니다.", "FA 신청", "primary", func() -> void:
 		CareerFA.declare(cs, Rng.new(hash("fa:%s:%d" % [c.player.id, cs.season.season_year])))
 		refresh(), false))
-	row.add_child(_choice_card("house", "잔류", "원소속 구단과 연봉 %s 원에 1년 재계약합니다. FA 자격은 유지되어 내년 겨울에 다시 신청할 수 있습니다." % FreeAgency.money(c.salary), "1년 재계약", "button", func() -> void:
+	row.add_child(_choice_card("house", "잔류", "연봉 %s 원에 1년 재계약. 자격은 내년에도 유지됩니다." % FreeAgency.money(c.salary), "1년 재계약", "button", func() -> void:
 		CareerFA.stay(cs)
 		refresh(), false))
-	row.add_child(_choice_card("user", "에이전트", "계약 총액의 %d%%를 수수료로 받고 협상을 맡습니다. 구단마다 더 높은 조건을 이끌어 내고, 협상 여지를 알려 줍니다." % roundi(CareerFA.AGENT_FEE * 100.0), "에이전트 선임 완료" if cs.agent else "에이전트 선임", "button", func() -> void:
+	row.add_child(_choice_card("user", "에이전트", "수수료 %d%%. 더 좋은 조건을 끌어냅니다." % roundi(CareerFA.AGENT_FEE * 100.0), "에이전트 선임 완료" if cs.agent else "에이전트 선임", "button", func() -> void:
 		CareerFA.hire_agent(cs)
 		message = "에이전트를 선임했습니다."
 		refresh(), cs.agent))
@@ -918,9 +1109,9 @@ func _fa_card(cs: CareerSeason, o: Dictionary, index: int) -> PanelContainer:
 # --- His contract and his money (CareerFA, CareerMoney) ---
 
 
-const INVEST_KINDS: Array = [["training", "트레이닝", "barbell", "이번 시즌 경기마다 얻는 성장 포인트가 늘어납니다"],
-	["conditioning", "컨디셔닝", "shield", "부상 회복이 빨라지고, 31세부터는 비시즌 노쇠가 줄어듭니다"],
-	["donations", "사회 공헌", "gift", "인기도가 올라 올스타 투표, FA 몸값, 원소속 구단의 대우에 도움이 됩니다"]]
+const INVEST_KINDS: Array = [["training", "트레이닝", "barbell", "성장 포인트가 늘어납니다"],
+	["conditioning", "컨디셔닝", "shield", "부상 기간과 노쇠가 줄어듭니다"],
+	["donations", "사회 공헌", "gift", "인기도가 올라 올스타·FA에 유리합니다"]]
 
 
 func _build_money(cs: CareerSeason) -> void:
@@ -929,8 +1120,10 @@ func _build_money(cs: CareerSeason) -> void:
 	var columns := UiKit.hbox(20)
 	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
-	# The deal and the money.
-	var left := panel("계약", "handshake", columns, 440.0, "CONTRACT")
+	# The deal and the money; under it his gear (both as tall as what is in them).
+	var stack := UiKit.vbox(16)
+	columns.add_child(stack)
+	var left := panel("계약", "handshake", stack, 440.0, "CONTRACT")
 	left.body.add_child(UiKit.heading(CareerFA.contract_line(c) if not s.school else "고교 선수", 22, UiTheme.ACCENT))
 	var tiles := UiKit.hbox(8)
 	left.body.add_child(tiles)
@@ -966,7 +1159,7 @@ func _build_money(cs: CareerSeason) -> void:
 	# What his money buys.
 	var middle := panel("개인 투자", "coins", columns, 0.0, "INVEST")
 	middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	middle.body.add_child(UiKit.label("연봉이 오를수록 더 좋은 지원을 받을 수 있습니다. 모든 지원은 시즌 단위로 계약합니다.", 16, UiTheme.INK, 500))
+	middle.body.add_child(UiKit.label("연봉이 오를수록 더 좋은 지원을 받습니다. 모두 시즌 단위입니다.", 16, UiTheme.INK, 500))
 	var goal := CareerMoney.next_goal(cs)
 	if goal != "":
 		middle.body.add_child(UiKit.label("다음 목표: %s" % goal, 15, UiTheme.ACCENT, 700))
@@ -986,13 +1179,12 @@ func _build_money(cs: CareerSeason) -> void:
 	if message != "":
 		middle.body.add_child(UiKit.label(message, 16, UiTheme.ACCENT, 600))
 	# Gear: the shop takes his money too.
-	var right := panel("장비", "shopping-cart", columns, 340.0, "GEAR")
-	right.body.add_child(UiKit.label("상점 장비는 포인트 대신 보유 금액으로도 구매할 수 있습니다 (1P = %s 원)." % FreeAgency.money(CareerMoney.SHOP_RATE), 15, UiTheme.INK, 500))
+	var right := panel("장비", "shopping-cart", stack, 440.0, "GEAR")
+	right.body.add_child(UiKit.label("상점 장비는 보유 금액으로도 살 수 있습니다 (1P = %s 원)." % FreeAgency.money(CareerMoney.SHOP_RATE), 15, UiTheme.INK, 500))
 	if c.gear.is_empty():
 		right.body.add_child(UiKit.label("보유한 장비가 없습니다.", 15, UiTheme.DIM, 500))
 	for name: String in c.gear:
 		right.body.add_child(UiKit.label("%s  ·  %s" % [name, str(RATING_NAMES.get(c.gear[name], c.gear[name]))], 15, UiTheme.INK, 600))
-	right.body.add_child(UiKit.spacer(0.0, 0.0, true))
 	right.body.add_child(UiKit.button("상점으로", func() -> void: go("res://ui/shop_screen.tscn"), "storefront"))
 
 

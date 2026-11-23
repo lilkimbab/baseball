@@ -188,6 +188,42 @@ func next_day() -> void:
 	_check_all_star()
 
 
+## Whether he takes the field in his club's game `ahead` games from now (0: today's or the next):
+## a hitter, a reliever or a closer every game (in the bullpen, ready); a starter only on his turn,
+## every fifth game — his place in the first team's rotation, or every fifth second-team game.
+func on_turn(ahead: int = 0) -> bool:
+	if not career.is_pitcher() or career.position != "SP":
+		return true
+	if not career.first_team:
+		return (futures_games + ahead) % 5 == 0
+	var team: Team = season.teams[career.team_id]
+	if not team.rotation().has(career.player):
+		return true
+	return team.starter_ahead(ahead) == career.player
+
+
+## The days a starter does not pitch, played without him up to his next turn (the user,
+## 2026-11-23: "as a pitcher, skip the days I do not play; a starter has days off, a reliever or a
+## closer is out there every day"). Stops for whatever he must see: the all-star game, the derby,
+## a scene waiting, the season's end; at most SKIP_MOST days. Returns the days gone by.
+const SKIP_MOST := 10
+
+
+func skip_rest_days() -> int:
+	var n := 0
+	while n < SKIP_MOST and not season.finished() and not all_star_today and not derby_waiting and cues.is_empty():
+		if has_game():
+			if on_turn():
+				break
+			quick()
+		elif club_game() != null or season.injuries.is_out(career.player.id) or not career.is_pitcher() or career.position != "SP":
+			# A game already played today, or hurt, or not a starter: the day is his to see.
+			break
+		next_day()
+		n += 1
+	return n
+
+
 ## Overnight for him: hurt (Injuries: on the injured list, off the first team; back to the
 ## second team to play his way back when he is healed), and another day in the second team.
 func _after_day() -> void:

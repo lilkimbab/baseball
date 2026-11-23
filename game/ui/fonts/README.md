@@ -15,5 +15,6 @@ texts are beside the files or at the addresses below. Which face is used where i
 | Galmuri 11 | `Galmuri11-Bold.ttf` | the stadium scoreboard (a dot-matrix face) | github.com/quiple/galmuri | OFL 1.1 |
 | Black Han Sans | `../../assets/fonts/uniform/BlackHanSans-Regular.ttf` | names on uniforms; sponsors' boards | github.com/google/fonts | OFL 1.1 |
 | Do Hyeon | `../../assets/fonts/uniform/DoHyeon-Regular.ttf` | names on some clubs' uniforms; sponsors' boards | github.com/google/fonts | OFL 1.1 |
-| College Block | `../../assets/fonts/uniform/CollegeBlock-*.ttf` | uniform numbers and letters (fallback), distances on the outfield wall | Matthew Welch, squaregear.net | MIT-style (`CollegeBlock-LICENSE.txt`) |
-| Lobster, Rye | `../../assets/fonts/uniform/` | script and Tuscan lettering on uniforms (fallbacks), sponsors' boards | github.com/google/fonts | OFL 1.1 |
+| Anton, Sancreek, Damion | `../../assets/fonts/uniform/` | block, Tuscan and script lettering on uniforms when the local pack's faces are not there (the public build) | github.com/google/fonts | OFL 1.1 |
+| College Block | `../../assets/fonts/uniform/CollegeBlock-*.ttf` | distances on the outfield wall | Matthew Welch, squaregear.net | MIT-style (`CollegeBlock-LICENSE.txt`) |
+| Lobster, Rye | `../../assets/fonts/uniform/` | sponsors' boards | github.com/google/fonts | OFL 1.1 |

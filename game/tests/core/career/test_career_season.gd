@@ -151,3 +151,26 @@ func test_his_second_team_plays_in_the_futures_league() -> void:
 	CareerSession.career_season = null
 	CareerSession.season = null
 	CareerSession.career = null
+
+
+## A starter pitches on his turn and the days between go by on their own; a reliever and a
+## hitter are out there every game (the user, 2026-11-23).
+func test_a_starter_skips_the_days_he_does_not_pitch() -> void:
+	var cs := _career("SP", "power_arm", 41, 72)
+	var turns := 0
+	var guard := 0
+	while not cs.season.finished() and guard < 200 and turns < 6:
+		guard += 1
+		cs.next_day()
+		cs.skip_rest_days()
+		if cs.has_game() and cs.cues.is_empty() and not cs.all_star_today and not cs.derby_waiting:
+			assert_true(cs.on_turn(), "after the skip a starter's game is his turn (day %d)" % cs.season.day)
+			if cs.on_turn():
+				turns += 1
+				cs.quick()
+		cs.cues.clear()
+	assert_gte(turns, 4, "he got his turns")
+	var rp := _career("RP", "power_arm", 42, 36)
+	assert_true(rp.on_turn(0) and rp.on_turn(1) and rp.on_turn(2), "a reliever is ready every game")
+	var hitter := _career("SS", "contact", 43, 36)
+	assert_eq(hitter.skip_rest_days(), 0, "a hitter's days are never skipped")

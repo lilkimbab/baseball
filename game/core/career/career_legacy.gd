@@ -134,7 +134,7 @@ static func should_retire(cs: CareerSeason) -> bool:
 static func announce(cs: CareerSeason) -> void:
 	var c := cs.career
 	c.final_season = true
-	cs.log.append("%d년 겨울: 은퇴 투어 발표 — %d 시즌이 마지막" % [cs.season.season_year, cs.season.season_year + 1])
+	cs.log.append("%d년 겨울: 은퇴 투어 발표. %d 시즌이 마지막입니다" % [cs.season.season_year, cs.season.season_year + 1])
 	note(c, cs.season.season_year + 1, "tour", "은퇴 투어", "마지막 시즌을 발표했습니다", c.team_id)
 
 

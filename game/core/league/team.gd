@@ -132,6 +132,14 @@ func _registered_with(origin: StringName) -> int:
 
 
 ## The starter for the next game, moving the rotation on.
+## The starter `ahead` games from now in the rotation (0: the next), without using up a turn.
+func starter_ahead(ahead: int = 0) -> Player:
+	var starters := rotation()
+	if starters.is_empty():
+		return null
+	return starters[(rotation_index + ahead) % starters.size()]
+
+
 func next_starter() -> Player:
 	var starters := rotation()
 	if starters.is_empty():

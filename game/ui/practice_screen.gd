@@ -48,8 +48,9 @@ func build() -> void:
 		if mode == id:
 			tile.status = "선택"
 		modes.add_child(tile)
+	# (The setup and the record as tall as what is in them; the mode pictures take the rest: no
+	# half-empty panels, the user, 2026-11-23.)
 	var columns := UiKit.hbox(16)
-	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_child(columns)
 	var p := panel("연습 설정", "sliders-horizontal", columns, 0.0, "SETUP")
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -91,7 +92,6 @@ func build() -> void:
 	for pick: Control in picks:
 		pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(pick)
-	p.body.add_child(UiKit.spacer(0.0, 0.0, true))
 	var start_button := UiKit.button("연습 시작", start, "play", "primary")
 	start_button.add_theme_font_size_override("font_size", 26)
 	p.body.add_child(start_button)

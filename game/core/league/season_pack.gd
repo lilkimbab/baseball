@@ -98,7 +98,7 @@ static func available() -> Array[SeasonPack]:
 
 
 static func local_dir() -> String:
-	return ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("content-local").path_join("seasons")
+	return LocalContent.dir().path_join("seasons")
 
 
 static func by_id(pack_id: String) -> SeasonPack:

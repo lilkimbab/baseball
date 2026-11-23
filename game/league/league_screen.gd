@@ -192,8 +192,8 @@ func _build_setup() -> void:
 		Settings.difficulty = v
 		Settings.save_file()
 		refresh()))
-	right.body.add_child(UiKit.spacer(0.0, 0.0, true))
 	var start := UiKit.button("시즌 시작", func() -> void: begin(_choice, _games), "play", "primary")
+	right.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	start.add_theme_font_size_override("font_size", 26)
 	start.disabled = _choice == ""
 	right.body.add_child(start)

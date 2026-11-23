@@ -52,7 +52,6 @@ var _play_t := -1.0
 var _ball_z := 0.0
 var _ball_vz := 0.0
 var _snapshot := {}
-var _voice := ""
 ## Its own beat clock, for when the visible crowd's is not running (no screen).
 var _beat := 0.0
 var _muffled := false
@@ -66,7 +65,9 @@ var _called_play: Object = null
 
 func _ready() -> void:
 	GameAudio.ensure_buses()
-	audible = DisplayServer.get_name() != "headless"
+	# (Nothing heard from a tool run with the sound off: the speech too, which does not go through
+	# the audio driver — the user, 2026-11-23, heard the umpire during the tests.)
+	audible = DisplayServer.get_name() != "headless" and AudioServer.get_driver_name() != "Dummy"
 	for name: String in ["crowd/bed_quiet", "crowd/bed_normal", "crowd/bed_loud"]:
 		var p := AudioStreamPlayer.new()
 		p.bus = &"Crowd"
@@ -111,9 +112,9 @@ func _ready() -> void:
 			p.play()
 	if audible:
 		_preload()
-	if Settings.voices and audible:
-		var voices := DisplayServer.tts_get_voices_for_language("ko")
-		_voice = voices[0] if not voices.is_empty() else ""
+	_umpire = AudioStreamPlayer.new()
+	_umpire.bus = &"Voice"
+	add_child(_umpire)
 	caster = CasterVoice.new()
 	add_child(caster)
 
@@ -599,9 +600,20 @@ func _free3d(pool: Array[AudioStreamPlayer3D]) -> AudioStreamPlayer3D:
 	return pool[0]
 
 
-## The umpire or the announcer, by the system's Korean voice (none: nothing).
+## The umpire's calls, recorded with a generated voice (tools/audio/umpire_calls.py; the user,
+## 2026-11-23: "not the system's TTS"): another voice than the caster's.
+const UMPIRE_CALLS := {"스트라이크": "voice/umpire_strike", "스트라이크 아웃": "voice/umpire_strikeout", "아웃": "voice/umpire_out", "세이프": "voice/umpire_safe"}
+var _umpire: AudioStreamPlayer
+
+
+## The umpire's call, or the announcer's line. The announcer reads names, which cannot be
+## recorded beforehand, and the system's speech is not used any more: his lines are only counted.
 func _say(line: String) -> void:
 	_count("voice:" + line)
-	if not audible or _voice == "" or not Settings.voices:
+	if not audible or not Settings.voices or not UMPIRE_CALLS.has(line):
 		return
-	DisplayServer.tts_speak(line, _voice, int(clampf(Settings.voice_volume * Settings.volume, 0.0, 1.0) * 100.0), 1.0, 1.05, 0, true)
+	var s := GameAudio.stream(str(UMPIRE_CALLS[line]))
+	if s == null:
+		return
+	_umpire.stream = s
+	_umpire.play()

@@ -1,0 +1,75 @@
+머니볼 (Moneyball) {VERSION} — 사용한 자료와 라이선스
+
+이 게임은 무료 비상업 프로젝트입니다. 아래 자료는 각 라이선스를 따릅니다.
+라이선스 전문은 LICENSES 폴더에 있습니다.
+
+
+■ 엔진
+
+- Godot Engine 4.7.2 — MIT 라이선스 (LICENSES/GODOT-LICENSE.txt, 엔진에 들어 있는 라이브러리 포함)
+- godot-cpp (공 물리 확장 libballphysics) — MIT 라이선스
+
+
+■ 글꼴 (LICENSES/fonts/)
+
+- Giants (롯데 자이언츠, T-Lab 제작) — 무료, 원본 그대로 동봉 허용, 글꼴 자체 판매 금지
+- NEXON Lv.2 고딕, NEXON 풋볼고딕 (넥슨코리아) — 넥슨 글꼴 정책, 원본 그대로 동봉 허용
+- Paperlogy, S-Core Dream, Gmarket Sans, Galmuri11, 나눔스퀘어 네오 — SIL Open Font License 1.1
+- Barlow Condensed, Black Han Sans, Do Hyeon, Lobster, Rye, Anton, Sancreek, Damion
+  (github.com/google/fonts) — SIL Open Font License 1.1
+- DOS 고딕, DOS 샘물, DOS 이야기, 삼삼 (이담허) — MIT 라이선스
+- College Block (Matthew Welch) — MIT 스타일 라이선스
+
+
+■ 그림과 모델
+
+- 선수 모델: MakeHuman / MPFB와 MakeHuman 시스템 에셋 — CC0
+- 관중: Microsoft Rocketbox 아바타로 만든 그림 — MIT 라이선스
+- 구장 재질 사진: ambientCG (ambientcg.com) — CC0
+- 하늘: Poly Haven (polyhaven.com) — CC0
+- 구단 엠블럼 그림: game-icons.net (Lorc, Delapouite, Caro Asercion, Cathelineau)
+  — CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/), 그림 뒤 검은 사각형을 지워서 사용
+- 아이콘: Phosphor Icons — MIT 라이선스
+- 장비(글러브·미트·배트·공)와 구장, 그 밖의 그림은 이 게임을 위해 만들었습니다.
+
+
+■ 동작 (content-local/animations)
+
+- 투구·타격 동작: Driveline OpenBiomechanics Project
+  (https://github.com/drivelineresearch/openbiomechanics) — CC BY-NC-SA 4.0
+  Wasserberger KW, Brady AC, Besky DM, Jones BR, Boddy KJ. The OpenBiomechanics Project:
+  The open source initiative for anonymized, elite-level athletic motion capture data. (2022).
+  게임용으로 변환한 동작 파일(파생물)도 같은 CC BY-NC-SA 4.0으로 배포합니다.
+  원 자료 조건에 따라 프로 스포츠 구단과 금융 분석 회사 관계자는 쓸 수 없습니다.
+- 그 밖의 동작: CMU Graphics Lab Motion Capture Database (http://mocap.cs.cmu.edu/)
+  The data used in this project was obtained from mocap.cs.cmu.edu.
+  The database was created with funding from NSF EIA-0196217.
+
+
+■ 소리 (content-local/audio)
+
+- 효과음과 관중 소리: Google "Actions on Google" 사운드 라이브러리
+  (https://developers.google.com/assistant/tools/sound-library) — CC BY 4.0, 잘라서 사용
+- 음악: Raving Energy, Exhilarate, Pump, Rocket, Volatile Reaction, Movement Proposition,
+  Take a Chance, Hep Cats, Funkorama, Galactic Rap, Crunk Knight, Big Rock, Overcast,
+  Ouroboros, Hyperfun
+  Music by Kevin MacLeod (incompetech.com), Licensed under CC BY 4.0
+  (http://creativecommons.org/licenses/by/4.0/) — 곡의 일부를 잘라서 사용
+- 불꽃놀이 소리: Wikimedia Commons — 퍼블릭 도메인
+- 심판 콜 음성: Supertonic 3 (Supertone Inc.)로 생성 — 모델 BigScience Open RAIL-M, 코드 MIT
+
+
+■ 기록 (content-local/rosters, content-local/seasons)
+
+- 선수 시즌 기록: Kaggle "KBO Player Stats 1982–2026" (netsong) — CC BY-NC-SA 4.0
+  기록 값은 KBO 공식 기록입니다. 이 기록으로 만든 로스터·시즌 팩(파생물)도 같은
+  CC BY-NC-SA 4.0으로 배포합니다. 구단과 선수 이름은 실제와 다르게 바꿨습니다.
+- 투구별 기록(구종·구속): Hugging Face "slothman3878/kbo_playbyplay"
+  (https://huggingface.co/datasets/slothman3878/kbo_playbyplay) — CC BY 4.0
+- 시즌 최종 순위와 포스트시즌 결과: 한국어 위키백과 "20XX년 KBO 리그" 문서 (사실 정보)
+
+
+■ 참고한 게임
+
+- 화면 구성과 연출은 프로야구 2K14(넥슨, 서비스 종료)를 참고했습니다.
+  그 게임의 자료(그림, 소리, 글꼴, 데이터)는 쓰지 않았습니다.

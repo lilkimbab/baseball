@@ -9,13 +9,14 @@ extends RefCounted
 ## Recreations of the real faces are in the local content pack when it has them
 ## (content-local/fonts/uniform/, fetched by tools/assets/fetch_uniform_fonts.sh; free for
 ## private use, not passed on); otherwise open-licence faces of the same kinds, which are in
-## the game (game/assets/fonts/uniform/, licences beside them).
+## the game (game/assets/fonts/uniform/, licences beside them), chosen from a side-by-side sheet
+## as the nearest to the pack's (2026-11-23, tools/font_sheet.gd): Anton, Sancreek, Damion.
 
 const BUNDLED := "res://assets/fonts/uniform/"
 const FACES := {
-	&"block": ["jersey_m54.ttf", "CollegeBlock-Bold.ttf"],
-	&"tuscan": ["mlb_tuscan.ttf", "Rye-Regular.ttf"],
-	&"script": ["ballpark_weiner.ttf", "Lobster-Regular.ttf"],
+	&"block": ["jersey_m54.ttf", "Anton-Regular.ttf"],
+	&"tuscan": ["mlb_tuscan.ttf", "Sancreek-Regular.ttf"],
+	&"script": ["ballpark_weiner.ttf", "Damion-Regular.ttf"],
 	&"name": ["", "BlackHanSans-Regular.ttf"],
 	&"name_square": ["", "DoHyeon-Regular.ttf"],
 }

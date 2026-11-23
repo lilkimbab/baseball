@@ -42,6 +42,7 @@ func build() -> void:
 	content.add_child(columns)
 	# The case as a whole.
 	var left := panel("달성 현황", "medal", columns, 380.0, "PROGRESS")
+	left.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var tally := book.tally()
 	var total := book.defs.size()
 	var ring_box := Control.new()

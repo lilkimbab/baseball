@@ -49,7 +49,8 @@ func _initialize() -> void:
 	# --setup: the league screen's club choice (no league started).
 	if _args.has("swing-turn"):
 		PlayerStage.swing_turn = float(str(_args["swing-turn"]))
-	if (_args.has("league") or _names.has("league")) and not _args.has("history") and not _args.has("setup"):
+	var league_tabs := Array(_names).any(func(n: String) -> bool: return n.begins_with("league:"))
+	if (_args.has("league") or _names.has("league") or league_tabs) and not _args.has("history") and not _args.has("setup"):
 		var clubs := LeagueSession.league_clubs()
 		LeagueSession.start(clubs[2].id, 36, 4)
 		LeagueSession.slot = "menu_shots"
@@ -91,6 +92,11 @@ func _initialize() -> void:
 		spec.name = "한도윤"
 		spec.number = 27
 		spec.type_id = rules.batter_types[0].id
+		# --position SP: a pitcher's career (the growth tab and the pitch shop).
+		if _args.has("position"):
+			spec.position = str(_args["position"])
+			if CareerRules.is_pitching_position(spec.position):
+				spec.type_id = rules.pitcher_types[0].id
 		spec.body_id = rules.bodies[1].id
 		spec.skin = rules.skins[1]
 		spec.hair = rules.hairs[0]
@@ -181,6 +187,7 @@ func _initialize() -> void:
 				CareerSession.career.earned = 61000
 				CareerSession.career_season.trainer = 1
 				CareerSession.career_season.invest_paid = {"training": 2000}
+				CareerSession.career.gp["pitching"] = 420.0
 		# (No cutscenes waiting: the screen itself is the picture.)
 		if CareerSession.career_season != null:
 			CareerSession.career_season.cues.clear()
@@ -200,6 +207,18 @@ func _next() -> void:
 		quit()
 		return
 	var name := _names[_index]
+	# "career:growth", "league:roster", "settings:sound": a screen on one of its tabs, so that one
+	# run takes every tab (the UI audit, 2026-11-23).
+	if name.contains(":"):
+		var tab := name.get_slice(":", 1)
+		name = name.get_slice(":", 0)
+		match name:
+			"career":
+				_args["career-tab"] = tab
+			"league":
+				_args["tab"] = tab
+			"settings":
+				SettingsScreen.group = tab
 	# The opening's notice, the title with its menu open, the loading screens (a game's
 	# match-up and the league's).
 	if name == "splash_notice":
@@ -329,7 +348,7 @@ func _process(_delta: float) -> bool:
 	if _args.has("frames"):
 		var marks := PackedInt32Array(Array(str(_args["frames"]).split(",")).map(func(x: String) -> int: return int(x)))
 		if marks.has(_frames):
-			var shot := "%s_%s_f%03d.png" % [_prefix, _names[_index], _frames]
+			var shot := "%s_%s_f%03d.png" % [_prefix, _names[_index].replace(":", "_"), _frames]
 			root.get_texture().get_image().save_png(shot)
 			print("menu_shots: ", shot)
 		if _frames >= marks[marks.size() - 1]:
@@ -344,7 +363,7 @@ func _process(_delta: float) -> bool:
 			return false
 	elif _frames < shoot_at:
 		return false
-	var path := "%s_%s.png" % [_prefix, _names[_index]]
+	var path := "%s_%s.png" % [_prefix, _names[_index].replace(":", "_")]
 	root.get_texture().get_image().save_png(path)
 	print("menu_shots: ", path)
 	_next()

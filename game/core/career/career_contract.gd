@@ -38,7 +38,7 @@ static func lesson(cs: CareerSeason, id: StringName) -> bool:
 	if not PitchEvolution.learn(c, id, cs.rules, cs.season.catalog, true):
 		return false
 	c.money -= LESSON_PRICE
-	cs.log.append("%d일: 구종 레슨 — %s 습득" % [cs.season.day + 1, String(id)])
+	cs.log.append("%d일: 레슨으로 %s 습득" % [cs.season.day + 1, String(id)])
 	return true
 
 
@@ -109,14 +109,31 @@ static func performance(cs: CareerSeason) -> float:
 	return clampf(1.0 + (b.ops() - 0.72) / 0.2, 0.4, 2.0)
 
 
-## Next year's salary (10,000 won, rounded to a million).
-static func renewed(c: CareerPlayer, share: float, perf: float) -> int:
-	var factor := 0.8 + share * perf * 0.9
+## What the league pays a man of his standing next year (FreeAgency, as for its own men): a
+## reserved man a share of his market value growing with his counted seasons, one who has been
+## a free agent his market value.
+static func worth(cs: CareerSeason) -> int:
+	var c := cs.career
+	var z := FreeAgency.standing(c.player, cs.season)
+	if c.fa_count == 0:
+		return FreeAgency.reserve_salary(z, CareerFA.seasons_counted(c, cs.season.total_days()))
+	return roundi(FreeAgency.market_value(z, cs.season.season_year + 1 - c.player.born) * 0.9 / 100.0) * 100
+
+
+## Next year's salary (10,000 won, rounded to a million): toward his worth, more for a fine
+## season and less for a poor one or one spent partly in the second team, moving at most CUT_MOST
+## down and RAISE_MOST up in a winter. (A star's pay climbs over a few winters as in the KBO,
+## where the best reserved men reach 5억 in their fourth season and 11억 in their seventh, and no
+## one is paid more than FreeAgency.MOST a year.)
+static func renewed(c: CareerPlayer, share: float, perf: float, worth_of: int) -> int:
 	if share < RELEASE_SHARE * 3.0:
 		# Mostly in the second team: a cut.
-		factor = minf(factor, 0.9)
-	factor = clampf(factor, 1.0 - CUT_MOST, RAISE_MOST)
-	return maxi(MINIMUM, roundi(c.salary * factor / 100.0) * 100)
+		var cut := clampf(0.8 + share * perf * 0.9, 1.0 - CUT_MOST, 0.9)
+		return maxi(MINIMUM, roundi(c.salary * cut / 100.0) * 100)
+	var target := float(worth_of) * clampf(0.6 + 0.4 * perf, 0.6, 1.4) * lerpf(0.6, 1.0, share)
+	target = minf(target, float(FreeAgency.MOST))
+	var next := clampf(lerpf(float(c.salary), target, 0.6), c.salary * (1.0 - CUT_MOST), c.salary * RAISE_MOST)
+	return maxi(MINIMUM, roundi(next / 100.0) * 100)
 
 
 ## A day of the regular season: a day's pay.
@@ -185,7 +202,7 @@ static func winter(cs: CareerSeason, rng: Rng) -> PackedStringArray:
 		c.contract_kind = ""
 		c.contract_option = []
 	var before := c.salary
-	c.salary = renewed(c, share, perf)
+	c.salary = renewed(c, share, perf, worth(cs))
 	c.best_salary = maxi(c.best_salary, c.salary)
 	if c.salary > before:
 		lines.append("연봉 인상: %s → %s 원" % [FreeAgency.money(before), FreeAgency.money(c.salary)])

@@ -66,11 +66,17 @@ func test_three_seasons_with_salary_winters_and_the_same_club() -> void:
 func test_salary_follows_playing_time_and_play() -> void:
 	var c := CareerPlayer.new()
 	c.salary = 5000
-	assert_lt(CareerContract.renewed(c, 0.05, 1.0), 5000, "a season in the second team: a cut")
-	assert_gte(CareerContract.renewed(c, 0.05, 1.0), roundi(5000 * (1.0 - CareerContract.CUT_MOST)))
-	assert_gt(CareerContract.renewed(c, 0.9, 1.6), 7000, "a fine full season: a big raise")
+	assert_lt(CareerContract.renewed(c, 0.05, 1.0, 20000), 5000, "a season in the second team: a cut")
+	assert_gte(CareerContract.renewed(c, 0.05, 1.0, 20000), roundi(5000 * (1.0 - CareerContract.CUT_MOST)))
+	assert_gt(CareerContract.renewed(c, 0.9, 1.6, 20000), 7000, "a fine full season: a big raise")
+	assert_lte(CareerContract.renewed(c, 1.0, 2.5, 900000), roundi(5000 * CareerContract.RAISE_MOST), "at most RAISE_MOST in a winter")
+	assert_lt(CareerContract.renewed(c, 1.0, 1.0, 4000), 5000, "paid more than he is worth: it comes down")
+	c.salary = 200000
+	for i: int in 10:
+		c.salary = CareerContract.renewed(c, 1.0, 2.5, 900000)
+	assert_lte(c.salary, FreeAgency.MOST, "a raise every winter stops at the league's most (the user, 2026-11-23: 361억 a year in a soak)")
 	c.salary = CareerContract.MINIMUM
-	assert_eq(CareerContract.renewed(c, 0.0, 0.5), CareerContract.MINIMUM, "never below the minimum")
+	assert_eq(CareerContract.renewed(c, 0.0, 0.5, 20000), CareerContract.MINIMUM, "never below the minimum")
 
 
 func test_free_agency_after_eight_full_seasons() -> void:
