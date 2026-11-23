@@ -145,6 +145,7 @@ func _ready() -> void:
 			_trees(70, Vector2(-180.0, 180.0), Vector2(edge + 15.0, edge + 60.0))
 	_draw_streets()
 	_flush_buildings()
+	_flush_beacons()
 	_roofs()
 
 
@@ -391,8 +392,8 @@ func _trees(count: int, sector: Vector2, reach: Vector2) -> void:
 		var size := Vector3(_rng.next_range(3.5, 6.5), _rng.next_range(5.0, 9.0), _rng.next_range(3.5, 6.5))
 		var turn := _rng.next_range(0.0, PI)
 		var g := _rng.next_range(0.55, 0.9)
-		# (None in the street.)
-		if _on_a_street(p, Vector3(size.x, 0.0, size.z), 0.0):
+		# (None in the street, nor buried in a hill.)
+		if _on_a_street(p, Vector3(size.x, 0.0, size.z), 0.0) or _in_a_hill(p, Vector3(size.x, 0.0, size.z)):
 			continue
 		spots.append(Transform3D((Basis(Vector3.UP, turn) * Basis.from_scale(size)), Field.to_world(p + Vector3(0.0, 0.0, size.y * 0.7))))
 		greens.append(Color(g * 0.8, g, g * 0.62))
@@ -411,12 +412,106 @@ func _trees(count: int, sector: Vector2, reach: Vector2) -> void:
 ## One building: a box wearing the front named, standing on the ground at `foot`. (Turned,
 ## then sized along its own sides: sized along the world's axes after the turn, as it was, a
 ## turned box came out skewed.)
+##
+## Not all boxes (queue 2-3, 2026-11-23: "the buildings are plain"): a tall one (not a slab of
+## flats) often steps back as it rises, a part of a third narrower on top and sometimes a crown
+## above that; a middling one now and then stands on a wide low podium of shops. The tallest
+## carry red aircraft lights at their corners, lit at night. Each part is one more box of the
+## same batch.
 func _building(front: String, size: Vector3, foot: Vector3, yaw: float, tint: float = -1.0) -> void:
 	var shade := tint if tint > 0.0 else _rng.next_range(0.58, 0.78)
+	var colour := Color(shade, shade * _rng.next_range(0.96, 1.0), shade * _rng.next_range(0.92, 1.0))
+	var slab := size.z < 15.0 or size.x > 2.6 * size.z
+	if size.y > 60.0 and not slab and _rng.chance(0.6):
+		var low := size.y * _rng.next_range(0.55, 0.7)
+		_block(front, Vector3(size.x, low, size.z), foot, yaw, colour, 0.0)
+		var upper := Vector3(size.x * _rng.next_range(0.62, 0.8), size.y - low, size.z * _rng.next_range(0.62, 0.8))
+		_block(front, upper, foot, yaw, colour.darkened(0.04), low)
+		if size.y > 95.0 and _rng.chance(0.5):
+			_block(front, Vector3(upper.x * 0.55, _rng.next_range(5.0, 11.0), upper.z * 0.55), foot, yaw, colour.darkened(0.1), size.y)
+	elif size.y > 25.0 and size.y <= 60.0 and not slab and _rng.chance(0.35):
+		var podium := _rng.next_range(9.0, 14.0)
+		_block("a", Vector3(size.x * 1.45, podium, size.z * 1.6), foot, yaw, colour.lightened(0.06), 0.0)
+		_block(front, Vector3(size.x, size.y - podium, size.z), foot, yaw, colour, podium)
+	else:
+		_block(front, size, foot, yaw, colour, 0.0)
+	if size.y > 90.0:
+		var turn := Basis(Vector3.UP, yaw)
+		var top := size.y + (6.0 if size.y > 95.0 else 0.0)
+		for corner: Vector2 in [Vector2(-0.3, -0.3), Vector2(0.3, 0.3)]:
+			var off := turn * Vector3(size.x * corner.x, 0.0, size.z * corner.y)
+			_beacons.append(Field.to_world(foot + Vector3(off.x, -off.z, top)))
+
+
+## One box of a building, `base` metres up.
+func _block(front: String, size: Vector3, foot: Vector3, yaw: float, colour: Color, base: float) -> void:
 	if not _buildings.has(front):
 		_buildings[front] = []
-	_buildings[front].append([Transform3D((Basis(Vector3.UP, yaw) * Basis.from_scale(size)), Field.to_world(foot + Vector3(0.0, 0.0, size.y * 0.5 - 1.0))),
-		Color(shade, shade * _rng.next_range(0.96, 1.0), shade * _rng.next_range(0.92, 1.0)), size, foot, yaw])
+	_buildings[front].append([Transform3D((Basis(Vector3.UP, yaw) * Basis.from_scale(size)), Field.to_world(foot + Vector3(0.0, 0.0, base + size.y * 0.5 - (1.0 if base == 0.0 else 0.0)))),
+		colour, size, foot, yaw])
+
+
+## Avenues end at a hill's foot (one went on into the hill and under it); one starting in a
+## hill is dropped.
+func _trim_streets_at_hills() -> void:
+	if _hills.is_empty():
+		return
+	var kept: Array[Array] = []
+	for line: Array in _street_lines:
+		var a: Vector3 = line[0]
+		var b: Vector3 = line[1]
+		if _in_a_hill(a, Vector3.ZERO):
+			continue
+		for h: Array in _hills:
+			var centre: Vector3 = h[0]
+			var radius := float(h[1]) + 10.0
+			# The first point along a→b within the hill, if any.
+			var d := Vector2(b.x - a.x, b.y - a.y)
+			var f := Vector2(a.x - centre.x, a.y - centre.y)
+			var qa := d.dot(d)
+			var qb := 2.0 * f.dot(d)
+			var qc := f.dot(f) - radius * radius
+			var disc := qb * qb - 4.0 * qa * qc
+			if qa > 0.0 and disc >= 0.0:
+				var t := (-qb - sqrt(disc)) / (2.0 * qa)
+				if t > 0.0 and t < 1.0:
+					b = a.lerp(b, t)
+		kept.append([a, b, line[2]])
+	_street_lines = kept
+
+
+## The hills things may not stand in: [foot (field), radius at the foot].
+var _hills: Array[Array] = []
+
+
+func _in_a_hill(foot: Vector3, size: Vector3) -> bool:
+	for h: Array in _hills:
+		var centre: Vector3 = h[0]
+		if Vector2(foot.x - centre.x, foot.y - centre.y).length() < float(h[1]) + Vector2(size.x, size.z).length() * 0.5:
+			return true
+	return false
+
+
+## The red lights on the tallest roofs (world positions), lit at night.
+var _beacons: Array[Vector3] = []
+
+
+func _flush_beacons() -> void:
+	if _beacons.is_empty():
+		return
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.9
+	mesh.height = 1.8
+	mesh.radial_segments = 8
+	mesh.rings = 4
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = mesh
+	mm.instance_count = _beacons.size()
+	for i: int in _beacons.size():
+		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, _beacons[i]))
+	var m := _glowing(Color(1.0, 0.1, 0.06), 6.0)
+	_multi(mm, m, "Beacons")
 
 
 ## An apartment complex: ranks of the same slab, all facing one way, as they are built —
@@ -513,7 +608,9 @@ func _flush_buildings() -> void:
 	mesh.size = Vector3.ONE
 	for front: String in _buildings:
 		# Nothing stands in the street.
-		var list: Array = (_buildings[front] as Array).filter(func(b: Array) -> bool: return not _on_a_street(b[3], b[2], b[4]))
+		# Nothing stands in the street, nor inside a hill (only its roof showed, floating on the
+		# slope).
+		var list: Array = (_buildings[front] as Array).filter(func(b: Array) -> bool: return not _on_a_street(b[3], b[2], b[4]) and not _in_a_hill(b[3], b[2]))
 		_buildings[front] = list
 		var blocks := MultiMesh.new()
 		blocks.transform_format = MultiMesh.TRANSFORM_3D
@@ -595,6 +692,7 @@ func _plan_streets() -> void:
 
 
 func _draw_streets() -> void:
+	_trim_streets_at_hills()
 	if _street_lines.is_empty():
 		return
 	_lay_streets()
@@ -1163,6 +1261,7 @@ func _needle_tower(az: float, r: float) -> void:
 	hill.height = 125.0
 	hill.radial_segments = 28
 	_add(hill, _mat(Color(0.6, 0.72, 0.54), 1.0, "forest", 70.0, 1.0), "TowerHill", foot + Vector3(0.0, 0.0, 61.0))
+	_hills.append([foot, hill.bottom_radius])
 	var top := 125.0
 	var shaft := _tool()
 	_cylinder(shaft, 3.2, 6.0, 118.0, foot + Vector3(0.0, 0.0, top), 18)

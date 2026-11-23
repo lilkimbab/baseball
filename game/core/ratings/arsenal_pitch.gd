@@ -12,3 +12,7 @@ var movement := 50.0
 var command := 50.0
 ## Share of all pitches thrown, 0..1.
 var usage := 0.5
+## His share of it by the count (queue stage 3, from the pitch table: tools/kbo/pitch_mix.py):
+## [even, ahead (more strikes than balls), behind (more balls)]. Empty: the game's usual lean
+## by the count (AiPitcher).
+var by_count := PackedFloat32Array()

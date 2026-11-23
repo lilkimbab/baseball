@@ -41,6 +41,11 @@ func _load(i: int) -> void:
 
 func _process(_delta: float) -> bool:
 	_frames += 1
+	# The park alone: none of the broadcast's cards over it, no HUD.
+	if _scene.broadcast.current != null:
+		_scene.broadcast.skip_all()
+	for n: Node in _scene.find_children("*", "CanvasLayer", true, false):
+		(n as CanvasLayer).visible = false
 	if _frames < 20:
 		return false
 	var cam := _cam

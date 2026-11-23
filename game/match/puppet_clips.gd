@@ -83,7 +83,7 @@ static func swing(t: float, lead: float, contact_height: float) -> PuppetPose:
 static func catcher(mitt_height: float = 0.72) -> PuppetPose:
 	var a := PuppetPose.at
 	var mitt := clampf(mitt_height, 0.35, 1.25)
-	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 24.0, a.call(0.22, 0.55, 0.1), a.call(-0.04, mitt, 0.5), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
+	return _pose(a.call(0.0, 0.46, 0.0), 0.0, 0.0, 24.0, a.call(0.24, 0.5, 0.05), a.call(0.02, mitt, 0.56), a.call(0.3, 0.08, 0.12), a.call(-0.3, 0.08, 0.12))
 
 
 ## The catcher putting down the sign: right hand deep between his thighs, mitt on his left
@@ -364,6 +364,18 @@ static func umpire_signal(kind: StringName, t: float) -> PuppetPose:
 
 
 ## Walking, for the pitcher coming back to the rubber and anyone strolling. phase as run().
+## Hit by a pitch: turned from it and bent over where it caught him, a hand to his side.
+static func flinch() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.86, -0.04), 0.0, 22.0, 26.0, a.call(0.1, 0.98, 0.14), a.call(-0.24, 0.9, 0.16), a.call(0.17, 0.08, 0.06), a.call(-0.17, 0.08, -0.12))
+
+
+## A home run's hitter coming home: a fist up, the other arm out a little (queue stage 6).
+static func fist_pump() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.94, 0.02), 0.0, 0.0, 4.0, a.call(0.2, 1.95, 0.12), a.call(-0.3, 0.95, 0.12), a.call(0.13, 0.08, 0.06), a.call(-0.13, 0.08, -0.08))
+
+
 ## Standing at ease, arms by the sides: the figure in the menus (player card, portraits).
 static func standing() -> PuppetPose:
 	var a := PuppetPose.at
@@ -375,3 +387,32 @@ static func walk(phase: float) -> PuppetPose:
 	var left := _pose(a.call(0.0, 0.95, 0.0), 0.0, 4.0, 3.0, a.call(0.24, 0.86, 0.12), a.call(-0.24, 0.86, -0.1), a.call(0.12, 0.1, -0.28), a.call(-0.12, 0.08, 0.28))
 	var right := _pose(a.call(0.0, 0.95, 0.0), 0.0, -4.0, 3.0, a.call(0.24, 0.86, -0.1), a.call(-0.24, 0.86, 0.12), a.call(0.12, 0.08, 0.28), a.call(-0.12, 0.1, -0.28))
 	return left.blend(right, 0.5 - 0.5 * cos(phase * PI))
+
+
+## A bow (KBO: to the room at a ceremony, cap in place), `k` 0 upright to 1 bowed: the trunk
+## forward, the hands down the front of the thighs.
+static func bow(k: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var drop := 0.06 * k
+	return _pose(a.call(0.0, 0.955 - 0.015 * k, -0.05 * k), 0.0, 0.0, 1.5 + 36.0 * k, a.call(0.17 - 0.03 * k, 0.83 - drop, 0.07 + 0.22 * k), a.call(-0.17 + 0.03 * k, 0.83 - drop, 0.07 + 0.22 * k), a.call(0.12, 0.08, 0.0), a.call(-0.12, 0.08, 0.0))
+
+
+## Both hands holding something up in front: at `height` (m), `apart` between the hands,
+## `reach` in front of the hips (a jersey held up at a signing, a trophy at the chest or over
+## the head).
+static func hold(height: float, apart: float, reach: float) -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.955, 0.0), 0.0, 0.0, 1.0, a.call(apart * 0.5, height, reach), a.call(-apart * 0.5, height, reach), a.call(0.12, 0.08, 0.0), a.call(-0.12, 0.08, 0.0))
+
+
+## A wave to the stands with the right hand, `t` seconds in.
+static func wave(t: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var sway := 0.09 * sin(t * TAU * 1.4)
+	return _pose(a.call(0.0, 0.955, 0.0), 0.0, 0.0, 1.0, a.call(0.36 + sway, 1.72, 0.14), a.call(-0.25, 0.83, 0.07), a.call(0.12, 0.08, 0.0), a.call(-0.12, 0.08, 0.0))
+
+
+## Down on one knee, bent over, a hand on where it hurts (a man hit by a pitch).
+static func kneel() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.52, -0.05), 0.0, 12.0, 32.0, a.call(0.12, 0.72, 0.3), a.call(-0.16, 0.62, 0.32), a.call(0.16, 0.08, 0.32), a.call(-0.14, 0.12, -0.42))

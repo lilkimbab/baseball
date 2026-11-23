@@ -27,6 +27,10 @@ const CASUAL: Array[Color] = [
 ]
 ## Beats a second of the cheering songs.
 const BEATS_PER_SECOND := 2.1
+## On each stage: the cheer leader and the cheerleaders.
+const STAGE_CREW := 5
+## The fan who leads the cheering (one of the men in the atlas).
+const LEADER := 6
 
 var park: StadiumBuilder
 var home_colours: Array[Color] = [Color(0.95, 0.95, 0.96), Color(0.1, 0.2, 0.5)]
@@ -41,6 +45,10 @@ var counts := Vector3i.ZERO
 var _materials: Array[ShaderMaterial] = []
 var _states := PackedFloat32Array([0, 0, 0, 0, 0, 0, 0, State.CHEERING])
 var _beat := 0.0
+## How many people the atlas has, and how many of them are fans (the rest cheerleaders).
+var _people := 13
+var _fans := 13
+var _cheer_scale := 1.0
 
 
 func _init(stadium: StadiumBuilder = null) -> void:
@@ -76,13 +84,20 @@ func _ready() -> void:
 			mid_items.append(item)
 		else:
 			far_items.append(item)
-	# The cheering stages: a cheer leader and two cheerleaders on each.
+	# The cheering stages: the cheer leader in the middle, cheerleaders either side of him
+	# (KBO), all in the club's colours.
+	var info := atlas_info()
+	_people = int(info.get("people", 13))
+	_fans = int(info.get("fans", _people))
+	_cheer_scale = float(info.get("cheer_scale", 1.0))
 	for side: float in [1.0, -1.0]:
 		var at := park.stage_spot(side)
 		if at.is_finite():
-			for k: int in 3:
-				var spot := at + Vector3(0.0, 0.0, 0.0) + _across(at, (k - 1) * 0.9)
-				near_items.append([spot, rad_to_deg(atan2(Field.to_field(at).x, Field.to_field(at).y)), Zone.STAGE, rng.next_float(), rng])
+			for k: int in STAGE_CREW:
+				var spot := at + _across(at, (k - (STAGE_CREW - 1) * 0.5) * 0.85)
+				# The leader a fan in the club's jacket; the others the cheerleaders by turns.
+				var who := LEADER if k == STAGE_CREW / 2 or _people == _fans else _fans + k % (_people - _fans)
+				near_items.append([spot, rad_to_deg(atan2(Field.to_field(at).x, Field.to_field(at).y)), Zone.STAGE, rng.next_float(), rng, who, side])
 			_build_stage(at)
 	_fill(near, near_items)
 	_fill(mid, mid_items)
@@ -150,10 +165,19 @@ func _fill(mm: MultiMesh, items: Array) -> void:
 		var size := rng.next_range(0.92, 1.06)
 		mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * size), at))
 		var shirt := _shirt(zone, rng)
+		var person := rng.next_float() * float(_fans) / float(maxi(_people, 1))
+		if it.size() > 5:
+			# Someone on a stage: who he is, in his side's colours. A cheerleader's picture
+			# covers more than a fan's (her arms reach wide): her card is that much bigger.
+			person = (float(it[5]) + 0.5) / float(maxi(_people, 1))
+			if int(it[5]) >= _fans:
+				mm.set_instance_transform(i, Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * size * _cheer_scale), at))
+			var colours := home_colours if float(it[6]) > 0.0 else away_colours
+			shirt = colours[1] if int(it[5]) == LEADER else colours[int(it[5]) % colours.size()]
 		# Only club colours are dyed in; anyone else keeps the clothes he came in.
 		var dyed := 1.0 if shirt in home_colours or shirt in away_colours or zone == Zone.STAGE else 0.0
 		mm.set_instance_color(i, Color(shirt.r, shirt.g, shirt.b, 1.0))
-		mm.set_instance_custom_data(i, Color(float(it[3]), float(zone), dyed, rng.next_float()))
+		mm.set_instance_custom_data(i, Color(float(it[3]), float(zone), dyed, person))
 
 
 static func _multimesh(mesh: Mesh) -> MultiMesh:
@@ -183,9 +207,12 @@ func _material() -> ShaderMaterial:
 	m.set_shader_parameter("mask", load(MASK) as Texture2D)
 	var info := atlas_info()
 	m.set_shader_parameter("people", info.get("people", 13))
+	m.set_shader_parameter("fans", info.get("fans", info.get("people", 13)))
 	m.set_shader_parameter("poses", info.get("poses", 8))
 	m.set_shader_parameter("columns", info.get("columns", 8))
 	m.set_shader_parameter("rows", info.get("rows", 13))
+	# Each person from the back as well (an atlas of two views): shown when the eye is behind.
+	m.set_shader_parameter("views", info.get("views", 1))
 	m.set_shader_parameter("card", CARD)
 	return m
 
@@ -199,6 +226,8 @@ static func atlas_info() -> Dictionary:
 		var parts := line.split(" ", false)
 		if parts.size() >= 2 and parts[1].is_valid_int():
 			out[parts[0]] = int(parts[1])
+		elif parts.size() == 2 and parts[1].is_valid_float():
+			out[parts[0]] = float(parts[1])
 		elif parts.size() >= 2 and parts[0] == "poses":
 			# The pictures of each person, by name: how many there are.
 			out["poses"] = parts.size() - 1

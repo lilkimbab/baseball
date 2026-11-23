@@ -38,6 +38,8 @@ var backward := 0.88
 var reach := 1.1
 var high := 2.3
 var dive_reach := 0.9
+## The last dive was at a ball well out of reach (Injuries.RECKLESS_DIVE).
+var reckless := false
 var leap := 2.9
 var field: AnalyticField
 
@@ -103,6 +105,8 @@ func dive(t: float, path: Trajectory) -> bool:
 		when += 0.02
 	dive_toward = toward.normalized() if best < 8.0 and toward.length() > 0.05 else velocity.normalized()
 	dive_time = t
+	# Thrown at a ball well out of his reach: a reckless dive (a worse chance of being hurt).
+	reckless = best > dive_reach + 0.4
 	return true
 
 
@@ -162,6 +166,9 @@ func step(t: float, dt: float, wish: Vector2, path: Trajectory) -> bool:
 		velocity = velocity.move_toward(want, rate * dt)
 		pos += velocity * dt
 	_stay_in_the_park()
+	# Against the wall he goes no faster than he gets on (his legs ran on the spot there).
+	if not diving(t):
+		velocity = velocity.limit_length((pos - from).length() / dt)
 	# The ball against him, along the step.
 	var steps := maxi(ceili(dt / CHECK), 1)
 	for i: int in range(1, steps + 1):
@@ -192,6 +199,16 @@ func step(t: float, dt: float, wish: Vector2, path: Trajectory) -> bool:
 		_sampled = t
 		track.append(Vector3(t, pos.x, pos.y))
 	return false
+
+
+## Nothing is asked of him any more (a team-mate has the ball, the play is decided): he pulls
+## up over a few steps. Left with the speed he had, he ran on the spot for the rest of the play.
+func coast(dt: float) -> void:
+	if got or dt <= 0.0 or velocity == Vector2.ZERO:
+		return
+	velocity = velocity.move_toward(Vector2.ZERO, quickness * 1.6 * dt)
+	pos += velocity * dt
+	_stay_in_the_park()
 
 
 func _stay_in_the_park() -> void:

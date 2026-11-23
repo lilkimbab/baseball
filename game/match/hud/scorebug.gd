@@ -23,6 +23,8 @@ var scene: MatchScene
 func _draw() -> void:
 	if scene == null or scene.game == null:
 		return
+	if scene.pregame_showing() or scene.post_game_showing():
+		return
 	# The manager's situation board has its own line score where the bug would be.
 	var board := scene as ManagerMatch
 	if board != null and not board.game.over and board.board_visible():
@@ -133,7 +135,7 @@ func _strip(r: Rect2, g: GameState) -> void:
 	var pitches: int = g.pitch_counts.get(g.pitcher_id(), 0)
 	text(r.position + Vector2(14.0, 21.0), "투구", 15, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
 	figure(r.position + Vector2(52.0, 23.0), str(pitches), 20, Color.WHITE)
-	_draw_weather(Rect2(r.position + Vector2(r.size.x - 250.0, 0.0), Vector2(250.0, r.size.y)))
+	# (The weather is told before the game only: the user, 2026-11-23.)
 
 
 func _draw_weather(r: Rect2) -> void:

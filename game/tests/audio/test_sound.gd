@@ -107,6 +107,13 @@ func test_a_game_makes_the_sounds_of_what_happens() -> void:
 	assert_gt(heard.call("sfx/bat"), 2, "balls hit")
 	assert_gt(heard.call("sfx/glove") + heard.call("sfx/bounce"), 1, "plays in the field")
 	assert_gt(heard.call("cheer/"), 10, "the cheering between pitches")
+	assert_gt(heard.call("cheer/song_"), 0, "the batters' songs")
+	var songs := GameAudio.variants("cheer/song").size()
+	assert_eq(songs, 6, "the game's six songs")
+	for id: String in ["a", "kbo-123", "career-7"]:
+		var n := MatchSound.song_number(id, songs)
+		assert_between(n, 1, songs)
+		assert_eq(MatchSound.song_number(id, songs), n, "a man's song is always his")
 	assert_gt(heard.call("crowd/"), 1, "the crowd's reactions")
 	assert_eq(MatchSound.bat_sound(160.0, &"good"), "sfx/bat_solid_4", "crushed on time")
 	assert_eq(MatchSound.bat_sound(80.0, &"late"), "sfx/bat_jam_1", "late and weak: jammed")

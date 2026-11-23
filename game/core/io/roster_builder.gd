@@ -226,11 +226,72 @@ static func set_stuff(p: Player, target: float, catalog: Dictionary[StringName, 
 			a.movement = clampf(a.movement + step, 1.0, 99.0)
 
 
+## A pitcher's real pitches (the user: the real men's real pitches): which, how often, how hard;
+## their movement and command start from the generated ones (set_stuff then brings his stuff to
+## his record). Most used first, six at most.
+static func real_arsenal(p: Player, rows: Array) -> void:
+	var made := p.pitching.arsenal
+	var movement := made[0].movement if not made.is_empty() else 50.0
+	var command := made[0].command if not made.is_empty() else 50.0
+	var sorted := rows.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["usage"]) > float(b["usage"]))
+	var arsenal: Array[ArsenalPitch] = []
+	for row: Dictionary in sorted.slice(0, 6):
+		var a := ArsenalPitch.new()
+		a.type = StringName(str(row["type"]))
+		a.usage = float(row["usage"])
+		if row.has("usage_even") and str(row["usage_even"]) != "":
+			a.by_count = PackedFloat32Array([float(row["usage_even"]), float(row["usage_ahead"]), float(row["usage_behind"])])
+		a.velo_avg = clampf(float(row.get("velo", 0.0)), 90.0, 162.0) if float(row.get("velo", 0.0)) > 60.0 else 140.0
+		a.velo_max = a.velo_avg + 4.0
+		a.movement = movement
+		a.command = command - (0.0 if arsenal.is_empty() else 2.0)
+		arsenal.append(a)
+	if not arsenal.is_empty():
+		p.pitching.arsenal = arsenal
+
+
+## The league's OPS against the other hand over the same hand (2023–2025: about .03 to .05);
+## plate appearances that count half toward a man's own split; OPS for a point of rating in
+## both contact and power (measured: tools/pitch_data_report.gd).
+const LEAGUE_SPLIT := 0.04
+const SPLIT_PRIOR := 1000.0
+const OPS_PER_POINT := 0.02
+
+
+## A batter's own split beyond the league's, in rating points (0 without a line or for a
+## switch-hitter): his OPS against the other hand over the same hand, less the league's, pulled
+## toward nothing by his plate appearances on the side he has fewer of.
+static func own_split(row: Dictionary, bats: StringName) -> float:
+	if row.is_empty() or bats == &"S":
+		return 0.0
+	var pa_l := float(row.get("pa_l", 0))
+	var pa_r := float(row.get("pa_r", 0))
+	var same := float(row.get("ops_l" if bats == &"L" else "ops_r", 0.0))
+	var other := float(row.get("ops_r" if bats == &"L" else "ops_l", 0.0))
+	var n := 2.0 * pa_l * pa_r / maxf(pa_l + pa_r, 1.0)
+	var weight := n / (n + SPLIT_PRIOR)
+	return clampf((other - same - LEAGUE_SPLIT) * weight / OPS_PER_POINT, -8.0, 12.0)
+
+
 ## Builds the clubs from the tables: teams (id, name, short, stadium, primary, secondary,
 ## accent), players (id, team, name, number, born, height_cm, weight_kg, bats, throws,
 ## positions "SS/2B", role "SP"/"RP" for pitchers, origin, registered 1/0), batting (id, pa,
 ## ab, h, 2b, 3b, hr, bb, hbp, so, sb, cs), pitching (id, g, gs, outs, bf, so, bb, hr).
-static func build(teams: Array, players: Array, batting: Array, pitching: Array, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], names: NameTable) -> Array[Team]:
+static func build(teams: Array, players: Array, batting: Array, pitching: Array, env: LeagueEnv, catalog: Dictionary[StringName, PitchType], names: NameTable, pitches: Array = [], splits: Array = []) -> Array[Team]:
+	# Each batter's own split against left- and right-handed pitchers (queue stage 3): how much
+	# more (or less) he does against the other hand than the league does, pulled toward it by
+	# how few plate appearances there are (SPLIT_PRIOR).
+	var split_of: Dictionary = {}
+	for row: Dictionary in splits:
+		split_of[str(row["id"])] = row
+	# Each pitcher's real pitches where the tables have them (id, type, usage, velo).
+	var mix: Dictionary = {}
+	for row: Dictionary in pitches:
+		if catalog.has(StringName(str(row.get("type", "")))):
+			if not mix.has(str(row["id"])):
+				mix[str(row["id"])] = []
+			(mix[str(row["id"])] as Array).append(row)
 	var coeffs := coefficients(env)
 	var parks := park_effects(teams)
 	var team_of: Dictionary = {}
@@ -291,6 +352,8 @@ static func build(teams: Array, players: Array, batting: Array, pitching: Array,
 		p.throws = StringName(str(prow.get("throws", "R")))
 		p.origin = StringName(str(prow.get("origin", "")))
 		if pitcher:
+			if mix.has(id):
+				real_arsenal(p, mix[id])
 			var line: Dictionary = pitch_by.get(id, {})
 			var r := pitcher_ratings(line, mu_p, coeffs["pitcher"], like(groups_p, float(line.get("bf", 0)), mu_p))
 			set_stuff(p, float(r["stuff"]), catalog)
@@ -299,11 +362,15 @@ static func build(teams: Array, players: Array, batting: Array, pitching: Array,
 		else:
 			var line: Dictionary = bat_by.get(id, {})
 			var r := hitter_ratings(line, mu, coeffs["batter"], like(groups, float(line.get("pa", 0)), mu))
-			var platoon := 2.0
-			p.batting.contact_r = clamp_rating(float(r["contact"]) + (platoon if p.bats == &"L" else -platoon) * 0.5)
-			p.batting.contact_l = clamp_rating(float(r["contact"]) - (platoon if p.bats == &"L" else -platoon) * 0.5)
-			p.batting.power_r = float(r["power"])
-			p.batting.power_l = float(r["power"])
+			# (The league's own split is in the outcome tables already: LeagueEnv.same_hand,
+			# opposite_hand. Only his own beyond it goes into his ratings.)
+			var platoon := own_split(split_of.get(id, {}), p.bats)
+			# (Positive: better against right-handed pitchers.)
+			var toward_r := platoon if p.bats == &"L" else (-platoon if p.bats == &"R" else 0.0)
+			p.batting.contact_r = clamp_rating(float(r["contact"]) + toward_r * 0.5)
+			p.batting.contact_l = clamp_rating(float(r["contact"]) - toward_r * 0.5)
+			p.batting.power_r = clamp_rating(float(r["power"]) + toward_r * 0.5)
+			p.batting.power_l = clamp_rating(float(r["power"]) - toward_r * 0.5)
 			p.batting.eye = float(r["eye"])
 			p.batting.speed = float(r["speed"])
 		team.players.append(p)

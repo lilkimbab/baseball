@@ -23,6 +23,9 @@ var results: Array[ScheduledGame] = []
 var played_day := -1
 ## Ids of the players who played in a farm game today, for growth.
 var played_today: Dictionary[String, bool] = {}
+## A club whose futures game today is the career player's to play (not settled with the
+## others: CareerSeason records it when he has played it). "" none.
+var held := ""
 
 var _fillers: Dictionary[String, Array] = {}
 var _names: NameTable
@@ -103,6 +106,8 @@ func play_day(season: Season, games: Array[ScheduledGame]) -> void:
 		var d := 0 if schedule != null else season.division_of(g.home)
 		if d < 0 or (schedule == null and season.postseason_of(g) != null):
 			continue
+		if held != "" and g.involves(held):
+			continue
 		var away := futures_team(season, g.away)
 		var home := futures_team(season, g.home)
 		var sim := GameSim.create(away, home, season.rules, season.env, season.catalog, season.ovr,
@@ -121,6 +126,36 @@ func play_day(season: Season, games: Array[ScheduledGame]) -> void:
 		for id: String in sim.scorer.book.pitching:
 			book.pitch(id).add(sim.scorer.book.pitching[id])
 			played_today[id] = true
+
+
+## A game the career player played (on screen or at once): into the table, the results and
+## the book, as the others are.
+func record_game(g: ScheduledGame, state: GameState, played: StatBook) -> void:
+	var result := ScheduledGame.new()
+	result.day = g.day
+	result.away = g.away
+	result.home = g.home
+	result.finish(state.score[0], state.score[1], state.inning)
+	g.finish(state.score[0], state.score[1], state.inning)
+	if not standings.is_empty():
+		standings[0].record(result)
+	results.append(result)
+	for id: String in played.batting:
+		book.bat(id).add(played.batting[id])
+		played_today[id] = true
+	for id: String in played.pitching:
+		book.pitch(id).add(played.pitching[id])
+		played_today[id] = true
+
+
+## Today's game of a club's second team on the league's own calendar, or null.
+func game_of(season: Season, team_id: String) -> ScheduledGame:
+	if schedule == null or season.phase != Season.Phase.REGULAR or season.day >= schedule.days:
+		return null
+	for g: ScheduledGame in schedule.games_on(season.day):
+		if g.involves(team_id):
+			return g
+	return null
 
 
 ## His turn in the rotation: by the games his team has played in this league.

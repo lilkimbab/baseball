@@ -18,8 +18,8 @@ func _start(position: String, type_id: String) -> void:
 	spec.position = position
 	spec.type_id = type_id
 	var c := PlayerCreator.create(spec, r, PitchCatalogIO.load_default())
-	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	CareerSession.start(c, clubs[24].id, 36, 7)
+	var clubs := LeagueSession.league_clubs()
+	CareerSession.start(c, clubs[4].id, 36, 7)
 	# Wait for a game day.
 	var guard := 0
 	while not CareerSession.career_season.has_game() and guard < 10:

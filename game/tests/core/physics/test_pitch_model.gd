@@ -24,8 +24,12 @@ func before_all() -> void:
 	catalog = PitchCatalogIO.load_default()
 
 
-func test_catalog_has_the_eight_pitch_types_and_four_evolved_ones() -> void:
-	assert_eq(catalog.size(), 12)
+func test_catalog_has_the_eight_pitch_types_four_evolved_ones_and_six_more() -> void:
+	# The eight, the four a pitch can grow into, and the six more KBO pitchers throw (sinker,
+	# forkball, knuckle curve, slurve, screwball, knuckleball: the user, 2026-11-23).
+	assert_eq(catalog.size(), 18)
+	for id: StringName in [&"sinker", &"forkball", &"knuckle_curve", &"slurve", &"screwball", &"knuckleball"]:
+		assert_true(catalog.has(id), "missing %s" % id)
 	for id: StringName in EXPECTED:
 		assert_true(catalog.has(id), "missing %s" % id)
 

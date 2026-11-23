@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it. Types marked evolved are reached only by the career mode's pitch evolution (docs/02 section 6.3): a four-seam with more spin and ride, a slider thrown harder, a curve with more spin, a changeup with more fade (A: typical Statcast values for such pitches).",
+  "note": "Reference values for a right-handed, over-the-top delivery. tilt_deg is the direction of the Magnus force seen by the catcher: 0 = up, +90 = toward first base. Left-handers mirror it. Types marked evolved are reached only by the career mode's pitch evolution (docs/02 section 6.3): a four-seam with more spin and ride, a slider thrown harder, a curve with more spin, a changeup with more fade (A: typical Statcast values for such pitches). Added 2026-11-23 (the user: more of the pitches really thrown): sinker, forkball, knuckle curve, slurve, screwball, knuckleball ('knuckle': the flutter of a ball thrown nearly without spin, m/s², PitchDuel); the circle change is thrown from the start by some as well as reached by evolving a changeup.",
   "types": [
     {
       "id": "four_seam",
@@ -119,6 +119,65 @@
       "efficiency": 0.9,
       "tilt_deg": -72,
       "evolved": true
+    },
+    {
+      "id": "sinker",
+      "label": "싱커",
+      "family": "fastball",
+      "speed_kmh": 141,
+      "spin_rpm": 2100,
+      "efficiency": 0.85,
+      "tilt_deg": -52,
+      "ssw_accel": 1.2,
+      "ssw_deg": -120
+    },
+    {
+      "id": "forkball",
+      "label": "포크볼",
+      "family": "offspeed",
+      "speed_kmh": 128,
+      "spin_rpm": 900,
+      "efficiency": 0.45,
+      "tilt_deg": -10,
+      "ssw_accel": 0.9,
+      "ssw_deg": -172
+    },
+    {
+      "id": "knuckle_curve",
+      "label": "너클 커브",
+      "family": "breaking",
+      "speed_kmh": 126,
+      "spin_rpm": 2550,
+      "efficiency": 0.8,
+      "tilt_deg": 165
+    },
+    {
+      "id": "slurve",
+      "label": "슬러브",
+      "family": "breaking",
+      "speed_kmh": 124,
+      "spin_rpm": 2450,
+      "efficiency": 0.55,
+      "tilt_deg": 118
+    },
+    {
+      "id": "screwball",
+      "label": "스크루볼",
+      "family": "offspeed",
+      "speed_kmh": 122,
+      "spin_rpm": 1900,
+      "efficiency": 0.7,
+      "tilt_deg": -128
+    },
+    {
+      "id": "knuckleball",
+      "label": "너클볼",
+      "family": "offspeed",
+      "speed_kmh": 112,
+      "spin_rpm": 250,
+      "efficiency": 0.3,
+      "tilt_deg": 0,
+      "knuckle": 6.0
     }
   ]
 }

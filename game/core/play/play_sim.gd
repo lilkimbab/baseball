@@ -1176,10 +1176,22 @@ func _throw_frames(thrower: PlayFielder, from: Vector2, release: float, b: BallA
 	# release, crossing ten metres in a few hundredths of a second.
 	var shown_release := minf(maxf(b.time - _throw_time(thrower, b.distance), 0.0), b.time - 0.05)
 	_fielder_waits(thrower, shown_release)
+	# Taken in front of the bag, in the glove held out toward the throw (the first baseman's
+	# stretch reaches furthest): the receiver stands on the bag, the ball ends where his glove
+	# is. (Thrown to the bag itself, it flew into his chest while his glove was out in front.)
+	var toward := (from - target).normalized() if from.distance_to(target) > 0.1 else Vector2.ZERO
+	var reach := STRETCH_REACH if b.base == 1 else CATCH_IN_FRONT
+	var catch_at := Vector3(target.x + toward.x * reach, target.y + toward.y * reach, 1.05 if b.base == 1 else 1.2)
 	out.timeline.add("ball", shown_release, start)
-	out.timeline.add("ball", b.time, Vector3(target.x, target.y, 1.2))
-	out.timeline.add_throw(shown_release, start, b.time, Vector3(target.x, target.y, 1.2))
+	out.timeline.add("ball", b.time, catch_at)
+	out.timeline.add_throw(shown_release, start, b.time, catch_at)
 	_fielder_run(b.receiver, minf(_cover_time(b.receiver, b.base), b.time), Vector3(target.x, target.y, 0.0))
+
+
+## How far in front of the bag (m, toward the thrower) a throw is caught: at first base the
+## first baseman's stretch, elsewhere a glove held out in front of the chest.
+const STRETCH_REACH := 1.2
+const CATCH_IN_FRONT := 0.45
 
 
 func _runner_frames(r: PlayRunner) -> void:

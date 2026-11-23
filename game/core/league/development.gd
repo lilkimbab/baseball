@@ -34,6 +34,7 @@ const ROOM_PER_YEAR := 1.6
 const ROOM_SPREAD := 3.0
 ## Drafted rookies were picked for their upside.
 const DRAFT_UPSIDE := 2.0
+const DRAFT_FLOOR := 1.0
 ## Winter decline from DECLINE_FROM: BASE plus SLOPE a year past it, in rating points;
 ## physical ratings take more of it, skills less.
 const DECLINE_FROM := 31
@@ -81,6 +82,9 @@ static func initial_room(age: int, rng: Rng, drafted: bool = false) -> float:
 		room = 1.5 + rng.next_normal() * 1.5
 	if drafted:
 		room += DRAFT_UPSIDE
+		# A club drafts a man for what he may become: never one with nothing left to gain
+		# (three deviations low, one rookie in a few hundred had none).
+		return maxf(room, DRAFT_FLOOR)
 	return maxf(room, 0.0)
 
 
@@ -185,6 +189,9 @@ static func winter(season: Season) -> Winter:
 		var gen := LeagueGenerator.new(names, season.catalog, hash("draft:%d:%s" % [w.year, team_id]))
 		var leaving: Array[Player] = []
 		for p: Player in team.players:
+			# (A career's own player retires when the person says so.)
+			if p.id == season.career_player:
+				continue
 			if retires(w.year - p.born, regular(season, p), rng):
 				leaving.append(p)
 		var numbers: Dictionary[int, bool] = {}
@@ -215,8 +222,10 @@ static func winter(season: Season) -> Winter:
 		for p: Player in team.players:
 			decline(p, w.year - p.born)
 		RosterMoves.refill(season, team)
-		if team_id != season.my_team:
+		if team_id != season.my_team or season.career_player != "":
 			for m: RosterMoves.Move in RosterMoves.advice(season, team, true):
+				if season.career_player != "" and ((m.up != null and m.up.id == season.career_player) or (m.down != null and m.down.id == season.career_player)):
+					continue
 				RosterMoves.apply(season, team, m)
 	season.grown.clear()
 	return w

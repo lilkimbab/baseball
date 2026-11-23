@@ -279,6 +279,7 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 	points.add_child(UiKit.number("%d" % Profile.points, 34, UiTheme.ACCENT))
 	side.body.add_child(UiKit.rule())
 	if chosen.is_empty():
+		_guide(side)
 		return
 	var ids: Array = []
 	var words: Array = []
@@ -308,3 +309,33 @@ func _detail(side: GlassPanel, chosen: Dictionary, _family: Array) -> void:
 	b.add_theme_font_size_override("font_size", 26)
 	b.disabled = why != ""
 	side.body.add_child(b)
+
+
+## Before anything is picked: how points are earned, the day's goals as they stand, and what is
+## owned already.
+func _guide(side: GlassPanel) -> void:
+	side.body.add_child(UiKit.caption("포인트 얻는 법"))
+	side.body.add_child(UiKit.label("경기 완료 +%d P · 승리 +%d P" % [Profile.GAME_POINTS, Profile.WIN_POINTS], 18, UiTheme.INK, 600))
+	side.body.add_child(UiKit.label("어려운 난이도일수록 더 받고, 오늘의 목표와 업적에서도 받습니다", 15, UiTheme.DIM, 500))
+	side.body.add_child(UiKit.rule())
+	side.body.add_child(UiKit.caption("오늘의 목표"))
+	for g: Array in Profile.goals_today():
+		var met := Profile.met.has(str(g[0]))
+		var have := mini(int(Profile.today.get(str(g[2]), 0)), int(g[3]))
+		var row := UiKit.hbox(8)
+		side.body.add_child(row)
+		var words := UiKit.label(str(g[1]), 18, UiTheme.GREEN if met else UiTheme.INK, 600)
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(words)
+		row.add_child(UiKit.label("완료" if met else "%d/%d" % [have, int(g[3])], 16, UiTheme.GREEN if met else UiTheme.DIM, 600))
+		row.add_child(UiKit.number("+%d" % int(g[4]), 18, UiTheme.ACCENT))
+	side.body.add_child(UiKit.rule())
+	side.body.add_child(UiKit.caption("가진 것"))
+	var any := false
+	for item: Dictionary in items():
+		var n := int(Profile.owned.get(str(item["id"]), 0))
+		if n > 0:
+			any = true
+			side.body.add_child(UiKit.label("%s  ×%d" % [str(item["name"]), n], 17, UiTheme.INK, 600))
+	if not any:
+		side.body.add_child(UiKit.label("아직 없습니다. 왼쪽에서 골라 보세요", 16, UiTheme.DIM, 500))

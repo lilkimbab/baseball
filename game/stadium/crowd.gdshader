@@ -7,6 +7,8 @@ render_mode cull_disabled, world_vertex_coords;
 // so a section is never all in one attitude: no bones, one draw for thousands.
 // A card turns about its foot toward whoever is looking (never edge-on), is flipped left to
 // right for half the people, and each person is a little taller or shorter than the next.
+// From behind (a camera at the back of the stands) the picture is the person's back: the fans
+// face the game, not the camera (the user, 2026-11-23).
 //
 // Per instance: COLOR.rgb the club colour his top is dyed in, INSTANCE_CUSTOM.x a phase, .y
 // the zone, .z 1 when his top is dyed (the cheering sections), .w which person (0..1).
@@ -15,9 +17,13 @@ uniform sampler2D atlas : source_color, filter_linear_mipmap_anisotropic, repeat
 // White where each picture's top (shirt, jacket) is.
 uniform sampler2D mask : hint_default_black, filter_linear_mipmap, repeat_disable;
 uniform int people = 13;
+// The first `fans` people are fans; the rest are cheerleaders, on the stages only.
+uniform int fans = 13;
 uniform int poses = 8;
 uniform int columns = 8;
 uniform int rows = 13;
+// 2 when the atlas has each person from the back too (the fronts, then the backs).
+uniform int views = 1;
 uniform vec2 card = vec2(1.0, 2.0);
 // Beats of the cheering so far (the songs run at about two a second).
 uniform float beat = 0.0;
@@ -33,6 +39,14 @@ const int STAND = 4;
 const int STAND_CLAP = 5;
 const int CHEER = 6;
 const int CHEER_ONE = 7;
+// With something in hand (an atlas of 14 pictures a person): fried chicken, a beer, a phone,
+// thunder sticks up and struck together, the club's towel held up.
+const int EAT = 8;
+const int DRINK = 9;
+const int PHONE = 10;
+const int STICKS_UP = 11;
+const int STICKS_HIT = 12;
+const int TOWEL = 13;
 
 varying flat vec2 v_cell;
 varying flat float v_flip;
@@ -48,20 +62,74 @@ void vertex() {
 	float b = beat + phase * 0.6;
 	int pose = SEATED;
 	float bounce = 0.0;
-	if (st > 2.5) {
+	bool props = poses >= 14;
+	if (person >= fans) {
+		// A cheerleader: her routine, a step a beat through the six pictures of her dance.
+		int step = int(floor(b)) % 8;
+		pose = (step == 0 || step == 2 || step == 6) ? 0 : (step == 1 ? 1 : (step == 3 ? 2 : (step == 4 ? 3 : (step == 5 ? 4 : 5))));
+		bounce = 0.05 * abs(sin(b * 3.14159));
+	} else if (st > 2.5) {
 		// Clapping: hands together on the beat, apart between; a few just watch.
 		pose = who < 0.8 ? (fract(b) < 0.5 ? CLAP : SEATED) : LEAN;
 	} else if (st > 1.5) {
-		// Cheering: arms up, one arm, or clapping on their feet, each to the beat.
-		pose = who < 0.45 ? CHEER : (who < 0.75 ? (fract(b * 0.5) < 0.5 ? CHEER_ONE : STAND_CLAP) : (fract(b) < 0.5 ? STAND_CLAP : STAND));
+		// Cheering: arms up, thunder sticks up and struck on the beat, a towel held up, one
+		// arm, or clapping on their feet.
+		if (who < 0.3) {
+			pose = CHEER;
+		} else if (who < 0.5) {
+			pose = props ? (fract(b) < 0.5 ? STICKS_UP : STICKS_HIT) : CHEER;
+		} else if (who < 0.58) {
+			pose = props ? TOWEL : CHEER;
+		} else if (who < 0.78) {
+			pose = fract(b * 0.5) < 0.5 ? CHEER_ONE : STAND_CLAP;
+		} else {
+			pose = fract(b) < 0.5 ? STAND_CLAP : STAND;
+		}
 		bounce = 0.07 * abs(sin(b * 3.14159));
 	} else if (st > 0.5) {
-		// On their feet singing: at ease, clapping along, now and then an arm in the air.
-		pose = who < 0.4 ? STAND : (who < 0.75 ? (fract(b) < 0.5 ? STAND_CLAP : STAND) : (fract(b * 0.5) < 0.4 ? CHEER_ONE : STAND));
+		// On their feet singing: at ease, clapping along, now and then an arm in the air, a
+		// phone up to film, the sticks.
+		if (who < 0.35) {
+			pose = STAND;
+		} else if (who < 0.65) {
+			pose = fract(b) < 0.5 ? STAND_CLAP : STAND;
+		} else if (who < 0.75) {
+			pose = fract(b * 0.5) < 0.4 ? CHEER_ONE : STAND;
+		} else if (who < 0.83) {
+			pose = props ? PHONE : STAND;
+		} else if (who < 0.93) {
+			pose = props ? (fract(b) < 0.5 ? STICKS_HIT : STICKS_UP) : STAND;
+		} else {
+			pose = STAND;
+		}
 	} else {
-		pose = who < 0.5 ? SEATED : (who < 0.75 ? LEAN : ARMS);
+		// Sitting: upright, leaning on the knees, arms folded; eating and drinking, a bite or a
+		// sip now and then.
+		if (who < 0.4) {
+			pose = SEATED;
+		} else if (who < 0.58) {
+			pose = LEAN;
+		} else if (who < 0.7 || !props) {
+			pose = ARMS;
+		} else if (who < 0.82) {
+			pose = fract(TIME * 0.25 + phase * 3.0) < 0.55 ? EAT : SEATED;
+		} else if (who < 0.92) {
+			pose = fract(TIME * 0.15 + phase * 3.0) < 0.3 ? DRINK : SEATED;
+		} else {
+			pose = ARMS;
+		}
 	}
 	int f = person * poses + pose;
+	// Seen from behind (the eye on the far side of where he faces, the field): his back.
+	// (The card's z axis points away from the field — a node faces along its -Z — so the way
+	// he faces is minus it. With the sign the other way every fan showed his back to the
+	// field's cameras and his face to the one behind the stands.)
+	vec3 facing_field = -normalize(MODEL_MATRIX[2].xyz * vec3(1.0, 0.0, 1.0));
+	vec3 eye_dir = CAMERA_POSITION_WORLD - MODEL_MATRIX[3].xyz;
+	eye_dir.y = 0.0;
+	if (views > 1 && dot(facing_field, normalize(eye_dir)) < -0.2) {
+		f += people * poses;
+	}
 	v_cell = vec2(float(f % columns), float(f / columns));
 	v_flip = step(0.5, fract(phase * 7.77 + INSTANCE_CUSTOM.w * 3.1));
 	v_tint = COLOR.rgb;

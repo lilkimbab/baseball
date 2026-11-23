@@ -74,6 +74,39 @@ func refresh() -> void:
 		Achievements.check_league(LeagueSession.season)
 		LeagueSession.autosave()
 	super.refresh()
+	_season_end_scenes.call_deferred()
+
+
+## Seasons whose ending has been shown (this run of the game).
+static var _ended_shown: Dictionary[String, bool] = {}
+
+
+## When the season is over: his club's championship (its best man lifting the cup), and the
+## awards his men won (MVP, best pitcher, rookie of the year), once each (Ceremony).
+func _season_end_scenes() -> void:
+	var s := LeagueSession.season
+	if s == null or not s.finished() or not is_inside_tree() or Ceremony.showing:
+		return
+	var key := "%d:%s:%d" % [s.season_year, s.my_team, s.get_instance_id()]
+	if _ended_shown.has(key):
+		return
+	_ended_shown[key] = true
+	var d := s.division_of(s.my_team)
+	var team: Team = s.teams[s.my_team]
+	var list: Array = []
+	var post := s.postseasons[d] if d < s.postseasons.size() else null
+	var awards := SeasonAwards.for_division(s, d, s.season_year)
+	if post != null and post.finished() and post.champion() == s.my_team:
+		var star := team.player(awards.mvp.player_id) if awards.mvp != null and awards.mvp.team_id == s.my_team else null
+		if star == null:
+			for p: Player in team.first_team():
+				if star == null or ClubRules.player_ovr(p, s.ovr, s.catalog) > ClubRules.player_ovr(star, s.ovr, s.catalog):
+					star = p
+		list.append([&"champion", "%d %s" % [s.season_year, post.round_name(post.format.size() - 1)], "%s 우승!" % team.name, PackedStringArray(["정규 시즌 %d위" % s.standings[d].rank_of(s.my_team)]), team, null, star])
+	for a: SeasonAwards.Award in [awards.mvp, awards.pitcher, awards.rookie]:
+		if a != null and a.team_id == s.my_team and team.player(a.player_id) != null:
+			list.append([&"award", "%d KBO 시상식" % s.season_year, a.title, PackedStringArray([a.text]), team, null, team.player(a.player_id)])
+	Ceremony.play_all(self, list)
 
 
 func build() -> void:
@@ -224,6 +257,9 @@ func _club_card(t: Team, on: bool) -> DragCard:
 static func league_name(s: Season, d: int) -> String:
 	if s.history != null:
 		return "%d 시즌" % s.season_year
+	if s.school:
+		var first: String = s.divisions[0][0] if not s.divisions.is_empty() and not s.divisions[0].is_empty() else ""
+		return "%s 주말리그" % str(SchoolLeague.school(first).get("league", "고교"))
 	return LeagueSession.league_title() if s.divisions.size() == 1 else "%d부 리그" % (d + 1)
 
 
@@ -358,6 +394,11 @@ func _build_today(parent: Control, s: Season) -> void:
 	if g != null and g.played:
 		ahead = g
 	var title := "오늘의 경기" if g != null and g == ahead else "다음 경기"
+	# The all-star break (LeagueAllStar): its panel first while the game or the derby is on.
+	if LeagueAllStar.due(s):
+		LeagueAllStar.hold(s)
+	if LeagueAllStar.on(s):
+		_build_all_star(parent, s)
 	var p := panel(title, "calendar-blank", parent, 0.0, "DAY %d" % ((ahead.day if ahead != null else s.day) + 1))
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if ahead != null:
@@ -418,6 +459,9 @@ func _build_today(parent: Control, s: Season) -> void:
 		actions.add_child(UiKit.button("정규 시즌 끝까지" if s.phase == Season.Phase.REGULAR else "포스트시즌 끝까지", to_phase_end, "fast-forward"))
 	if message != "":
 		p.body.add_child(_centered(message, UiTheme.ACCENT))
+	# Injuries since he last looked, and who was called up in their place.
+	for line: String in s.news:
+		p.body.add_child(_centered(line, UiTheme.ORANGE))
 
 
 ## The club's next game not played yet (regular season; the postseason's are made a day at a
@@ -2434,13 +2478,61 @@ func quick_result() -> void:
 	refresh()
 
 
+## The all-star break: his men picked, the game (himself or at once) and the derby (his
+## hitter, himself or at once), and what it paid.
+func _build_all_star(parent: Control, s: Season) -> void:
+	var p := panel("올스타 브레이크", "star", parent, 0.0, "ALL-STAR")
+	var mine := LeagueAllStar.of_my_club(s)
+	var names := PackedStringArray()
+	for id: String in mine:
+		names.append(s.teams[s.my_team].player(id).name)
+	p.body.add_child(UiKit.label("우리 구단 선정: %s" % (", ".join(names) if not names.is_empty() else "없음"), 18, UiTheme.INK, 600))
+	for line: Variant in s.all_star.get("paid", []):
+		p.body.add_child(UiKit.label(str(line), 16, UiTheme.ACCENT, 600))
+	var row := UiKit.hbox(10)
+	p.body.add_child(row)
+	var game: Array = s.all_star.get("game", [])
+	if game.is_empty():
+		row.add_child(UiKit.button("올스타전 직접 플레이", func() -> void:
+			go(ALL_STAR_MATCH, {"title": "올스타전", "away": LeagueAllStar.teams(s)[0], "home": LeagueAllStar.teams(s)[1]}), "play", "primary"))
+		row.add_child(UiKit.button("올스타전 빠른 결과", func() -> void:
+			LeagueAllStar.quick_game(s)
+			LeagueSession.autosave()
+			refresh(), "fast-forward"))
+	else:
+		var sides := ["드림", "나눔"]
+		p.body.add_child(UiKit.label("올스타전: %s %d : %d %s" % [sides[0], int(game[0]), int(game[1]), sides[1]], 17, UiTheme.INK, 600))
+	if not LeagueAllStar.derby_over(s):
+		var his := LeagueAllStar.my_derby_man(s)
+		if his != "":
+			var man := s.teams[s.my_team].player(his)
+			row.add_child(UiKit.button("홈런 더비 (%s) 직접" % man.name, func() -> void:
+				HomeRunDerby.league_batter = man
+				go(DERBY, {"title": "홈런 더비"}), "fire"))
+		row.add_child(UiKit.button("홈런 더비 빠른 결과", func() -> void:
+			LeagueAllStar.quick_derby(s)
+			LeagueSession.autosave()
+			refresh(), "fast-forward"))
+	else:
+		var best := LeagueAllStar.winner(s)
+		var who := LeagueAllStar._find(s, best)
+		p.body.add_child(UiKit.label("홈런 더비 우승: %s (%d개)" % [who.name if who != null else best, int((s.all_star["derby"] as Dictionary).get(best, 0))], 17, UiTheme.INK, 600))
+
+
+const ALL_STAR_MATCH := "res://league/all_star_match.tscn"
+const DERBY := "res://career/home_run_derby.tscn"
+
+
 func next_day() -> void:
 	var s := LeagueSession.season
+	s.news.clear()
 	var g := s.my_game_today()
 	if g != null and not g.played:
 		message = "오늘 경기를 먼저 진행해야 합니다."
 		refresh()
 		return
+	if LeagueAllStar.on(s):
+		LeagueAllStar.settle(s)
 	s.advance()
 	s.play_day()
 	message = ""
@@ -2450,11 +2542,14 @@ func next_day() -> void:
 ## Days go by (our games settled at once) until our next game is today.
 func to_next_game() -> void:
 	var s := LeagueSession.season
+	s.news.clear()
 	var guard := 0
 	while s.phase != Season.Phase.OVER and guard < 400:
 		var g := s.my_game_today()
 		if g != null and not g.played:
 			break
+		if LeagueAllStar.due(s) or LeagueAllStar.on(s):
+			LeagueAllStar.settle(s)
 		s.advance()
 		s.play_day()
 		guard += 1
@@ -2464,10 +2559,13 @@ func to_next_game() -> void:
 ## The rest of the regular season (or of the postseason) at once.
 func to_phase_end() -> void:
 	var s := LeagueSession.season
+	s.news.clear()
 	var phase := s.phase
 	var guard := 0
 	while s.phase == phase and guard < 400:
 		s.play_day(true)
+		if LeagueAllStar.due(s) or LeagueAllStar.on(s):
+			LeagueAllStar.settle(s)
 		s.advance()
 		guard += 1
 	if s.phase != Season.Phase.OVER:

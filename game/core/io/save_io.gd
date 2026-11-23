@@ -9,9 +9,40 @@ extends RefCounted
 ##
 ## The standings and the postseason's wins are not stored: they are worked out again from the
 ## games' scores.
+##
+## Adding something to a save (queue stage 1, 2026-11-23): write it in season_to / career_to,
+## read it with a default in season_from / career_from, raise FORMAT, and list it with its
+## default under the new format in ADDED. Loading an older save fills in each format's
+## additions in turn (migrate). A test (test_save_formats) fails when a saved key is in no
+## format, so a new key cannot be forgotten.
 
-const FORMAT := 1
+const FORMAT := 4
 const ROOT := "user://saves"
+## The keys of format 1's season and career, as they were first written.
+const BASE_KEYS := {
+	"season": ["year", "games", "day", "phase", "my_team", "featured", "featured_role", "rng", "management", "teams", "players", "divisions", "schedules", "postseasons", "book", "postseason_book", "usage", "recent", "sitting", "condition", "streak", "starters", "club", "farm", "grown", "played_today", "last_winter", "history"],
+	"career": ["player", "position", "type", "team", "first_team", "appearance", "gp", "popularity", "pitch_uses", "points", "gear", "ratings", "futures_book", "futures_games", "futures_day", "all_star_done", "all_star_selected", "all_star_today", "derby", "derby_waiting", "log"],
+}
+## What each format added, with the value an older save gets: format → {"season": {key:
+## default}, "career": {key: default}}.
+const ADDED := {
+	2: {
+		# The difficulty, the reward for playing oneself and injuries (2026-11-22, 23); the high-
+		# school league (R8-3).
+		"season": {"level_games": [0, 0, 0, 0], "difficulty": 1, "level_days": [0, 0, 0, 0], "involvement": [0.0, 0], "rewarded": false, "injuries": {"out": {}}, "school": false},
+		# The pro career over seasons (R8-3, R8-4).
+		"career": {"recent_futures": [], "recent_first": [], "futures_days": 0, "drafted": "", "signing_bonus": 0, "pro_games": 144, "pro_years": 0, "money": 0, "salary": 3000, "first_days": [], "fa_years": 8, "free_agent_done": false, "seasons": [], "season_first_days": 0, "events_seen": [], "salary_paid": 0.0, "released": false, "winter_lines": [], "fa_offers": [], "release_team": ""},
+	},
+	3: {
+		# The league's all-star break (queue stage 4).
+		"season": {"all_star": {}},
+	},
+	4: {
+		# Each game's line of the men followed (queue stage 5); a career's whole record.
+		"season": {"game_logs": {}},
+		"career": {"game_log": [], "retired": false},
+	},
+}
 ## format → Callable(Dictionary) -> Dictionary bringing a save of that format to the next.
 const MIGRATIONS := {}
 
@@ -49,15 +80,45 @@ static func read(path: String) -> Dictionary:
 	return migrate(parsed) if parsed is Dictionary else {}
 
 
-## Brings an older save up to FORMAT, one step at a time.
+## Brings an older save up to FORMAT, one step at a time: each later format's additions filled
+## in with their defaults (ADDED), and any step that has to change more (MIGRATIONS). A save
+## with no number is format 1; one from a newer game than this is left as it is.
 static func migrate(data: Dictionary) -> Dictionary:
 	var out := data
-	var f := int(out.get("format", FORMAT))
-	while f < FORMAT and MIGRATIONS.has(f):
-		var step: Callable = MIGRATIONS[f]
-		out = step.call(out)
+	var f := int(out.get("format", 1))
+	while f < FORMAT:
+		if MIGRATIONS.has(f):
+			var step: Callable = MIGRATIONS[f]
+			out = step.call(out)
+		_fill(out, f + 1)
 		f += 1
 		out["format"] = f
+	return out
+
+
+## A format's additions into a save that lacks them (its season, and its career if it has one).
+static func _fill(data: Dictionary, format: int) -> void:
+	var added: Dictionary = ADDED.get(format, {})
+	for part: String in ["season", "career"]:
+		if not data.has(part) or not (data[part] is Dictionary):
+			continue
+		var into: Dictionary = data[part]
+		var defaults: Dictionary = added.get(part, {})
+		for key: String in defaults:
+			if not into.has(key):
+				var value: Variant = defaults[key]
+				into[key] = value.duplicate(true) if value is Array or value is Dictionary else value
+	# An old career's pro seasons were as long as its season.
+	if format == 2 and data.has("career") and data.has("season") and (data["career"] as Dictionary).get("pro_games", 144) == 144:
+		(data["career"] as Dictionary)["pro_games"] = int((data["season"] as Dictionary).get("games", 144))
+
+
+## Every key a save of this format may have (BASE_KEYS and each format's additions).
+static func known_keys(part: String) -> PackedStringArray:
+	var out := PackedStringArray(BASE_KEYS.get(part, []))
+	for format: int in ADDED:
+		for key: String in (ADDED[format] as Dictionary).get(part, {}):
+			out.append(key)
 	return out
 
 
@@ -204,6 +265,7 @@ static func season_to(s: Season) -> Dictionary:
 		"last_winter": _winter_to(s.last_winter) if s.last_winter != null else {},
 		"history": {"pack": s.history.id, "scenario": s.scenario_id} if s.history != null else {},
 		"level_games": Array(s.level_games), "difficulty": s.difficulty, "level_days": Array(s.level_days),
+		"school": s.school, "all_star": s.all_star.duplicate(true), "game_logs": s.game_logs.duplicate(true),
 		"involvement": [s.involvement_sum, s.involvement_games], "rewarded": s.rewarded,
 		"injuries": s.injuries.to_dict(),
 	}
@@ -357,6 +419,9 @@ static func season_from(d: Dictionary) -> Season:
 	if not winter.is_empty():
 		s.last_winter = _winter_from(winter)
 	s.difficulty = int(d.get("difficulty", Difficulty.Level.PRO))
+	s.school = bool(d.get("school", false))
+	s.all_star = (d.get("all_star", {}) as Dictionary).duplicate(true)
+	s.game_logs = (d.get("game_logs", {}) as Dictionary).duplicate(true)
 	var days_at: Array = d.get("level_days", [])
 	if days_at.size() == 4:
 		s.level_days = PackedInt32Array(days_at)
@@ -533,8 +598,14 @@ static func career_to(cs: CareerSeason) -> Dictionary:
 		"player": c.player.id, "position": c.position, "type": c.type_id, "team": c.team_id,
 		"first_team": c.first_team, "appearance": c.appearance.duplicate(), "gp": c.gp.duplicate(),
 		"popularity": c.popularity, "pitch_uses": uses, "points": c.points, "gear": c.gear.duplicate(),
+		"drafted": c.drafted, "signing_bonus": c.signing_bonus, "pro_games": cs.pro_games,
+		"pro_years": c.pro_years, "money": c.money, "salary": c.salary, "first_days": Array(c.first_days),
+		"fa_years": c.fa_years, "free_agent_done": c.free_agent_done, "seasons": c.seasons.duplicate(true),
+		"season_first_days": cs.first_team_days, "events_seen": cs.events_seen.duplicate(), "salary_paid": cs.salary_paid,
+		"released": c.released, "game_log": c.game_log.duplicate(true), "retired": c.retired, "winter_lines": Array(cs.winter_lines), "fa_offers": cs.fa_offers.duplicate(true), "release_team": cs.release_team,
 		"ratings": Array(c.ratings),
 		"futures_book": book_to(cs.futures_book), "futures_games": cs.futures_games, "futures_day": cs._futures_day,
+		"recent_futures": cs.recent_futures.duplicate(true), "recent_first": cs.recent_first.duplicate(true), "futures_days": cs.futures_days,
 		"all_star_done": cs.all_star_done, "all_star_selected": cs.all_star_selected.duplicate(),
 		"all_star_today": cs.all_star_today, "derby": cs.derby.duplicate(), "derby_waiting": cs.derby_waiting,
 		"log": Array(cs.log),
@@ -564,6 +635,16 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 	for key: String in gear:
 		c.gear[key] = str(gear[key])
 	c.ratings = PackedFloat64Array(d.get("ratings", []) as Array)
+	c.drafted = str(d.get("drafted", ""))
+	c.signing_bonus = int(d.get("signing_bonus", 0))
+	c.pro_years = int(d.get("pro_years", 0))
+	c.money = int(d.get("money", 0))
+	c.salary = int(d.get("salary", 3000))
+	for v: Variant in d.get("first_days", []):
+		c.first_days.append(int(v))
+	c.fa_years = int(d.get("fa_years", 8))
+	c.free_agent_done = bool(d.get("free_agent_done", false))
+	c.seasons = (d.get("seasons", []) as Array).duplicate(true)
 	var cs := CareerSeason.new()
 	cs.season = season
 	cs.career = c
@@ -571,6 +652,29 @@ static func career_from(d: Dictionary, season: Season) -> CareerSeason:
 	cs.futures_book = book_from(d.get("futures_book", {}))
 	cs.futures_games = int(d.get("futures_games", 0))
 	cs._futures_day = int(d.get("futures_day", -1))
+	for key: String in ["recent_futures", "recent_first"]:
+		var into: Array = cs.recent_futures if key == "recent_futures" else cs.recent_first
+		for line: Variant in d.get(key, []):
+			var numbers: Array = []
+			for v: Variant in (line as Array):
+				numbers.append(int(v))
+			into.append(numbers)
+	cs.futures_days = int(d.get("futures_days", 0))
+	cs.pro_games = int(d.get("pro_games", 144))
+	cs.first_team_days = int(d.get("season_first_days", 0))
+	cs.salary_paid = float(d.get("salary_paid", 0.0))
+	c.released = bool(d.get("released", false))
+	c.game_log = (d.get("game_log", []) as Array).duplicate(true)
+	c.retired = bool(d.get("retired", false))
+	for line: Variant in d.get("winter_lines", []):
+		cs.winter_lines.append(str(line))
+	for offer: Variant in d.get("fa_offers", []):
+		var o: Array = offer
+		cs.fa_offers.append([str(o[0]), int(o[1]), int(o[2])])
+	cs.release_team = str(d.get("release_team", ""))
+	for key: Variant in d.get("events_seen", []):
+		cs.events_seen.append(str(key))
+	season.career_player = c.player.id if c.player != null else ""
 	cs.all_star_done = bool(d.get("all_star_done", false))
 	for id: Variant in d.get("all_star_selected", []):
 		cs.all_star_selected.append(str(id))

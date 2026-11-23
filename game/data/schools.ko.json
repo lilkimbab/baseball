@@ -1,0 +1,398 @@
+{
+ "_about": "고교 야구부가 있는 실제 학교 이름(사실 정보, 저작권 대상 아님: 사용자 결정 2026-11-23). 학교와 권역은 고교야구 주말리그·황금사자기 보도(2011·2014)에서 확인했다. 선수는 흔한 이름으로 무작위 생성한다. 색은 학교 실제 색이 아니라 이름에서 만든 것.",
+ "leagues": [
+  "서울권 A",
+  "서울·강원권 B",
+  "경기·인천권",
+  "부산·경남권",
+  "대구·경북권",
+  "충청권",
+  "전라권"
+ ],
+ "season_games": 14,
+ "talent": 37.0,
+ "schools": [
+  {
+   "id": "hs_00_93f9",
+   "name": "서울고",
+   "league": "서울권 A",
+   "primary": "#1d387b",
+   "secondary": "#f2f2f2",
+   "accent": "#d39145"
+  },
+  {
+   "id": "hs_00_ed33",
+   "name": "휘문고",
+   "league": "서울권 A",
+   "primary": "#7b1d57",
+   "secondary": "#f2f2f2",
+   "accent": "#45d366"
+  },
+  {
+   "id": "hs_00_3b63",
+   "name": "충암고",
+   "league": "서울권 A",
+   "primary": "#477b1d",
+   "secondary": "#f2f2f2",
+   "accent": "#456fd3"
+  },
+  {
+   "id": "hs_00_0d71",
+   "name": "경기고",
+   "league": "서울권 A",
+   "primary": "#541d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d36e"
+  },
+  {
+   "id": "hs_00_b4db",
+   "name": "신일고",
+   "league": "서울권 A",
+   "primary": "#1d7b43",
+   "secondary": "#f2f2f2",
+   "accent": "#45d36d"
+  },
+  {
+   "id": "hs_00_d456",
+   "name": "배명고",
+   "league": "서울권 A",
+   "primary": "#1d347b",
+   "secondary": "#f2f2f2",
+   "accent": "#d38545"
+  },
+  {
+   "id": "hs_00_e4ef",
+   "name": "경동고",
+   "league": "서울권 A",
+   "primary": "#7b1d50",
+   "secondary": "#f2f2f2",
+   "accent": "#454fd3"
+  },
+  {
+   "id": "hs_00_0ae7",
+   "name": "청원고",
+   "league": "서울권 A",
+   "primary": "#1d2c7b",
+   "secondary": "#f2f2f2",
+   "accent": "#d36645"
+  },
+  {
+   "id": "hs_01_4f8c",
+   "name": "덕수고",
+   "league": "서울·강원권 B",
+   "primary": "#541d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45c0d3"
+  },
+  {
+   "id": "hs_01_3f04",
+   "name": "장충고",
+   "league": "서울·강원권 B",
+   "primary": "#1d227b",
+   "secondary": "#f2f2f2",
+   "accent": "#9945d3"
+  },
+  {
+   "id": "hs_01_c9e7",
+   "name": "성남고",
+   "league": "서울·강원권 B",
+   "primary": "#6e1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#4560d3"
+  },
+  {
+   "id": "hs_01_618c",
+   "name": "선린인터넷고",
+   "league": "서울·강원권 B",
+   "primary": "#7b5e1d",
+   "secondary": "#f2f2f2",
+   "accent": "#7c45d3"
+  },
+  {
+   "id": "hs_01_e5e4",
+   "name": "설악고",
+   "league": "서울·강원권 B",
+   "primary": "#5c1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#6845d3"
+  },
+  {
+   "id": "hs_01_09b1",
+   "name": "강릉고",
+   "league": "서울·강원권 B",
+   "primary": "#1d307b",
+   "secondary": "#f2f2f2",
+   "accent": "#d3a045"
+  },
+  {
+   "id": "hs_01_c70a",
+   "name": "원주고",
+   "league": "서울·강원권 B",
+   "primary": "#4f7b1d",
+   "secondary": "#f2f2f2",
+   "accent": "#d34645"
+  },
+  {
+   "id": "hs_02_edc5",
+   "name": "야탑고",
+   "league": "경기·인천권",
+   "primary": "#1d6c7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d385"
+  },
+  {
+   "id": "hs_02_9183",
+   "name": "유신고",
+   "league": "경기·인천권",
+   "primary": "#1d2c7b",
+   "secondary": "#f2f2f2",
+   "accent": "#4567d3"
+  },
+  {
+   "id": "hs_02_c9d9",
+   "name": "장안고",
+   "league": "경기·인천권",
+   "primary": "#1d7b5c",
+   "secondary": "#f2f2f2",
+   "accent": "#8845d3"
+  },
+  {
+   "id": "hs_02_2fcc",
+   "name": "안산공고",
+   "league": "경기·인천권",
+   "primary": "#2c1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d36a"
+  },
+  {
+   "id": "hs_02_ebde",
+   "name": "부천고",
+   "league": "경기·인천권",
+   "primary": "#397b1d",
+   "secondary": "#f2f2f2",
+   "accent": "#45d3c1"
+  },
+  {
+   "id": "hs_02_d47f",
+   "name": "백송고",
+   "league": "경기·인천권",
+   "primary": "#7b1d55",
+   "secondary": "#f2f2f2",
+   "accent": "#d38145"
+  },
+  {
+   "id": "hs_02_8b32",
+   "name": "제물포고",
+   "league": "경기·인천권",
+   "primary": "#7b1d1e",
+   "secondary": "#f2f2f2",
+   "accent": "#45d395"
+  },
+  {
+   "id": "hs_02_6f25",
+   "name": "인천고",
+   "league": "경기·인천권",
+   "primary": "#7b1d62",
+   "secondary": "#f2f2f2",
+   "accent": "#4565d3"
+  },
+  {
+   "id": "hs_02_91b4",
+   "name": "동산고",
+   "league": "경기·인천권",
+   "primary": "#1d237b",
+   "secondary": "#f2f2f2",
+   "accent": "#d3458c"
+  },
+  {
+   "id": "hs_03_b179",
+   "name": "경남고",
+   "league": "부산·경남권",
+   "primary": "#321d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d3c8"
+  },
+  {
+   "id": "hs_03_ee14",
+   "name": "부경고",
+   "league": "부산·경남권",
+   "primary": "#7b531d",
+   "secondary": "#f2f2f2",
+   "accent": "#d3454e"
+  },
+  {
+   "id": "hs_03_bc5c",
+   "name": "부산고",
+   "league": "부산·경남권",
+   "primary": "#7b391d",
+   "secondary": "#f2f2f2",
+   "accent": "#d38445"
+  },
+  {
+   "id": "hs_03_7645",
+   "name": "울산공고",
+   "league": "부산·경남권",
+   "primary": "#7b5f1d",
+   "secondary": "#f2f2f2",
+   "accent": "#5245d3"
+  },
+  {
+   "id": "hs_03_6b9f",
+   "name": "용마고",
+   "league": "부산·경남권",
+   "primary": "#1d7b31",
+   "secondary": "#f2f2f2",
+   "accent": "#d39945"
+  },
+  {
+   "id": "hs_03_7b12",
+   "name": "마산고",
+   "league": "부산·경남권",
+   "primary": "#1d237b",
+   "secondary": "#f2f2f2",
+   "accent": "#d38245"
+  },
+  {
+   "id": "hs_03_f0b2",
+   "name": "김해고",
+   "league": "부산·경남권",
+   "primary": "#1d3b7b",
+   "secondary": "#f2f2f2",
+   "accent": "#d3c545"
+  },
+  {
+   "id": "hs_03_2ace",
+   "name": "제주고",
+   "league": "부산·경남권",
+   "primary": "#7b1d34",
+   "secondary": "#f2f2f2",
+   "accent": "#d34548"
+  },
+  {
+   "id": "hs_04_1644",
+   "name": "경북고",
+   "league": "대구·경북권",
+   "primary": "#781d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#5cd345"
+  },
+  {
+   "id": "hs_04_2bcd",
+   "name": "대구고",
+   "league": "대구·경북권",
+   "primary": "#1d7b45",
+   "secondary": "#f2f2f2",
+   "accent": "#4548d3"
+  },
+  {
+   "id": "hs_04_e755",
+   "name": "상원고",
+   "league": "대구·경북권",
+   "primary": "#261d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d371"
+  },
+  {
+   "id": "hs_04_c975",
+   "name": "포철공고",
+   "league": "대구·경북권",
+   "primary": "#1d397b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d3b9"
+  },
+  {
+   "id": "hs_04_0c1e",
+   "name": "의성고",
+   "league": "대구·경북권",
+   "primary": "#1d7b72",
+   "secondary": "#f2f2f2",
+   "accent": "#45d3d3"
+  },
+  {
+   "id": "hs_05_a0af",
+   "name": "북일고",
+   "league": "충청권",
+   "primary": "#7b1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#5dd345"
+  },
+  {
+   "id": "hs_05_d1bf",
+   "name": "청주고",
+   "league": "충청권",
+   "primary": "#1d767b",
+   "secondary": "#f2f2f2",
+   "accent": "#4586d3"
+  },
+  {
+   "id": "hs_05_1d0d",
+   "name": "대전고",
+   "league": "충청권",
+   "primary": "#7b591d",
+   "secondary": "#f2f2f2",
+   "accent": "#d3c045"
+  },
+  {
+   "id": "hs_05_2ea5",
+   "name": "세광고",
+   "league": "충청권",
+   "primary": "#1f7b1d",
+   "secondary": "#f2f2f2",
+   "accent": "#d37445"
+  },
+  {
+   "id": "hs_05_c8d3",
+   "name": "공주고",
+   "league": "충청권",
+   "primary": "#7b241d",
+   "secondary": "#f2f2f2",
+   "accent": "#d345d2"
+  },
+  {
+   "id": "hs_06_e407",
+   "name": "광주일고",
+   "league": "전라권",
+   "primary": "#501d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#d34569"
+  },
+  {
+   "id": "hs_06_0215",
+   "name": "동성고",
+   "league": "전라권",
+   "primary": "#7b501d",
+   "secondary": "#f2f2f2",
+   "accent": "#4599d3"
+  },
+  {
+   "id": "hs_06_bf34",
+   "name": "화순고",
+   "league": "전라권",
+   "primary": "#1d7b60",
+   "secondary": "#f2f2f2",
+   "accent": "#45d349"
+  },
+  {
+   "id": "hs_06_047b",
+   "name": "군산상고",
+   "league": "전라권",
+   "primary": "#3d1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45a0d3"
+  },
+  {
+   "id": "hs_06_0cac",
+   "name": "효천고",
+   "league": "전라권",
+   "primary": "#4d1d7b",
+   "secondary": "#f2f2f2",
+   "accent": "#45d3c6"
+  }
+ ],
+ "tournaments": [
+  "황금사자기",
+  "청룡기",
+  "봉황대기",
+  "대통령배"
+ ]
+}

@@ -37,6 +37,11 @@ var _sfx: Array[AudioStreamPlayer3D] = []
 var _flat: Array[AudioStreamPlayer] = []
 var _music: AudioStreamPlayer
 var _chant: AudioStreamPlayer3D
+## The batter whose song is up, the song, its name, and the beat it started on.
+var _song_for := ""
+var _song: AudioStream
+var _song_name := ""
+var _song_start := 0.0
 var _rng := Rng.new(77)
 var _duel: PitchDuel
 var _contact_heard := false
@@ -371,6 +376,7 @@ func _cheering(g: GameState) -> void:
 		cheers.reset()
 		if _chant != null and _chant.playing:
 			_chant.stop()
+		_show_song(false)
 		return
 	var side := g.batting()
 	# A club's own chant from the local content pack goes instead of the drums.
@@ -386,8 +392,63 @@ func _cheering(g: GameState) -> void:
 	var full := g.balls == 3 and g.strikes == 2
 	var risp := not g.base_empty(2) or not g.base_empty(3)
 	var beat := m.crowd.beat() if m.crowd.beat() > 0.0 else _beat
+	# The batter's own song, unless the moment calls for the special drums (a full count,
+	# runners in scoring position with the fans up).
+	var special := full or (risp and e >= 0.45)
+	if not special and _sing(g, side, e, beat):
+		return
+	_stop_song()
 	for sound: String in cheers.due(beat, func() -> int: return CheerSequencer.choose(e, full, risp, _rng.next_float())):
 		_cheer_hit("cheer/" + sound, side, -3.0 + 6.0 * e)
+
+
+## The batter's song: his own from the local content pack, or one of the game's songs (the
+## same one each time he comes up). It starts at the top of the cheering's next bar and keeps
+## to its beat; between pitches it picks up where the beat has got to. False while it waits
+## for the bar (the drums play till then) or when there is no song.
+func _sing(g: GameState, side: int, e: float, beat: float) -> bool:
+	var id := g.batter_id()
+	if id != _song_for:
+		_song_for = id
+		_song_start = ceilf(beat / CheerSequencer.BEATS) * CheerSequencer.BEATS
+		_song = GameAudio.local("chants/players/" + id, true) if audible else null
+		if _song == null:
+			var count := GameAudio.variants("cheer/song").size()
+			_song = GameAudio.stream("cheer/song_%d" % song_number(id, count), true) if count > 0 else null
+			_song_name = "cheer/song_%d" % song_number(id, count)
+		else:
+			_song_name = "chants/players/" + id
+	if _song == null or beat < _song_start:
+		_show_song(false)
+		return false
+	if not _chant.playing or _chant.stream != _song:
+		_count(_song_name)
+		_show_song(true)
+		if audible:
+			_chant.stream = _song
+			var length := _song.get_length()
+			var bag := PlaySim.base_xy(1 if side == GameState.HOME else 3)
+			_chant.global_position = Field.to_world(Vector3(bag.x * 2.2, bag.y * 2.2, 8.0))
+			_chant.play(fmod((beat - _song_start) / Crowd.BEATS_PER_SECOND, length) if length > 0.0 else 0.0)
+	_chant.volume_db = -4.0 + 6.0 * e - (0.0 if side == GameState.HOME else 5.0)
+	return true
+
+
+## Which of the game's songs is a man's (1..count), the same every game.
+static func song_number(id: String, count: int) -> int:
+	return 1 + absi(hash(id)) % maxi(count, 1)
+
+
+func _stop_song() -> void:
+	if _chant != null and _chant.playing and _chant.stream == _song:
+		_chant.stop()
+	_show_song(false)
+
+
+func _show_song(on: bool) -> void:
+	var m := scene as MatchScene
+	if m != null and m.board_screen != null:
+		m.board_screen.song_on = on
 
 
 func _cheer_hit(name: String, side: int, gain_db: float) -> void:
@@ -408,6 +469,11 @@ func _cheer_hit(name: String, side: int, gain_db: float) -> void:
 
 func _count(name: String) -> void:
 	played[name] = int(played.get(name, 0)) + 1
+
+
+## A sound the scene asks for at a place on the field (a bat let go on a walk to first).
+func play_at(prefix: String, at: Vector3, gain_db: float = 0.0) -> void:
+	_play_at(prefix, at, gain_db)
 
 
 func _play_at(prefix: String, at: Vector3, gain_db: float = 0.0) -> void:

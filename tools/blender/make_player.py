@@ -82,9 +82,30 @@ FACE_KEYS = [
     "nose-scale-horiz-incr", "nose-scale-horiz-decr", "nose-scale-vert-incr", "nose-hump-incr",
     "mouth-scale-horiz-incr", "mouth-scale-horiz-decr",
     "l-cheek-bones-incr", "r-cheek-bones-incr",
+    # (Queue 2-1, 2026-11-23: no two players with one face.) The jaw, lips, nose, forehead,
+    # head's age and fullness, the neck.
+    "chin-height-incr", "chin-height-decr", "chin-jaw-drop-incr", "chin-bones-incr",
+    "mouth-lowerlip-volume-incr", "mouth-lowerlip-volume-decr", "mouth-upperlip-volume-incr", "mouth-upperlip-volume-decr",
+    "nose-point-width-incr", "nose-point-width-decr", "nose-base-up", "nose-base-down", "nose-flaring-incr",
+    "forehead-scale-vert-incr", "forehead-scale-vert-decr",
+    "head-age-incr", "head-fat-incr", "head-fat-decr", "neck-scale-horiz-incr",
 ]
-# (No eye keys: the eyes, brows and lashes are separate meshes fitted to the default face and
-# would not follow them.)
+# The same, made of a left and a right target together (one key for both sides), and those
+# around the eyes and brows: the eyes, brows and lashes are separate meshes fitted to the face,
+# and they are given each key too, from the same fitting weights (face_keys_to_parts).
+PAIRED_KEYS = {
+    "eyes-scale-incr": ["l-eye-scale-incr", "r-eye-scale-incr"], "eyes-scale-decr": ["l-eye-scale-decr", "r-eye-scale-decr"],
+    "eyes-trans-in": ["l-eye-trans-in", "r-eye-trans-in"], "eyes-trans-out": ["l-eye-trans-out", "r-eye-trans-out"],
+    "eyes-trans-up": ["l-eye-trans-up", "r-eye-trans-up"], "eyes-trans-down": ["l-eye-trans-down", "r-eye-trans-down"],
+    "eyes-corner-up": ["l-eye-corner1-up", "r-eye-corner1-up"], "eyes-corner-down": ["l-eye-corner1-down", "r-eye-corner1-down"],
+    "eyes-fold-down": ["l-eye-eyefold-down", "r-eye-eyefold-down"], "eyes-bag-incr": ["l-eye-bag-incr", "r-eye-bag-incr"],
+    "eyes-height-decr": ["l-eye-height1-decr", "r-eye-height1-decr"],
+    "cheeks-volume-incr": ["l-cheek-volume-incr", "r-cheek-volume-incr"], "cheeks-volume-decr": ["l-cheek-volume-decr", "r-cheek-volume-decr"],
+    "ears-scale-incr": ["l-ear-scale-incr", "r-ear-scale-incr"], "ears-scale-decr": ["l-ear-scale-decr", "r-ear-scale-decr"],
+    "ears-flap-incr": ["l-ear-flap-incr", "r-ear-flap-incr"],
+    "eyebrows-angle-up": ["eyebrows-angle-up"], "eyebrows-angle-down": ["eyebrows-angle-down"],
+    "eyebrows-trans-up": ["eyebrows-trans-up"], "eyebrows-trans-down": ["eyebrows-trans-down"],
+}
 RACE = {"asian": 1.0, "caucasian": 0.0, "african": 0.0}
 # Builds (docs/13 S11-1): MPFB weight and muscle for a lean, standard, solid and heavy player
 # of the same height. Weight rises with muscle first (athletes), then with mass. The trunk's
@@ -193,8 +214,16 @@ def stand_on_ground(body, rig):
 
 
 SKIN_FILE = "skins/young_asian_male/young_asian_male.mhmat"
-FACE_ASSETS = [("eyes/low-poly/low-poly.mhclo", "Eyes"), ("eyebrows/eyebrow001/eyebrow001.mhclo", "Eyebrows"),
-               ("eyelashes/eyelashes01/eyelashes01.mhclo", "Eyelashes")]
+# (path, MakeHuman's kind, the part's name in the model). Four brows a man might have — thick
+# and full, straight, medium, a full arch — of which the game shows one per player; the thin
+# painted-looking arch (eyebrow001) is gone. (The fuller eye model's iris did not take the
+# game's eye texture: the eyes came out blue-white.)
+FACE_ASSETS = [("eyes/low-poly/low-poly.mhclo", "Eyes", "Eyes"),
+               ("eyebrows/eyebrow009/eyebrow009.mhclo", "Eyebrows", "Eyebrows"),
+               ("eyebrows/eyebrow004/eyebrow004.mhclo", "Eyebrows", "Eyebrows2"),
+               ("eyebrows/eyebrow012/eyebrow012.mhclo", "Eyebrows", "Eyebrows3"),
+               ("eyebrows/eyebrow008/eyebrow008.mhclo", "Eyebrows", "Eyebrows4"),
+               ("eyelashes/eyelashes01/eyelashes01.mhclo", "Eyelashes", "Eyelashes")]
 
 
 def add_skin_and_face(body):
@@ -207,17 +236,69 @@ def add_skin_and_face(body):
         return []
     HumanService.set_character_skin(skin, body, skin_type="GAMEENGINE", material_instances=False)
     extras = []
-    for path, kind in FACE_ASSETS:
+    for path, kind, name in FACE_ASSETS:
         full = os.path.join(data, path)
         if not os.path.exists(full):
             continue
         before = set(bpy.data.objects)
         HumanService.add_mhclo_asset(full, body, asset_type=kind, subdiv_levels=0, material_type="GAMEENGINE")
         for obj in set(bpy.data.objects) - before:
-            obj.name = obj.data.name = kind
+            obj.name = obj.data.name = name
+            obj["mhclo_path"] = full
             extras.append(obj)
     print("make_player: skin texture and", [o.name for o in extras])
     return extras
+
+
+def paired_keys(body):
+    """Loads PAIRED_KEYS: each its targets at full weight, mixed into one key (weight 0)."""
+    for name, targets in PAIRED_KEYS.items():
+        loaded = []
+        for target in targets:
+            key = "pair_part_" + target
+            TargetService.load_target(body, TargetService.target_full_path(target), weight=1.0, name=key)
+            loaded.append(key)
+        blocks = body.data.shape_keys.key_blocks
+        for kb in blocks:
+            if kb.name not in loaded and kb != body.data.shape_keys.reference_key:
+                kb.value = 0.0
+        mixed = body.shape_key_add(name="face_" + name, from_mix=True)
+        mixed.value = 0.0
+        for key in loaded:
+            body.shape_key_remove(body.data.shape_keys.key_blocks[key])
+
+
+def face_keys_to_parts(body, parts):
+    """Gives the eyes, brows and lashes each face key of the body: MakeHuman fits each of their
+    vertices to three of the body's with fixed weights (their .mhclo), so a key moves them by
+    the same mix of the body's movement under it. Without this the eyes stayed where a default
+    face has them when the face around them changed."""
+    from bl_ext.user_default.mpfb.entities.clothes.mhclo import Mhclo
+    keys = [kb for kb in body.data.shape_keys.key_blocks if kb.name.startswith("face_")]
+    basis = body.data.shape_keys.reference_key.data
+    for part in parts:
+        path = part.get("mhclo_path")
+        if not path:
+            continue
+        mhclo = Mhclo()
+        mhclo.load(path)
+        rest = [v.co.copy() for v in part.data.vertices]
+        if part.data.shape_keys is None:
+            part.shape_key_add(name="Basis", from_mix=False)
+        for kb in keys:
+            moved = part.shape_key_add(name=kb.name, from_mix=False)
+            for j, co in enumerate(rest):
+                info = mhclo.verts.get(j)
+                if info is None:
+                    moved.data[j].co = co
+                    continue
+                shift = Vector((0.0, 0.0, 0.0))
+                for v, w in zip(info["verts"], info["weights"]):
+                    if v < len(basis):
+                        shift += w * (kb.data[v].co - basis[v].co)
+                moved.data[j].co = co + shift
+            moved.value = 0.0
+    print("make_player: face keys", len(keys), "on", [p.name for p in parts])
 
 
 def _group_weights(body, name):
@@ -1407,6 +1488,8 @@ def main():
     # The face keys stay as keys (weight 0) for the game to set per player.
     for name in FACE_KEYS:
         TargetService.load_target(body, TargetService.target_full_path(name), weight=0.0, name="face_" + name)
+    paired_keys(body)
+    face_keys_to_parts(body, face_parts)
     stand_on_ground(body, rig)
     stem = os.path.splitext(OUT_GLB)[0]
     marks = body_marks(body, max(v.co.z for v in body.data.vertices))
@@ -1419,7 +1502,9 @@ def main():
     if os.environ.get("MEASURE_ONLY"):
         return
     hair = add_hair(body)
-    bake_skin_maps(body, rig, [*hair, *[p for p in face_parts if p.name != "Eyes"]], stem + "_skin_detail.png",
+    # (The brows' shade baked from the first brow only: four of them over each other darkened
+    # the skin under all four.)
+    bake_skin_maps(body, rig, [*hair, *[p for p in face_parts if p.name in ("Eyebrows", "Eyelashes")]], stem + "_skin_detail.png",
                    os.path.join(os.path.dirname(OUT_GLB), "player_skin_relief.png"))
     if os.environ.get("SKIN_ONLY"):
         # Quick look at the skin maps alone (SKIN_ONLY=1): no garments, no export.

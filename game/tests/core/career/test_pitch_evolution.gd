@@ -13,13 +13,19 @@ func _pitcher(type_id: String) -> CareerPlayer:
 
 func test_a_slider_thrown_enough_with_movement_becomes_a_sweeper() -> void:
 	var r := CareerIO.load_default()
-	var c := _pitcher("finesse")
+	# (The power arm starts with his fastball and a slider.)
+	var c := _pitcher("power_arm")
 	var slider: ArsenalPitch = null
 	for a: ArsenalPitch in c.player.pitching.arsenal:
 		if a.type == &"slider":
 			slider = a
 	assert_not_null(slider)
+	# A slider with a big break, from an arm under the hard slider's line (147 km/h: a harder
+	# thrower's slider grows into a hard slider instead).
 	slider.movement = 60.0
+	for a: ArsenalPitch in c.player.pitching.arsenal:
+		if a.type == &"four_seam":
+			a.velo_avg = 142.0
 	c.pitch_uses[&"slider"] = 100
 	assert_true(PitchEvolution.check(c, r, F.catalog()).is_empty(), "not thrown enough yet")
 	c.pitch_uses[&"slider"] = 260
@@ -61,9 +67,17 @@ func test_learning_a_pitch_costs_points_and_stops_at_six() -> void:
 
 
 func test_a_game_s_pitches_count_toward_proficiency() -> void:
-	var c := _pitcher("control")
+	# (The finesse pitcher starts with his fastball and a curve.)
+	var c := _pitcher("finesse")
+	var curve_share := 0.0
+	var fastball_share := 0.0
+	for a: ArsenalPitch in c.player.pitching.arsenal:
+		if a.type == &"curve":
+			curve_share = a.usage
+		if a.type == &"four_seam":
+			fastball_share = a.usage
 	PitchEvolution.note_game(c, 100, {} as Dictionary[StringName, int])
-	assert_eq(int(c.pitch_uses[&"four_seam"]), 50)
+	assert_eq(int(c.pitch_uses[&"four_seam"]), roundi(100 * fastball_share))
 	var seen: Dictionary[StringName, int] = {&"curve": 12}
 	PitchEvolution.note_game(c, 30, seen)
-	assert_eq(int(c.pitch_uses[&"curve"]), roundi(100 * 0.25) + 12)
+	assert_eq(int(c.pitch_uses[&"curve"]), roundi(100 * curve_share) + 12)

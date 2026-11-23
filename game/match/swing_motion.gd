@@ -142,6 +142,14 @@ func aim_height(height: float) -> void:
 	_other_weight = clampf((height - own) / (there - own), 0.0, 1.0)
 
 
+## How much higher (m) the barrel is at contact with the other swing mixed in (aim_height)
+## than in the main swing alone.
+func contact_shift() -> float:
+	if _other == null:
+		return 0.0
+	return (_contact_height(_other) - _contact_height(clip)) * _other_weight
+
+
 static func _contact_height(c: JointClip) -> float:
 	var t := c.event(&"contact", c.duration * 0.8)
 	var pose := c.sample(t)

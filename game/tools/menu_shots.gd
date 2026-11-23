@@ -2,6 +2,7 @@ extends SceneTree
 ## Photographs the menu screens (docs/05 section 5), for checking their look.
 ##
 ##   ./dev tool-win menu_shots build/menus/menu [--only hub,settings] [--league] [--career]
+##       [--school | --school-done | --season-done] [--draft-at mine|end]
 ##
 ## --league starts a manager league first (so the hub and the league screen have one to show).
 
@@ -10,6 +11,7 @@ const SCREENS := {
 	"settings": "res://ui/settings_screen.tscn", "practice": "res://ui/practice_screen.tscn", "load": "res://ui/load_screen.tscn",
 	"shop": "res://ui/shop_screen.tscn", "league": "res://league/league_screen.tscn", "career": "res://career/career_screen.tscn",
 	"create": "res://career/creation_screen.tscn", "achievements": "res://ui/achievements_screen.tscn",
+	"draft": "res://career/draft_screen.tscn", "splash": "res://ui/splash_screen.tscn", "retire": "res://career/retire_screen.tscn",
 }
 
 var _prefix := "user://menu"
@@ -91,8 +93,31 @@ func _initialize() -> void:
 		spec.skin = rules.skins[1]
 		spec.hair = rules.hairs[0]
 		spec.beard = rules.beards[0]
-		var clubs := RosterIO.load_pack(LeagueSession.PACK)
-		CareerSession.start(PlayerCreator.create(spec, rules, PitchCatalogIO.load_default()), clubs[22].id, 36, 5)
+		var made := PlayerCreator.create(spec, rules, PitchCatalogIO.load_default())
+		# --school: a high-school career (--school-done: its season played out, the draft next).
+		if _args.has("school") or _args.has("school-done") or _names.has("draft"):
+			var school := str((SchoolLeague.schools()[0] as Dictionary)["id"])
+			CareerSession.start_school(made, school, 72, 5)
+			if _args.has("school-done") or _names.has("draft"):
+				var cs := CareerSession.career_season
+				var guard := 0
+				while not cs.season.finished() and guard < 200:
+					if cs.has_game():
+						cs.quick()
+					cs.next_day()
+					guard += 1
+		else:
+			CareerSession.start(made, LeagueSession.league_clubs()[2].id, 36, 5)
+			CareerSession.career_season.pro_games = 36
+			# --season-done: the pro season played out (the winter, the next season after it).
+			if _args.has("season-done"):
+				var cs := CareerSession.career_season
+				var guard := 0
+				while not cs.season.finished() and guard < 400:
+					if cs.has_game():
+						cs.quick()
+					cs.next_day()
+					guard += 1
 		CareerSession.slot = "menu_shots_career"
 	_next()
 
@@ -118,6 +143,13 @@ func _next() -> void:
 	_scene = (load(SCREENS[name]) as PackedScene).instantiate()
 	root.add_child(_scene)
 	current_scene = _scene
+	# --draft-at <mine|end>: the draft board run on to his pick, or to its end.
+	var draft := _scene as DraftScreen
+	if draft != null and _args.has("draft-at"):
+		if str(_args["draft-at"]) == "end":
+			draft.skip_to_end()
+		else:
+			draft.skip_to_mine()
 	# --career-tab <home|growth|table>: the career hub's tab.
 	var career := _scene as CareerScreen
 	if career != null and _args.has("career-tab"):

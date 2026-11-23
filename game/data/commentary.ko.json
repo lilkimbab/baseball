@@ -1,110 +1,280 @@
 {
- "note": "One-line play-by-play (docs/13 S6-7). Scorebook terms first; several lines per situation so the same play does not always read the same. Placeholders: {name} batter, {runner} runner, {play} the scorebook text ('유격수 땅볼', '좌전 안타'), {fielders} the fielders ('6-4-3'), {runs} runs scored, {base} base number.",
+ "note": "One-line play-by-play (docs/13 S6-7). Scorebook terms first; several lines per situation so the same play does not always read the same. Placeholders: {name} batter, {runner} runner, {play} the scorebook text ('유격수 땅볼', '좌전 안타'), {fielders} the fielders ('6-4-3'), {runs} runs scored, {base} base number. Context keys (Commentary.context_keys) take a situation's own lines when the file has them: <key>_walk_off then walk_off, home_run_grand_slam, <key>_go_ahead then hit_go_ahead, <key>_tying then hit_tying, <key>_rbi, home_run_solo, <key>_escape (the half ended with runners left), then <key>. A line with {runs} gets no runs tail.",
  "strikeout_swinging": [
   "{name}, 헛스윙 삼진",
   "{name}, 방망이가 헛돌며 삼진",
-  "{name} 헛스윙 삼진으로 물러납니다"
+  "{name} 헛스윙 삼진으로 물러납니다",
+  "헛스윙! {name} 삼진입니다",
+  "{name}, 따라 나간 방망이가 허공을 가릅니다. 삼진",
+  "결정구에 {name}의 방망이가 돌아갑니다. 삼진",
+  "{name}, 크게 휘둘렀지만 삼진"
  ],
  "strikeout_looking": [
   "{name}, 루킹 삼진",
   "{name}, 서서 삼진을 당합니다",
-  "{name} 루킹 삼진"
+  "{name} 루킹 삼진",
+  "꼼짝 못 합니다! {name} 루킹 삼진",
+  "스트라이크 콜! {name}, 그대로 지켜보며 삼진",
+  "{name}, 존에 걸치는 공을 흘려보냅니다. 삼진",
+  "바깥쪽 꽉 찬 공! {name} 서서 삼진"
  ],
  "strikeout_foul_tip": [
-  "{name}, 파울 팁 삼진"
+  "{name}, 파울 팁 삼진",
+  "파울 팁, 포수가 잡아냅니다. {name} 삼진",
+  "{name}, 스친 공이 미트에 들어갑니다. 파울 팁 삼진"
  ],
  "dropped_third_strike": [
-  "{name}, 스트라이크 아웃 낫아웃으로 1루에 나갑니다"
+  "{name}, 스트라이크 아웃 낫아웃으로 1루에 나갑니다",
+  "공이 빠졌습니다! {name}, 낫아웃으로 1루에",
+  "삼진이지만 포수가 놓칩니다. {name} 1루까지 살아 나갑니다"
  ],
  "walk": [
   "{name}, 볼넷",
-  "{name} 볼넷으로 걸어 나갑니다"
+  "{name} 볼넷으로 걸어 나갑니다",
+  "볼넷, {name} 1루로",
+  "{name}, 끝까지 골라내며 볼넷",
+  "제구가 흔들립니다. {name} 볼넷",
+  "{name}, 침착하게 볼넷을 얻어 냅니다"
  ],
  "intentional_walk": [
-  "{name}, 고의사구"
+  "{name}, 고의사구",
+  "{name}을 거릅니다. 고의사구",
+  "승부를 피합니다. {name} 고의사구로 1루에"
  ],
  "hit_by_pitch": [
   "{name}, 몸에 맞는 공",
-  "{name}, 몸에 맞는 공으로 1루에"
+  "{name}, 몸에 맞는 공으로 1루에",
+  "몸쪽 공이 그대로 맞습니다. {name} 1루로",
+  "아, 맞았습니다. {name} 몸에 맞는 공",
+  "{name}, 공에 맞고 1루로 걸어 나갑니다"
  ],
  "single": [
   "{name}, {play}",
-  "{name} {play}!"
+  "{name} {play}!",
+  "{name}, 깨끗한 {play}",
+  "{play}! {name} 1루에 나갑니다",
+  "{name}, 투수 옆을 빠져나가는 {play}",
+  "{name}, 가볍게 밀어 친 {play}",
+  "{name}의 방망이가 빛납니다. {play}"
  ],
  "double": [
   "{name}, {play}",
-  "{name}의 {play}!"
+  "{name}의 {play}!",
+  "{name}, 펜스 앞까지 굴러가는 {play}",
+  "{play}! {name} 2루까지",
+  "{name}, 외야를 가르는 {play}",
+  "{name}, 빠른 발로 2루까지. {play}"
  ],
  "triple": [
   "{name}, {play}!",
-  "{name}, 펜스까지 굴러가는 {play}!"
+  "{name}, 펜스까지 굴러가는 {play}!",
+  "{name} 3루까지! {play}",
+  "외야를 꿰뚫습니다! {name}의 {play}",
+  "{name}, 3루에 슬라이딩. {play}!"
  ],
  "home_run": [
   "{name}, {play}!",
   "{name}, 담장을 넘깁니다! {play}",
-  "넘어갔습니다! {name}의 {play}"
+  "넘어갔습니다! {name}의 {play}",
+  "큽니다, 큽니다, 넘어갑니다! {name}의 {play}",
+  "맞는 순간 홈런! {name}, {play}",
+  "{name}, 관중석에 꽂아 넣습니다! {play}",
+  "쭉쭉 뻗어 나가 담장 밖으로! {name}의 {play}"
  ],
  "ground_out": [
   "{name}, {play}",
-  "{name} {play}로 물러납니다"
+  "{name} {play}로 물러납니다",
+  "{name}, 땅볼로 아웃",
+  "{play}, {name} 1루에서 아웃",
+  "{name}, 잘 맞았지만 야수 정면. {play}",
+  "{name}, 빗맞은 {play}"
  ],
  "fly_out": [
   "{name}, {play}",
-  "{name} {play}로 물러납니다"
+  "{name} {play}로 물러납니다",
+  "높이 뜬 공, {play}. {name} 아웃",
+  "{name}, 잘 맞았지만 잡힙니다. {play}",
+  "{name}의 타구, 외야수가 편하게 잡습니다",
+  "{name}, 힘껏 당겼지만 {play}"
  ],
  "line_out": [
   "{name}, {play}",
-  "{name}, 잘 맞았지만 {play}"
+  "{name}, 잘 맞은 타구가 정면으로. {play}",
+  "직선타! {name} 아웃",
+  "{name}의 총알 같은 타구, 그대로 글러브에. {play}"
  ],
  "pop_out": [
-  "{name}, {play}"
+  "{name}, {play}",
+  "{name}, 높이 뜬 내야 뜬공",
+  "{name}, 하늘 높이 솟은 공이 내야에서 잡힙니다"
  ],
  "double_play": [
   "{name}, {fielders} 병살",
-  "{name}, {play}"
+  "{name}, 병살타. {fielders}",
+  "병살! {fielders}로 이어지며 투 아웃",
+  "{name}의 타구, 병살로 연결됩니다. {fielders}",
+  "깔끔한 병살 플레이! {fielders}"
  ],
  "triple_play": [
-  "{name}, 삼중살! {fielders}"
+  "{name}, 삼중살! {fielders}",
+  "보기 드문 삼중살! {fielders}, 한 번에 세 개의 아웃"
  ],
  "sac_fly": [
   "{name}, {play}",
-  "{name}, {play}로 점수를 냅니다"
+  "{name}, 희생 플라이로 한 점",
+  "{play}, 3루 주자 들어옵니다",
+  "{name}, 외야로 띄워 주자를 불러들입니다. {play}"
  ],
  "sac_bunt": [
-  "{name}, 희생 번트 성공"
+  "{name}, 희생 번트 성공",
+  "{name}, 번트로 주자를 한 베이스 보냅니다",
+  "작전 성공! {name}의 희생 번트"
  ],
  "fielders_choice": [
-  "{name}, {play}"
+  "{name}, {play}",
+  "{name}, 야수 선택으로 1루에",
+  "선행 주자를 잡습니다. {name}은 1루에"
  ],
  "reached_on_error": [
-  "{name}, {play}"
+  "{name}, {play}",
+  "실책! {name} 1루에 살아 나갑니다",
+  "{name}의 타구를 놓칩니다. {play}",
+  "아쉬운 수비, {name} 실책으로 출루"
  ],
  "runs": [
   ", {runs}점",
-  " ({runs}점)"
+  ", {runs}점 들어옵니다",
+  ", {runs}점을 냅니다"
  ],
  "steal": [
   "{runner}, {base}루 도루 성공",
-  "{runner}, {base}루를 훔칩니다"
+  "{runner}, {base}루를 훔칩니다",
+  "도루 성공! {runner}, {base}루까지",
+  "{runner}, 빠른 발로 {base}루 도루"
  ],
  "caught_stealing": [
-  "{runner}, {base}루 도루 실패"
+  "{runner}, {base}루 도루 실패",
+  "{runner}, {base}루에서 잡힙니다. 도루 실패",
+  "강한 송구! {runner} {base}루 도루 저지"
  ],
  "pickoff": [
-  "{runner}, 견제사"
+  "{runner}, 견제사",
+  "견제에 걸립니다! {runner} 아웃",
+  "{runner}, 귀루가 늦었습니다. 견제사"
  ],
  "wild_pitch": [
-  "폭투, 주자 진루"
+  "폭투, 주자 진루",
+  "공이 뒤로 빠집니다. 폭투로 주자 한 베이스씩",
+  "원바운드 공을 놓칩니다. 폭투"
  ],
  "passed_ball": [
-  "포일, 주자 진루"
+  "포일, 주자 진루",
+  "포수가 공을 놓칩니다. 포일",
+  "미트를 맞고 튀어 나갑니다. 포일로 진루"
  ],
  "home_run_wind": [
   "{name}, 바람을 타고 담장을 넘깁니다! {play}",
-  "외야로 부는 바람에 실려 넘어갑니다! {name}의 {play}"
+  "바람까지 도와줍니다! {name}의 {play}",
+  "높이 뜬 공이 바람을 타고 넘어갑니다! {name}, {play}"
  ],
  "fly_out_wind": [
   "{name}의 큰 타구, 맞바람에 막혀 잡힙니다. {play}",
-  "{name}, 잘 맞았지만 바람이 잡아 둡니다. {play}"
+  "넘어가나 했는데, 바람에 걸립니다. {name}, {play}",
+  "{name}, 잘 맞았지만 맞바람이 붙잡습니다. {play}"
+ ],
+ "walk_rbi": [
+  "밀어내기 볼넷! {name}, 한 점을 얻어 냅니다",
+  "{name} 볼넷, 만루에서 밀어내기로 {runs}점",
+  "만루에서 볼넷, 밀어내기 득점입니다. {name}"
+ ],
+ "hit_by_pitch_rbi": [
+  "만루에서 몸에 맞는 공! 밀어내기로 한 점, {name}",
+  "{name} 몸에 맞는 공, 밀어내기 득점입니다"
+ ],
+ "single_rbi": [
+  "{name}, {play}! 주자 들어옵니다. {runs}점",
+  "적시타! {name}의 {play}로 {runs}점",
+  "{name}, 주자를 불러들이는 {play}",
+  "{name} {play}, {runs}점을 보탭니다"
+ ],
+ "double_rbi": [
+  "{name}, 주자를 쓸어 담는 {play}! {runs}점",
+  "{name}의 {play}, 주자 들어옵니다. {runs}점",
+  "적시 2루타! {name}, {runs}점을 냅니다"
+ ],
+ "triple_rbi": [
+  "{name}, 주자를 모두 불러들이는 {play}! {runs}점",
+  "{name}의 {play}, 싹쓸이입니다. {runs}점"
+ ],
+ "hit_go_ahead": [
+  "역전! {name}의 {play}로 앞서 나갑니다",
+  "{name}, 경기를 뒤집는 {play}!",
+  "{name} {play}, 리드를 가져옵니다",
+  "{name}, 결승타가 될지도 모를 {play}! {runs}점"
+ ],
+ "hit_tying": [
+  "동점! {name}의 {play}",
+  "{name}, 균형을 맞추는 {play}!",
+  "{name} {play}로 경기는 원점입니다",
+  "따라붙었습니다! {name}의 동점 {play}"
+ ],
+ "home_run_solo": [
+  "{name}, 솔로 홈런! {play}",
+  "{name}의 한 방, 솔로 아치를 그립니다",
+  "넘어갔습니다! {name}의 솔로 홈런",
+  "{name}, 혼자서 한 점을 만듭니다. {play}"
+ ],
+ "home_run_grand_slam": [
+  "만루 홈런! {name}의 그랜드슬램!",
+  "주자 일소! {name}, 만루에서 담장을 넘깁니다!",
+  "{name}의 만루포! 단숨에 네 점입니다",
+  "그랜드슬램! {name}, 경기장이 들썩입니다"
+ ],
+ "home_run_go_ahead": [
+  "역전 홈런! {name}의 {play}!",
+  "{name}, 경기를 뒤집는 한 방! {play}",
+  "{name}의 역전포! 리드를 가져옵니다",
+  "뒤집었습니다! {name}의 {play}"
+ ],
+ "home_run_tying": [
+  "동점 홈런! {name}의 {play}",
+  "{name}, 균형을 맞추는 한 방! {play}",
+  "원점으로! {name}의 동점포"
+ ],
+ "walk_off": [
+  "경기 끝! {name}의 끝내기 {play}!",
+  "끝내기! {name}이 경기를 끝냅니다!",
+  "{name}, 끝내기 {play}! 더그아웃이 쏟아져 나옵니다",
+  "이겼습니다! {name}의 끝내기 {play}"
+ ],
+ "home_run_walk_off": [
+  "끝내기 홈런! {name}이 경기를 끝냅니다!",
+  "넘어갔습니다! {name}의 끝내기 {play}!",
+  "{name}, 끝내기 아치! 경기 끝!",
+  "말이 필요 없습니다! {name}의 끝내기 홈런!"
+ ],
+ "ground_out_escape": [
+  "{play}, 이닝 끝! 주자를 남겨 두고 위기를 넘깁니다",
+  "{name} {play}, 득점 없이 이닝을 마칩니다"
+ ],
+ "fly_out_escape": [
+  "{play}, 잡았습니다! 위기를 넘기며 이닝 끝",
+  "{name}의 타구 잡히고, 주자 남긴 채 이닝 종료"
+ ],
+ "double_play_escape": [
+  "병살로 위기 탈출! {fielders}",
+  "{fielders} 병살, 한 번에 이닝을 끝냅니다",
+  "{name} 병살타, 실점 없이 이닝 종료. {fielders}"
+ ],
+ "strikeout_swinging_escape": [
+  "삼진! {name}을 돌려세우며 위기를 넘깁니다",
+  "{name} 삼진, 주자를 묶어 두고 이닝을 마칩니다",
+  "위기 탈출! {name}을 삼진으로 잡아냅니다",
+  "{name} 헛방망이, 득점권 위기를 삼진으로 정리합니다"
+ ],
+ "strikeout_looking_escape": [
+  "루킹 삼진! {name}을 얼려 놓고 위기를 넘깁니다",
+  "{name}, 서서 삼진. 주자를 남기고 이닝 끝",
+  "꽉 찬 공에 {name} 꼼짝 못 합니다. 위기 탈출"
  ]
 }

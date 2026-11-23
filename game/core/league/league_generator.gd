@@ -53,8 +53,14 @@ const BACKUP_GAP := 8.0
 const HITTER_OFFSET := -4.0
 const PITCHER_OFFSET := 2.5
 ## Breaking and off-speed pitches by how often pitchers have them (A).
-const SECONDARY: Array[StringName] = [&"slider", &"changeup", &"curve", &"splitter", &"cutter", &"sweeper", &"two_seam"]
-const SECONDARY_WEIGHTS: Array[float] = [0.85, 0.55, 0.45, 0.35, 0.25, 0.12, 0.2]
+## A pitcher's other pitches and how likely each is, as the KBO's (Statiz through 시사IN: the
+## fastball about half of all pitches, the slider about a quarter — more for left-handers — two-
+## seamers 6-9%, the splitter the least of the main ones; the sweeper up from 0.7% in 2025 to
+## 4.3% in 2026; the forkball still common among Korean pitchers; knuckle curves, slurves and
+## screwballs rare, a knuckleballer once in a long while).
+const SECONDARY: Array[StringName] = [&"slider", &"changeup", &"curve", &"forkball", &"splitter", &"cutter", &"two_seam", &"sinker", &"sweeper",
+	&"circle_change", &"knuckle_curve", &"slurve", &"screwball", &"knuckleball"]
+const SECONDARY_WEIGHTS: Array[float] = [0.85, 0.5, 0.42, 0.3, 0.15, 0.22, 0.18, 0.1, 0.12, 0.06, 0.05, 0.04, 0.01, 0.003]
 
 var names: NameTable
 var catalog: Dictionary[StringName, PitchType]
@@ -224,7 +230,10 @@ func _pitcher(p: Player, role: String, talent: float) -> void:
 	fastball.movement = clampf(stuff + rng.next_normal() * 6.0, 20.0, 99.0)
 	fastball.command = _ability(talent)
 	r.arsenal.append(fastball)
-	var count := 2 + (1 if role == "SP" else 0) + (1 if rng.chance(0.45) else 0) + (1 if role == "SP" and rng.chance(0.3) else 0)
+	# How many pitches (the fastball among them): a reliever two or three, now and then four; a
+	# starter three to five, six very rarely (the user: not everyone six; some only three).
+	var count := 2 + (1 if role == "SP" else 0) + (1 if rng.chance(0.45) else 0) + (1 if role == "SP" and rng.chance(0.3) else 0) \
+		+ (1 if role == "SP" and rng.chance(0.04) else 0)
 	var weights := PackedFloat64Array(SECONDARY_WEIGHTS)
 	for i: int in count - 1:
 		var pick := rng.pick_weighted(weights)

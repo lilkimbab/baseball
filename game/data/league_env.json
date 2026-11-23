@@ -5,45 +5,113 @@
     "kbo_2025": {
       "label": "KBO 2025 정규시즌",
       "basis": "Strikeouts, walks (incl. intentional), hit batsmen, hits and home runs from the 2025 KBO team pitching totals (K): 11024 SO, 5123 BB, 806 HBP, 12824 H, 1191 HR over an estimated 55,700 plate appearances. Doubles and triples split is A.",
-      "pa": {"K": 0.198, "BB": 0.092, "HBP": 0.0145, "1B": 0.1635, "2B": 0.0413, "3B": 0.0041, "HR": 0.0214},
+      "pa": {
+        "K": 0.198,
+        "BB": 0.092,
+        "HBP": 0.0145,
+        "1B": 0.1635,
+        "2B": 0.0413,
+        "3B": 0.0041,
+        "HR": 0.0214
+      },
       "targets": {
-        "avg": 0.262, "runs_per_team_game": 4.73, "era": 4.31,
-        "errors_per_team_game": 0.673, "double_plays_per_team_game": 0.840,
-        "steal_attempts_per_team_game": 0.842, "steal_success": 0.745,
-        "passed_balls_per_team_game": 0.056, "pickoffs_per_team_game": 0.042,
-        "wild_pitches_per_team_game": 0.40
+        "avg": 0.262,
+        "runs_per_team_game": 4.73,
+        "era": 4.31,
+        "errors_per_team_game": 0.673,
+        "double_plays_per_team_game": 0.84,
+        "steal_attempts_per_team_game": 0.842,
+        "steal_success": 0.745,
+        "passed_balls_per_team_game": 0.056,
+        "pickoffs_per_team_game": 0.042,
+        "wild_pitches_per_team_game": 0.4
       }
     }
   },
   "coefficients": {
     "note": "rate = league_rate * exp(k * (rating - 50) / 15) (docs/03 section 6.3)",
     "batter": {
-      "K": {"contact": -0.28},
-      "BB": {"eye": 0.30},
-      "HR": {"power": 0.55},
-      "2B": {"power": 0.18, "speed": 0.10},
-      "3B": {"power": 0.05, "speed": 0.40},
-      "1B": {"contact": 0.10, "speed": 0.05}
+      "K": {
+        "contact": -0.28
+      },
+      "BB": {
+        "eye": 0.3
+      },
+      "HR": {
+        "power": 0.55
+      },
+      "2B": {
+        "power": 0.18,
+        "speed": 0.1
+      },
+      "3B": {
+        "power": 0.05,
+        "speed": 0.4
+      },
+      "1B": {
+        "contact": 0.1,
+        "speed": 0.05
+      }
     },
     "pitcher": {
-      "K": {"stuff": 0.28},
-      "BB": {"control": -0.32},
-      "HR": {"stuff": -0.20},
-      "1B": {"stuff": -0.05},
-      "2B": {"stuff": -0.08}
+      "K": {
+        "stuff": 0.28
+      },
+      "BB": {
+        "control": -0.32
+      },
+      "HR": {
+        "stuff": -0.2
+      },
+      "1B": {
+        "stuff": -0.05
+      },
+      "2B": {
+        "stuff": -0.08
+      }
     },
     "defence_hits": -0.05,
     "clutch": 0.04,
-    "platoon": {"same_hand": {"K": 1.06, "BB": 0.95, "HR": 0.92, "1B": 0.97}, "opposite_hand": {"K": 0.96, "BB": 1.03, "HR": 1.05, "1B": 1.02}},
-    "fatigue": {"K": -0.20, "BB": 0.30, "HR": 0.35, "1B": 0.10}
+    "platoon": {
+      "same_hand": {
+        "K": 1.018,
+        "BB": 0.985,
+        "HR": 0.976,
+        "1B": 0.991
+      },
+      "opposite_hand": {
+        "K": 0.988,
+        "BB": 1.009,
+        "HR": 1.015,
+        "1B": 1.006
+      }
+    },
+    "fatigue": {
+      "K": -0.2,
+      "BB": 0.3,
+      "HR": 0.35,
+      "1B": 0.1
+    },
+    "platoon_note": "KBO 2023-2026 투구별 기록(로컬): 같은 손 상대 OPS .679/.716/.678/.693, 다른 손 .708/.746/.709/.740 (차이 약 .034). 처음 값(MLB 기준 K 1.06/0.96 등)은 게임에서 .083 차이를 냈다: 편차를 30%로 줄임 (40%에서 .046) (queue stage 3, tools/pitch_data_report.gd)"
   },
   "calibration": {
     "note": "Multipliers on the league rates when drawing outcomes, tuned with ./dev sim so that the simulated totals match the targets. They make up for effects that do not average out (tired pitchers, managers' choices). 1 = no correction.",
-    "K": 0.96, "BB": 0.99, "HBP": 1.0, "1B": 1.0, "2B": 1.04, "3B": 1.0, "HR": 0.90
+    "K": 0.96,
+    "BB": 0.99,
+    "HBP": 1.0,
+    "1B": 1.0,
+    "2B": 1.04,
+    "3B": 1.0,
+    "HR": 0.9
   },
   "in_play": {
     "basis": "A",
-    "out_types": {"ground": 0.45, "fly": 0.30, "line": 0.12, "popup": 0.13},
+    "out_types": {
+      "ground": 0.45,
+      "fly": 0.3,
+      "line": 0.12,
+      "popup": 0.13
+    },
     "reached_on_error": 0.025,
     "extra_base_error_on_hit": 0.034,
     "double_play_on_ground_force": 0.42,
@@ -71,7 +139,13 @@
     "wild_pitch": 0.021,
     "passed_ball": 0.0037
   },
-  "pitches_per_pa": {"basis": "A", "K": 4.8, "BB": 5.6, "HBP": 3.2, "in_play": 3.3},
+  "pitches_per_pa": {
+    "basis": "A",
+    "K": 4.8,
+    "BB": 5.6,
+    "HBP": 3.2,
+    "in_play": 3.3
+  },
   "manager": {
     "basis": "A",
     "starter_runs_early_hook": 5,
@@ -89,5 +163,8 @@
     "intentional_walk_from_inning": 6,
     "save_lead": 3
   },
-  "home_advantage": {"basis": "A, set so the home side wins about 53% of decided games", "hits": 1.045}
+  "home_advantage": {
+    "basis": "A, set so the home side wins about 53% of decided games",
+    "hits": 1.045
+  }
 }

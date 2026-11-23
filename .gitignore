@@ -13,3 +13,7 @@ content-local/
 # Native libraries (and their .gdextension) are put there by ./dev native.
 game/native/
 __pycache__/
+game/override.cfg
+
+# The crowd builder's single pictures (tools/blender/make_crowd.py makes the atlas from them)
+game/assets/crowd/_frames/

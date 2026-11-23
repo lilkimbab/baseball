@@ -33,6 +33,8 @@ const TOLERANCE := (1.0 - ACCURACY_SWEET) * GAUGE_TIME
 const MAX_FOLLOW_TIME := 6.5
 ## How far outside the strike zone the pointer can be put: to the side, and above or below.
 const AIM_BEYOND_ZONE := Vector2(0.25, 0.3)
+## How far past the zone's inside edge (m) the person may aim a pitch: to the batter's body.
+const AIM_AT_BODY := 0.6
 
 ## The batting camera: straight behind the plate, on the middle of the strike zone (which is
 ## then in the middle of the screen; `_camera_preset` puts it on this batter's own zone).
@@ -490,8 +492,20 @@ func step(delta: float) -> void:
 				_finish_pitch()
 		State.RESULT:
 			var hold := 2.6 if duel.result == PitchDuel.Result.HOME_RUN else 1.5
+			hold = maxf(hold, result_hold())
+			_result_tick(delta)
 			if state_time >= hold:
 				_after_result()
+
+
+## How long the result stays (a game's walk to first is longer: MatchScene).
+func result_hold() -> float:
+	return 0.0
+
+
+## Each frame of the result (a game shows the batter's walk to first: MatchScene).
+func _result_tick(_delta: float) -> void:
+	pass
 
 
 func _process(delta: float) -> void:
@@ -672,21 +686,26 @@ func _after_result() -> void:
 func _begin_swing_pose() -> void:
 	_swing_shown = true
 	_swing_lead = SwingModel.swing_time(duel.swing.kind)
-	_swing_height = duel.ideal_contact_pos.z
+	# The bat goes where the batter aims (the person's pointer), or where the pitch crosses if
+	# he is not aiming: never to the ball when he aimed somewhere else (the user, 2026-11-23:
+	# "the bat goes to the circle where the pitch is coming; it must be where my mouse is").
+	# A swing aimed off the ball is seen to miss it.
+	var at := duel.ideal_contact_pos
+	if duel.swing.has_aim:
+		at.x = duel.swing.aim.x
+		at.z = duel.swing.aim.y
+	_swing_height = at.z
 	if swing_motion != null:
 		swing_motion.aim_height(_swing_height)
 	_swing_clock = 0.0
 	if swing_motion == null:
 		return
 	swing_motion.begin_swing(maxf(duel.swing.contact_time - duel.time, 0.02))
-	# The recorded swing goes through one spot. Move the hands so that this one goes where
-	# the batter aims, or where the pitch crosses if he is not aiming. Along the pitch's path
-	# the swing meets the ball where the recording does.
-	var at := duel.ideal_contact_pos
-	if duel.swing.has_aim:
-		at.x = duel.swing.aim.x
-		at.z = duel.swing.aim.y
-	_reach = batter.to_local(Field.to_world(at)) - _recorded_contact
+	# The recorded swing goes through one spot (higher or lower with the high and low swings
+	# mixed in for this height). The hands are moved by what is left, so that the barrel goes
+	# through the spot itself. Along the pitch's path the swing meets the ball where the
+	# recording does.
+	_reach = batter.to_local(Field.to_world(at)) - (_recorded_contact + Vector3(0.0, swing_motion.contact_shift(), 0.0))
 	_reach.x = 0.0
 	_reach = _reach.limit_length(0.45)
 
@@ -809,7 +828,16 @@ func _update_pointer() -> void:
 		return
 	var at := Field.to_field(hit)
 	var zone := duel.zone
-	at.x = clampf(at.x, -zone.half_width - AIM_BEYOND_ZONE.x, zone.half_width + AIM_BEYOND_ZONE.x)
+	# A pitcher may aim inside as far as the batter's body (a pitch at him: the user, 2026-11-
+	# 23); the batter and the other side stay near the zone.
+	var low_x := -zone.half_width - AIM_BEYOND_ZONE.x
+	var high_x := zone.half_width + AIM_BEYOND_ZONE.x
+	if human_pitches() and state == State.PRE_PITCH:
+		if settings.bats_left:
+			high_x = zone.half_width + AIM_AT_BODY
+		else:
+			low_x = -zone.half_width - AIM_AT_BODY
+	at.x = clampf(at.x, low_x, high_x)
 	at.z = clampf(at.z, zone.bottom - AIM_BEYOND_ZONE.y, zone.top + AIM_BEYOND_ZONE.y)
 	at.y = Field.PLATE_FRONT_Y
 	if human_pitches() and state == State.PRE_PITCH:

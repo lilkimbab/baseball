@@ -16,11 +16,14 @@ const RUN_POSE_SPEED := 0.8
 ## ball over the last CATCHER_REACH_TIME s of its flight; a pitch arriving lower than
 ## BLOCK_BELOW (m) is blocked; framing draws a caught pitch at most FRAME_PULL (m) inward.
 const SIGN_TIME := 1.2
-const CATCHER_REACH_TIME := 0.25
+const CATCHER_REACH_TIME := 0.18
 const BLOCK_BELOW := 0.18
 const FRAME_PULL := 0.04
 ## After this long (s) into a result the catcher is still, and is left as he is.
 const CATCHER_SETTLED := 0.45
+## The mitt's give as the ball goes in (m) and how long it takes to go and come back (s).
+const CATCH_GIVE := 0.07
+const CATCH_GIVE_TIME := 0.16
 ## Fielders drifting back slower than this (m/s) under a fly ball backpedal; faster, they turn
 ## and run. Running puppets turn at most TURN_RATE rad/s: a first step, not a snap.
 const BACKPEDAL_BELOW := 4.5
@@ -178,6 +181,7 @@ var _club_cache: Array[Team] = []
 var broadcast := Broadcast.new()
 var broadcast_cards: BroadcastCards
 var _seen_batter := ""
+var _board_intro_done := false
 var _seen_pitcher := PackedStringArray(["", ""])
 ## The batting side's runs, hits and men left on at the start of the half (for its summary).
 var _half_start := Vector3i.ZERO
@@ -241,6 +245,7 @@ func _ready() -> void:
 	_box.x = -absf(_box.x)
 	_build_officials()
 	_build_dropped_bat()
+	_build_dissolve()
 	_build_bullpen()
 	_half_key = _half_name()
 	_dress_for_half()
@@ -457,7 +462,8 @@ func _apply_weather() -> void:
 	park.show_wind(resolver.cfg.wind)
 	if lighting != null:
 		lighting.set_cover(weather.cover)
-	last_text = "오늘 날씨 · " + weather.describe(park_def.orientation_deg)
+	# The weather is told before the game (the match-up card), not in it (the user).
+	last_text = ""
 
 
 ## A club's own park: one of the park models (home_park), standing in a setting of its own —
@@ -530,7 +536,13 @@ func swing_feedback_visible() -> bool:
 
 
 func plate_marks_visible() -> bool:
-	return _play_time < 0.0
+	# (Not in the walk to first: the camera has gone from behind the plate.)
+	return _play_time < 0.0 and not trot_showing()
+
+
+## The walk to first is on the screen (its own camera).
+func trot_showing() -> bool:
+	return state == State.RESULT and _trot != "" and _trot_begun
 
 
 func help_keys() -> String:
@@ -562,6 +574,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if key != null and not key.echo and key.keycode == KEY_SHIFT and steal_key(key.pressed):
+		get_viewport().set_input_as_handled()
+		return
+	# Space during a home run's trot: on to the next batter.
+	if key != null and key.pressed and not key.echo and key.keycode == KEY_SPACE and hr_trot_on():
+		_end_play()
 		get_viewport().set_input_as_handled()
 		return
 	super._unhandled_input(event)
@@ -672,6 +689,8 @@ func _play_pace(delta: float) -> float:
 	if _freeze > 0.0:
 		_freeze -= delta
 		return 0.0
+	if hr_trot_on():
+		return HR_TROT_PACE
 	var h := highlight()
 	return h.pace_at(_play_time) if h != null else 1.0
 
@@ -689,6 +708,8 @@ func _open_manual() -> void:
 		return
 	var kind := chasing_fielder()
 	if kind == Position.Kind.DH or _play.result == PaResult.Kind.HOME_RUN or resolver.last_context == null:
+		return
+	if not manual_always and not own_to_field(_play, kind):
 		return
 	var ctx := resolver.last_context
 	_manual = ManualFielding.make(ctx.fielders[kind], resolver.motion, ctx.field)
@@ -710,6 +731,27 @@ func _open_manual() -> void:
 				_manual_until = minf(_manual_until, m.time)
 	_choice_open = true
 	_decide_at = INF
+
+
+## Tools and tests: every ball in play is the person's own to field.
+var manual_always := false
+
+
+## Is this ball the person's own to field (the user, 2026-11-23)? Not a routine ball in the air
+## (the fielder gets under it by himself), and not a clean hit nobody had a chance at. His
+## when it takes him: a ball far enough from the fielder that he has to run to his limit or
+## leave his feet for it (the play's hard chance, in the air or on the ground), or a ground ball
+## an infielder has to pick up and throw.
+static func own_to_field(play: PlayResult, kind: Position.Kind) -> bool:
+	if play.has_hard_chance() and play.hard_fielder == kind:
+		return true
+	var on_the_ground := is_inf(play.short_of_fence)
+	return on_the_ground and kind <= Position.Kind.SS
+
+
+## The person's own fielder is seen through his own eyes now (Settings.fielding_view).
+func fielder_view_on() -> bool:
+	return _manual != null and not _manual.got and Settings.fielding_view == "eyes" and highlight() == null
 
 
 ## The player's own fielder is still his to move (he has not got the ball, nor has anyone).
@@ -751,22 +793,33 @@ func manual_key(code: Key, pressed: bool) -> bool:
 	if pressed and manual_chasing():
 		if code == KEY_C:
 			_manual.press_catch(_play_time)
-		else:
-			_manual.dive(_play_time, duel.path)
+		elif _manual.dive(_play_time, duel.path):
+			# A dive can hurt him: a reckless one more often (Injuries).
+			var id := ""
+			for slot: LineupSlot in game.fielding_team().lineup:
+				if slot.position == _manual.kind:
+					id = slot.player_id
+			if id != "":
+				_maybe_hurt(id, "dive", Injuries.RECKLESS_DIVE if _manual.reckless else Injuries.DIVE)
 	return true
 
 
 func _tick_manual(dt: float) -> void:
-	if _manual == null or not _choice_open:
+	if _manual == null:
+		return
+	if not _choice_open:
+		_manual.coast(dt)
 		return
 	if not _manual.got:
 		if _play_time < _manual_until:
 			if _manual.step(_play_time, dt, _manual_wish(), duel.path):
 				# He has it: the throw goes where the player says (or already said).
 				_decide_at = _play_time if _choice.throw_to > 0 else _play_time + THROW_WAIT
-		elif _decide_at == INF:
-			# A team-mate has it: the play goes on as it was going.
-			_decide_at = _play_time + DECIDE_GRACE
+		else:
+			# A team-mate has it: he pulls up, and the play goes on as it was going.
+			_manual.coast(dt)
+			if _decide_at == INF:
+				_decide_at = _play_time + DECIDE_GRACE
 		return
 	# With the ball: he waits a moment for the throw key, longer while one is held.
 	if _choice.throw_to > 0:
@@ -1039,6 +1092,208 @@ func _pay_profile() -> void:
 	profile_lines.append_array(Achievements.note_game(feats, game, scorer.book, played_level(), stadium.id if stadium != null else ""))
 
 
+## A look away from the play (the cheering stage, the scoreboard): the small views give way.
+func cutaway_showing() -> bool:
+	return broadcast != null and broadcast.current != null and broadcast.current.kind in [Broadcast.Kind.BOARD, Broadcast.Kind.FANS, Broadcast.Kind.WALK_OFF, Broadcast.Kind.BENCH_CLEAR, Broadcast.Kind.INJURY]
+
+
+## The broadcast's introduction is on (the match-up, the line-ups): it has the screen alone.
+func pregame_showing() -> bool:
+	return broadcast != null and broadcast.current != null and broadcast.current.kind == Broadcast.Kind.PREGAME
+
+
+## The screen after the game is up (PostGame): it has the screen alone too.
+func post_game_showing() -> bool:
+	return game != null and game.over and broadcast != null and broadcast.current == null
+
+
+## A man's season in four figures for the line-ups, each [label, value] (the season's book; in
+## an exhibition, or before he has played, his rating and his tools): never today's line, which
+## is for his turn at bat. The first is the one a list shows.
+func season_figures(p: Player) -> Array:
+	if p == null:
+		return []
+	var s := _season()
+	if s != null:
+		if p.is_pitcher():
+			var q: PitchingLine = s.book.pitching.get(p.id)
+			if q != null and q.outs > 0:
+				return [["평균자책점", "%.2f" % q.era()], ["승-패", "%d-%d" % [q.wins, q.losses]], ["탈삼진", "%d" % q.strikeouts], ["이닝", q.innings_text()]]
+		else:
+			var b: BattingLine = s.book.batting.get(p.id)
+			if b != null and b.pa > 0:
+				return [["타율", BattingLine.rate_text(b.average())], ["홈런", "%d" % b.home_runs], ["타점", "%d" % b.rbi], ["OPS", BattingLine.rate_text(b.ops())]]
+	var o := ClubRules.player_ovr(p, LeagueEnvIO.load_overall(), catalog)
+	if p.is_pitcher():
+		return [["OVR", UiTheme.shown_text(o)], ["구위", UiTheme.shown_text(p.pitching.stuff(catalog))], ["제구", UiTheme.shown_text(p.pitching.control)], ["구속", "%d" % roundi(p.pitching.fastball_speed())]]
+	return [["OVR", UiTheme.shown_text(o)], ["컨택트", UiTheme.shown_text(p.batting.contact())], ["파워", UiTheme.shown_text(p.batting.power())], ["주력", UiTheme.shown_text(p.batting.speed)]]
+
+
+## A man may be hurt (Injuries): if he is, he is out of the game at once (AiManager.hurt) and
+## on the injured list after it (GameState.injured).
+func _maybe_hurt(player_id: String, cause: String, chance: float) -> void:
+	var rng := Rng.new(hash("hurt:%d:%d:%s" % [seed_value, _pitch_count, player_id]))
+	if not rng.chance(chance):
+		return
+	var days := Injuries.days_for(rng, cause)
+	game.injured[player_id] = [days, cause]
+	manager.hurt[player_id] = true
+	var who := game.teams[0].player(player_id)
+	if who == null:
+		who = game.teams[1].player(player_id)
+	banner = "부상: %s  (%s · %d일)" % [who.name if who != null else "", Injuries.CAUSES.get(cause, "부상"), days]
+	banner_time = 3.0
+
+
+## Reached on four balls or a pitch that hit him: a short scene and on to the next batter (the
+## user, 2026-11-23: no long run to first for anything but a hit — he lets the bat go and
+## starts for first, and the picture goes over to the next plate appearance). _trot: "walk",
+## "hbp", "hurt" (hit and hurt: he does not go; a man runs for him), or "".
+var _trot := ""
+## The scene's length (s); a hit batter flinches for HURT_STILL first.
+const TROT_TIME := 2.7
+const HURT_STILL := 0.9
+## He stands up out of his stance and lets the bat go (s into the scene), then jogs (m/s).
+const TROT_LET_GO := 0.3
+const TROT_GO := 0.5
+const TROT_SPEED := 4.4
+## The bat's fall from his hand to the ground (s).
+const BAT_FALL := 0.42
+## The picture dissolves into the next plate appearance over this long (s).
+const DISSOLVE := 0.45
+var _trot_begun := false
+var _bat_landed := false
+var _trot_cut := false
+var _trot_yaw := 0.0
+var _bat_from := Vector3.ZERO
+var _bat_to := Vector3.ZERO
+var _bat_let_go := -1.0
+var _dissolve: TextureRect
+
+
+func result_hold() -> float:
+	match _trot:
+		"walk", "hurt":
+			return TROT_TIME
+		"hbp":
+			return TROT_TIME + HURT_STILL
+	return 0.0
+
+
+## The batter each frame of that scene, after the duel has posed him in his stance (it does
+## every frame: posed from the game's step instead, he slid to first in his stance).
+func _pose_players() -> void:
+	super._pose_players()
+	if state == State.RESULT and _trot != "" and batter != null and _play_time < 0.0:
+		_pose_trot()
+
+
+func _pose_trot() -> void:
+	var start := Vector3(_box.x * (-1.0 if settings.bats_left else 1.0), _box.y, 0.0)
+	if not _trot_begun:
+		_trot_begun = true
+		_trot_cut = true
+		_trot_yaw = batter.rotation.y
+		_bat_let_go = -1.0
+		_bat_landed = false
+		_strides.erase(batter)
+		batter.ease_from_shown(0.3)
+	batter.frame_time = _frame_time
+	var hit := _trot != "walk"
+	# The bat: let go (a hit batter drops it at once), it falls beside the box.
+	var let_go := 0.1 if hit else TROT_LET_GO
+	if state_time >= let_go and _bat_let_go < 0.0:
+		_bat_let_go = state_time
+		batter.show_bat = false
+		_bat_from = batter.global_transform * batter.ball_spot(&"RightHand")
+		var side := signf(start.x) if start.x != 0.0 else -1.0
+		var land := Field.to_world(Vector3(start.x + side * (0.35 if hit else 0.9), start.y - (0.15 if hit else 0.55), 0.0))
+		_bat_to = Vector3(land.x, 0.034, land.z)
+		_dropped_bat.visible = true
+	if _bat_let_go >= 0.0:
+		var k := clampf((state_time - _bat_let_go) / BAT_FALL, 0.0, 1.0)
+		# The bat on the dirt (sfx/bat_drop: a real recording where the local pack has it).
+		if k >= 1.0 and not _bat_landed:
+			_bat_landed = true
+			if sound != null and GameAudio.variants("sfx/bat_drop").size() > 0:
+				sound.play_at("sfx/bat_drop", Field.to_field(_bat_to), -4.0)
+		var at_bat := _bat_from.lerp(_bat_to, k)
+		at_bat.y = lerpf(_bat_from.y, _bat_to.y, k * k)
+		var yaw := PI * 0.5 + (float(_pitch_count % 7) - 3.0) * 0.25
+		_dropped_bat.transform = Transform3D(Basis(Vector3.UP, yaw * k) * Basis(Vector3.BACK, lerpf(0.3, PI * 0.5, k)), at_bat)
+	# Hit by the pitch: he turns from it and bends over it a moment; hurt, he stays so.
+	if hit and (state_time < HURT_STILL or _trot == "hurt"):
+		batter.apply(PuppetClips.flinch())
+		return
+	var t := state_time - (HURT_STILL if hit else 0.0)
+	var first := Vector2(Field.FIRST_BASE.x, Field.FIRST_BASE.y)
+	# He joins the line a few steps up it, on its foul side (the runner's lane).
+	var join := Vector2(3.4, 3.0)
+	var from := Vector2(start.x, start.y)
+	var tau := t - TROT_GO
+	var speed := 0.0
+	var ran := 0.0
+	if tau > 0.0:
+		speed = TROT_SPEED * minf(tau / 0.6, 1.0)
+		ran = TROT_SPEED * (tau * tau / 1.2 if tau < 0.6 else tau - 0.3)
+	var leg := from.distance_to(join)
+	var at := from.move_toward(join, ran) if ran <= leg else join.move_toward(first, ran - leg)
+	var ahead := join if ran <= leg else first
+	batter.position = Field.to_world(Vector3(at.x, at.y, 0.0))
+	# He turns toward first as he straightens up, and with the line as he joins it.
+	if t > 0.12:
+		_trot_yaw = lerp_angle(_trot_yaw, _yaw_toward(at, ahead), clampf(_frame_time * 8.0, 0.0, 1.0))
+	batter.rotation.y = _trot_yaw
+	batter.look_at_world(Field.to_world(Vector3(first.x, first.y, 1.5)))
+	if tau <= 0.0:
+		batter.apply(PuppetClips.standing())
+	else:
+		batter.apply(PuppetClips.run_at(_stride(batter, speed), speed / SPRINT))
+
+
+## The scene's camera: from the infield grass up the first-base line, on him from the front as
+## he lets the bat go and comes up the line; never so near that he fills the picture.
+func _trot_camera(delta: float) -> void:
+	var him := Field.to_field(batter.global_position)
+	var eye := Vector3(7.0, 10.0, 1.55)
+	var away := Vector2(eye.x - him.x, eye.y - him.y).length()
+	var look := Vector3(him.x, him.y, 1.05)
+	var fov := clampf(rad_to_deg(2.0 * atan(1.9 / maxf(away, 1.0))), 14.0, 42.0)
+	_follow_target = look if _trot_cut else _follow_target.lerp(look, clampf(delta * 8.0, 0.0, 1.0))
+	camera.fov = fov if _trot_cut else lerpf(camera.fov, fov, clampf(delta * 6.0, 0.0, 1.0))
+	_trot_cut = false
+	camera.position = Field.to_world(eye)
+	camera.look_at(Field.to_world(_follow_target))
+	catcher.visible = true
+	umpire.visible = true
+
+
+## The picture as it is now, laid over the next one and let go: a broadcast's dissolve from
+## one shot to another.
+func _begin_dissolve() -> void:
+	if _dissolve == null or DisplayServer.get_name() == "headless":
+		return
+	var image := get_viewport().get_texture().get_image()
+	if image == null or image.is_empty():
+		return
+	_dissolve.texture = ImageTexture.create_from_image(image)
+	_dissolve.modulate.a = 1.0
+	_dissolve.visible = true
+
+
+func _build_dissolve() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 5
+	add_child(layer)
+	_dissolve = TextureRect.new()
+	_dissolve.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_dissolve.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_dissolve.stretch_mode = TextureRect.STRETCH_SCALE
+	_dissolve.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_dissolve.visible = false
+	layer.add_child(_dissolve)
+
+
 ## What the achievements count of this game (GameFeats), from its first event.
 var feats: GameFeats
 ## The easiest difficulty the person played a pitch at in this game (−1: none yet).
@@ -1137,7 +1392,7 @@ func _set_body(puppet: Puppet, p: Player, kind: Position.Kind) -> void:
 	model.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, kind))
 	model.set_hair(1 + absi(hash(p.id)) % 4, hair_color_of(p))
 	model.helmet_flaps = &"both" if p.bats == &"S" else &"left"
-	model.set_face(p.id)
+	model.set_face(p.id, (_season().season_year if _season() != null else 2026) - p.born)
 
 
 ## The club's letter on the cap and helmet (the first letter of its nickname in English).
@@ -1229,6 +1484,24 @@ func _finish_pitch() -> void:
 		# play is over); only what the umpire declares while the ball is in the air is.
 		banner = "인필드 플라이" if play.infield_fly else ""
 	banner_time = 2.4
+	# The plate umpire's warning or sending off for a pitch at a batter (KBO rules on the
+	# beanball): said over the screen with the pitch's call, and in the commentary line.
+	if resolver.last_call != "":
+		var who := game.fielding_team().player(game.pitcher_id())
+		var said := resolver.last_call
+		if said.ends_with("퇴장") and who != null:
+			said = "%s — %s" % [said, who.name]
+		banner = said if banner == "" else "%s · %s" % [banner, said]
+		banner_time = 3.4
+		last_text = "주심 %s" % said
+		# A pitch at a man's head, a pitcher sent off for a beanball, sometimes a warning:
+		# both benches empty (the user, 2026-11-23: "bench-clearing after a hit by pitch").
+		var tempers := resolver.last_call.ends_with("퇴장") or (resolver.last_call == "경고: 빈볼" and Rng.new(hash("clear:%d:%d" % [seed_value, _pitch_count])).chance(0.5))
+		if tempers and broadcast.enabled and park != null:
+			_plan_bench_clear()
+			var clear := Broadcast.segment(Broadcast.Kind.BENCH_CLEAR)
+			clear.shots = [bench_clear_shot()]
+			broadcast.push(clear)
 	if play != null and not play.foul:
 		_play = play
 		_moves = PlayMoves.read(play.timeline, play.calls)
@@ -1374,6 +1647,7 @@ func step(delta: float) -> void:
 
 
 func _end_play() -> void:
+	_leave_fielder_view()
 	_play_time = -1.0
 	_doing.clear()
 	_manual = null
@@ -1390,8 +1664,19 @@ func _end_play() -> void:
 	if _play != null and not _play.foul:
 		banner = last_text
 		banner_time = 2.6
+	if last_outcome != null and last_outcome.walk_off and broadcast.enabled and park != null:
+		# A walk-off: his side pours out to mob him at the plate.
+		_plan_walk_off(last_outcome.batter_id)
+		var mob := Broadcast.segment(Broadcast.Kind.WALK_OFF)
+		mob.shots = [Broadcast.Shot.make(0.0, Vector3(9.0, -5.0, 2.6), Vector3(0.0, 0.8, 1.1), 36.0, Vector3(7.0, -4.0, 2.2), Vector3(0.0, 0.8, 1.2), 30.0)]
+		broadcast.push(mob)
 	if _play != null and broadcast.enabled and _replay_wanted():
 		if _play.result == PaResult.Kind.HOME_RUN:
+			# The batting side's stand on its feet, then the ball again.
+			if not game.over and park != null:
+				var fans := Broadcast.segment(Broadcast.Kind.FANS)
+				fans.shots = [stage_shot(game.batting())]
+				broadcast.push(fans)
 			_push_replay(_play, &"home_run")
 		elif _play.hard_made and _play.hard_odds <= PlayHighlight.DOUBTFUL_CATCH:
 			_push_replay(_play, &"catch")
@@ -1412,6 +1697,25 @@ func _apply(e: GameEvent) -> void:
 	manager.note_change(game, e)
 	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
 		_clear_track = true
+		# Reached on four balls or a pitch: he walks to first (the trot), and a hit batter may
+		# be hurt — replaced by a pinch runner at once, out of the game.
+		_trot = ""
+		if e.result in [PaResult.Kind.WALK, PaResult.Kind.INTENTIONAL_WALK, PaResult.Kind.HIT_BY_PITCH]:
+			_trot = "hbp" if e.result == PaResult.Kind.HIT_BY_PITCH else "walk"
+		if e.result == PaResult.Kind.HIT_BY_PITCH:
+			game.scene_rolls = true
+			var head := game.head_hits.has(batter)
+			_maybe_hurt(batter, "head" if head else "hbp", Injuries.HEAD if head else Injuries.HBP)
+			if game.injured.has(batter):
+				_trot = "hurt"
+				# The trainer and a teammate come out and help him off (the user, 2026-11-23:
+				# "injury: replaced, helped off").
+				if broadcast.enabled and park != null:
+					_trot = ""
+					_plan_injury(batter, out.batting_before)
+					var help := Broadcast.segment(Broadcast.Kind.INJURY)
+					help.shots = injury_shots()
+					broadcast.push(help)
 	var text := _describe(e, out, batter)
 	if text != "":
 		last_text = text
@@ -1435,11 +1739,18 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 			# held up by it at the wall.
 			var wind: float = resolver.wind_out if resolver != null else 0.0
 			var deep: bool = duel != null and duel.contact != null and duel.contact.exit_speed_kmh() > 150.0
+			# The situation picks the line: a walk-off, a lead taken or a game tied, runs driven
+			# in, a jam escaped (Commentary.best_key).
+			var side := out.batting_before
+			var lead_before := out.score_before[side] - out.score_before[1 - side]
+			var lead_after := game.score[side] - game.score[1 - side]
+			var runs := out.scored.size()
+			key = commentary.best_key(key, runs, out.walk_off, lead_before <= 0 and lead_after > 0, lead_before < 0 and lead_after == 0, out.half_over and out.left_on_base >= 2)
 			if key == "home_run" and wind > 2.5:
 				key = "home_run_wind"
 			elif key == "fly_out" and wind < -2.5 and deep:
 				key = "fly_out_wind"
-			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, out.scored.size())
+			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, runs)
 		GameEvent.Kind.STEAL, GameEvent.Kind.PICKOFF:
 			var m := e.moves[0]
 			var runner := team.player(out.runner_ids[0]) if not out.runner_ids.is_empty() else null
@@ -1521,6 +1832,13 @@ func _person_flags() -> void:
 
 
 func _after_result() -> void:
+	if _trot != "":
+		# The walk to first is over: the picture dissolves into what comes next.
+		_begin_dissolve()
+		_trot = ""
+		_trot_begun = false
+		_dropped_bat.visible = false
+		batter.show_bat = true
 	if _drain():
 		return
 	if game.over:
@@ -1936,8 +2254,19 @@ func _show_target() -> void:
 	if duel.bounced or ball.z < BLOCK_BELOW:
 		pose = PuppetClips.catcher_block()
 	var coming := (duel.ball.pos.y - PitchDuel.CATCH_Y) / maxf(-duel.ball.vel.y, 1.0) if state == State.LIVE else 0.0
+	# A catcher moves his mitt late, in one short quick move: before that it is still, up as
+	# the target (a mitt drifting to the ball from far off gave the pitch away and looked limp).
 	var reach := 1.0 - smoothstep(0.0, CATCHER_REACH_TIME, coming)
-	catch_at(catcher, pose, catcher.to_local(Field.to_world(ball)), reach)
+	reach = reach * reach * (3.0 - 2.0 * reach)
+	var local := catcher.to_local(Field.to_world(ball))
+	if state == State.RESULT and not duel.bounced:
+		# The ball's weight in the mitt: it gives a few centimetres toward him and the
+		# shoulders with it, then is held (and framed, _catcher_ball).
+		var give := sin(clampf(state_time / CATCH_GIVE_TIME, 0.0, 1.0) * PI) * CATCH_GIVE
+		# (The figure's forward is -Z: toward him is +Z.)
+		local += Vector3(0.0, -0.25, 1.0).normalized() * give
+		pose.hips += Vector3(0.0, 0.0, 0.35) * give
+	catch_at(catcher, pose, local, reach)
 
 
 ## Where the catcher means to take the pitch, in field coordinates: where it will cross his
@@ -2015,9 +2344,17 @@ static func _yaw_toward(from: Vector2, to: Vector2) -> float:
 
 
 func refresh(delta: float) -> void:
+	if _dissolve != null and _dissolve.visible:
+		_dissolve.modulate.a = maxf(_dissolve.modulate.a - delta / DISSOLVE, 0.0)
+		if _dissolve.modulate.a <= 0.0:
+			_dissolve.visible = false
+			_dissolve.texture = null
 	if broadcast.current != null and not broadcast.holding():
 		broadcast.step(delta)
 	broadcast_cards.queue_redraw()
+	var rushing := broadcast.showing(Broadcast.Kind.WALK_OFF) or broadcast.showing(Broadcast.Kind.BENCH_CLEAR) or broadcast.showing(Broadcast.Kind.INJURY)
+	if rushing or _rush_shown:
+		_show_rush(broadcast.time if rushing else -1.0)
 	if broadcast.showing(Broadcast.Kind.REPLAY) and _replay_play != null:
 		_show_replay()
 		_crowd_react(delta)
@@ -2119,7 +2456,7 @@ func _build_pip(layer: Node) -> void:
 ## While a pitch is being set up and thrown: the lead runner taking his lead, or with the
 ## bases empty the pitcher from the side.
 func _update_pip() -> void:
-	var showing := _play_time < 0.0 and not game.over and (state == State.PRE_PITCH or state == State.WINDUP or state == State.LIVE)
+	var showing := _play_time < 0.0 and not game.over and (state == State.PRE_PITCH or state == State.WINDUP or state == State.LIVE) and not pregame_showing() and not cutaway_showing()
 	pip_rect.visible = showing
 	# Drawn every other frame: half the cost, and a small view does not need more.
 	_pip_frame += 1
@@ -2171,12 +2508,18 @@ func _show_play(t: float) -> void:
 		# He runs from where he stood in the box, not from the middle of the plate (he jumped
 		# a metre and more to it at contact), from the moment he is first shown running (after
 		# a slow-motion swing the play has gone on without him).
-		if _box_left < 0.0:
+		# (Not before he sets off: a batter who stands and watches his home run was slid out of
+		# the box while he stood.)
+		var setting_off := tl.position(batter_key, t + 0.1).distance_to(tl.position(batter_key, t)) / 0.1 > RUN_POSE_SPEED
+		if _box_left < 0.0 and setting_off:
 			_box_left = t
 		var box := Vector3(_box.x * (-1.0 if settings.bats_left else 1.0), _box.y, 0.0)
-		var start := tl.position(batter_key, _box_left)
-		var off := (box - Vector3(start.x, start.y, 0.0)) * (1.0 - smoothstep(_box_left, _box_left + BOX_LEAVING, t))
+		var start := tl.position(batter_key, _box_left if _box_left >= 0.0 else t)
+		var off := (box - Vector3(start.x, start.y, 0.0)) * (1.0 - smoothstep(_box_left, _box_left + BOX_LEAVING, t) if _box_left >= 0.0 else 1.0)
 		batter.position += Field.to_world(off) - Field.to_world(Vector3.ZERO)
+		# A home run's hitter pumps his fist the last few strides home.
+		if hr_trot_on() and t > tl.duration - 1.6:
+			batter.apply(PuppetClips.fist_pump())
 	_umpire_signals(t)
 
 
@@ -2432,7 +2775,7 @@ func _pose_on_track(p: Puppet, tl: PlayTimeline, key: String, t: float) -> Strin
 				if from.length() > 0.05:
 					_turn(p, _yaw_toward(Vector2.ZERO, from), QUICK_TURN)
 				# The first baseman takes a throw on the bag with a stretch toward it.
-				if key == "F:1B" and Vector2(m.at.x, m.at.y).distance_to(PlaySim.base_xy(1)) < 1.0 and m.at.z > 0.6:
+				if key == "F:1B" and Vector2(m.at.x, m.at.y).distance_to(PlaySim.base_xy(1)) < PlaySim.STRETCH_REACH + 0.4 and m.at.z > 0.6:
 					var reach := smoothstep(-0.3, -0.05, t - m.time) * (1.0 - smoothstep(0.1, 0.25, t - m.time))
 					catch_at(p, PuppetClips.first_base_stretch(), p.to_local(Field.to_world(_ball_at(tl, t))), reach)
 					return &"stretch"
@@ -2531,31 +2874,26 @@ func _move_camera_play(delta: float) -> void:
 	umpire.visible = true
 	var h := highlight()
 	if h != null:
+		_leave_fielder_view()
 		_close_camera(h, ball, delta)
+		return
+	if hr_trot_on():
+		_hr_trot_camera(delta)
 		return
 	# High behind home plate, inside the backstop, turning to keep the ball in view.
 	var from := Vector3(clampf(ball.x * 0.1, -5.0, 5.0), -14.0, 16.0)
 	# (A pop-up over the plate is looked up at further, or it goes out of the top.)
 	var target := Vector3(ball.x, maxf(ball.y, 12.0), maxf(ball.z * (0.85 if ball.y < 20.0 else 0.7), 0.0))
+	if _manual == null or _manual.got:
+		_leave_fielder_view()
 	if _manual != null and _manual.got:
 		# He has it: back to the whole field, for the throw.
 		pass
 	elif _manual != null:
-		# The player's own fielder: the camera stands behind him (on the plate's side) and
-		# above, near enough for him to be steered, with him and where the ball is going both
-		# in the picture. (From behind the plate he was a few pixels tall in the outfield.)
-		var own := Vector2(_manual.pos.x, _manual.pos.y)
-		var going := landing_point if landing_known and _play_time < landing_time else Vector3(ball.x, ball.y, 0.0)
-		var spot := Vector2(going.x, going.y)
-		var focus := own.lerp(spot, 0.5)
-		var toward := focus.normalized() if focus.length() > 5.0 else Vector2(0.0, 1.0)
-		var back := clampf(MANUAL_CAMERA_BACK + own.distance_to(spot) * 0.6, MANUAL_CAMERA_BACK, 45.0)
-		var stand := focus - toward * back
-		from = Vector3(stand.x, stand.y, 8.0 + back * 0.35)
-		# Looking down on the field: he and the ring where the ball comes down stay in the
-		# picture, and a high fly goes out of the top of it for a moment (looking up after it,
-		# the camera showed the stands and the sky and lost him).
-		target = Vector3(focus.x, focus.y, clampf(ball.z * 0.25, 0.0, 3.0))
+		# The player's own fielder: seen as he sees it (the user, 2026-11-23: "when I field,
+		# the view should be the fielder's own").
+		_fielder_view(ball, delta)
+		return
 	# Back from a close-up the picture cuts, as a broadcast does.
 	var cut := _close or _cut
 	_close = false
@@ -2568,6 +2906,105 @@ func _move_camera_play(delta: float) -> void:
 
 ## The next camera move is a cut, not a follow.
 var _cut := false
+
+
+## A home run's trot (queue stage 6, 2026-11-23: "a short scene of him going round, close on
+## him, just touching the bases"): once the ball is out, the jog round the bases at
+## HR_TROT_PACE with the camera beside him a few metres off the base paths, a fist pumped as
+## he comes home. Space skips it.
+const HR_TROT_PACE := 2.6
+const HR_TROT_AFTER := 0.8
+
+
+## The ball is out and he is on his way round (the play still showing).
+func hr_trot_on() -> bool:
+	if _play == null or _play.foul or _play.result != PaResult.Kind.HOME_RUN or _play_time < 0.0 or _running:
+		return false
+	return _play_time > _ball_out_time() + HR_TROT_AFTER and _batter_at_start != ""
+
+
+func _ball_out_time() -> float:
+	var ball: PackedVector4Array = _play.timeline.tracks.get("ball", PackedVector4Array())
+	return ball[ball.size() - 1].x if not ball.is_empty() else 4.0
+
+
+## Beside him on the outside of the diamond, 7 m off and a little above, looking at him.
+func _hr_trot_camera(delta: float) -> void:
+	var key := "R:%s" % _batter_at_start
+	var him := _play.timeline.position(key, _play_time)
+	var flat := Vector2(him.x, him.y)
+	var middle := Vector2(0.0, Field.BASE_DISTANCE * 0.7071)
+	var out := (flat - middle).normalized() if flat.distance_to(middle) > 1.0 else Vector2(0.0, -1.0)
+	var ahead := _play.timeline.position(key, _play_time + 0.4)
+	var going := Vector2(ahead.x, ahead.y) - flat
+	var side := out * 7.0 + (going.normalized() * 3.0 if going.length() > 0.05 else Vector2.ZERO)
+	var eye := Vector3(flat.x + side.x, flat.y + side.y, 2.2)
+	var look := Vector3(him.x, him.y, 1.15)
+	var first := not _close
+	_close = true
+	_follow_target = look if first else _follow_target.lerp(look, clampf(delta * 6.0, 0.0, 1.0))
+	camera.position = Field.to_world(eye) if first else camera.position.lerp(Field.to_world(eye), clampf(delta * 4.0, 0.0, 1.0))
+	camera.fov = 40.0
+	camera.look_at(Field.to_world(_follow_target))
+
+
+## The person's own fielder's view: through his eyes ("eyes": he himself is not drawn, the
+## glove's marks are on the screen), or from just behind his shoulder ("shoulder"). He looks
+## at the ball, and a little toward where it is coming down while that is far off, so that the
+## ground he has to cover is in the picture. W A S D move him as the picture lies.
+const EYE_HEIGHT := 1.66
+var _view_dir := Vector3.ZERO
+var _view_height := EYE_HEIGHT
+var _view_of: Puppet
+
+
+func _fielder_view(ball: Vector3, delta: float) -> void:
+	var eyes := Settings.fielding_view == "eyes"
+	var own := Vector2(_manual.pos.x, _manual.pos.y)
+	var going := landing_point if landing_known and _play_time < landing_time else Vector3(ball.x, ball.y, 0.0)
+	var down := _manual.diving(_play_time)
+	_view_height = lerpf(_view_height, 0.7 if down else EYE_HEIGHT, clampf(delta * 9.0, 0.0, 1.0))
+	var head := Vector3(own.x, own.y, _view_height)
+	# Mostly where it comes down, a little toward the ball: the ground he has to cover stays in
+	# the picture (looking up after a high fly, it was all sky and stands); a ball above the
+	# picture is shown by its marker at the edge (PlayOverlay).
+	var look := Vector3(going.x, going.y, 0.0).lerp(ball, 0.35)
+	var to := look - head
+	var flat := Vector2(to.x, to.y)
+	# Right at him (or straight overhead) there is no telling which way to face: he keeps
+	# looking the way he was.
+	var want := _view_dir
+	if flat.length() > 0.6 or _view_dir == Vector3.ZERO:
+		var tilt := clampf(atan2(to.z, maxf(flat.length(), 0.6)), deg_to_rad(-40.0), deg_to_rad(20.0))
+		var ahead := flat.normalized() if flat.length() > 0.01 else Vector2(0.0, -1.0)
+		want = Vector3(ahead.x * cos(tilt), ahead.y * cos(tilt), sin(tilt))
+	var first := not _close or _cut or _view_dir == Vector3.ZERO
+	_view_dir = want if first else _view_dir.slerp(want, clampf(delta * 7.0, 0.0, 1.0)).normalized()
+	_close = true
+	_cut = false
+	var ahead_flat := Vector2(_view_dir.x, _view_dir.y).normalized()
+	var eye := head + Vector3(ahead_flat.x, ahead_flat.y, 0.0) * 0.12
+	if not eyes:
+		eye = head - Vector3(ahead_flat.x, ahead_flat.y, 0.0) * 2.4 + Vector3(0.0, 0.0, 0.45)
+	# Through his eyes he is not drawn himself (the camera is inside his head).
+	var figure: Puppet = fielders.get(_manual.kind)
+	if _view_of != null and _view_of != figure:
+		_view_of.visible = true
+	_view_of = figure if eyes else null
+	if figure != null:
+		figure.visible = not eyes
+	camera.position = Field.to_world(eye)
+	camera.fov = 72.0 if eyes else 60.0
+	camera.look_at(Field.to_world(eye + _view_dir * 10.0))
+
+
+## Out of the fielder's view: he is drawn again.
+func _leave_fielder_view() -> void:
+	if _view_of != null:
+		_view_of.visible = true
+		_view_of = null
+	_view_dir = Vector3.ZERO
+	_view_height = EYE_HEIGHT
 
 
 ## The close camera on a chance stands this far (m) from the spot.
@@ -2707,7 +3144,13 @@ func _push_pregame() -> void:
 		Broadcast.Shot.make(0.0, Vector3(-120.0, 10.0, 62.0), centre, 55.0, Vector3(-55.0, -110.0, 48.0), centre, 50.0),
 		Broadcast.Shot.make(4.5, Vector3(2.8, 12.6, 2.2), Vector3(0.0, Field.RUBBER_Y, 1.6), 28.0, Vector3(2.2, 13.4, 2.0), Vector3(0.0, Field.RUBBER_Y, 1.6), 22.0),
 		Broadcast.Shot.make(7.5, Vector3(0.0, -34.0, 13.0), Vector3(0.0, 30.0, 2.0), 50.0, Vector3(0.0, -28.0, 11.0), Vector3(0.0, 30.0, 2.0), 46.0),
+		Broadcast.Shot.make(14.5, Vector3(26.0, -26.0, 12.0), Vector3(0.0, 30.0, 2.0), 48.0, Vector3(20.0, -30.0, 11.0), Vector3(0.0, 30.0, 2.0), 46.0),
 	]
+	# Their faces drawn now, for the line-ups on the field (BroadcastCards._order).
+	for side: int in 2:
+		for slot: LineupSlot in game.teams[side].lineup:
+			PortraitStudio.request(self, game.teams[side].player(slot.player_id), club(side), func(_t: Texture2D) -> void: pass)
+		PortraitStudio.request(self, game.teams[side].player(game.teams[side].pitcher_id), club(side), func(_t: Texture2D) -> void: pass)
 	broadcast.push(seg)
 
 
@@ -2746,8 +3189,41 @@ func _push_half() -> void:
 	# The last play's line has had its time; the card takes the screen.
 	banner_time = 0.0
 	var seg := Broadcast.segment(Broadcast.Kind.HALF, data)
-	seg.shots = [Broadcast.Shot.make(0.0, Vector3(0.0, -48.0, 30.0), Vector3(0.0, 40.0, 0.0), 52.0, Vector3(0.0, -40.0, 26.0), Vector3(0.0, 40.0, 0.0), 50.0)]
+	_halves_shown += 1
+	if _halves_shown % 2 == 0 and park != null:
+		# Every other change of sides, the cheering stage of the side coming in to bat (a KBO
+		# broadcast's look at the cheerleaders between halves).
+		seg.shots = [stage_shot(game.batting())]
+	else:
+		seg.shots = [Broadcast.Shot.make(0.0, Vector3(0.0, -48.0, 30.0), Vector3(0.0, 40.0, 0.0), 52.0, Vector3(0.0, -40.0, 26.0), Vector3(0.0, 40.0, 0.0), 50.0)]
 	broadcast.push(seg)
+
+
+var _halves_shown := 0
+
+
+## The benches cleared: from behind the third-base side of the plate, low, closing in on the
+## two sides facing each other.
+func bench_clear_shot() -> Broadcast.Shot:
+	return Broadcast.Shot.make(0.0, Vector3(-6.5, -7.0, 3.6), Vector3(0.0, 5.0, 1.2), 36.0, Vector3(-4.5, -4.5, 3.0), Vector3(0.0, 5.0, 1.2), 30.0)
+
+
+## The park's scoreboard from high behind the plate (over the batter), closing in on it.
+func board_shot() -> Broadcast.Shot:
+	var board := park.scoreboard_at
+	return Broadcast.Shot.make(0.0, Vector3(2.0, -12.0, 16.0), board, 12.0, Vector3(1.8, -11.0, 16.0), board, 9.0)
+
+
+## A side's cheering stage from the field (field coordinates): the cheer leader and the
+## cheerleaders on it, the fans in the club's colours behind them, the camera easing in.
+func stage_shot(side: int) -> Broadcast.Shot:
+	var at := Field.to_field(park.stage_spot(1.0 if side == GameState.HOME else -1.0))
+	var home := -Vector2(at.x, at.y).normalized()
+	var across := Vector2(home.y, -home.x)
+	var from := Vector3(at.x + home.x * 10.0 + across.x * 2.0, at.y + home.y * 10.0 + across.y * 2.0, at.z + 1.0)
+	var to := Vector3(at.x - home.x * 2.5, at.y - home.y * 2.5, at.z + 1.9)
+	var closer := Vector3(at.x + home.x * 8.0 + across.x * 1.6, at.y + home.y * 8.0 + across.y * 1.6, at.z + 1.1)
+	return Broadcast.Shot.make(0.0, from, to, 34.0, closer, to, 31.0)
 
 
 ## The batter coming up and a new pitcher: their cards (a close-up that holds the game unless
@@ -2765,12 +3241,226 @@ func _push_people(new_half: bool) -> void:
 		var holds := not human_bats()
 		if holds:
 			banner_time = 0.0
+		# The player's own man's first time up: the park's scoreboard introduces him, his song
+		# starting (a KBO park's board between batters), before the duel's camera.
+		if game.batter_id() == featured_batter() and not _board_intro_done and park != null and park.scoreboard != null:
+			_board_intro_done = true
+			var intro := Broadcast.segment(Broadcast.Kind.BOARD, {"id": game.batter_id()})
+			intro.shots = [board_shot()]
+			broadcast.push(intro)
 		var seg := Broadcast.segment(Broadcast.Kind.BATTER, {"id": game.batter_id()}, holds)
 		if holds:
 			var bx := _box.x * (-1.0 if settings.bats_left else 1.0)
 			seg.shots = [Broadcast.Shot.make(0.0, Vector3(bx + 1.4, 5.2, 1.6), Vector3(bx, 0.0, 1.4), 26.0, Vector3(bx + 1.2, 4.8, 1.6), Vector3(bx, 0.0, 1.45), 22.0)]
 		broadcast.push(seg)
 	_seen_batter = game.batter_id()
+
+
+# --- Men coming out: a walk-off's mob at the plate, the benches clearing ---
+
+
+## The extra figures for these (made the first time they are wanted, hidden otherwise).
+var _rush: Array[Puppet] = []
+## Each figure's part: [side, from, to (field), delay (s), role: &"hero", &"mob", &"face_off"].
+var _rush_plan: Array = []
+var _rush_shown := false
+## Men out of a dugout for a walk-off; a side's for a bench-clearing.
+const RUSH_MOB := 9
+const RUSH_CLEAR := 7
+## How fast they run out (m/s).
+const RUSH_SPEED := 7.0
+
+
+func _rush_figures(n: int) -> void:
+	while _rush.size() < n:
+		var p := _add_puppet(Vector3.ZERO, 0.0, Color.WHITE, Color.WHITE, true)
+		p.visible = false
+		_rush.append(p)
+
+
+## A side's dugout (field coordinates): the home side's on the first-base side (KBO).
+func _dugout(side: int) -> Vector3:
+	var dug := park.dugout_span()
+	var az := (dug.x + dug.y) * 0.5 * (1.0 if side == GameState.HOME else -1.0)
+	return StadiumBuilder.at_az(az, park.collision.boundary_distance(az) - 1.5, 0.0)
+
+
+## The men of a side who come out (his lineup and bench, their numbers on their backs).
+func _men_of(side: int, n: int, skip: String) -> Array[Player]:
+	var out: Array[Player] = []
+	var t := game.teams[side]
+	for id: String in t.players:
+		if id != skip and out.size() < n and not t.removed.has(id):
+			out.append(t.players[id])
+	return out
+
+
+func _dress_rush(fig: Puppet, side: int, p: Player) -> void:
+	_dress(fig, _style_for(side), p.number, p.name, false)
+	_set_body(fig, p, p.primary_position())
+	_logo(fig, side)
+
+
+## A walk-off: the hero at the plate, his side's men pouring out of the dugout around him.
+func _plan_walk_off(hero_id: String) -> void:
+	var side := GameState.HOME
+	var men := _men_of(side, RUSH_MOB, hero_id)
+	_rush_figures(men.size() + 1)
+	_rush_plan.clear()
+	var rng := Rng.new(hash("walkoff:%d" % seed_value))
+	var plate := Vector3(0.0, 0.8, 0.0)
+	var hero := game.teams[side].player(hero_id)
+	if hero != null:
+		_dress_rush(_rush[0], side, hero)
+		_rush_plan.append([side, plate, plate, 0.0, &"hero"])
+	var from := _dugout(side)
+	for i: int in men.size():
+		var fig := _rush[_rush_plan.size()]
+		_dress_rush(fig, side, men[i])
+		var ang := TAU * float(i) / men.size() + rng.next_float() * 0.4
+		var r := rng.next_range(0.9, 1.7)
+		_rush_plan.append([side, from + Vector3(rng.next_range(-2.0, 2.0), rng.next_range(-1.5, 1.5), 0.0), plate + Vector3(cos(ang) * r, sin(ang) * r, 0.0), rng.next_range(0.0, 0.7), &"mob"])
+
+
+## The benches clear: both sides out of their dugouts to face each other between the plate and
+## the mound, a few of them with words and hands up; nobody throws a punch.
+func _plan_bench_clear() -> void:
+	_rush_plan.clear()
+	var rng := Rng.new(hash("clear:%d:%d" % [seed_value, _pitch_count]))
+	var spot := Vector3(0.0, 5.0, 0.0)
+	var total := 0
+	for side: int in [GameState.AWAY, GameState.HOME]:
+		var men := _men_of(side, RUSH_CLEAR, "")
+		_rush_figures(total + men.size())
+		var from := _dugout(side)
+		var toward := 1.0 if side == GameState.HOME else -1.0
+		for i: int in men.size():
+			_dress_rush(_rush[total + i], side, men[i])
+			var to := spot + Vector3(toward * rng.next_range(0.9, 2.8), rng.next_range(-2.6, 2.6), 0.0)
+			_rush_plan.append([side, from + Vector3(rng.next_range(-2.0, 2.0), rng.next_range(-1.5, 1.5), 0.0), to, rng.next_range(0.0, 0.9), &"face_off"])
+		total += men.size()
+
+
+## A man hurt at the plate: down where he was hit; the trainer and a teammate run out of his
+## dugout to him, and the three walk back to it slowly, one either side of him.
+func _plan_injury(hurt_id: String, side: int) -> void:
+	_rush_plan.clear()
+	var man := game.teams[side].player(hurt_id)
+	var helpers := _men_of(side, 2, hurt_id)
+	if man == null:
+		return
+	_rush_figures(1 + helpers.size())
+	var at := Vector3(_box.x * (-1.0 if settings.bats_left else 1.0), _box.y, 0.0)
+	var dugout := _dugout(side)
+	_dress_rush(_rush[0], side, man)
+	_rush_plan.append([side, at, dugout, INJURY_DOWN, &"hurt"])
+	for i: int in helpers.size():
+		_dress_rush(_rush[i + 1], side, helpers[i])
+		_rush_plan.append([side, dugout, at, 0.3 + 0.3 * i, &"helper", i])
+
+
+## Seconds he stays down before he is helped up, and how fast the three walk off (m/s).
+const INJURY_DOWN := 2.6
+const INJURY_WALK := 1.3
+
+
+## The injury from the side of the plate, then wider as he is helped toward the dugout.
+func injury_shots() -> Array[Broadcast.Shot]:
+	var bx := _box.x * (-1.0 if settings.bats_left else 1.0)
+	# (From his outside, toward the mound: the catcher and the umpire are not in the way.)
+	var out := signf(bx) if bx != 0.0 else -1.0
+	return [Broadcast.Shot.make(0.0, Vector3(bx + out * 4.2, 3.0, 1.5), Vector3(bx, 0.0, 0.6), 36.0, Vector3(bx + out * 3.6, 2.6, 1.4), Vector3(bx, 0.0, 0.7), 32.0),
+		Broadcast.Shot.make(INJURY_DOWN, Vector3(bx + 7.0, -8.0, 4.0), Vector3(bx * 0.3, 3.0, 1.0), 44.0, Vector3(bx + 8.0, -9.0, 4.5), Vector3(bx * 0.2, 6.0, 1.0), 48.0)]
+
+
+## Where the hurt man is `t` seconds in: down at the plate, then walking off at a slow pace.
+func _hurt_at(plan: Array, t: float) -> Vector3:
+	var from: Vector3 = plan[1]
+	var to: Vector3 = plan[2]
+	var walked := maxf(t - INJURY_DOWN, 0.0) * INJURY_WALK
+	var span := Vector2(to.x - from.x, to.y - from.y)
+	return from.lerp(to, clampf(walked / maxf(span.length(), 0.01), 0.0, 1.0))
+
+
+## The figures at `t` seconds into their scene (or all hidden, t < 0).
+func _show_rush(t: float) -> void:
+	_rush_shown = t >= 0.0
+	# The hero is one of the figures: the batter's own figure steps aside meanwhile.
+	var hero_out: bool = t >= 0.0 and not _rush_plan.is_empty() and (_rush_plan[0] as Array)[4] in [&"hero", &"hurt"]
+	batter.visible = not hero_out
+	# The beaten catcher has walked off; the plate is theirs.
+	catcher.visible = not (hero_out and (_rush_plan[0] as Array)[4] == &"hero")
+	for i: int in _rush.size():
+		var fig := _rush[i]
+		if t < 0.0 or i >= _rush_plan.size():
+			fig.visible = false
+			continue
+		var plan: Array = _rush_plan[i]
+		var from: Vector3 = plan[1]
+		var to: Vector3 = plan[2]
+		var delay: float = plan[3]
+		var role: StringName = plan[4]
+		var flat := Vector2(to.x - from.x, to.y - from.y)
+		var run_time := maxf(flat.length() / RUSH_SPEED, 0.01)
+		var u := clampf((t - delay) / run_time, 0.0, 1.0)
+		var at := from.lerp(to, u)
+		var look := Vector2(to.x, to.y) + flat.normalized()
+		var pose := PuppetClips.standing()
+		var lift := 0.0
+		if role == &"hurt":
+			# Down holding where it hit him, then up and walking slowly.
+			at = _hurt_at(plan, t)
+			if t < INJURY_DOWN:
+				pose = PuppetClips.kneel() if t > 0.4 else PuppetClips.flinch().blend(PuppetClips.kneel(), t / 0.4)
+				look = Vector2(at.x - 1.0, at.y + 1.0)
+			else:
+				pose = PuppetClips.walk((t - INJURY_DOWN) * 1.6)
+				look = Vector2(to.x, to.y)
+		elif role == &"helper":
+			# Out to him at a run; at his side as he walks.
+			var him := _hurt_at(_rush_plan[0], t)
+			var off_dir := Vector2(1.0, 0.0)
+			var back: Vector3 = (_rush_plan[0] as Array)[2]
+			var path := Vector2(back.x - him.x, back.y - him.y)
+			if path.length() > 0.1:
+				off_dir = path.normalized().orthogonal()
+			var beside := him + Vector3(off_dir.x, off_dir.y, 0.0) * (0.55 if int(plan[5]) == 0 else -0.55)
+			if t < INJURY_DOWN:
+				at = from.lerp(beside, u)
+				pose = PuppetClips.run_at((t - delay) * 3.0, 0.8) if u < 1.0 and t >= delay else PuppetClips.fielder_crouch()
+				look = Vector2(him.x, him.y) if u >= 1.0 else Vector2(beside.x, beside.y) + flat.normalized()
+			else:
+				at = beside
+				pose = PuppetClips.walk((t - INJURY_DOWN) * 1.6)
+				look = Vector2(back.x, back.y)
+			at.z = 0.0
+		elif role == &"hero":
+			# Jumping at the plate, arms up.
+			lift = 0.22 * maxf(sin(t * 7.0), 0.0)
+			pose = PuppetClips.fist_pump() if fmod(t, 0.9) < 0.5 else PuppetClips.hold(2.0, 0.5, 0.1)
+			look = Vector2(9.0, -5.0)
+		elif t < delay or u < 1.0:
+			pose = PuppetClips.run_at((t - delay) * 3.2, 1.0) if t >= delay else PuppetClips.standing()
+		elif role == &"mob":
+			# Round him, jumping, hands up and on him.
+			var phase := t * 6.0 + float(i) * 1.3
+			lift = 0.18 * maxf(sin(phase), 0.0)
+			pose = PuppetClips.hold(1.95, 0.45, 0.15) if sin(phase * 0.5) > 0.0 else PuppetClips.fist_pump()
+			look = Vector2(0.0, 0.8)
+		else:
+			# Facing the other side: hands up, pointing, held back.
+			look = Vector2(at.x - (1.0 if int(plan[0]) == GameState.HOME else -1.0) * 4.0, at.y)
+			pose = PuppetClips.hold(1.3, 0.55, 0.35) if i % 3 == 0 else (PuppetClips.wave(t) if i % 3 == 1 else PuppetClips.standing())
+		fig.visible = true
+		fig.position = Field.to_world(Vector3(at.x, at.y, lift))
+		fig.rotation.y = _yaw_toward(Vector2(at.x, at.y), look)
+		fig.apply(pose)
+
+
+## The man the game is about (the career's own player): his first at-bat is introduced on the
+## park's scoreboard. None in other games.
+func featured_batter() -> String:
+	return ""
 
 
 ## What a man's card says under his name: today, and his season when there is one.
@@ -2851,10 +3541,16 @@ func _show_replay() -> void:
 ## The broadcast's camera when one of its moments has a shot; the game's own otherwise.
 func _move_camera(delta: float) -> void:
 	var cam := broadcast.camera()
+	if park != null:
+		park.show_flags(not broadcast.showing(Broadcast.Kind.BOARD))
 	if not cam.is_empty() and not broadcast.showing(Broadcast.Kind.REPLAY):
 		camera.fov = float(cam[2])
 		camera.look_at_from_position(Field.to_world(cam[0]), Field.to_world(cam[1]))
-		catcher.visible = true
+		# (At a walk-off the beaten catcher has walked off: the plate is the winners'.)
+		catcher.visible = not broadcast.showing(Broadcast.Kind.WALK_OFF)
 		umpire.visible = true
+		return
+	if trot_showing() and _play_time < 0.0:
+		_trot_camera(delta)
 		return
 	super._move_camera(delta)

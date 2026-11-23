@@ -92,7 +92,7 @@ func _show() -> void:
 	_viewport.add_child(_puppet)
 	_puppet.set_body(p.height_cm / 100.0, SkinnedPuppet.build_for(p.height_cm, p.weight_kg, p.primary_position()))
 	_puppet.set_hair(1 + absi(hash(p.id)) % 4, MatchScene.hair_color_of(p))
-	_puppet.set_face(p.id)
+	_puppet.set_face(p.id, 2026 - p.born)
 	if team != null:
 		_puppet.set_logo(style.cap_letter, style.cap_ink())
 	_puppet.repaint()

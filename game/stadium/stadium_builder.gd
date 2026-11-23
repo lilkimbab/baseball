@@ -64,6 +64,8 @@ var _flag_cloths: MultiMesh
 ## The scoreboard's screen: whatever is put in this viewport shows on it (MatchScene draws
 ## the game on it, docs/13 S13-6).
 var scoreboard: SubViewport
+## The middle of the scoreboard's screen (field coordinates), for a camera to look at.
+var scoreboard_at := Vector3.ZERO
 ## Every seat, as the stands are laid out (for the crowd, docs/13 S14): where it is (world),
 ## its azimuth, row, tier (0 lower, 1 upper) and zone (Crowd.Zone).
 var seat_pos := PackedVector3Array()
@@ -808,6 +810,15 @@ func _build_flags() -> void:
 	add_child(flag_node)
 
 
+## The flags on and off: the broadcast's look at the scoreboard is taken from behind the
+## plate, and the poles along the outfield stands stand right in front of the board.
+func show_flags(on: bool) -> void:
+	for name: String in ["FlagPoles", "Flags"]:
+		var n := get_node_or_null(name) as Node3D
+		if n != null and n.visible != on:
+			n.visible = on
+
+
 ## How hard the wind blows on the flags: 0 slack, 1 a fresh breeze, 2 a gale.
 func set_wind(strength: float) -> void:
 	if _flags != null:
@@ -1049,6 +1060,7 @@ func _build_scoreboard() -> void:
 	var bottom := 2.2 + rows * ROW_DEPTH * tan(deg_to_rad(rake)) + 3.0
 	var centre := at_az(az, r, bottom + SCREEN_SIZE.y * 0.5)
 	var facing := Field.to_world(Vector3(0.0, 0.0, bottom))
+	scoreboard_at = centre
 	scoreboard = SubViewport.new()
 	scoreboard.size = Vector2i(1400, 600)
 	scoreboard.transparent_bg = false

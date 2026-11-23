@@ -255,16 +255,22 @@ func test_a_tool_can_aim_the_pitch_without_a_mouse() -> void:
 	assert_almost_eq(scene.target, spot, Vector3.ONE * 0.02, "the target follows the pointer")
 
 
-func test_the_pitch_cannot_be_aimed_at_the_batter() -> void:
+func test_the_pitch_can_be_aimed_at_the_batter_s_body_but_not_his_head() -> void:
+	# The user (2026-11-23): a pitcher may throw at a batter (KBO rules on beanballs follow);
+	# never at the head, and not far past him.
 	var scene := _start(&"pitch")
 	var zone := scene.duel.zone
 	scene.refresh(DT)
 	# Pointer on the batter's head: a metre inside and well above the zone.
 	scene.pointer_override = scene.camera.unproject_position(Field.to_world(Vector3(-1.0, Field.PLATE_FRONT_Y, 1.7)))
 	scene.refresh(DT)
-	assert_almost_eq(scene.target.x, -zone.half_width - DuelScene.AIM_BEYOND_ZONE.x, 1e-4, "held at the edge of the aiming area")
-	assert_almost_eq(scene.target.z, zone.top + DuelScene.AIM_BEYOND_ZONE.y, 1e-4)
-	assert_gt(scene.target.x, scene.batter.position.x + 0.3, "which stops short of where the batter stands")
+	assert_almost_eq(scene.target.x, -zone.half_width - DuelScene.AIM_AT_BODY, 1e-4, "as far in as his body")
+	assert_almost_eq(scene.target.z, zone.top + DuelScene.AIM_BEYOND_ZONE.y, 1e-4, "no higher than a little over the zone")
+	assert_lt(scene.target.z, 1.5, "not at his head")
+	# The other side stays near the zone.
+	scene.pointer_override = scene.camera.unproject_position(Field.to_world(Vector3(1.0, Field.PLATE_FRONT_Y, 0.8)))
+	scene.refresh(DT)
+	assert_almost_eq(scene.target.x, zone.half_width + DuelScene.AIM_BEYOND_ZONE.x, 1e-4)
 
 
 func test_the_mound_is_a_surface_that_faces_up_at_its_regulation_height() -> void:

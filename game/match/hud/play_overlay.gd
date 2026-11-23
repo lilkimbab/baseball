@@ -3,8 +3,9 @@ extends HudCanvas
 ## What the screen shows while a ball is in play (docs/13 S6-6, S6-7): the bases marked on
 ## the field, where a fly ball will come down, an edge that lights up toward a ball off the
 ## screen, the runners on a small diamond, and the umpire's call on a close play. When the
-## player's team is in the field, a ring under the fielder going after the ball (gold while he
-## is the player's own to move), the throw keys and the gauge; at bat, the running keys (S12).
+## player's team is in the field, the throw keys and the gauge, and a gold ring under the fielder
+## only while he is the player's own to move (a fielder who plays the ball by himself gets no
+## mark: the user, 2026-11-23); at bat, the running keys (S12).
 ## The other side's fielding is only watched: nothing is drawn on it. A slow-motion highlight
 ## is a clean picture: only the call is drawn over it.
 
@@ -74,30 +75,26 @@ func _landing_spot(t: float) -> void:
 	draw_arc(p, r * 0.45, 0.0, TAU, 24, Color(UiTheme.GOLD, pulse * 0.7), 2.0, true)
 
 
-## The player's fielder who plays the ball: a ring at his feet, gold with a marker over his
-## head while he is the player's own to move.
-func _fielder_ring(tl: PlayTimeline, t: float) -> void:
+## The player's own fielder: a ring at his feet and a marker over his head while he is the
+## player's to move. Seen through his own eyes (the fielder's view) there is no figure to
+## mark: the catch key and the glove's ring are shown at the top of the picture instead.
+func _fielder_ring(_tl: PlayTimeline, _t: float) -> void:
 	if not scene._controls_fielding():
 		return
 	var own := scene.manual_fielder()
-	var kind := own.kind if own != null else scene.chasing_fielder()
-	if kind == Position.Kind.DH:
-		return
-	var key := "F:%s" % Position.code(kind)
-	if own == null and not tl.tracks.has(key):
-		return
-	var at := Vector3(own.pos.x, own.pos.y, 0.0) if own != null else tl.position(key, t)
-	if not _in_front(at):
-		return
-	var p := _project(at)
-	var edge := _project(at + Vector3(0.8, 0.0, 0.0))
-	var r := maxf(p.distance_to(edge), 9.0)
 	if own == null:
-		draw_arc(p, r, 0.0, TAU, 32, UiTheme.BLUE, 3.0, true)
 		return
-	draw_arc(p, r, 0.0, TAU, 32, UiTheme.GOLD, 3.5, true)
+	var at := Vector3(own.pos.x, own.pos.y, 0.0)
+	var eyes := scene.fielder_view_on()
+	if not eyes and not _in_front(at):
+		return
+	var p := Vector2(view.x * 0.5, view.y * 0.5) if eyes else _project(at)
+	if not eyes:
+		var edge := _project(at + Vector3(0.8, 0.0, 0.0))
+		var r := maxf(p.distance_to(edge), 9.0)
+		draw_arc(p, r, 0.0, TAU, 32, UiTheme.GOLD, 3.5, true)
 	if scene.manual_chasing():
-		var head := _project(at + Vector3(0.0, 0.0, 2.3))
+		var head := Vector2(view.x * 0.5, 210.0) if eyes else _project(at + Vector3(0.0, 0.0, 2.3))
 		var t_now := scene._play_time
 		if own.glove_up(t_now):
 			# The glove is up: a green ring round the marker while it stays up.

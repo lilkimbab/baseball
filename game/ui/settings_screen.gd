@@ -33,6 +33,9 @@ func build() -> void:
 		b.custom_minimum_size.y = 56.0
 		b.add_theme_font_size_override("font_size", 22)
 		side.body.add_child(b)
+	side.body.add_child(UiKit.spacer(0.0, 0.0, true))
+	side.body.add_child(UiKit.rule())
+	side.body.add_child(UiKit.label("바꾸는 즉시 저장됩니다", 15, UiTheme.DIM, 500))
 	var names := {"game": "게임", "screen": "화면", "sound": "소리", "show": "경기 화면 표시"}
 	var icons := {"game": "baseball", "screen": "monitor", "sound": "speaker-high", "show": "eye"}
 	var main := panel(str(names[group]), str(icons[group]), columns, 0.0, str({"game": "GAMEPLAY", "screen": "DISPLAY", "sound": "AUDIO", "show": "HUD"}[group]))
@@ -42,25 +45,26 @@ func build() -> void:
 			var levels: Array = []
 			for id: String in Difficulty.IDS:
 				levels.append(id)
-			_pick(main, "난이도", "", levels, Difficulty.NAMES, Settings.difficulty, func(v: String) -> void: Settings.difficulty = v)
-			_pick(main, "기본 이닝", "", ["3", "6", "9"], ["3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
-			_switch(main, "피치 클락", "", Settings.pitch_clock, func(on: bool) -> void: Settings.pitch_clock = on)
-			_switch(main, "선수 교체 보조", "", Settings.auto_changes, func(on: bool) -> void: Settings.auto_changes = on)
-			_pick(main, "감독 지휘 중 직접 플레이 횟수", "", ["0", "3", "5", "-1"], ["0", "3", "5", "무제한"], str(Settings.interventions), func(v: String) -> void: Settings.interventions = int(v))
-			_pick(main, "수비 방식", "수동: 타구 쪽 야수를 W A S D로 직접 움직이고 Space로 몸을 날립니다. 송구는 두 방식 모두 방향 키", ["0", "1"], ["자동", "수동"], "1" if Settings.manual_fielding else "0", func(v: String) -> void: Settings.manual_fielding = v == "1")
-			_switch(main, "커리어 투수: 전 타자 상대", "", Settings.pitch_all, func(on: bool) -> void: Settings.pitch_all = on)
+			_pick(main, "난이도", "상대 구단의 실력과 판정의 너그러움. 어려울수록 경기 보상이 큽니다", levels, Difficulty.NAMES, Settings.difficulty, func(v: String) -> void: Settings.difficulty = v)
+			_pick(main, "기본 이닝", "친선 경기를 시작할 때의 이닝 수", ["3", "6", "9"], ["3이닝", "6이닝", "9이닝"], str(Settings.innings), func(v: String) -> void: Settings.innings = int(v))
+			_switch(main, "피치 클락", "투구 사이 제한 시간(KBO 2025년 도입). 넘기면 투수는 볼, 타자는 스트라이크", Settings.pitch_clock, func(on: bool) -> void: Settings.pitch_clock = on)
+			_switch(main, "선수 교체 보조", "투수 교체·대타·대주자를 코치가 알아서 합니다", Settings.auto_changes, func(on: bool) -> void: Settings.auto_changes = on)
+			_pick(main, "감독 지휘 중 직접 플레이 횟수", "리그 감독 경기에서 결정적인 순간 직접 타석·마운드에 설 수 있는 횟수", ["0", "3", "5", "-1"], ["0", "3", "5", "무제한"], str(Settings.interventions), func(v: String) -> void: Settings.interventions = int(v))
+			_pick(main, "수비 방식", "수동: 땅볼과 몸을 날려야 하는 타구는 야수를 W A S D로 직접 움직이고 Space로 몸을 날립니다(평범한 뜬공과 확실한 안타는 자동). 송구는 두 방식 모두 방향 키", ["0", "1"], ["자동", "수동"], "1" if Settings.manual_fielding else "0", func(v: String) -> void: Settings.manual_fielding = v == "1")
+			_pick(main, "직접 수비 시점", "직접 수비할 때의 카메라: 선수의 눈높이 또는 어깨 뒤", ["eyes", "shoulder"], ["선수 눈(1인칭)", "어깨 뒤"], Settings.fielding_view, func(v: String) -> void: Settings.fielding_view = v)
+			_switch(main, "커리어 투수: 전 타자 상대", "커리어 투수로 등판하면 모든 타자를 직접 상대합니다(끄면 중요한 장면만)", Settings.pitch_all, func(on: bool) -> void: Settings.pitch_all = on)
 		"screen":
-			_switch(main, "전체 화면", "", Settings.fullscreen, func(on: bool) -> void: Settings.fullscreen = on)
+			_switch(main, "전체 화면", "끄면 창 모드", Settings.fullscreen, func(on: bool) -> void: Settings.fullscreen = on)
 			var res_ids: Array = []
 			var res_names: Array = []
 			for i: int in Settings.RESOLUTIONS.size():
 				res_ids.append(str(i))
 				res_names.append("%d×%d" % [Settings.RESOLUTIONS[i].x, Settings.RESOLUTIONS[i].y])
-			_pick(main, "해상도", "", res_ids, res_names, str(Settings.resolution), func(v: String) -> void: Settings.resolution = int(v))
-			_pick(main, "품질", "", ["0", "1", "2"], ["낮음", "보통", "높음"], str(Settings.quality), func(v: String) -> void: Settings.quality = int(v))
-			_pick(main, "업스케일링 (FSR 2)", "", ["0", "1", "2", "3"], ["끄기", "품질", "균형", "원본 크기"], str(Settings.upscale), func(v: String) -> void: Settings.upscale = int(v))
-			_pick(main, "프레임 제한", "", ["30", "60", "0"], ["30", "60", "없음"], str(Settings.fps_limit), func(v: String) -> void: Settings.fps_limit = int(v))
-			_pick(main, "글꼴", "", ["paperlogy", "football", "nanum_neo", "score", "dos_gothic", "dos_saemmul", "sam3"], ["페이퍼로지", "풋볼고딕", "나눔스퀘어", "에스코어", "도스고딕", "도스샘물", "삼국지3"], Settings.menu_font, func(v: String) -> void:
+			_pick(main, "해상도", "창 모드의 크기", res_ids, res_names, str(Settings.resolution), func(v: String) -> void: Settings.resolution = int(v))
+			_pick(main, "품질", "그림자·관중·건물의 세밀함. 낮을수록 빠릅니다", ["0", "1", "2"], ["낮음", "보통", "높음"], str(Settings.quality), func(v: String) -> void: Settings.quality = int(v))
+			_pick(main, "업스케일링 (FSR 2)", "작게 그린 뒤 키워서 프레임을 올립니다", ["0", "1", "2", "3"], ["끄기", "품질", "균형", "원본 크기"], str(Settings.upscale), func(v: String) -> void: Settings.upscale = int(v))
+			_pick(main, "프레임 제한", "초당 최대 프레임. 노트북은 60을 권장합니다", ["30", "60", "0"], ["30", "60", "없음"], str(Settings.fps_limit), func(v: String) -> void: Settings.fps_limit = int(v))
+			_pick(main, "글꼴", "메뉴와 경기 화면의 글꼴(바꾸면 화면을 다시 불러옵니다)", ["paperlogy", "football", "nanum_neo", "score", "dos_gothic", "dos_saemmul", "sam3"], ["페이퍼로지", "풋볼고딕", "나눔스퀘어", "에스코어", "도스고딕", "도스샘물", "삼국지3"], Settings.menu_font, func(v: String) -> void:
 				Settings.menu_font = v
 				UiTheme.set_menu_family(v)
 				# Everything on screen was drawn in the old face.
@@ -77,25 +81,25 @@ func build() -> void:
 			_pick(main, "전체 볼륨", "", levels, level_names, near.call(Settings.volume), func(v: String) -> void:
 				Settings.volume = float(v)
 				GameAudio.apply_volumes())
-			_pick(main, "음악", "", levels, level_names, near.call(Settings.music_volume), func(v: String) -> void:
+			_pick(main, "음악", "메뉴 음악과 팡파르", levels, level_names, near.call(Settings.music_volume), func(v: String) -> void:
 				Settings.music_volume = float(v)
 				GameAudio.apply_volumes())
-			_pick(main, "관중", "", levels, level_names, near.call(Settings.crowd_volume), func(v: String) -> void:
+			_pick(main, "관중", "관중 함성·응원가·북", levels, level_names, near.call(Settings.crowd_volume), func(v: String) -> void:
 				Settings.crowd_volume = float(v)
 				GameAudio.apply_volumes())
-			_pick(main, "효과음", "", levels, level_names, near.call(Settings.sfx_volume), func(v: String) -> void:
+			_pick(main, "효과음", "타격·포구·발소리", levels, level_names, near.call(Settings.sfx_volume), func(v: String) -> void:
 				Settings.sfx_volume = float(v)
 				GameAudio.apply_volumes())
-			_pick(main, "음성", "", levels, level_names, near.call(Settings.voice_volume), func(v: String) -> void:
+			_pick(main, "음성", "심판 콜과 장내 방송", levels, level_names, near.call(Settings.voice_volume), func(v: String) -> void:
 				Settings.voice_volume = float(v)
 				GameAudio.apply_volumes())
-			_switch(main, "심판·장내 방송 음성", "", Settings.voices, func(on: bool) -> void: Settings.voices = on)
+			_switch(main, "심판·장내 방송 음성", "시스템의 한국어 음성으로 콜과 장내 방송을 읽습니다", Settings.voices, func(on: bool) -> void: Settings.voices = on)
 		"show":
-			_switch(main, "낙하 지점", "", Settings.landing_spot, func(on: bool) -> void: Settings.landing_spot = on)
-			_switch(main, "투구 도착 지점", "", Settings.pitch_marker, func(on: bool) -> void: Settings.pitch_marker = on)
-			_switch(main, "명장면 슬로모션", "", Settings.highlights, func(on: bool) -> void: Settings.highlights = on)
-			_switch(main, "문자 중계", "", Settings.commentary, func(on: bool) -> void: Settings.commentary = on)
-			_switch(main, "중계 연출", "", Settings.broadcast, func(on: bool) -> void: Settings.broadcast = on)
+			_switch(main, "낙하 지점", "뜬공이 떨어질 자리를 땅에 표시합니다", Settings.landing_spot, func(on: bool) -> void: Settings.landing_spot = on)
+			_switch(main, "투구 도착 지점", "던진 공이 홈 플레이트를 지난 자리", Settings.pitch_marker, func(on: bool) -> void: Settings.pitch_marker = on)
+			_switch(main, "명장면 슬로모션", "아슬아슬한 플레이를 느리게 다시 보여 줍니다", Settings.highlights, func(on: bool) -> void: Settings.highlights = on)
+			_switch(main, "문자 중계", "플레이마다 한 줄 중계", Settings.commentary, func(on: bool) -> void: Settings.commentary = on)
+			_switch(main, "중계 연출", "경기 전 소개, 이닝 교대, 다시 보기, 응원단상·전광판, 끝내기·벤치 클리어링 장면", Settings.broadcast, func(on: bool) -> void: Settings.broadcast = on)
 
 
 ## One setting: its name and a line about it on the left, the control on the right.

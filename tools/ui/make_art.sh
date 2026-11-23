@@ -20,7 +20,7 @@ card() { # name, source, crop filter
     echo "make_art: missing $2" >&2
   fi
 }
-card exhibition build/look2/body.png "crop=1000:562:200:100"
+card exhibition build/look2/body.png "crop=1000:562:60:40"
 card league build/crowd2/park_grand_park_day_high.png "crop=iw:ih*0.8:0:ih*0.1"
 card career build/forms2/pitch_side_09.png "crop=1000:562:140:60"
 card practice build/forms2/swing_side_10.png "crop=1000:562:160:20"

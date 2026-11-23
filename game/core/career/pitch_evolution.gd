@@ -66,11 +66,13 @@ static func learnable(c: CareerPlayer, rules: CareerRules) -> Array[StringName]:
 	return out
 
 
-## Learns a pitch with pitching points: it starts a little below his others.
-static func learn(c: CareerPlayer, id: StringName, rules: CareerRules, catalog: Dictionary[StringName, PitchType]) -> bool:
-	if not learnable(c, rules).has(id) or float(c.gp.get("pitching", 0.0)) < rules.new_pitch_gp:
+## Learns a pitch with pitching points (or, `free`, picked up by himself: CareerEvents, a lesson
+## paid for: CareerContract): it starts a little below his others.
+static func learn(c: CareerPlayer, id: StringName, rules: CareerRules, catalog: Dictionary[StringName, PitchType], free: bool = false) -> bool:
+	if not learnable(c, rules).has(id) or (not free and float(c.gp.get("pitching", 0.0)) < rules.new_pitch_gp):
 		return false
-	c.gp["pitching"] = float(c.gp["pitching"]) - rules.new_pitch_gp
+	if not free:
+		c.gp["pitching"] = float(c.gp["pitching"]) - rules.new_pitch_gp
 	var r := c.player.pitching
 	var fastball := r.fastball_speed()
 	var a := ArsenalPitch.new()

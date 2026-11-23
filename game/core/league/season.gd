@@ -72,6 +72,16 @@ var season_year := 2026
 ## The second teams' league (docs/08 R6); null where there is none (the career mode, which
 ## plays its own player's second-team games, and batch simulations).
 var farm: FarmLeague
+## A career's own player (CareerSeason): his club is managed by the computer like the others,
+## but he is moved up and down only by his manager's judgement. "" outside a career.
+var career_player := ""
+## A high-school league (SchoolLeague): its own playoff, no all-star game.
+var school := false
+## The league's all-star break (LeagueAllStar): who was picked, the derby, the game, what it
+## paid. Empty until it comes.
+var all_star := {}
+## Each game's line of the men the person follows (GameLog): player id → entries.
+var game_logs: Dictionary = {}
 ## Rating points each player has grown this season (Development), for the winter's report.
 var grown: Dictionary[String, float] = {}
 ## Players who played in a first-team game today (for growth); emptied when the day ends.
@@ -105,6 +115,9 @@ var rewarded := false
 var injuries := Injuries.new()
 ## Today's news of the manager's club: [player id, days, cause] hurt, and the ids healed.
 var hurt_today: Array = []
+## What the manager should hear about his club since he last looked (an injury and who took
+## the place). Not saved: told once.
+var news := PackedStringArray()
 var healed_today := PackedStringArray()
 var featured := ""
 var featured_role := ""
@@ -225,18 +238,32 @@ func prepare(game: ScheduledGame, physical: bool = false) -> GameSim:
 	return sim
 
 
-## A game's injuries (Injuries): drawn for both sides; a computer club fills the first-team
-## place at once, the manager's club is told (hurt_today) and calls a man up himself.
-func _note_injuries(game: ScheduledGame, game_book: StatBook) -> void:
+## A game's injuries (Injuries): drawn for both sides. Every club fills the first-team place at
+## once with the best second-team man of the kind it is short of, as a real club does the same
+## day; the manager's club too (an empty place played a club short all season: its winning
+## share fell by a third), and he is told who went down and who came up (news) — he may change
+## it as he likes.
+func _note_injuries(game: ScheduledGame, game_book: StatBook, state: GameState = null) -> void:
 	if history != null or my_team == "":
 		return
-	var hurt := injuries.note_game(self, game_book, rng.fork(hash("hurt:%d:%s" % [day, game.home])))
+	var hurt := injuries.note_game(self, game_book, rng.fork(hash("hurt:%d:%s" % [day, game.home])), state)
 	for h: Array in hurt:
 		var team: Team = teams[str(h[0])]
-		if team.id == my_team:
-			hurt_today.append([h[1], h[2], h[3]])
-		else:
-			RosterMoves.refill(self, team)
+		var before := team.registered.duplicate()
+		RosterMoves.refill(self, team)
+		if team.id != my_team:
+			continue
+		hurt_today.append([h[1], h[2], h[3]])
+		if career_player != "":
+			continue
+		var who := team.player(str(h[1]))
+		var called := ""
+		for id: String in team.registered:
+			if not before.has(id):
+				called = team.player(id).name
+		news.append("부상: %s (%s · %d일)%s" % [who.name if who != null else "", Injuries.CAUSES.get(str(h[3]), "부상"), int(h[2]), " → %s 1군 등록" % called if called != "" else ""])
+		while news.size() > 6:
+			news.remove_at(0)
 
 
 ## Pitchers' overalls for the bullpen roles, worked out once a day (play_day empties it):
@@ -463,7 +490,7 @@ func resting(team: Team, on_day: int) -> Dictionary[String, bool]:
 
 func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 	game.finish(state.score[0], state.score[1], state.inning)
-	_note_injuries(game, game_book)
+	_note_injuries(game, game_book, state)
 	var playoff := postseason_of(game)
 	var target := book
 	if playoff != null:
@@ -500,6 +527,25 @@ func record(game: ScheduledGame, state: GameState, game_book: StatBook) -> void:
 		target.pitch(id).add(line)
 		usage.note(id, game.day, line.pitches)
 		played_today[id] = true
+	# The followed men's lines of this game (GameLog): his club's, or a career's own player.
+	var followed := _followed(game)
+	if not followed.is_empty():
+		GameLog.note(game_logs, followed, game, game_book, "고교" if school else ("PS" if playoff != null else "1군"))
+
+
+## The men whose games are kept (GameLog) in a game: the person's club's when he manages one,
+## the career's own player when there is one; id → his side.
+func _followed(game: ScheduledGame) -> Dictionary:
+	var out := {}
+	if career_player != "":
+		for side: String in [game.away, game.home]:
+			if (teams[side] as Team).player(career_player) != null:
+				out[career_player] = side
+		return out
+	if my_team != "" and game.involves(my_team) and history == null:
+		for p: Player in (teams[my_team] as Team).players:
+			out[p.id] = my_team
+	return out
 
 
 func _note_recent(id: String, line: BattingLine, on_day: int) -> void:
@@ -600,6 +646,8 @@ func play_regular_season() -> void:
 func postseason_format(d: int) -> Array[Postseason.Round]:
 	if history != null:
 		return history.postseason_format()
+	if school:
+		return SchoolLeague.playoff()
 	return Postseason.kbo() if d == 0 else Postseason.ladder()
 
 

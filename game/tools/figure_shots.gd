@@ -5,7 +5,7 @@ extends SceneTree
 ##
 ##   ./dev tool-win figure_shots build/figure/now [--build standard] [--team 22] [--away]
 ##       [--headgear cap|helmet|none] [--height 1.83] [--views 0,35,90,180] [--pose standing|stance|ready]
-##       [--player 3] [--bare] [--veins 0..1] [--umpire plate|base] [--sleeves] [--socks] [--guards] [--zoom head|top|arm|legs]
+##       [--player 3] [--mirror] [--bare] [--veins 0..1] [--umpire plate|base] [--sleeves] [--socks] [--guards] [--zoom head|top|arm|legs]
 ##
 ## --bare hides the cap and lettering details (the body and plain uniform alone).
 
@@ -117,6 +117,9 @@ func _build() -> void:
 		puppet.position = Vector3((i - (views.size() - 1) * 0.5) * spacing, 0.0, 0.0)
 		# The figure faces away from the camera at rest.
 		puppet.rotation.y = PI + deg_to_rad(views[i])
+		# A left-hander is drawn as his own mirror image (--mirror).
+		if _args.has("mirror"):
+			puppet.scale.x = -1.0
 
 	var camera := Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL

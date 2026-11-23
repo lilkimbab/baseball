@@ -28,5 +28,6 @@ static func load_file(path: String) -> Dictionary[StringName, PitchType]:
 		t.tilt_deg = entry.get("tilt_deg", 0.0)
 		t.ssw_accel = entry.get("ssw_accel", 0.0)
 		t.ssw_deg = entry.get("ssw_deg", 0.0)
+		t.knuckle = float(entry.get("knuckle", 0.0))
 		out[t.id] = t
 	return out

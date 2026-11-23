@@ -35,7 +35,10 @@ func _init() -> void:
 	# Variants to try against a real season (tools/season_check.gd --roster).
 	RosterBuilder.by_playing_time = not args.has("league-prior")
 	RosterBuilder.contact_from_k = float(str(args.get("contact-from-k", RosterBuilder.CONTACT_FROM_K)))
-	var teams := RosterBuilder.build(tables[0], tables[1], tables[2], tables[3], LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), RosterIO.load_names())
+	# Optional: each pitcher's real pitches (tools/kbo/pitch_mix.py).
+	var pitches := read_csv(dir.path_join("pitches.csv"))
+	var splits := read_csv(dir.path_join("splits.csv"))
+	var teams := RosterBuilder.build(tables[0], tables[1], tables[2], tables[3], LeagueEnvIO.load_default(), PitchCatalogIO.load_default(), RosterIO.load_names(), pitches, splits)
 	DirAccess.make_dir_recursive_absolute(out.get_base_dir())
 	var err := RosterIO.save_pack(out, str(args.get("id", out.get_file().get_basename())), str(args.get("name", "")), int(str(args.get("season", "2025"))), teams)
 	var count := 0

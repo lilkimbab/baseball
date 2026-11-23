@@ -160,10 +160,12 @@ static func apply(season: Season, team: Team, m: Move) -> bool:
 ## The weekly moves of the computer clubs (not the player's).
 static func weekly(season: Season) -> void:
 	for team_id: String in season.teams:
-		if team_id == season.my_team:
+		if team_id == season.my_team and season.career_player == "":
 			continue
 		var team: Team = season.teams[team_id]
 		for m: Move in advice(season, team):
+			if season.career_player != "" and ((m.up != null and m.up.id == season.career_player) or (m.down != null and m.down.id == season.career_player)):
+				continue
 			apply(season, team, m)
 
 
@@ -192,6 +194,9 @@ static func refill(season: Season, team: Team) -> void:
 				short_kind = kind
 		var best: Player = null
 		for p: Player in team.second_team():
+			# (A career's own player goes up only by his manager's judgement: CareerSeason.)
+			if p.id == season.career_player or season.injuries.is_out(p.id):
+				continue
 			if kind_of(p) != short_kind and short_by > 0:
 				continue
 			if p.origin != &"" and not _foreign_ok(team, p, p, season.rules):
@@ -201,6 +206,8 @@ static func refill(season: Season, team: Team) -> void:
 		if best == null and short_by > 0:
 			# Nobody of that kind: the best of any.
 			for p: Player in team.second_team():
+				if p.id == season.career_player or season.injuries.is_out(p.id):
+					continue
 				if best == null or _overall(season, p) > _overall(season, best):
 					best = p
 		if best == null:

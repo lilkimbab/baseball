@@ -22,6 +22,10 @@ var _ovr: Overall
 func _draw() -> void:
 	if scene == null or scene.game == null:
 		return
+	# Before the first pitch the broadcast has the screen (the match-up, the line-ups): no
+	# batter's card under it (the user: "첫 타석" showed under the line-up).
+	if scene.pregame_showing() or scene.post_game_showing():
+		return
 	begin()
 	if _ovr == null:
 		_ovr = LeagueEnvIO.load_overall()

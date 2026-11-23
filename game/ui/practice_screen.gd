@@ -8,9 +8,9 @@ const FIELD := "res://match/duel.tscn"
 ## What the pitcher throws in batting practice: every pitch, or one family.
 const MIXES := {
 	"all": [],
-	"fast": [&"four_seam", &"two_seam", &"cutter"],
-	"breaking": [&"slider", &"curve", &"sweeper"],
-	"offspeed": [&"changeup", &"splitter"],
+	"fast": [&"four_seam", &"two_seam", &"sinker", &"cutter"],
+	"breaking": [&"slider", &"curve", &"sweeper", &"knuckle_curve", &"slurve"],
+	"offspeed": [&"changeup", &"circle_change", &"splitter", &"forkball", &"screwball", &"knuckleball"],
 }
 
 static var mode := "bat"

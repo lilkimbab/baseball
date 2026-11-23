@@ -81,6 +81,7 @@ func _initialize() -> void:
 	if _broadcast:
 		Engine.time_scale = 1.0
 	_scene.human_team = 0 if _highlight else (1 if _menus or _fielding or _manual else -1)
+	_scene.manual_always = _manual
 	_scene.innings = 3
 	_scene.seed_value = int(str(args.get("seed", "20261121")))
 	root.add_child(_scene)
@@ -110,6 +111,8 @@ func _process(_delta: float) -> bool:
 		return _manager_shots()
 	if _to_end:
 		if _scene.game.over and not _taken.has("postgame"):
+			if _scene.profile_lines.is_empty():
+				_scene.profile_lines = PackedStringArray(["승리 +195P  (올스타 ×1.3)", "목표 달성: 안타 3개 +40P", "업적: 첫 홈런 +100P", "레벨 업! Lv.4  +120P"])
 			_shoot("postgame")
 		return _taken.has("postgame") and _due.is_empty()
 	if _scene.state == DuelScene.State.LIVE and _scene.duel.phase == PitchDuel.Phase.FLIGHT and not _taken.has("pitch"):
@@ -397,7 +400,8 @@ func _broadcast_shots() -> bool:
 		var names := {Broadcast.Kind.PREGAME: "pregame", Broadcast.Kind.HALF: "half", Broadcast.Kind.BATTER: "batter", Broadcast.Kind.PITCHER_CHANGE: "pitcher", Broadcast.Kind.REPLAY: "replay", Broadcast.Kind.GAME_END: "end"}
 		var name: String = names[c.kind]
 		if c.kind == Broadcast.Kind.PREGAME:
-			for at: float in [2.5, 6.2, 9.4]:
+			# The match-up, the starter, each club's line-up building on the field (and done).
+			for at: float in [2.5, 6.2, 9.4, 13.8, 19.5]:
 				var tag := "pregame_%.0f" % at
 				if b.time >= at and not _taken.has(tag):
 					_shoot(tag)
@@ -415,6 +419,9 @@ func _broadcast_shots() -> bool:
 			done += 1
 	if _scene.game.over and _scene.broadcast.current == null and _taken.has("end"):
 		if not _taken.has("postgame"):
+			# (A tool's game pays nothing: sample lines, to see the earnings laid out.)
+			if _scene.profile_lines.is_empty():
+				_scene.profile_lines = PackedStringArray(["승리 +195P  (올스타 ×1.3)", "목표 달성: 안타 3개 +40P", "업적: 첫 홈런 +100P", "레벨 업! Lv.4  +120P"])
 			_shoot("postgame")
 		return _due.is_empty()
 	return false

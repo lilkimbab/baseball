@@ -15,6 +15,8 @@ extends RefCounted
 ## other club; the home side flips from one cycle to the next.
 
 const LENGTHS: Array[int] = [36, 72, 144]
+## The empty place in a circle of an odd number of clubs.
+const BYE := "_bye"
 const GAME_DAYS_PER_WEEK := 6
 
 var team_ids := PackedStringArray()
@@ -28,8 +30,17 @@ static func make(ids: PackedStringArray, games_per_team: int, rng: Rng) -> Sched
 	var s := Schedule.new()
 	s.team_ids = ids
 	var n := ids.size()
-	if n < 2 or n % 2 != 0:
-		push_error("Schedule: needs an even number of clubs, got %d" % n)
+	if n < 2:
+		push_error("Schedule: needs two clubs at least, got %d" % n)
+		return s
+	# An odd number (a high-school league): one more place in the circle, a bye; the games
+	# against it are not played.
+	if n % 2 != 0:
+		var with_bye := ids.duplicate()
+		with_bye.append(BYE)
+		var full := make(with_bye, games_per_team, rng)
+		s.games = full.games.filter(func(g: ScheduledGame) -> bool: return not g.involves(BYE))
+		s.days = full.days
 		return s
 	var meetings := games_per_team / (n - 1)
 	var cycles := series_lengths(meetings / 2)

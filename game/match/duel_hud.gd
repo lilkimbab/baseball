@@ -273,7 +273,14 @@ func _draw_pitch_readout() -> void:
 		return
 	if not _visible(duel.pitch.plate_pos):
 		return
-	var at := _screen(duel.pitch.plate_pos)
+	# Beside where it crossed, on the side away from the plate's middle: on the spot itself it
+	# covered the catcher's mitt as he took the ball (the user, 2026-11-23: "the catch does not
+	# feel like a catch").
+	var spot := _screen(duel.pitch.plate_pos)
+	var middle := _screen(Vector3(0.0, Field.PLATE_FRONT_Y, (duel.zone.bottom + duel.zone.top) * 0.5))
+	var out := 1.0 if spot.x >= middle.x else -1.0
+	var at := spot + Vector2(out * 96.0, -46.0)
+	draw_line(spot + Vector2(out * 14.0, -7.0), at - Vector2(out * 26.0, -12.0), Color(1.0, 1.0, 1.0, 0.35), 1.5, true)
 	draw_circle(at, 26.0, Color(0.05, 0.05, 0.08, 0.8))
 	draw_arc(at, 26.0, 0.0, TAU, 32, INK, 2.0, true)
 	figure(at + Vector2(-26.0, 6.0), "%d" % roundi(duel.pitch.release_speed_kmh()), 27, INK, HORIZONTAL_ALIGNMENT_CENTER, 52.0, true)

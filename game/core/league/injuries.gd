@@ -62,7 +62,7 @@ func injure(team: Team, p: Player, days: int, cause: String) -> void:
 
 ## A game's draws: each man who played, his wear; each man hit by a pitch, the pitch. Returns
 ## [team id, player id, days, cause] of each hurt.
-func note_game(season: Season, book: StatBook, rng: Rng) -> Array:
+func note_game(season: Season, book: StatBook, rng: Rng, state: GameState = null) -> Array:
 	var hurt: Array = []
 	for side: String in [season_team_of(season, book, 0), season_team_of(season, book, 1)]:
 		if side == "":
@@ -74,7 +74,17 @@ func note_game(season: Season, book: StatBook, rng: Rng) -> Array:
 			var cause := ""
 			var bat: BattingLine = book.batting.get(p.id)
 			var pitch: PitchingLine = book.pitching.get(p.id)
-			if bat != null and bat.hit_by_pitch > 0 and rng.chance(1.0 - pow(1.0 - HBP, bat.hit_by_pitch)):
+			# Hurt during the game on screen: as it happened.
+			if state != null and state.injured.has(p.id):
+				var entry: Array = state.injured[p.id]
+				injure(team, p, int(entry[0]), str(entry[1]))
+				hurt.append([side, p.id, int(entry[0]), str(entry[1])])
+				continue
+			if state != null and state.scene_rolls and bat != null and bat.hit_by_pitch > 0:
+				pass
+			elif state != null and state.head_hits.has(p.id) and rng.chance(HEAD):
+				cause = "head"
+			elif bat != null and bat.hit_by_pitch > 0 and rng.chance(1.0 - pow(1.0 - HBP, bat.hit_by_pitch)):
 				cause = "hbp"
 			elif bat != null and bat.pa > 0 and not p.is_pitcher() and rng.chance(WEAR_HITTER):
 				cause = "wear"

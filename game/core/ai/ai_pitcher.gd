@@ -35,6 +35,8 @@ class Option:
 	var type: PitchType
 	var usage := 0.0
 	var command := 50.0
+	## His share of it by the count ([even, ahead, behind]; ArsenalPitch.by_count), or empty.
+	var by_count := PackedFloat32Array()
 
 
 ## What he threw last, to avoid a third identical pitch in a row.
@@ -75,6 +77,7 @@ static func options_for(pitcher: Player, catalog: Dictionary[StringName, PitchTy
 		o.type = t
 		o.usage = a.usage
 		o.command = a.command
+		o.by_count = a.by_count
 		out.append(o)
 	return out
 
@@ -86,9 +89,14 @@ static func decide(options: Array[Option], zone: StrikeZone, balls: int, strikes
 	var weights := PackedFloat64Array()
 	var behind := balls >= 2 and balls > strikes
 	var ahead := strikes == 2 and balls <= 1
+	# His own mix for this count where the pitch table has it (queue stage 3); otherwise the
+	# usual lean: more fastballs behind, more breaking balls with two strikes.
+	var count_bucket := 1 if strikes > balls else (2 if balls > strikes else 0)
 	for o: Option in options:
 		var w := o.usage
-		if behind and o.type.family == &"fastball":
+		if o.by_count.size() == 3:
+			w = o.by_count[count_bucket]
+		elif behind and o.type.family == &"fastball":
 			w *= BEHIND_FASTBALL
 		elif ahead and o.type.family != &"fastball":
 			w *= AHEAD_BREAKING

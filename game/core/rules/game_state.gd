@@ -23,6 +23,18 @@ var line: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
 var order := PackedInt32Array([0, 0])
 ## Pitches thrown and batters faced per pitcher.
 var pitch_counts: Dictionary[String, int] = {}
+## The plate umpire has warned both benches (KBO: a fastball at the head, or a pitch thrown at a
+## batter); after it a pitch thrown at a batter sends the pitcher off.
+var warned := false
+## How heated the game is: one for each batter hit (the bench-clearing cutscene, later).
+var heat := 0
+## Batters hit in the head (Injuries: a worse chance of being hurt).
+var head_hits := PackedStringArray()
+## Hurt in this game (the scene rolls it as it happens: a batter hit by a pitch, a dive):
+## id -> [days, cause]; the season puts them on the injured list (Injuries.note_game).
+var injured: Dictionary[String, Array] = {}
+## The scene rolled the hit batters' injuries itself (the season does not roll them again).
+var scene_rolls := false
 ## The bullpen (docs/08 R4): how warm each reliever is (0 cold, 1 ready to pitch) by team, who
 ## is throwing out there now (at most MAX_WARMING a side), and how warm each pitcher was when
 ## he came into the game (a starter is ready).

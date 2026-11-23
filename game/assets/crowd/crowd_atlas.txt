@@ -1,6 +1,9 @@
-people 13
-poses seated seated_lean seated_arms clapping standing standing_clap cheering cheer_one
-columns 8
-rows 13
+cheer_scale 1.25
+people 15
+fans 13
+poses seated seated_lean seated_arms clapping standing standing_clap cheering cheer_one eating drinking phone sticks_up sticks_hit towel
+columns 16
+rows 27
 frame 128 256
 height_m 2.00
+views 2

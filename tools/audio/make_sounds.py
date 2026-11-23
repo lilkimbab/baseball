@@ -583,6 +583,143 @@ def music_sounds():
     write("music/menu", stereo, peak=0.6)
 
 
+# --- Batter songs -----------------------------------------------------------------------
+# A KBO park's cheering section plays each batter his own song: a trumpet's tune the crowd
+# sings along to, a bass drum on every beat, thunder sticks, and the crowd's shout in the gaps.
+# These are the game's own tunes (written here, like nothing in particular); a man's real song
+# can be put in content-local/audio/chants/players/<id>.ogg and is played instead.
+
+## The crowd's beat (Crowd.BEATS_PER_SECOND 2.1 a second): the songs keep to the stands' movement.
+SONG_BPM = 126
+SONG_BEATS = 32
+## Each song: its four eight-beat phrases ("note:beats", "r" a rest) and the beats where the
+## crowd shouts ("hey") or calls ("oh").
+SONGS = [
+    (["E5:1 E5:.5 G5:.5 C6:1 G5:1 A5:.5 G5:.5 E5:1 D5:2", "E5:1 E5:.5 G5:.5 C6:1 G5:1 A5:.5 B5:.5 C6:1 G5:2",
+      "G5:.5 G5:.5 A5:1 r:2 G5:.5 G5:.5 E5:1 r:2", "C5:.5 E5:.5 G5:.5 C6:.5 D6:1 B5:1 C6:2 r:2"],
+     {"hey": [18, 19, 22, 23], "oh": [30]}),
+    (["D5:.5 G5:.5 G5:.5 A5:.5 B5:1 G5:1 D5:.5 E5:.5 G5:1 r:2", "D5:.5 G5:.5 G5:.5 A5:.5 B5:1 D6:1 C6:.5 B5:.5 A5:1 r:2",
+      "B5:1 B5:1 C6:.5 B5:.5 A5:1 G5:1 A5:1 B5:2", "D6:1 B5:1 G5:1 A5:1 B5:.5 A5:.5 G5:1 r:2"],
+     {"hey": [6, 7, 14, 15], "oh": [30]}),
+    (["A4:.5 A4:.5 C5:.5 E5:.5 A5:1 G5:.5 E5:.5 F5:1 E5:1 r:2", "A4:.5 A4:.5 C5:.5 E5:.5 A5:1 G5:.5 E5:.5 D5:1 E5:1 r:2",
+      "F5:1 F5:.5 E5:.5 D5:1 E5:1 F5:1 G5:1 A5:2", "A5:.5 G5:.5 E5:1 G5:.5 F5:.5 D5:1 E5:2 r:2"],
+     {"hey": [6, 7, 14, 15, 31], "oh": [30]}),
+    (["C5:1 F5:1.5 G5:.5 A5:1 C6:1 A5:1 G5:2", "C5:1 F5:1.5 G5:.5 A5:1 C6:1 D6:1 C6:2",
+      "D6:1 C6:1 A5:1 F5:1 G5:1 A5:.5 G5:.5 F5:2", "r:1 C5:.5 C5:.5 F5:1 r:1 C5:.5 C5:.5 F5:1 r:2"],
+     {"hey": [24, 28, 30, 31], "oh": []}),
+    (["D5:.5 F#5:.5 A5:.5 F#5:.5 D5:.5 F#5:.5 A5:1 B5:.5 A5:.5 F#5:.5 E5:.5 D5:1 r:1",
+      "D5:.5 F#5:.5 A5:.5 F#5:.5 D5:.5 F#5:.5 A5:1 D6:.5 C#6:.5 B5:.5 C#6:.5 D6:1 r:1",
+      "E5:1 r:1 E5:1 r:1 F#5:.5 G5:.5 A5:.5 B5:.5 A5:2", "D6:.5 D6:.5 D6:1 A5:.5 A5:.5 A5:1 F#5:.5 E5:.5 D5:1 r:2"],
+     {"hey": [7, 15, 17, 19, 31], "oh": [30]}),
+    (["E5:1 E5:1 G5:1 E5:1 B5:1.5 A5:.5 G5:2", "E5:1 E5:1 G5:1 E5:1 D5:1.5 E5:.5 F#5:1 r:1",
+      "G5:.5 G5:.5 G5:1 A5:.5 A5:.5 A5:1 B5:.5 B5:.5 B5:1 r:2", "E6:1 D6:1 B5:1 A5:1 G5:1 F#5:1 E5:2"],
+     {"hey": [15, 22, 23], "oh": [30]}),
+]
+
+
+def song_notes(phrases):
+    """The phrases' notes as [(beat, beats, note)]."""
+    out = []
+    b = 0.0
+    for phrase in phrases:
+        start = b
+        for tok in phrase.split():
+            name, length = tok.split(":")
+            length = float(length)
+            if name != "r":
+                out.append((b, length, name))
+            b += length
+        assert abs(b - start - 8.0) < 1e-6, "a phrase is eight beats: " + phrase
+    return out
+
+
+def octave_down(name):
+    return name[:-1] + str(int(name[-1]) - 1)
+
+
+def crowd_sing(freq, seconds, vowel="o", voices=14):
+    """A crowd singing one note: many voices a little out of tune and out of time, a buzz
+    through the vowel's formants. Returns frames x 2."""
+    n = int(seconds * SR)
+    t = np.arange(n) / SR
+    out = np.zeros((n, 2))
+    for v in range(voices):
+        f = freq * 2 ** (RNG.normal(0.0, 0.22) / 12.0)
+        vib = 1 + 0.006 * np.sin(2 * np.pi * RNG.uniform(4.5, 6.5) * t + RNG.uniform(0, 6))
+        phase = 2 * np.pi * np.cumsum(f * vib) / SR
+        buzz = sum(np.sin(k * phase) / k for k in range(1, 12))
+        shift = RNG.uniform(0.9, 1.15)
+        peaks = [(fq * shift, w * 1.5, g) for fq, w, g in VOWELS[vowel]]
+        voice = formants(buzz + 0.2 * RNG.standard_normal(n), peaks)
+        lag = RNG.uniform(0.0, 0.045)
+        voice *= np.clip((t - lag) / 0.06, 0, 1) * np.clip((seconds - t) / 0.08, 0, 1)
+        pan = RNG.uniform(0.1, 0.9)
+        g = RNG.uniform(0.5, 1.0)
+        out[:, 0] += voice * g * np.sqrt(1 - pan)
+        out[:, 1] += voice * g * np.sqrt(pan)
+    return out
+
+
+def stereo(x):
+    return np.stack([x, x], axis=1) if x.ndim == 1 else x
+
+
+def place(x, seconds, total):
+    """A sound (mono or stereo) at `seconds` into a stereo track `total` long."""
+    x = stereo(x)
+    out = np.zeros((int(total * SR), 2))
+    i = int(seconds * SR)
+    j = min(i + len(x), len(out))
+    if i < len(out):
+        out[i:j] += x[: j - i]
+    return out
+
+
+def batter_song(phrases, calls):
+    """One song, exactly SONG_BEATS long so it loops on the beat (what rings past the end is
+    folded back onto the start)."""
+    beat = 60.0 / SONG_BPM
+    loop = SONG_BEATS * beat
+    total = loop + 1.6
+    notes = song_notes(phrases)
+    lead = sequence(notes, SONG_BPM, brass, total)
+    low = sequence([(b, l, octave_down(nm)) for b, l, nm in notes], SONG_BPM, brass, total)
+    # Every part set against the trumpet's peak: the crowd's singing nearly as loud, the drum
+    # under it, the sticks and the shouts.
+    ref = np.max(np.abs(lead))
+
+    def level(x, share):
+        return x * (share * ref / max(np.max(np.abs(x)), 1e-9))
+
+    track = stereo(lead + level(low, 0.3))
+    sing = np.zeros((int(total * SR), 2))
+    for b, l, nm in notes:
+        sing += place(crowd_sing(hz(octave_down(nm)), l * beat * 0.95), b * beat, total)
+    track += level(sing, 0.8)
+    bass_drum = level(kick(), 0.7)
+    sticks = level(thunder_sticks(), 0.35)
+    drum_hi = level(tom(), 0.45)
+    for k in range(SONG_BEATS):
+        track += place(bass_drum, k * beat, total)
+        track += place(sticks, k * beat + 0.01, total)
+        if k % 8 in (3, 7):
+            track += place(drum_hi, (k + 0.5) * beat, total)
+    for b in calls.get("hey", []):
+        track += place(level(chant_hey(60), 0.9), b * beat, total)
+    for b in calls.get("oh", []):
+        track += place(level(chant_oh(60), 0.9), b * beat, total)
+    n = int(loop * SR)
+    out = track[:n].copy()
+    tail = track[n:]
+    out[: len(tail)] += tail
+    return out
+
+
+def song_sounds():
+    for i, (phrases, calls) in enumerate(SONGS):
+        write("cheer/song_%d" % (i + 1), batter_song(phrases, calls), peak=0.7, quality=3)
+
+
 # --- All --------------------------------------------------------------------------------
 
 def main():
@@ -627,6 +764,8 @@ def main():
         cheer_sounds()
     if only is None or "music" in only:
         music_sounds()
+    if only is None or "songs" in only:
+        song_sounds()
     total = sum(os.path.getsize(p) for p in WRITTEN)
     print("make_sounds: %d files, %.1f MB in %s" % (len(WRITTEN), total / 1e6, OUT))
 

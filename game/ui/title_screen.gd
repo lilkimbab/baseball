@@ -12,6 +12,11 @@ func setup() -> void:
 
 
 func _ready() -> void:
+	# A tool's window is opened so that it cannot take the keyboard (./dev tool-win); should
+	# the game itself ever be started in that moment, its window is put right.
+	if not Profile.tool_run() and DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS):
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, false)
+		get_window().grab_focus()
 	# Saves and settings from before the game was called Moneyball.
 	UserData.carry_over()
 	Settings.ensure_loaded()

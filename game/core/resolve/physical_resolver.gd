@@ -40,6 +40,8 @@ var tactics: Array[Tactics] = [Tactics.new(), Tactics.new()]
 
 ## The last pitch and play, for the scene and the checks.
 var last_duel: PitchDuel
+## The umpire's call on the last pitch for the screen ("헤드샷 퇴장", "경고: 위협구"), or "".
+var last_call := ""
 var last_play: PlayResult
 ## What the last ball in play was worked out from (the fielders where they stood).
 var last_context: PlayContext
@@ -431,6 +433,36 @@ func new_duel(state: GameState) -> PitchDuel:
 	return last_duel
 
 
+## The KBO's rules on pitches at batters (since 2014; rules 6.02(c)(9)): a fastball that hits
+## a batter's head, or grazes it, sends the pitcher off whatever he meant; a fastball at the
+## head that misses is a warning to both benches; a pitch thrown at a batter is a warning, and
+## after a warning sends the pitcher off. A breaking ball to the head is a warning.
+func _beanball_rules(state: GameState, duel: PitchDuel) -> void:
+	last_call = ""
+	if duel.decision == null:
+		return
+	var fastball := duel.decision.type.family == &"fastball"
+	var hit := duel.result == PitchDuel.Result.HIT_BY_PITCH
+	var pitcher := state.pitcher_id()
+	if hit:
+		state.heat += 1
+	if hit and duel.head_hit:
+		state.head_hits.append(state.batter_id())
+	if hit and duel.head_hit and fastball:
+		manager.ejected[pitcher] = true
+		last_call = "헤드샷 퇴장"
+	elif hit and duel.aimed_at_body:
+		if state.warned:
+			manager.ejected[pitcher] = true
+			last_call = "빈볼 퇴장"
+		else:
+			state.warned = true
+			last_call = "경고: 빈볼"
+	elif (duel.near_head or duel.head_hit) and not state.warned:
+		state.warned = true
+		last_call = "경고: 위협구"
+
+
 ## A tired pitcher also loses a little speed (about 2.5 km/h at the end of his limit).
 func tire(state: GameState, decision: PitchDecision) -> PitchDecision:
 	decision.effort *= 1.0 - 0.017 * _tiredness(state)
@@ -457,6 +489,7 @@ func _tiredness(state: GameState) -> float:
 func after_pitch(state: GameState, duel: PitchDuel) -> Array[GameEvent]:
 	if tally != null:
 		tally.add(state, duel)
+	_beanball_rules(state, duel)
 	_pitch_in_pa += 1
 	var events: Array[GameEvent] = []
 	var strike_three := state.strikes == 2

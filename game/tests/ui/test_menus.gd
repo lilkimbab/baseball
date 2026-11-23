@@ -181,9 +181,14 @@ func test_the_career_screen_builds_every_tab() -> void:
 	spec.skin = rules.skins[1]
 	spec.hair = rules.hairs[0]
 	spec.beard = rules.beards[0]
-	var clubs := RosterIO.load_pack(LeagueSession.PACK)
-	CareerSession.start(PlayerCreator.create(spec, rules, PitchCatalogIO.load_default()), clubs[24].id, 36, 9)
+	var clubs := LeagueSession.league_clubs()
+	CareerSession.start(PlayerCreator.create(spec, rules, PitchCatalogIO.load_default()), clubs[4].id, 36, 9)
 	CareerSession.slot = "menu_test"
+	# (The futures league has days off: to a day with his game.)
+	var guard := 0
+	while not CareerSession.career_season.has_game() and guard < 10:
+		CareerSession.career_season.next_day()
+		guard += 1
 	var screen := (load(CareerSession.HUB) as PackedScene).instantiate() as CareerScreen
 	add_child_autofree(screen)
 	for tab: String in ["home", "growth", "table"]:

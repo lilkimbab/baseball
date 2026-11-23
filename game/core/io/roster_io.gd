@@ -139,6 +139,7 @@ static func player_from(entry: Dictionary) -> Player:
 			pitch.movement = a.get("movement", 50.0)
 			pitch.command = a.get("command", 50.0)
 			pitch.usage = a.get("usage", 0.25)
+			pitch.by_count = PackedFloat32Array(a.get("by_count", []) as Array)
 			p.pitching.arsenal.append(pitch)
 	var forms: Dictionary = entry.get("forms", {})
 	for key: String in forms:
@@ -173,7 +174,7 @@ static func player_to(p: Player, exact: bool = false) -> Dictionary:
 	if p.pitching != null:
 		var arsenal: Array = []
 		for a: ArsenalPitch in p.pitching.arsenal:
-			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.000001 if exact else 0.1), "velo_max": snappedf(a.velo_max, 0.000001 if exact else 0.1), "movement": r.call(a.movement), "command": r.call(a.command), "usage": snappedf(a.usage, 0.000001 if exact else 0.01)})
+			arsenal.append({"type": String(a.type), "velo_avg": snappedf(a.velo_avg, 0.000001 if exact else 0.1), "velo_max": snappedf(a.velo_max, 0.000001 if exact else 0.1), "movement": r.call(a.movement), "command": r.call(a.command), "usage": snappedf(a.usage, 0.000001 if exact else 0.01), "by_count": Array(a.by_count).map(func(x: float) -> float: return snappedf(x, 0.0001))})
 		d["pitching"] = {"stamina": r.call(p.pitching.stamina), "control": r.call(p.pitching.control), "composure": r.call(p.pitching.composure), "hold": r.call(p.pitching.hold), "fielding": r.call(p.pitching.fielding), "arsenal": arsenal}
 	return d
 

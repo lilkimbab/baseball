@@ -16,6 +16,16 @@ FFMPEG="${FFMPEG:-$ROOT/.tools/ffmpeg/node_modules/ffmpeg-static/ffmpeg}"
 
 win_game_path() { wslpath -w "$GAME"; }
 
+# A tool's window on Windows must not take the keyboard or the pointer: the person may be
+# playing the game while a tool photographs something, and a window that came to the front
+# took his keys and mouse from it. The engine reads override.cfg beside project.godot when it
+# starts: there for a tool's start only (the game itself undoes the setting if it is ever
+# started in that moment: TitleScreen), and the window is opened off the desktop.
+quiet_window_on() {
+  printf '[display]\n\nwindow/size/no_focus=true\n' > "$GAME/override.cfg"
+  ( sleep 8; rm -f "$GAME/override.cfg" ) >/dev/null 2>&1 &
+}
+
 cmd="${1:-help}"
 [ $# -gt 0 ] && shift
 
@@ -183,6 +193,10 @@ case "$cmd" in
     fi
     for season in $seasons; do
       python3 -I "$ROOT/tools/kbo/kaggle_to_tables.py" "$season" | tail -1
+      # Each pitcher's real pitches where the local pitch tables have the season (2023 on).
+      if [ -f "$ROOT/content-local/raw/kbo-pbp/kbo_pbp_$season.parquet" ]; then
+        "$ROOT/.tools/pyenv/bin/python" -I "$ROOT/tools/kbo/pitch_mix.py" "$season" | tail -1
+      fi
       "$GODOT" --headless --path "$GAME" --script res://tools/build_roster.gd -- --in "../content-local/raw/kbo-$season" \
         --out "../content-local/rosters/kbo-$season.json" --id "kbo-$season" --name "$season 시즌" --season "$season" 2>&1 | grep -E "build_roster|ERROR" || true
       pack="--season kbo-$season"
@@ -192,7 +206,7 @@ case "$cmd" in
     done
     ;;
   audio)
-    # ./dev audio [sfx,crowd,cheer,music]   Makes the game's own sounds (tools/audio/make_sounds.py)
+    # ./dev audio [sfx,crowd,cheer,music,songs]   Makes the game's own sounds (tools/audio/make_sounds.py)
     # into game/audio/ with Blender's Python (numpy) and ffmpeg (Vorbis).
     py="$(ls "$ROOT"/.tools/blender-*/[0-9]*/python/bin/python3* | head -1)"
     ff="$ROOT/.tools/ffmpeg/node_modules/ffmpeg-static/ffmpeg"
@@ -253,7 +267,9 @@ case "$cmd" in
   perf)
     # ./dev perf [--scene res://x.tscn] [--seconds 5]   Frame-rate probe on Windows, vsync off.
     # The sound is mixed but not played aloud (SOUND=1 to hear it).
-    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --disable-vsync --resolution 1920x1080 $( [ "${SOUND:-0}" = 1 ] || echo --audio-driver Dummy ) \
+    # Off the desktop and without focus, like the other tool windows (the user may be playing).
+    quiet_window_on
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --disable-vsync --resolution 1920x1080 --position 30000,30000 $( [ "${SOUND:-0}" = 1 ] || echo --audio-driver Dummy ) \
       --script res://tools/perf_probe.gd -- "$@"
     ;;
   video)
@@ -278,9 +294,10 @@ case "$cmd" in
     tool="$1"; out="$2"; shift 2
     mkdir -p "$(dirname "$ROOT/$out")"
     # Tools are quiet (they run while nobody listens): the sound is mixed but not played.
-    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution "${RES:-1280x720}" --audio-driver Dummy \
+    quiet_window_on
+    "$GODOT_WIN_CONSOLE" --path "$(win_game_path)" --resolution "${RES:-1280x720}" --position 30000,30000 --audio-driver Dummy \
       --script "res://tools/$tool.gd" -- --out "$(wslpath -w "$ROOT/$(dirname "$out")")\\$(basename "$out")" "$@" 2>&1 \
-      | grep -E "^[a-z_]+:|ERROR|SCRIPT" || true
+      | grep -E "^[a-z_]+:|ERROR|SCRIPT|^   at: |GDScript backtrace|^ +\[[0-9]+\]" || true
     ;;
   shot-win)
     # ./dev shot-win [out.png] [res://scene.tscn]   GPU-rendered capture on Windows.

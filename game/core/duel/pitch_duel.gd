@@ -15,6 +15,8 @@ const FOUL_TIP_DEG := 12.0
 ## ...when the catcher holds on to it, as he usually does.
 const FOUL_TIP_HELD := 0.75
 
+## Tools only (scene_probe): a ball met is sent off at (speed m/s, launch °, spray °).
+var probe_launch := Vector3.ZERO
 var cfg: PhysicsConfig
 var field: CollisionProvider
 var settings: DuelSettings
@@ -59,6 +61,13 @@ func _init(config: PhysicsConfig, collision: CollisionProvider, duel_settings: D
 ## exact = true to put the pitch precisely on its target (tests, practice mode).
 func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 	decision = choice
+	head_hit = false
+	near_head = false
+	# Aimed at the batter himself (a person's pitch: the computer never does): his body's
+	# column, from the ankles to the top of his head.
+	var side := 1.0 if settings.bats_left else -1.0
+	aimed_at_body = choice.by_hand and absf(choice.target.x - side * settings.body_offset) < settings.body_radius + 0.08 \
+		and choice.target.z >= settings.body_ankle and choice.target.z <= settings.batter_height + 0.05
 	var actual := choice.target
 	if not exact:
 		var quality := clampf(choice.quality, 0.0, 1.0)
@@ -78,6 +87,12 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 	ball.vel = pitch.release_vel
 	ball.spin = pitch.spin
 	ball.ssw = pitch.ssw
+	_flutter_base = pitch.ssw
+	_flutter = Vector4.ZERO
+	if type.knuckle > 0.0:
+		# A knuckleball: its own wobble, two ways at two speeds (the pitcher cannot say where).
+		_flutter = Vector4(_rng.next_range(4.0, 9.0), _rng.next_range(0.0, TAU), _rng.next_range(3.0, 8.0), _rng.next_range(0.0, TAU))
+		_flutter_size = type.knuckle * _rng.next_range(0.6, 1.2)
 	ideal_contact_time = pitch.contact_time
 	ideal_contact_pos = pitch.contact_pos
 	swing = null
@@ -96,6 +111,21 @@ func throw_pitch(choice: PitchDecision, exact: bool = false) -> void:
 ## perfect pitch still missed by 12 cm on average and one a moment late by 22, and aiming
 ## felt like it did nothing.)
 const PLAYER_BEST := 0.15
+## A knuckleball's flutter this pitch: the frequencies and phases across and up (x, y, z, w),
+## its size, and the push it had before (the seam-shifted wake, none for a knuckleball).
+var _flutter := Vector4.ZERO
+var _flutter_size := 0.0
+var _flutter_base := Vector3.ZERO
+## This pitch: aimed at the batter's body (by a person), it came near his head, it hit his head.
+var aimed_at_body := false
+var near_head := false
+var head_hit := false
+## The head as a ball this big over the shoulders; a pitch passing within NEAR_HEAD of its
+## middle came at his head.
+const HEAD_RADIUS := 0.12
+const NEAR_HEAD := 0.3
+
+
 ## A reliever not yet ready misses this much more (times how cold he is).
 const COLD_SCATTER := 0.9
 const PLAYER_WORST := 2.0
@@ -146,6 +176,8 @@ func tick(dt: float) -> void:
 
 
 func _tick_flight(dt: float) -> void:
+	if _flutter != Vector4.ZERO and not ball.batted:
+		ball.ssw = _flutter_base + Vector3(sin(_flutter.x * time + _flutter.y), 0.0, sin(_flutter.z * time + _flutter.w)) * _flutter_size
 	var hit := ball.advance(dt, field)
 	if hit != null and hit.normal.z > 0.5:
 		bounced = true
@@ -192,13 +224,24 @@ func _tick_in_play(dt: float) -> void:
 func _hits_batter() -> bool:
 	var side := 1.0 if settings.bats_left else -1.0
 	var centre := Vector2(side * settings.body_offset, StrikeZone.MID_PLANE_Y)
+	# His head, above the shoulders: the pitch that comes nearest it is noted (a warning), one
+	# that reaches it is a hit to the head (KBO: a fastball there sends the pitcher off).
+	var head := Vector3(centre.x, centre.y, settings.batter_height - HEAD_RADIUS)
+	var to_head := Vector3(ball.pos.x, ball.pos.y, ball.pos.z).distance_to(head)
+	if to_head < NEAR_HEAD:
+		near_head = true
+	if to_head < HEAD_RADIUS + cfg.ball_radius:
+		head_hit = true
+		return true
 	if Vector2(ball.pos.x, ball.pos.y).distance_to(centre) > settings.body_radius + cfg.ball_radius:
 		return false
 	return ball.pos.z >= settings.body_ankle and ball.pos.z <= settings.batter_height * settings.body_shoulder_share
 
 
 ## A swing at it is a strike; a pitch in the zone is a strike; otherwise he takes his base,
-## unless he got out of the way.
+## unless he got out of the way — which he does from a pitch that got away, as often as he
+## can (settings.dodge), and never from one thrown at him (the user: "a pitch meant to hit him
+## hits him; one that slips toward his hip he gets out of the way of").
 func _hit_batter() -> void:
 	phase = Phase.DONE
 	if swing != null:
@@ -208,8 +251,9 @@ func _hit_batter() -> void:
 		result = Result.SWINGING_STRIKE
 	elif zone.is_strike(pitch):
 		result = Result.CALLED_STRIKE
-	elif settings.dodge > 0.0 and _rng.chance(settings.dodge):
+	elif not aimed_at_body and settings.dodge > 0.0 and _rng.chance(settings.dodge):
 		result = Result.BALL
+		head_hit = false
 	else:
 		result = Result.HIT_BY_PITCH
 	ball.vel = Vector3.ZERO
@@ -272,6 +316,11 @@ func _resolve_swing() -> void:
 	if not contact.made_contact:
 		swing.miss_reason = &"under" if offset_up > 0.0 else &"over"
 		return
+	if probe_launch != Vector3.ZERO:
+		# (Tools only: the scene probe's home run, to look at what follows one.)
+		var up := deg_to_rad(probe_launch.y)
+		var spray := deg_to_rad(probe_launch.z)
+		contact.velocity = Vector3(sin(spray) * cos(up), cos(spray) * cos(up), sin(up)) * probe_launch.x
 	if not bunt and contact.velocity.normalized().dot(incoming.normalized()) > cos(deg_to_rad(FOUL_TIP_DEG)) \
 			and _rng.chance(FOUL_TIP_HELD):
 		# Straight back into the mitt.

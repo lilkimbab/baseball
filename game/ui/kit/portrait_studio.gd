@@ -9,7 +9,7 @@ extends Node
 ##   PortraitStudio.request(self, player, team, func(face: Texture2D) -> void: table.set_portrait(row, face))
 
 ## Raise when the figure changes (face, uniform, framing), so old pictures are drawn again.
-const VERSION := 2
+const VERSION := 3
 const SIDE := 160
 ## Frames to let a figure dress itself and its textures settle before the picture is taken.
 const SETTLE := 3
@@ -91,7 +91,11 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if _current.is_empty():
 		if _queue.is_empty():
+			# Nothing to take: the figure is not drawn (a hidden viewport is not rendered —
+			# in a game it would cost a frame's share for nothing).
+			_stage.visible = false
 			return
+		_stage.visible = true
 		_current = _queue.pop_front()
 		if _cache.has(_current[0]):
 			_finish(_cache[_current[0]])

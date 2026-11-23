@@ -4,10 +4,16 @@ extends RefCounted
 ## his second-team games until he is called up, his first-team games after, and what each game
 ## earns him.
 ##
-## The second team plays the same days as the first, against the same club's second team.
-## Second teams are short of players, so each gets fillers made at second-team level (A). A
-## rookie is called up when his second-team numbers or his ratings are good enough for the
-## first team (CALL_UP_*), and sent back down if he is overmatched there.
+## In a league of the KBO's ten clubs (docs/08 R8-3) his second team plays in the futures
+## league (FarmLeague: twelve teams, north and south, on its own calendar). In an older league
+## of three divisions the second team plays the same days as the first, against the same
+## club's second team, made up with fillers at second-team level (A).
+##
+## Up and down are his manager's judgement on how he is playing (the user, 2026-11-23: "sent
+## down when he slumps or needs a rest, not too strictly; called up again when he plays well
+## in the second team"), not on his ratings: called up after a good run in his recent second-
+## team games (CALL_UP_*), not every time at once; sent down after a poor run in his recent
+## first-team games (DOWN_*).
 
 const FILLER_ROLES: Array[String] = ["SP", "SP", "SP", "RP", "RP", "RP", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"]
 ## Second-team talent below the division's first teams (as LeagueGenerator.FARM_GAP).
@@ -17,24 +23,31 @@ const FARM_GAP := 13.0
 ## first-teamer in his place after this many games. (Measured with tools/balance_report.gd: at
 ## 30 PA, .780 and five games a rookie was up on the fourth day, and the second team meant
 ## nothing; now a month or so, sooner for a hot start.)
-const CALL_UP_OPS := 0.85
-const CALL_UP_PA := 60
-const CALL_UP_ERA := 3.0
-const CALL_UP_OUTS_SP := 45
-const CALL_UP_OUTS_RP := 24
-const CALL_UP_GAP := 0.0
-const CALL_UP_MIN_GAMES := 20
-## Sent down: OPS under this over this many first-team plate appearances, or ERA over this
-## over this many outs.
-const DOWN_OPS := 0.45
-const DOWN_PA := 60
-const DOWN_ERA := 7.5
-const DOWN_OUTS := 45
+## Called up: over his last RECENT second-team games a hitter with this OPS in at least this
+## many plate appearances, a pitcher with this ERA in at least this many outs (starter,
+## reliever); then on each such day the call comes with CALL_CHANCE (a manager waits for the
+## right moment), and never in the first CALL_UP_MIN_GAMES second-team games of a season.
+const RECENT := 12
+const CALL_UP_OPS := 0.8
+const CALL_UP_PA := 30
+const CALL_UP_ERA := 3.5
+const CALL_UP_OUTS_SP := 27
+const CALL_UP_OUTS_RP := 12
+const CALL_CHANCE := 0.5
+const CALL_UP_MIN_GAMES := 8
+## Sent down: over his last RECENT first-team games OPS under this in at least this many
+## plate appearances, or ERA over this in at least this many outs.
+const DOWN_OPS := 0.48
+const DOWN_PA := 35
+const DOWN_ERA := 7.0
+const DOWN_OUTS := 18
 
 
 class Report:
 	var played := false
 	var first_team := false
+	## A postseason game (its numbers are not in the regular season's book).
+	var postseason := false
 	var gp: Dictionary[String, float] = {}
 	var goal := ""
 	var goal_met := false
@@ -54,6 +67,24 @@ var futures: Dictionary[String, Team] = {}
 ## Second-team lines (only the career player's matter), and his games there.
 var futures_book := StatBook.new()
 var futures_games := 0
+## His last RECENT games' lines, second team and first team ([pa, ab, hits, doubles, triples,
+## home runs, walks, hbp, sac flies] for a hitter; [outs, earned runs] for a pitcher).
+var recent_futures: Array = []
+var recent_first: Array = []
+## Days in a row in the second team this season (the long stays: CareerEvents).
+var futures_days := 0
+## The length of his pro seasons (chosen when he was made; a high-school season is its own).
+var pro_games := 144
+## Regular-season days on the first team this season (CareerContract), the salary owed but not
+## yet a whole unit, and the events told once (CareerEvents).
+var first_team_days := 0
+var salary_paid := 0.0
+var events_seen := PackedStringArray()
+## The winter after this season (CareerSession.start_winter): what he was told, free agency's
+## offers ([club id, years, money a year]) and, released, the club that signs him.
+var winter_lines := PackedStringArray()
+var fa_offers: Array = []
+var release_team := ""
 var _futures_day := -1
 ## The all-star break: held once at mid-season. Who was picked, whether the career player's
 ## all-star game and derby turn are still to come, the derby's home runs.
@@ -67,6 +98,15 @@ var special := ""
 static var _names: NameTable
 ## Popularity from games.
 var log := PackedStringArray()
+## The cutscenes waiting to be shown (queue stage 6, Ceremony): [kind, heading, big line, more
+## lines, the club he left (a trade)], kinds &"draft", &"contract", &"award", &"champion",
+## &"trade", &"call_up". Shown by the career's screen and gone; not saved (a scene missed by
+## quitting is not owed).
+var cues: Array = []
+
+
+func cue(kind: StringName, heading: String, big: String, more: PackedStringArray = PackedStringArray(), from_id: String = "") -> void:
+	cues.append([kind, heading, big, more, from_id])
 
 
 static func start(league: Season, c: CareerPlayer, career_rules: CareerRules) -> CareerSeason:
@@ -75,8 +115,14 @@ static func start(league: Season, c: CareerPlayer, career_rules: CareerRules) ->
 	cs.career = c
 	cs.rules = career_rules
 	league.my_team = c.team_id
+	league.career_player = c.player.id
 	cs.start_day()
 	return cs
+
+
+## His second team plays in the futures league on its own calendar.
+func farm_mode() -> bool:
+	return season.farm != null and season.farm.schedule != null
 
 
 ## The first-team games of the day are played: all of them while he is in the second team,
@@ -84,22 +130,36 @@ static func start(league: Season, c: CareerPlayer, career_rules: CareerRules) ->
 func start_day() -> void:
 	season.featured = career.player.id if career.first_team else ""
 	season.featured_role = career.position
+	if season.farm != null:
+		season.farm.held = career.team_id if farm_mode() and not career.first_team else ""
 	season.play_day(not career.first_team)
 
 
-## His club's game today (first team), or null on an off day or after the season.
+## His game today: his club's first-team game once he is up; before that his second team's in
+## the futures league (or, in an older league, his club's first-team game, whose opponent his
+## second team plays). Null on an off day or after the season.
 func club_game() -> ScheduledGame:
+	if farm_mode() and not career.first_team:
+		return season.farm.game_of(season, career.team_id)
 	for g: ScheduledGame in season.games_today():
 		if g.involves(career.team_id):
 			return g
 	return null
 
 
+## A side of today's game as a club (for the screens): a first team, a second team, or one of
+## the futures league's own teams.
+func side_team(team_id: String) -> Team:
+	if farm_mode() and not career.first_team:
+		return season.farm.team_of(season, team_id)
+	return season.teams.get(team_id)
+
+
 ## Whether he has a game still to play today: his club's first-team game once he is up, a
 ## second-team game on his club's game days before that (the regular season only).
 func has_game() -> bool:
 	var g := club_game()
-	if g == null:
+	if g == null or season.injuries.is_out(career.player.id):
 		return false
 	if career.first_team:
 		return not g.played
@@ -108,15 +168,43 @@ func has_game() -> bool:
 
 func next_day() -> void:
 	season.advance()
+	_after_day()
 	start_day()
 	_check_all_star()
 
+
+## Overnight for him: hurt (Injuries: on the injured list, off the first team; back to the
+## second team to play his way back when he is healed), and another day in the second team.
+func _after_day() -> void:
+	var id := career.player.id
+	if season.school:
+		# A school has no second team: out while hurt, back in the side when healed.
+		var team: Team = season.teams[career.team_id]
+		if not season.injuries.is_out(id) and not team.registered.has(id):
+			team.registered.append(id)
+		return
+	if season.injuries.is_out(id):
+		if career.first_team:
+			career.first_team = false
+			season.featured = ""
+			recent_first.clear()
+			log.append("%d일: 부상자 명단 (%s, %d일)" % [season.day + 1, season.injuries.cause_of(id), season.injuries.days_left(id)])
+	elif season.healed_today.has(id):
+		log.append("%d일: 부상 회복, 2군에서 재활" % (season.day + 1))
+		recent_futures.clear()
+	if season.phase == Season.Phase.REGULAR:
+		if career.first_team:
+			first_team_days += 1
+		else:
+			futures_days += 1
+		CareerContract.pay_day(self)
+	CareerEvents.day(self)
 
 ## Mid-season: the all-star picks and the derby. The career player's part waits for him; the
 ## rest is settled at once.
 func _check_all_star() -> void:
 	var share := float(rules.all_star.get("at_share", 0.5))
-	if all_star_done or season.phase != Season.Phase.REGULAR or season.day < int(season.total_days() * share):
+	if season.school or all_star_done or season.phase != Season.Phase.REGULAR or season.day < int(season.total_days() * share):
 		return
 	all_star_done = true
 	var d := season.division_of(career.team_id)
@@ -194,8 +282,8 @@ func prepare(physical: bool) -> GameSim:
 	if career.first_team:
 		season.featured = career.player.id
 		return season.prepare(g, physical)
-	var away := _futures_team(g.away)
-	var home := _futures_team(g.home)
+	var away := season.farm.futures_team(season, g.away) if farm_mode() else _futures_team(g.away)
+	var home := season.farm.futures_team(season, g.home) if farm_mode() else _futures_team(g.home)
 	var r := RuleSet.kbo_2026()
 	# He plays: a second team's manager has filler players who may be better than a rookie
 	# (a catcher's career never got a game); his career is about him playing.
@@ -285,6 +373,7 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	var report := Report.new()
 	report.played = true
 	report.first_team = career.first_team
+	report.postseason = season.phase == Season.Phase.POSTSEASON
 	var id := career.player.id
 	if special == "all_star":
 		return _finish_all_star(state, book, report)
@@ -294,12 +383,23 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	else:
 		futures_games += 1
 		_futures_day = season.day
+		if farm_mode():
+			season.farm.record_game(g, state, book)
+		# His second-team game into his log (GameLog).
+		var played := ScheduledGame.new()
+		played.day = season.day
+		played.away = g.away
+		played.home = g.home
+		played.finish(state.score[0], state.score[1], state.inning)
+		var side := g.away if my_side(state) == 0 else g.home
+		GameLog.note(season.game_logs, {id: side}, played, book, "2군")
 		if book.batting.has(id):
 			futures_book.bat(id).add(book.batting[id])
 		if book.pitching.has(id):
 			futures_book.pitch(id).add(book.pitching[id])
 	var bat: BattingLine = book.batting.get(id)
 	var pitch: PitchingLine = book.pitching.get(id)
+	_note_recent(recent_first if career.first_team else recent_futures, bat, pitch)
 	var gp := Growth.from_game(bat, pitch, chances, errors, rules)
 	for field: String in scene_gp:
 		gp[field] = float(gp.get(field, 0.0)) + scene_gp[field]
@@ -328,15 +428,61 @@ func finish(state: GameState, book: StatBook, chances: int, errors: int, scene_g
 	if pitch != null:
 		PitchEvolution.note_game(career, pitch.pitches, pitches_seen)
 	report.evolved = PitchEvolution.check(career, rules, season.catalog)
+	var picked_up := CareerEvents.after_game(self, report)
+	if picked_up != "":
+		report.evolved.append(picked_up)
 	for change: String in report.evolved:
 		log.append("%d일: 구종 진화 %s" % [season.day + 1, change])
-	if not career.first_team and ready_for_call_up():
+	if season.school:
+		pass
+	elif not career.first_team and ready_for_call_up() and Rng.new(hash("call:%d:%d:%s" % [season.season_year, season.day, id])).chance(CALL_CHANCE):
 		call_up()
 		report.called_up = career.first_team
-	elif career.first_team and overmatched():
+	elif career.first_team and season.phase == Season.Phase.REGULAR and overmatched():
 		send_down()
 		report.sent_down = true
 	return report
+
+
+## A game's line into his last RECENT.
+static func _note_recent(into: Array, bat: BattingLine, pitch: PitchingLine) -> void:
+	if pitch != null and pitch.outs + pitch.batters_faced > 0:
+		into.append([pitch.outs, pitch.earned_runs])
+	elif bat != null and bat.pa > 0:
+		into.append([bat.pa, bat.ab, bat.hits, bat.doubles, bat.triples, bat.home_runs, bat.walks, bat.hit_by_pitch, bat.sac_flies])
+	else:
+		return
+	while into.size() > RECENT:
+		into.remove_at(0)
+
+
+## A hitter's recent games as one line.
+static func recent_batting(lines: Array) -> BattingLine:
+	var b := BattingLine.new()
+	for l: Array in lines:
+		if l.size() < 9:
+			continue
+		b.pa += int(l[0])
+		b.ab += int(l[1])
+		b.hits += int(l[2])
+		b.doubles += int(l[3])
+		b.triples += int(l[4])
+		b.home_runs += int(l[5])
+		b.walks += int(l[6])
+		b.hit_by_pitch += int(l[7])
+		b.sac_flies += int(l[8])
+	return b
+
+
+## A pitcher's recent games as one line.
+static func recent_pitching(lines: Array) -> PitchingLine:
+	var q := PitchingLine.new()
+	for l: Array in lines:
+		if l.size() != 2:
+			continue
+		q.outs += int(l[0])
+		q.earned_runs += int(l[1])
+	return q
 
 
 ## The all-star game counts for nothing in the season; it brings popularity, a few growth
@@ -382,23 +528,20 @@ func _line_text(bat: BattingLine, pitch: PitchingLine) -> String:
 func ready_for_call_up() -> bool:
 	var id := career.player.id
 	var team: Team = season.teams[career.team_id]
-	# Ten days after being sent down (KBO), whatever his numbers.
+	# Ten days after being sent down (KBO), whatever his numbers; and hurt, not at all.
 	if team.removed_on.has(id) and season.day - team.removed_on[id] < Team.RECALL_DAYS:
 		return false
-	if career.is_pitcher():
-		var p: PitchingLine = futures_book.pitching.get(id)
-		var need := CALL_UP_OUTS_SP if career.position == "SP" else CALL_UP_OUTS_RP
-		if p != null and p.outs >= need and p.era() <= CALL_UP_ERA:
-			return true
-	else:
-		var b: BattingLine = futures_book.batting.get(id)
-		if b != null and b.pa >= CALL_UP_PA and b.ops() >= CALL_UP_OPS:
-			return true
-	# A month or so of a 144-game season; a short season's share of it.
-	if futures_games < mini(CALL_UP_MIN_GAMES, season.games_per_team / 4):
+	if season.injuries.is_out(id):
 		return false
-	var weakest := weakest_in_place()
-	return weakest != null and _ovr(career.player) >= _ovr(weakest) - CALL_UP_GAP
+	# A few games first (fewer in a short season).
+	if futures_games < mini(CALL_UP_MIN_GAMES, maxi(season.games_per_team / 12, 3)):
+		return false
+	if career.is_pitcher():
+		var q := recent_pitching(recent_futures)
+		var need := CALL_UP_OUTS_SP if career.position == "SP" else CALL_UP_OUTS_RP
+		return q.outs >= need and q.era() <= CALL_UP_ERA
+	var b := recent_batting(recent_futures)
+	return b.pa >= CALL_UP_PA and b.ops() >= CALL_UP_OPS
 
 
 ## The weakest first-teamer in his place: same pitching role, or same main position.
@@ -433,16 +576,21 @@ func call_up() -> void:
 	if not team.register(career.player.id, season.day, season.rules):
 		return
 	career.first_team = true
+	recent_first.clear()
+	futures_days = 0
 	log.append("%d일: 1군 등록" % (season.day + 1))
+	var first := not events_seen.has("first_call_up")
+	if first:
+		events_seen.append("first_call_up")
+	cue(&"call_up", "%d년 %s" % [season.season_year, team.name], "첫 1군 등록" if first else "1군 등록", PackedStringArray(["%d일 · 퓨처스에서 올라왔습니다" % (season.day + 1)]))
 
 
 func overmatched() -> bool:
-	var id := career.player.id
 	if career.is_pitcher():
-		var p: PitchingLine = season.book.pitching.get(id)
-		return p != null and p.outs >= DOWN_OUTS and p.era() > DOWN_ERA
-	var b: BattingLine = season.book.batting.get(id)
-	return b != null and b.pa >= DOWN_PA and b.ops() < DOWN_OPS
+		var q := recent_pitching(recent_first)
+		return q.outs >= DOWN_OUTS and q.era() > DOWN_ERA
+	var b := recent_batting(recent_first)
+	return b.pa >= DOWN_PA and b.ops() < DOWN_OPS
 
 
 func send_down() -> void:
@@ -451,6 +599,6 @@ func send_down() -> void:
 	career.first_team = false
 	season.featured = ""
 	# He earns his way back with new numbers.
-	futures_book = StatBook.new()
-	futures_games = 0
+	recent_futures.clear()
+	recent_first.clear()
 	log.append("%d일: 2군으로" % (season.day + 1))

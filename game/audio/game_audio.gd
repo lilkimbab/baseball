@@ -119,9 +119,11 @@ static func variants(prefix: String) -> PackedStringArray:
 	if _variants.has(prefix):
 		return _variants[prefix]
 	var out := PackedStringArray()
+	# The game's own takes and those the local pack adds (real recordings may have more).
+	var local := MotionLibrary.pack_root().path_join("audio")
 	for i: int in range(1, 10):
 		var name := "%s_%d" % [prefix, i]
-		if ResourceLoader.exists("res://audio/%s.ogg" % name):
+		if ResourceLoader.exists("res://audio/%s.ogg" % name) or FileAccess.file_exists(local.path_join(name + ".ogg")):
 			out.append(name)
 		else:
 			break

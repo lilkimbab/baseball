@@ -37,7 +37,7 @@ const FAR_DETAIL := {"face": 30.0, "hair": 45.0, "button": 35.0}
 
 
 static func _detail_kind(part: String) -> String:
-	if part == "Eyes" or part == "Eyebrows" or part == "Eyelashes":
+	if part == "Eyes" or part.begins_with("Eyebrows") or part == "Eyelashes":
 		return "face"
 	if part.begins_with("Hair"):
 		return "hair"
@@ -103,6 +103,7 @@ var _skeleton: Skeleton3D
 var _mesh: MeshInstance3D
 var _cap: MeshInstance3D
 var _helmet: MeshInstance3D
+var _logo_colour := Color.WHITE
 var _model: Node3D
 var _gear_parts: Dictionary[StringName, MeshInstance3D] = {}
 ## Finger curls for the grips they were last worked out for, and bones that the first posing
@@ -226,6 +227,25 @@ func _ready() -> void:
 	_paint()
 	_build_props()
 	apply(PuppetClips.fielder_ready())
+	set_notify_local_transform(true)
+
+
+## A left-hander is drawn as his own mirror image (scale.x = -1). Two things go wrong on a
+## mirror image unless it is painted for it (the user, 2026-11-23: "a batter whose helmet is
+## see-through"): what is written on him reads backwards, and every surface drawn from both
+## sides is lit inside-out (the engine tells a surface's front from its back by its winding,
+## which a mirror image turns round: a glossy helmet then mirrored the park and looked like
+## glass). So a figure is painted again whenever it becomes, or stops being, a mirror image.
+var _mirrored := false
+## Surfaces given a material only for the mirror image: [part, surface].
+var _mirror_only: Array[Array] = []
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_LOCAL_TRANSFORM_CHANGED and _model != null and _mesh != null:
+		if (transform.basis.determinant() < 0.0) != _mirrored:
+			_paint()
+			set_logo(logo, _logo_colour)
 
 
 func _recompute_frames() -> void:
@@ -499,6 +519,36 @@ func _show_gear() -> void:
 		(part as MeshInstance3D).visible = bare and String(part.name) == "Hair%d" % hair
 	for piece: StringName in _gear_parts:
 		_gear_parts[piece].visible = gear.has(piece) or (headgear == &"helmet" and guards.has(piece))
+
+
+## The body and the parts that carry the face keys (eyes, brows, lashes).
+func _face_meshes() -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = [_mesh]
+	for part: Node in _model.find_children("*", "MeshInstance3D", true, false):
+		var n := String(part.name)
+		if n == "Eyes" or n == "Eyelashes" or n.begins_with("Eyebrows"):
+			out.append(part as MeshInstance3D)
+	return out
+
+
+## Sets a face key on the body and the parts that have it; true when the body has it.
+static func _set_face_key(faces: Array[MeshInstance3D], key: String, amount: float) -> bool:
+	var found := false
+	for m: MeshInstance3D in faces:
+		var index := m.find_blend_shape_by_name(StringName(key))
+		if index >= 0:
+			m.set_blend_shape_value(index, amount)
+			found = found or m == faces[0]
+	return found
+
+
+## Only his own brows show (Eyebrows for the first style, Eyebrows2..4 the others).
+func _show_brows() -> void:
+	if _model == null:
+		return
+	for part: Node in _model.find_children("Eyebrows*", "MeshInstance3D", true, false):
+		var n := String(part.name)
+		(part as MeshInstance3D).visible = n == ("Eyebrows" if brow == 1 else "Eyebrows%d" % brow)
 
 
 ## How far a lifted foot's toes hang down, past the right angle to the shin (degrees).
@@ -926,6 +976,11 @@ static func _grain() -> NoiseTexture2D:
 
 
 func _paint() -> void:
+	_mirrored = transform.basis.determinant() < 0.0
+	for entry: Array in _mirror_only:
+		if is_instance_valid(entry[0]):
+			(entry[0] as MeshInstance3D).set_surface_override_material(int(entry[1]), null)
+	_mirror_only.clear()
 	var plain := {
 		"Socks": uniform.socks, "Cap": uniform.cap, "Helmet": uniform.cap,
 		# The neck's trim: in the club colour on a jersey with piping or sleeve bands, plain otherwise.
@@ -965,8 +1020,8 @@ func _paint() -> void:
 			elif String(part.name).begins_with("Hair"):
 				part.set_surface_override_material(surface, _hair_material(original))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			elif part.name == &"Eyebrows" or part.name == &"Eyelashes":
-				part.set_surface_override_material(surface, _brow_material(original))
+			elif String(part.name).begins_with("Eyebrows") or part.name == &"Eyelashes":
+				part.set_surface_override_material(surface, _brow_material(original, part.name == &"Eyelashes"))
 				part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			elif plain.has(source):
 				part.set_surface_override_material(surface, _plain_material(source, plain[source]))
@@ -974,6 +1029,32 @@ func _paint() -> void:
 			# (Not with the trousers pulled up to the knee: the strip runs to the ankle.)
 			part.visible = uniform.pants_stripe and not high_socks
 	_wear_sleeves()
+	if _mirrored:
+		_light_mirror_image()
+
+
+## On a mirror image, a surface drawn from both sides becomes two drawn from one side each:
+## its outside as it is, and its inside after it. Each is then lit from the side it faces.
+func _light_mirror_image() -> void:
+	var copies: Dictionary[int, BaseMaterial3D] = {}
+	for part: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
+		if part.mesh == null or part.material_override != null:
+			continue
+		for surface: int in part.mesh.get_surface_count():
+			var m := part.get_active_material(surface) as BaseMaterial3D
+			if m == null or m.cull_mode != BaseMaterial3D.CULL_DISABLED:
+				continue
+			var key := m.get_instance_id()
+			if not copies.has(key):
+				var outside := m.duplicate() as BaseMaterial3D
+				outside.cull_mode = BaseMaterial3D.CULL_BACK
+				var inside := m.duplicate() as BaseMaterial3D
+				inside.cull_mode = BaseMaterial3D.CULL_FRONT
+				outside.next_pass = inside
+				copies[key] = outside
+			if part.get_surface_override_material(surface) == null:
+				_mirror_only.append([part, surface])
+			part.set_surface_override_material(surface, copies[key])
 
 
 static var _solid_copies: Dictionary[int, StandardMaterial3D] = {}
@@ -1046,6 +1127,7 @@ static func _skin_pores() -> NoiseTexture2D:
 ## bone, placed at the front of each in the model's rest pose.
 func set_logo(letter: String, colour: Color) -> void:
 	logo = letter
+	_logo_colour = colour
 	if _logos.is_empty() and letter != "":
 		for gear: MeshInstance3D in [_cap, _helmet]:
 			var box := gear.get_aabb()
@@ -1070,9 +1152,13 @@ func set_logo(letter: String, colour: Color) -> void:
 			var rest := _skeleton.get_bone_global_rest(_bone[&"Head"])
 			var basis := Basis(Vector3.RIGHT, -slope)
 			label.transform = rest.affine_inverse() * Transform3D(basis, front + basis.z * 0.0015)
+			label.set_meta(&"rest", label.transform)
 			attach.add_child(label)
 			_logos.append(label)
 	for label: Label3D in _logos:
+		# On a mirror image the letter is turned round in its place, so that it reads.
+		var rest_at: Transform3D = label.get_meta(&"rest", label.transform)
+		label.transform = Transform3D(rest_at.basis * Basis.from_scale(Vector3(-1.0, 1.0, 1.0)), rest_at.origin) if _mirrored else rest_at
 		label.text = letter
 		label.modulate = colour
 		# A league's initials (an umpire's cap) are set smaller than a club's one letter.
@@ -1111,9 +1197,12 @@ func _hair_material(original: Material) -> Material:
 	return m
 
 
-## Which face keys, how far (docs/13 S11-6): a head shape, chin, nose, mouth and cheekbones
-## each picked from the player's id, moderate amounts so the brows and eyes (fitted to the
-## default face) stay in place. Returns the weights set, by key.
+## Which face keys, how far (docs/13 S11-6; queue 2-1, 2026-11-23: no two men with one face):
+## for each group one key picked from the player's id and how far. The eyes, brows and lashes
+## carry the same keys (tools/blender/make_player.py: face_keys_to_parts), so the face around
+## the eyes may change too: their size, spacing, height and slant, the fold of the lid, the
+## brows' angle and height; the jaw, lips, nose, forehead, cheeks, ears, the head's fullness
+## and the neck. Returns the weights set, by key.
 const FACE_GROUPS: Array[Array] = [
 	[["face_head-oval", "face_head-round", "face_head-square", "face_head-triangular"], 0.5],
 	[["face_chin-width-incr", "face_chin-width-decr"], 0.6],
@@ -1122,30 +1211,59 @@ const FACE_GROUPS: Array[Array] = [
 	[["face_nose-scale-vert-incr"], 0.5],
 	[["face_nose-hump-incr"], 0.5],
 	[["face_mouth-scale-horiz-incr", "face_mouth-scale-horiz-decr"], 0.5],
+	[["face_eyes-scale-incr", "face_eyes-scale-decr"], 0.55],
+	[["face_eyes-trans-in", "face_eyes-trans-out"], 0.5],
+	[["face_eyes-trans-up", "face_eyes-trans-down"], 0.4],
+	[["face_eyes-corner-up", "face_eyes-corner-down"], 0.6],
+	[["face_eyes-fold-down"], 0.6],
+	[["face_eyes-bag-incr"], 0.5],
+	[["face_eyes-height-decr"], 0.5],
+	[["face_eyebrows-angle-up", "face_eyebrows-angle-down"], 0.6],
+	[["face_eyebrows-trans-up", "face_eyebrows-trans-down"], 0.5],
+	[["face_chin-height-incr", "face_chin-height-decr"], 0.5],
+	[["face_chin-jaw-drop-incr"], 0.4],
+	[["face_chin-bones-incr"], 0.6],
+	[["face_mouth-lowerlip-volume-incr", "face_mouth-lowerlip-volume-decr"], 0.6],
+	[["face_mouth-upperlip-volume-incr", "face_mouth-upperlip-volume-decr"], 0.5],
+	[["face_nose-point-width-incr", "face_nose-point-width-decr"], 0.6],
+	[["face_nose-base-up", "face_nose-base-down"], 0.5],
+	[["face_nose-flaring-incr"], 0.5],
+	[["face_forehead-scale-vert-incr", "face_forehead-scale-vert-decr"], 0.5],
+	[["face_cheeks-volume-incr", "face_cheeks-volume-decr"], 0.5],
+	[["face_ears-scale-incr", "face_ears-scale-decr"], 0.5],
+	[["face_ears-flap-incr"], 0.5],
+	[["face_head-fat-incr", "face_head-fat-decr"], 0.35],
+	[["face_neck-scale-horiz-incr"], 0.45],
 ]
+## A man's brows: one of the model's four (Eyebrows, Eyebrows2..4), from his id.
+var brow := 1
 
 
-func set_face(seed_text: String) -> Dictionary[String, float]:
+func set_face(seed_text: String, age: int = 27) -> Dictionary[String, float]:
 	var out: Dictionary[String, float] = {}
 	if _mesh == null or _mesh.mesh == null:
 		return out
-	for i: int in _mesh.get_blend_shape_count():
-		_mesh.set_blend_shape_value(i, 0.0)
+	var faces := _face_meshes()
+	for m: MeshInstance3D in faces:
+		for i: int in m.get_blend_shape_count():
+			m.set_blend_shape_value(i, 0.0)
 	var rng := Rng.new(hash(seed_text + ":face"))
 	for group: Array in FACE_GROUPS:
 		var keys: Array = group[0]
 		var key: String = keys[rng.next_int(keys.size())]
 		var amount := float(group[1]) * rng.next_float()
-		var index := _mesh.find_blend_shape_by_name(StringName(key))
-		if index >= 0:
-			_mesh.set_blend_shape_value(index, amount)
+		if _set_face_key(faces, key, amount):
 			out[key] = amount
 	var cheeks := 0.4 * rng.next_float()
 	for key: String in ["face_l-cheek-bones-incr", "face_r-cheek-bones-incr"]:
-		var index := _mesh.find_blend_shape_by_name(StringName(key))
-		if index >= 0:
-			_mesh.set_blend_shape_value(index, cheeks)
+		if _set_face_key(faces, key, cheeks):
 			out[key] = cheeks
+	# Older men look it: from the late twenties on.
+	var older := clampf((age - 26) / 14.0, 0.0, 0.8)
+	if older > 0.0 and _set_face_key(faces, "face_head-age-incr", older):
+		out["face_head-age-incr"] = older
+	brow = 1 + absi(hash(seed_text + ":brow")) % 4
+	_show_brows()
 	# Complexion: from fair to sun-browned (men who play outdoors all summer), how much beard
 	# shadow, how sweaty.
 	var sun := rng.next_float()
@@ -1192,13 +1310,24 @@ const SKIN_TANNED := Color(0.83, 0.7, 0.6)
 
 ## Brows and lashes: cut-outs in the player's hair colour; the brows a little fuller (the
 ## painted ones are thin and pale and left the face blank from a few metres away).
-func _brow_material(original: Material) -> Material:
+func _brow_material(original: Material, lashes: bool = false) -> Material:
 	var base := _solid(original, true) as StandardMaterial3D
 	if base == null:
 		return original
 	var m := base.duplicate() as StandardMaterial3D
 	m.albedo_color = (hair_color * 3.0).clamp() if hair_color.v < 0.3 else hair_color
 	m.alpha_scissor_threshold = 0.22
+	# The brows' hairs dithered by their own alpha (the upscaler's temporal smoothing blends it):
+	# cut out at one threshold, a full brow was a solid black bar.
+	if not lashes:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
+		m.alpha_hash_scale = 1.0
+		m.albedo_color = Color(0.11, 0.085, 0.07) if hair_color.v < 0.3 else hair_color
+	# The lashes: the denser hairs only, and a deep brown — drawn whole and black they read as
+	# mascara from the stands.
+	if lashes:
+		m.alpha_scissor_threshold = 0.5
+		m.albedo_color = Color(0.09, 0.07, 0.06)
 	# Matte: with a sheen, single hairs of the lashes caught the sun as white specks beside
 	# and under the eyes.
 	m.roughness = 1.0
@@ -1316,14 +1445,34 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 	viewport.size = Vector2i(roundi(half_size.x * pixels_per_metre) * 2, roundi(half_size.y * pixels_per_metre))
 	viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	viewport.disable_3d = true
-	var art := UniformArt.new()
-	art.garment = UniformArt.Garment.JERSEY if is_jersey else UniformArt.Garment.PANTS
-	art.style = uniform
-	art.half_size = half_size
-	if is_jersey:
-		_place_lettering(art, part.mesh.get_aabb())
-	art.size = Vector2(viewport.size)
-	viewport.add_child(art)
+	# What is painted: the garment's front and back side by side. On a mirror image each of the
+	# two is painted the other way round (seen through a window of its own), so that the
+	# lettering reads the right way on him.
+	var arts: Array[UniformArt] = []
+	# What is cut off at the knee when the trousers are worn high.
+	var cut_at_knee: Array[Control] = []
+	for half: int in (2 if _mirrored else 1):
+		var art := UniformArt.new()
+		art.garment = UniformArt.Garment.JERSEY if is_jersey else UniformArt.Garment.PANTS
+		art.style = uniform
+		art.half_size = half_size
+		if is_jersey:
+			_place_lettering(art, part.mesh.get_aabb())
+		art.size = Vector2(viewport.size)
+		arts.append(art)
+		if not _mirrored:
+			viewport.add_child(art)
+			cut_at_knee.append(art)
+			continue
+		var window := Control.new()
+		window.clip_contents = true
+		window.position = Vector2(viewport.size.x * 0.5 * half, 0.0)
+		window.size = Vector2(viewport.size.x * 0.5, viewport.size.y)
+		art.scale = Vector2(-1.0, 1.0)
+		art.position = Vector2(viewport.size.x * 0.5 * (1 + half), 0.0)
+		window.add_child(art)
+		viewport.add_child(window)
+		cut_at_knee.append(window)
 	part.add_child(viewport)
 
 	var material := StandardMaterial3D.new()
@@ -1334,8 +1483,9 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 		var knee := _skeleton.get_bone_global_rest(_bone[&"LeftLowerLeg"]).origin.y
 		var cut := clampf((box.end.y - (knee - 0.075)) / box.size.y, 0.3, 1.0)
 		viewport.transparent_bg = true
-		art.clip_contents = true
-		art.size.y = viewport.size.y * cut
+		for seen: Control in cut_at_knee:
+			seen.clip_contents = true
+			seen.size.y = viewport.size.y * cut
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
 		material.alpha_scissor_threshold = 0.5
 	_make_fabric(material)
@@ -1349,7 +1499,8 @@ func _garment_material(part: MeshInstance3D, is_jersey: bool) -> StandardMateria
 		material.detail_albedo = _weave(uniform.pinstripe if stripes else Color(0, 0, 0, 0))
 		material.detail_normal = _knit_wrap()
 		material.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-		art.stripes_on_wrap = not is_jersey
+		for art: UniformArt in arts:
+			art.stripes_on_wrap = not is_jersey
 	# The folds the cloth settled into, baked for this build (tools/blender/make_player.py).
 	var stem := "%s_%s" % [model_for(build).get_basename(), "jersey" if is_jersey else "pants"]
 	if ResourceLoader.exists(stem + "_folds.png"):

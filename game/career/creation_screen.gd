@@ -2,11 +2,17 @@ class_name CreationScreen
 extends Screen
 ## Making the career's player (docs/02 section 6.1, docs/13 S8-1): the player stands on the
 ## left as he is being made, with his starting ratings as a chart; in the middle who he is
-## (name, number, hands, build, looks); on the right what he plays (position, type), the club
-## he joins and the season's length.
+## (name, number, hands, build, looks) and what he plays (position, type); on the right where
+## he starts (docs/08 R8-3): a third-year student at a high school of his choice (its weekend
+## league, then the draft decides his club), or at once in a club's second team; and the length
+## of his pro seasons.
 
 var spec := PlayerCreator.Spec.new()
 var team_id := ""
+## "school" (high school, then the draft) or "pro" (a club's second team at once).
+var start_kind := "school"
+var school_id := ""
+var region := ""
 var games := 36
 var rules: CareerRules
 var _clubs: Array[Team] = []
@@ -22,7 +28,10 @@ func setup() -> void:
 
 func _ready() -> void:
 	rules = CareerIO.load_default()
-	_clubs = RosterIO.load_pack(LeagueSession.PACK)
+	_clubs = LeagueSession.league_clubs()
+	var all := SchoolLeague.schools()
+	if not all.is_empty():
+		region = str((all[0] as Dictionary)["league"])
 	spec.type_id = rules.batter_types[0].id
 	spec.body_id = rules.bodies[1].id
 	spec.skin = rules.skins[1]
@@ -114,19 +123,41 @@ func build() -> void:
 	if strengths != "":
 		who.body.add_child(UiKit.label("강점: %s (성장 비용 20%% 할인)" % strengths, 16, UiTheme.DIM, 500))
 
-	var where := panel("입단 구단", "users-three", columns, 520.0, "CLUB")
-	var table := DataTable.new()
-	table.row_height = 36.0
-	table.set_columns([["구단", 320.0, 0], ["리그", 80.0, 1]])
-	for i: int in _clubs.size():
-		var at := table.add_row([_clubs[i].name, "%d부" % (i / 10 + 1)], _clubs[i].id)
-		if _clubs[i].id == team_id:
-			table.selected = at
-	table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
-		team_id = str(tag)
-		refresh())
-	where.body.add_child(table)
-	choices("시즌 길이", ["36", "72", "144"], ["36", "72", "144"], str(games), func(v: String) -> void: games = int(v), where.body)
+	var where := panel("출발", "graduation-cap", columns, 540.0, "START")
+	choices("시작", ["school", "pro"], ["고교 3학년", "바로 프로 입단"], start_kind, func(v: String) -> void: start_kind = v, where.body)
+	if start_kind == "school":
+		where.body.add_child(UiKit.label("고교리그(주말리그와 왕중왕전)를 뛰고 신인 드래프트에서 지명한 구단에 입단합니다. 구단은 고를 수 없습니다.", 15, UiTheme.DIM, 500))
+		var regions: Array = SchoolLeague.data().get("leagues", [])
+		choices("권역", regions, regions, region, func(v: String) -> void:
+			region = v
+			school_id = "", where.body)
+		var schools := DataTable.new()
+		schools.row_height = 34.0
+		schools.set_columns([["학교", 300.0, 0], ["권역", 160.0, 1]])
+		for e: Dictionary in SchoolLeague.schools():
+			if str(e["league"]) != region:
+				continue
+			var at := schools.add_row([str(e["name"]), str(e["league"])], str(e["id"]))
+			if str(e["id"]) == school_id:
+				schools.selected = at
+		schools.row_pressed.connect(func(_row: int, tag: Variant) -> void:
+			school_id = str(tag)
+			refresh())
+		where.body.add_child(schools)
+	else:
+		where.body.add_child(UiKit.label("드래프트 없이 고른 구단의 2군(퓨처스리그)에서 시작합니다.", 15, UiTheme.DIM, 500))
+		var table := DataTable.new()
+		table.row_height = 36.0
+		table.set_columns([["구단", 380.0, 0]])
+		for i: int in _clubs.size():
+			var at := table.add_row([_clubs[i].name], _clubs[i].id)
+			if _clubs[i].id == team_id:
+				table.selected = at
+		table.row_pressed.connect(func(_row: int, tag: Variant) -> void:
+			team_id = str(tag)
+			refresh())
+		where.body.add_child(table)
+	choices("프로 시즌 길이", ["36", "72", "144"], ["36경기", "72경기", "144경기"], str(games), func(v: String) -> void: games = int(v), where.body)
 	_start = UiKit.button("커리어 시작", begin, "play", "primary")
 	_start.add_theme_font_size_override("font_size", 26)
 	where.body.add_child(_start)
@@ -135,14 +166,20 @@ func build() -> void:
 
 func _update_start() -> void:
 	if _start != null and is_instance_valid(_start):
-		_start.disabled = team_id == "" or spec.name.strip_edges() == ""
-		_start.tooltip_text = "이름을 입력하고 구단을 선택하세요" if _start.disabled else ""
+		var where := school_id if start_kind == "school" else team_id
+		_start.disabled = where == "" or spec.name.strip_edges() == ""
+		_start.tooltip_text = ("이름을 입력하고 학교를 선택하세요" if start_kind == "school" else "이름을 입력하고 구단을 선택하세요") if _start.disabled else ""
 
 
 ## Starts the career with the choices made (also used by tests).
 func begin() -> void:
 	var c := PlayerCreator.create(spec, rules, PitchCatalogIO.load_default())
-	CareerSession.start(c, team_id, games, int(Time.get_unix_time_from_system()) % 100000)
+	var seed_value := int(Time.get_unix_time_from_system()) % 100000
+	if start_kind == "school":
+		CareerSession.start_school(c, school_id, games, seed_value)
+	else:
+		CareerSession.start(c, team_id, games, seed_value)
+		CareerSession.career_season.pro_games = games
 	if is_inside_tree() and not Engine.is_editor_hint():
 		go(CareerSession.HUB)
 

@@ -15,8 +15,9 @@ var show_spread := false
 func _draw() -> void:
 	if scene == null or scene.game == null or scene.duel == null:
 		return
-	# The detail cards use the same corner; during a play the field matters more.
-	if scene.bottom_bar.detail or scene._play_time >= 0.0:
+	# The detail cards use the same corner; during a play the field matters more; the
+	# broadcast's introduction has the screen alone.
+	if scene.bottom_bar.detail or scene._play_time >= 0.0 or scene.pregame_showing() or scene.trot_showing() or scene.cutaway_showing():
 		return
 	begin()
 	var rect := Rect2(Vector2(view.x - SIZE.x - 16.0, view.y - BottomBar.HEIGHT - 26.0 - SIZE.y), SIZE)

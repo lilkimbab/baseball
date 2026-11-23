@@ -404,6 +404,7 @@ func test_the_player_fields_the_ball_himself_when_he_chooses_to() -> void:
 	var was := Settings.manual_fielding
 	Settings.manual_fielding = true
 	var scene := _human(1, 21)
+	scene.manual_always = true
 	var rng := Rng.new(3)
 	var swung: Array[bool] = [false]
 	var ticks := 0
@@ -450,6 +451,7 @@ func test_a_ball_the_player_leaves_alone_is_backed_up_and_the_game_goes_on() -> 
 	var was := Settings.manual_fielding
 	Settings.manual_fielding = true
 	var scene := _human(1, 22)
+	scene.manual_always = true
 	var rng := Rng.new(5)
 	var swung: Array[bool] = [false]
 	var ticks := 0
@@ -564,7 +566,12 @@ func test_the_game_is_played_in_its_weather() -> void:
 	assert_eq(scene.resolver.cfg.wind, w.wind_field(park.orientation_deg))
 	assert_eq(scene.cfg, scene.resolver.cfg, "the scene's physics are the resolver's")
 	assert_almost_eq(scene.resolver.cfg.air_density, Air.density(w.temp_c, 0.0, w.humidity), 1e-6)
-	assert_string_contains(scene.last_text, "날씨")
+	# The day's weather is told once, small, on the card before the game (the user, 2026-11-
+	# 23: not on the screen during the game).
+	var card: Dictionary = scene.broadcast.current.data if scene.broadcast.current != null else {}
+	if card.has("weather"):
+		assert_string_contains(str(card["weather"]), "°")
+	assert_false(scene.last_text.contains("날씨"), "not in the game's own line")
 	assert_almost_eq(scene.resolver.wind_out, w.wind_out(park.orientation_deg), 1e-6)
 	# Two games on different seeds are not all the same day.
 	var temps := {}
@@ -603,3 +610,69 @@ func test_the_hud_key_line_splits_into_keys_and_actions() -> void:
 	assert_eq(plate.size(), 6, "two corners cut")
 	assert_eq(plate[0], Vector2(10.0, 0.0))
 	assert_eq(plate[3], Vector2(90.0, 40.0))
+
+
+func test_the_player_fields_only_the_balls_that_need_him() -> void:
+	# A routine fly: the fielder gets under it by himself.
+	var fly := PlayResult.new()
+	fly.short_of_fence = 30.0
+	assert_false(MatchScene.own_to_field(fly, Position.Kind.CF), "a routine fly is fielded for him")
+	# A ball in the gap he has to dive for: his.
+	fly.hard_fielder = Position.Kind.CF
+	assert_true(MatchScene.own_to_field(fly, Position.Kind.CF), "a diving chance is his")
+	assert_false(MatchScene.own_to_field(fly, Position.Kind.LF), "but only the man whose chance it is")
+	# A ground ball to an infielder: he picks it up and throws.
+	var grounder := PlayResult.new()
+	assert_true(MatchScene.own_to_field(grounder, Position.Kind.SS), "a grounder to short is his to throw")
+	# A ground ball through to the outfield is a hit: nothing to do.
+	assert_false(MatchScene.own_to_field(grounder, Position.Kind.RF), "a clean single is not")
+
+
+func test_a_walk_off_mobs_the_hero_and_the_benches_can_clear() -> void:
+	var scene := _start(3)
+	var hero := scene.game.teams[GameState.HOME].batter_at(0)
+	scene._plan_walk_off(hero)
+	assert_eq(scene._rush_plan.size(), MatchScene.RUSH_MOB + 1, "the hero and nine of his side")
+	assert_eq((scene._rush_plan[0] as Array)[4], &"hero")
+	scene._show_rush(4.0)
+	assert_false(scene.batter.visible, "the batter's own figure steps aside for the hero")
+	var near := 0
+	for i: int in scene._rush_plan.size():
+		var at := Field.to_field(scene._rush[i].position)
+		if Vector2(at.x, at.y - 0.8).length() < 2.2:
+			near += 1
+	assert_eq(near, scene._rush_plan.size(), "all of them round the plate by then")
+	scene._show_rush(-1.0)
+	assert_true(scene.batter.visible)
+	for fig: Puppet in scene._rush:
+		assert_false(fig.visible)
+	scene._plan_bench_clear()
+	var sides := {}
+	for plan: Array in scene._rush_plan:
+		sides[int(plan[0])] = int(sides.get(int(plan[0]), 0)) + 1
+	assert_eq(sides.get(GameState.AWAY, 0), MatchScene.RUSH_CLEAR)
+	assert_eq(sides.get(GameState.HOME, 0), MatchScene.RUSH_CLEAR)
+	scene._show_rush(4.5)
+	for i: int in scene._rush_plan.size():
+		var at := Field.to_field(scene._rush[i].position)
+		var home: bool = int((scene._rush_plan[i] as Array)[0]) == GameState.HOME
+		assert_eq(at.x > 0.0, home, "each side on its own half, facing the other")
+
+
+func test_a_hurt_man_is_helped_off_to_his_dugout() -> void:
+	var scene := _start(4)
+	var side := scene.game.batting()
+	var hurt := scene.game.batter_id()
+	scene._plan_injury(hurt, side)
+	assert_eq(scene._rush_plan.size(), 3, "he and the two who help him")
+	scene._show_rush(1.0)
+	var down := Field.to_field(scene._rush[0].position)
+	scene._show_rush(MatchScene.INJURY_DOWN + 4.0)
+	var later := Field.to_field(scene._rush[0].position)
+	var dugout: Vector3 = (scene._rush_plan[0] as Array)[2]
+	assert_lt(Vector2(later.x - dugout.x, later.y - dugout.y).length(), Vector2(down.x - dugout.x, down.y - dugout.y).length() - 4.0, "walking off toward the dugout")
+	for i: int in [1, 2]:
+		var at := Field.to_field(scene._rush[i].position)
+		assert_lt(Vector2(at.x - later.x, at.y - later.y).length(), 0.8, "at his side")
+	scene._show_rush(-1.0)
+	assert_true(scene.batter.visible)

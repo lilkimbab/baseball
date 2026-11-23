@@ -234,7 +234,8 @@ baseball/
 |---|---|
 | 위치 | `user://saves/<슬롯>/` (Windows는 `%APPDATA%\Godot\app_userdata\<프로젝트>\`) |
 | 형식 | JSON을 압축해 저장. 파일은 `meta.json`(요약), `league.json`, `career.json`, `settings.json` |
-| 버전 | 모든 파일에 `format` 번호. 불러올 때 낮은 버전은 마이그레이션 함수를 차례로 적용 |
+| 버전 | 모든 파일에 `format` 번호(지금 2). 불러올 때 낮은 버전은 형식마다 차례로 올린다: 그 형식이 더한 항목을 기본값으로 채우고(`SaveIO.ADDED`), 더 바꿀 것이 있으면 `MIGRATIONS`의 함수. 번호 없는 파일은 1, 이 게임보다 새 형식은 그대로 둔다 |
+| 항목 추가 규칙 | 저장에 항목을 더할 때: `season_to`/`career_to`에 쓰고, `season_from`/`career_from`에서 기본값과 함께 읽고, `FORMAT`을 올리고, `ADDED`의 새 형식 아래에 기본값과 함께 적는다. `test_save_formats`가 어느 형식에도 없는 키를 잡는다. 옛 저장 확인: `./dev tool-win save_check build/saves/check`(모든 슬롯을 불러와 며칠 진행, 저장하지 않음) |
 | 시점 | 경기 종료, 날짜 진행, 설정 변경 시 자동 저장. 쓰기는 임시 파일에 쓴 뒤 이름을 바꾼다 |
 | 경기 중 저장 | `GameState` + 시드 + 입력 기록. 이어 하기는 그 시점까지 다시 계산해 복원 |
 | 리플레이 | 시드 + 입력 기록 + 로스터 요약. 수십 KB |

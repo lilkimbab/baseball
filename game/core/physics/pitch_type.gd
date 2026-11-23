@@ -17,3 +17,6 @@ var tilt_deg := 0.0
 ## changeups and splitters have it; the pitcher's own feel for it scales it.
 var ssw_accel := 0.0
 var ssw_deg := 0.0
+## A knuckleball's flutter (m/s²): thrown with almost no spin, the ball is pushed this hard one
+## way and another as the seams turn into the air, never the same twice (PitchDuel).
+var knuckle := 0.0

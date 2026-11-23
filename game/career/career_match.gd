@@ -58,7 +58,7 @@ func _start_game() -> void:
 	my_team = cs.my_side(game)
 	var today := cs.club_game()
 	if today != null:
-		_play_at_home(today.home, today.day, CareerSession.career_season.season.teams.get(today.home))
+		_play_at_home(today.home, today.day, cs.side_team(today.home))
 	me = cs.career.player.id
 	Settings.ensure_loaded()
 	pitch_all = Settings.pitch_all
@@ -80,6 +80,10 @@ func _ready() -> void:
 		for c: Dictionary in pause_menu.quit_requested.get_connections():
 			pause_menu.quit_requested.disconnect(c["callable"])
 		pause_menu.quit_requested.connect(func() -> void: Loading.go(get_tree(), CareerSession.HUB, {"title": "커리어로 이동 중"}))
+
+
+func featured_batter() -> String:
+	return me
 
 
 func help_keys() -> String:

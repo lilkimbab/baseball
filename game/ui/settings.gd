@@ -17,6 +17,9 @@ static var pitch_all := false
 ## The player moves the fielder the ball is hit to himself (W A S D, Space to dive); off, the
 ## fielders field by themselves and the player only chooses the throw.
 static var manual_fielding := false
+## How the person's own fielder is seen while he moves him: "eyes" (through the fielder's own
+## eyes) or "shoulder" (from just behind him).
+static var fielding_view := "eyes"
 ## Screen.
 static var fullscreen := false
 static var resolution := 2
@@ -74,6 +77,7 @@ static func load_file() -> void:
 	interventions = int(s.get("interventions", interventions))
 	pitch_all = bool(s.get("pitch_all", pitch_all))
 	manual_fielding = bool(s.get("manual_fielding", manual_fielding))
+	fielding_view = str(s.get("fielding_view", fielding_view))
 	highlights = bool(s.get("highlights", highlights))
 	fullscreen = bool(s.get("fullscreen", fullscreen))
 	resolution = clampi(int(s.get("resolution", resolution)), 0, RESOLUTIONS.size() - 1)
@@ -98,7 +102,7 @@ static func load_file() -> void:
 static func save_file() -> Error:
 	var d := {
 		"format": 1, "innings": innings, "pitch_clock": pitch_clock, "auto_changes": auto_changes,
-		"interventions": interventions, "pitch_all": pitch_all, "manual_fielding": manual_fielding,
+		"interventions": interventions, "pitch_all": pitch_all, "manual_fielding": manual_fielding, "fielding_view": fielding_view,
 		"highlights": highlights, "fullscreen": fullscreen,
 		"resolution": resolution, "quality": quality, "upscale": upscale, "fps_limit": fps_limit, "volume": volume,
 		"music_volume": music_volume, "crowd_volume": crowd_volume, "sfx_volume": sfx_volume, "voice_volume": voice_volume, "voices": voices, "broadcast": broadcast,

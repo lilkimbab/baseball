@@ -41,7 +41,8 @@ func test_pitcher_types_bring_their_pitches() -> void:
 	assert_eq(closer.player.role(), &"RP")
 	assert_eq(closer.position, "CL")
 	assert_gt(power_arm.player.pitching.fastball_speed(), finesse.player.pitching.fastball_speed())
-	assert_eq(finesse.player.pitching.arsenal.size(), 4)
+	# A young pitcher starts with two pitches and learns more (the user, 2026-11-23).
+	assert_eq(finesse.player.pitching.arsenal.size(), 2)
 	assert_gt(power_arm.player.pitching.stamina, finesse.player.pitching.stamina, "a starter has more stamina")
 	var usage := 0.0
 	for a: ArsenalPitch in finesse.player.pitching.arsenal:

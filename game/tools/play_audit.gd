@@ -13,6 +13,10 @@ extends SceneTree
 ##
 ## What is counted (a frame is a sixtieth of a second of the play):
 ##   jump       someone moved faster than anyone runs (more than JUMP_SPEED m/s)
+##   on the spot  someone's legs ran (a running pose) while he stayed where he was, for more
+##              than SPOT_TIME s (the user, 2026-11-23: "walking on the spot in the field")
+##   glide      someone moved at more than GLIDE_SPEED m/s while shown standing, for more than
+##              GLIDE_TIME s
 ##   spin       someone turned more than SPIN_DEG degrees in one frame
 ##   lurch      someone's hips rose or fell more than LURCH m in one frame
 ##   ball jump  the ball moved further in a frame than a ball can
@@ -36,6 +40,10 @@ const OVERLAP := 0.3
 const OVERLAP_TIME := 0.3
 const LOST_TIME := 0.6
 const CAMERA_JUMP := 4.0
+const SPOT_SPEED := 0.35
+const SPOT_TIME := 0.3
+const GLIDE_SPEED := 1.6
+const GLIDE_TIME := 0.3
 
 var _scene: MatchScene
 var _want := 120
@@ -60,6 +68,9 @@ var _was_close := false
 var _play_seen: PlayResult
 var _still := 0
 var _done_moments := {}
+## How long each has run on the spot, or glided, without a break (seconds; -1 once noted).
+var _spot := {}
+var _glide := {}
 
 
 func _initialize() -> void:
@@ -138,6 +149,8 @@ func _tick() -> void:
 
 func _forget() -> void:
 	_last.clear()
+	_spot.clear()
+	_glide.clear()
 	_overlaps.clear()
 	_ball_last = Vector3.INF
 	_camera_last = Vector3.INF
@@ -185,6 +198,18 @@ func _look() -> void:
 				if moved / step > JUMP_SPEED and moved > 0.35:
 					var track: Variant = _scene._play.timeline.tracks.get(key, PackedVector4Array())
 					_note("jump", "%s t=%.2f moved %.1f m (doing %s, result %s by %s, fielded %s at %.2f, hard %s at %.2f, track %s)" % [key, t, moved, str(_scene._doing.get(p, &"")), PaResult.Kind.keys()[_scene._play.result], _scene._play.fielders, _scene._play.timeline.fielded_key, _scene._play.timeline.fielded_time, Position.code(_scene._play.hard_fielder), _scene._play.hard_time, str(track).substr(0, 160)])
+				# Legs running under a man who stays put; a man carried along while he stands.
+				var doing := str(now[3])
+				var running := doing == "run" or doing == "backpedal" or doing == "matched" or doing.ends_with("_on_the_run")
+				for check: Array in [[_spot, running and moved / step < SPOT_SPEED, SPOT_TIME, "on the spot"], [_glide, doing == "ready" and moved / step > GLIDE_SPEED, GLIDE_TIME, "glide"]]:
+					var held: Dictionary = check[0]
+					if not bool(check[1]):
+						held[key] = 0.0
+					elif float(held.get(key, 0.0)) >= 0.0:
+						held[key] = float(held.get(key, 0.0)) + step
+						if float(held[key]) > float(check[2]):
+							held[key] = -1.0
+							_note(str(check[3]), "%s t=%.2f doing %s at %.2f m/s (result %s by %s)" % [key, t, doing, moved / step, PaResult.Kind.keys()[_scene._play.result], _scene._play.fielders])
 				var turned := absf(rad_to_deg(wrapf(p.rotation.y - float(before[1]), -PI, PI))) * (DT / step)
 				if turned > SPIN_DEG and step > DT * 0.5:
 					_note("spin", "%s t=%.2f turned %.0f deg" % [key, t, turned])
@@ -217,7 +242,8 @@ func _look() -> void:
 					var gap := glove.distance_to(_scene._ball_at(_scene._play.timeline, t))
 					if gap > CATCH_GAP:
 						var tl := _scene._play.timeline
-						_note("catch gap", "%s t=%.2f ball %.2f m from the glove (ball z %.1f) fielded %s at %.2f, ball then %s, his track %s, misses %s %s" % [key, t, gap, ball.z, tl.fielded_key, tl.fielded_time, tl.position("ball", tl.fielded_time), tl.tracks[key], tl.miss_keys, tl.misses])
+						var him := Field.to_field(p.global_position)
+						_note("catch gap", "%s t=%.2f (moment %.2f) ball %.2f m from the glove, doing %s; catch at %s, he at %s, glove at %s, ball now %s, throws %s" % [key, t, m.time, gap, str(_scene._doing.get(p, &"")), m.at, him, glove, _scene._ball_at(tl, t), tl.throws])
 				elif m.kind == PlayMoves.Kind.THROW:
 					var hand := Field.to_field(p.global_transform * p.ball_spot(&"RightHand"))
 					var gap := hand.distance_to(ball)
@@ -343,7 +369,7 @@ func duel_launch() -> float:
 func _report() -> void:
 	var mode := "the player at bat" if _bat else ("the player in the field" if _field else "computer against computer")
 	print("audit: %d plays, %s" % [_plays, mode])
-	var order := ["jump", "spin", "lurch", "ball jump", "catch gap", "throw gap", "overlap", "lost ball", "camera", "close-up"]
+	var order := ["jump", "on the spot", "glide", "spin", "lurch", "ball jump", "catch gap", "throw gap", "overlap", "lost ball", "camera", "close-up"]
 	for what: String in order:
 		var n := int(_counts.get(what, 0))
 		print("audit: %-10s %5d  (%.2f a play)" % [what, n, float(n) / maxi(_plays, 1)])

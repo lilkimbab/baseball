@@ -6,10 +6,15 @@ extends RefCounted
 ## seconds with its camera shots and its card; most hold the game while they show, all can be
 ## skipped (Space, Enter or a click). The match scene asks what to show; this only keeps time.
 
-enum Kind { PREGAME, HALF, BATTER, PITCHER_CHANGE, REPLAY, GAME_END }
+## BOARD: the park's scoreboard with the player's own man introduced on it (his first at-bat).
+## FANS: the batting side's cheering stage and its fans after a home run.
+## WALK_OFF: the home side mobbing its hero at the plate; BENCH_CLEAR: both benches out after a
+## pitch at a man's head or a beanball (MatchScene's rush of extra figures); INJURY: a hurt man
+## helped off by the trainer and a teammate.
+enum Kind { PREGAME, HALF, BATTER, PITCHER_CHANGE, REPLAY, GAME_END, BOARD, FANS, WALK_OFF, BENCH_CLEAR, INJURY }
 
 ## How long each kind lasts (s).
-const LENGTH := {Kind.PREGAME: 10.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5}
+const LENGTH := {Kind.PREGAME: 21.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5, Kind.BOARD: 3.2, Kind.FANS: 2.8, Kind.WALK_OFF: 5.5, Kind.BENCH_CLEAR: 5.5, Kind.INJURY: 6.5}
 
 
 ## A camera shot: from `at` seconds into its segment, moving from (from, to, fov) to (from2,

@@ -12,6 +12,8 @@ extends RefCounted
 enum Level { ROOKIE, PRO, ALL_STAR, LEGEND }
 
 const NAMES: Array[String] = ["루키", "프로", "올스타", "레전드"]
+## How often the person's batter gets out of the way of a pitch that got away.
+const PERSON_DODGE := 0.92
 const IDS: Array[String] = ["rookie", "pro", "all_star", "legend"]
 
 ## By level:
@@ -76,6 +78,9 @@ static func by_id(id: String) -> int:
 ## The person is at the plate.
 static func for_batter(s: DuelSettings, level: int) -> void:
 	var t: Dictionary = TABLE.get(level, TABLE[Level.PRO])
+	# A pitch that got away he gets out of the way of, nearly always (the user: being hit
+	# should be very rare); one thrown at him still hits him (PitchDuel.aimed_at_body).
+	s.dodge = PERSON_DODGE
 	s.timing_scale = float(t["timing"])
 	s.aim_scale = float(t["floor"])
 	s.aim_forgiven = float(t["forgive"])

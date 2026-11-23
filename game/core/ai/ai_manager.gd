@@ -11,6 +11,12 @@ var overall: Overall
 ## changes the rules force on it (a pinch hitter taking the field), not its pitching changes
 ## or pinch hitters.
 var manual_team := -1
+## Pitchers sent off by the umpire (KBO: a fastball to the head): changed at once, whoever's
+## side it is (a person's too: the computer picks the reliever).
+var ejected: Dictionary[String, bool] = {}
+## Men hurt in the game (GameState.injured): replaced at once — a runner by a pinch runner, a
+## fielder by a man from the bench at his place, a pitcher by a reliever — whoever's side.
+var hurt: Dictionary[String, bool] = {}
 ## Each pitcher's overall as he is, not as he feels today (a season sets it): bullpen roles
 ## (closer, set-up men) follow it, so a closer having a bad day is still the closer.
 var role_overall: Dictionary[String, float] = {}
@@ -244,6 +250,14 @@ func next_change(state: GameState) -> GameEvent:
 		if t != manual_team:
 			plan_bullpen(state, t)
 	var defence := state.fielding()
+	var gone := state.teams[defence].pitcher_id
+	if ejected.has(gone):
+		var reliever := _pick_reliever(state, defence, false)
+		if reliever != "" and reliever != gone:
+			return GameEvent.substitution(defence, GameEvent.Change.PITCHER, gone, reliever, Position.Kind.P)
+	var forced := _replace_hurt(state)
+	if forced != null:
+		return forced
 	var fix := _fill_positions(state, defence)
 	if fix != null:
 		return fix
@@ -254,6 +268,37 @@ func next_change(state: GameState) -> GameEvent:
 	if state.batting() == manual_team:
 		return null
 	return _offensive_change(state, state.batting())
+
+
+func _replace_hurt(state: GameState) -> GameEvent:
+	if hurt.is_empty():
+		return null
+	var batting := state.batting()
+	var team := state.teams[batting]
+	for base: int in [1, 2, 3]:
+		var r := state.runner_on(base)
+		if r != null and hurt.has(r.player_id):
+			hurt.erase(r.player_id)
+			var fast := ""
+			for id: String in team.bench:
+				if fast == "" or team.player(id).batting.speed > team.player(fast).batting.speed:
+					fast = id
+			if fast != "":
+				return GameEvent.substitution(batting, GameEvent.Change.PINCH_RUNNER, r.player_id, fast, Position.Kind.PR)
+	var defence := state.fielding()
+	var field := state.teams[defence]
+	if hurt.has(field.pitcher_id):
+		hurt.erase(field.pitcher_id)
+		var reliever := _pick_reliever(state, defence, false)
+		if reliever != "" and reliever != field.pitcher_id:
+			return GameEvent.substitution(defence, GameEvent.Change.PITCHER, field.pitcher_id, reliever, Position.Kind.P)
+	for slot: LineupSlot in field.lineup:
+		if hurt.has(slot.player_id) and slot.position != Position.Kind.DH:
+			hurt.erase(slot.player_id)
+			var sub := _best_bench(field, slot.position)
+			if sub != "":
+				return GameEvent.substitution(defence, GameEvent.Change.DEFENSE, slot.player_id, sub, slot.position)
+	return null
 
 
 ## Pinch hitters and runners keep their places on defence if they can play the position they
