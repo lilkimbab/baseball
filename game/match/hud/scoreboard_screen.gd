@@ -117,9 +117,11 @@ func _draw() -> void:
 		draw_string(regular, Vector2(1100.0, 480.0), "km/h", HORIZONTAL_ALIGNMENT_CENTER, 260.0, 40, DIM)
 
 
-## The batter's introduction: his face in a frame of his club's colour on the left; his number
-## large, his name, position and hands; his season's figures in boxes; today's line and the
-## score along the foot.
+## The batter's introduction, laid out as a KBO park's board shows it (Gocheok's, for one): the
+## batting side's order down the left with each man's average, the man up lit; in the middle his
+## face, number and name, his season in eight boxes (average, at-bats, hits, home runs; runs
+## batted in, steals, on-base, slugging) and what he has done today; the fielding side's order on
+## the right; the line score and the count along the foot.
 func _draw_intro(g: GameState) -> void:
 	var team := g.batting_team()
 	var p := team.player(g.batter_id())
@@ -128,38 +130,99 @@ func _draw_intro(g: GameState) -> void:
 	var accent := club.accent if club != null else AMBER
 	var font := UiTheme.face(&"board")
 	var w := size.x
-	# The club's colour in a band down the left.
-	draw_rect(Rect2(0.0, 0.0, 470.0, size.y), primary.darkened(0.35))
-	draw_rect(Rect2(470.0, 0.0, 8.0, size.y), accent)
-	var frame := Rect2(55.0, 50.0, 360.0, 360.0)
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.02, 0.025, 0.035))
+	# The two orders.
+	_draw_order(g, g.batting(), Rect2(14.0, 14.0, 330.0, 452.0), g.batter_id())
+	_draw_order(g, g.fielding(), Rect2(w - 344.0, 14.0, 330.0, 452.0), "")
+	# The middle: his face, number and name.
+	var mid := Rect2(360.0, 14.0, w - 720.0, 452.0)
+	draw_rect(mid, primary.darkened(0.55))
+	draw_rect(Rect2(mid.position, Vector2(mid.size.x, 6.0)), accent)
+	var frame := Rect2(mid.position + Vector2(16.0, 22.0), Vector2(190.0, 190.0))
 	draw_rect(frame, Color(0.05, 0.06, 0.08))
 	if portrait != null and _portrait_for == p.id:
 		draw_texture_rect(portrait, frame, false)
-	else:
-		draw_string(font, Vector2(frame.position.x, frame.get_center().y + 60.0), str(p.number), HORIZONTAL_ALIGNMENT_CENTER, frame.size.x, 180, Color(1, 1, 1, 0.25))
-	draw_rect(frame, accent, false, 6.0)
-	draw_string(font, Vector2(55.0, 490.0), team.short_name, HORIZONTAL_ALIGNMENT_CENTER, 360.0, 52, LED)
-	# The number and the name, his place in the order, his position and hands.
-	var x := 520.0
-	draw_string(font, Vector2(x, 150.0), str(p.number), HORIZONTAL_ALIGNMENT_LEFT, -1, 140, AMBER)
-	var nw := font.get_string_size(str(p.number), HORIZONTAL_ALIGNMENT_LEFT, -1, 140).x
-	draw_string(font, Vector2(x + nw + 36.0, 140.0), p.name, HORIZONTAL_ALIGNMENT_LEFT, w - x - nw - 60.0, 104, LED)
+	draw_rect(frame, accent, false, 4.0)
+	var x := frame.end.x + 22.0
+	draw_string(font, Vector2(x, mid.position.y + 70.0), "NO.%d" % p.number, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, AMBER)
+	draw_string(font, Vector2(x, mid.position.y + 140.0), p.name, HORIZONTAL_ALIGNMENT_LEFT, mid.end.x - x - 10.0, 64, LED)
 	var slot := team.slot_of(p.id)
 	var kind := team.lineup[slot].position if slot >= 0 else p.primary_position()
-	var hands := "%s투%s타" % ["좌" if p.throws == &"L" else "우", "양" if p.bats == &"S" else ("좌" if p.bats == &"L" else "우")]
-	var order := "%d번 타자 · " % (slot + 1) if slot >= 0 else ""
-	draw_string(font, Vector2(x, 220.0), "%s%s · %s" % [order, Position.name_of(kind), hands], HORIZONTAL_ALIGNMENT_LEFT, w - x - 40.0, 46, DIM)
-	# His season (or his ratings in a game outside a season), in four boxes.
-	var figures: Array = scene.season_figures(p)
-	var box_w := (w - x - 60.0) / 4.0
-	for k: int in mini(figures.size(), 4):
-		var r := Rect2(x + k * box_w, 258.0, box_w - 16.0, 170.0)
+	draw_string(font, Vector2(x, mid.position.y + 190.0), ("%d번 · " % (slot + 1) if slot >= 0 else "") + Position.name_of(kind), HORIZONTAL_ALIGNMENT_LEFT, mid.end.x - x - 10.0, 34, DIM)
+	# His season, eight boxes in two rows.
+	var st: Dictionary = scene.board_stats(p)
+	var cells := [["타율", "avg"], ["타수", "ab"], ["안타", "h"], ["홈런", "hr"], ["타점", "rbi"], ["도루", "sb"], ["출루율", "obp"], ["장타율", "slg"]]
+	var cw := (mid.size.x - 32.0) / 4.0
+	var top := mid.position.y + 230.0
+	draw_string(font, Vector2(x, mid.position.y + 222.0), str(st.get("label", "")), HORIZONTAL_ALIGNMENT_LEFT, mid.end.x - x - 10.0, 26, AMBER)
+	for i: int in 8:
+		var r := Rect2(mid.position.x + 16.0 + cw * (i % 4), top + 8.0 + 62.0 * (i / 4), cw - 6.0, 56.0)
 		draw_rect(r, Color(1, 1, 1, 0.06))
-		draw_string(font, Vector2(r.position.x, r.position.y + 50.0), str(figures[k][0]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 38, DIM)
-		draw_string(font, Vector2(r.position.x, r.position.y + 140.0), str(figures[k][1]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 80, LED)
-	# Today, and the song when it plays.
-	var line: BattingLine = scene.scorer.book.batting.get(p.id)
-	var today := "오늘 %d타수 %d안타" % [line.ab, line.hits] if line != null and line.pa > 0 else "오늘 첫 타석"
-	draw_string(font, Vector2(x, 510.0), today, HORIZONTAL_ALIGNMENT_LEFT, 380.0, 46, LED)
-	if song_on:
-		draw_string(font, Vector2(x + 400.0, 510.0), "♪ 응원가", HORIZONTAL_ALIGNMENT_LEFT, -1, 46, AMBER)
+		draw_string(font, Vector2(r.position.x + 10.0, r.position.y + 38.0), str(cells[i][0]), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, DIM)
+		draw_string(font, Vector2(r.position.x, r.position.y + 40.0), str(st.get(cells[i][1], "-")), HORIZONTAL_ALIGNMENT_RIGHT, r.size.x - 10.0, 34, LED)
+	# Today.
+	var today: PackedStringArray = scene.pa_results.get(p.id, PackedStringArray())
+	var line := ""
+	for i: int in today.size():
+		line += "%d. %s   " % [i + 1, today[i]]
+	var ty := top + 8.0 + 62.0 * 2 + 10.0
+	draw_rect(Rect2(mid.position.x + 16.0, ty, mid.size.x - 32.0, 52.0), Color(1, 1, 1, 0.05))
+	draw_string(font, Vector2(mid.position.x + 28.0, ty + 37.0), "오늘 기록", HORIZONTAL_ALIGNMENT_LEFT, -1, 28, AMBER)
+	draw_string(font, Vector2(mid.position.x + 180.0, ty + 37.0), line if line != "" else "-", HORIZONTAL_ALIGNMENT_LEFT, mid.size.x - 200.0, 28, LED)
+	# The foot: the line score and the count.
+	_draw_foot(g, Rect2(14.0, 478.0, w - 28.0, 108.0))
+
+
+## A side's order as the board lists it: its name, then each slot's number, name, position and
+## average; `lit` (the man up) on a bar of light.
+func _draw_order(g: GameState, side: int, box: Rect2, lit: String) -> void:
+	var font := UiTheme.face(&"board")
+	var t := g.teams[side]
+	var club := scene.club(side)
+	draw_rect(box, Color(1, 1, 1, 0.04))
+	draw_rect(Rect2(box.position, Vector2(box.size.x, 42.0)), (club.primary if club != null else Color(0.2, 0.25, 0.4)).darkened(0.2))
+	draw_string(font, Vector2(box.position.x + 12.0, box.position.y + 32.0), t.short_name, HORIZONTAL_ALIGNMENT_LEFT, box.size.x - 24.0, 30, LED)
+	var row := (box.size.y - 50.0) / 9.0
+	for i: int in mini(t.lineup.size(), 9):
+		var slot := t.lineup[i]
+		var man := t.player(slot.player_id)
+		if man == null:
+			continue
+		var y := box.position.y + 50.0 + row * i
+		if slot.player_id == lit:
+			draw_rect(Rect2(box.position.x, y, box.size.x, row - 2.0), Color(AMBER, 0.85))
+		var ink := Color(0.05, 0.05, 0.06) if slot.player_id == lit else LED
+		draw_string(font, Vector2(box.position.x + 8.0, y + row * 0.72), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 26, ink if slot.player_id == lit else AMBER)
+		draw_string(font, Vector2(box.position.x + 34.0, y + row * 0.72), man.name, HORIZONTAL_ALIGNMENT_LEFT, 150.0, 26, ink)
+		draw_string(font, Vector2(box.position.x + 186.0, y + row * 0.72), Position.code(slot.position), HORIZONTAL_ALIGNMENT_LEFT, 50.0, 24, ink if slot.player_id == lit else DIM)
+		draw_string(font, Vector2(box.position.x + 236.0, y + row * 0.72), str(scene.board_stats(man).get("avg", "-")), HORIZONTAL_ALIGNMENT_RIGHT, box.size.x - 246.0, 26, ink)
+
+
+## The line score by innings with R H E, and the balls, strikes and outs as lamps.
+func _draw_foot(g: GameState, box: Rect2) -> void:
+	var font := UiTheme.face(&"board")
+	draw_rect(box, Color(1, 1, 1, 0.04))
+	var col := 48.0
+	var left := box.position.x + 150.0
+	var first := maxi(1, g.inning - 8)
+	for i: int in 9:
+		draw_string(font, Vector2(left + col * i, box.position.y + 28.0), str(first + i), HORIZONTAL_ALIGNMENT_CENTER, col, 22, DIM)
+	for k: int in 3:
+		draw_string(font, Vector2(left + col * (9.4 + k), box.position.y + 28.0), ["R", "H", "E"][k], HORIZONTAL_ALIGNMENT_CENTER, col, 22, AMBER)
+	for t: int in 2:
+		var y := box.position.y + 62.0 + 38.0 * t
+		draw_string(font, Vector2(box.position.x + 12.0, y), g.teams[t].short_name, HORIZONTAL_ALIGNMENT_LEFT, 130.0, 28, AMBER if g.batting() == t else LED)
+		for i: int in 9:
+			var inning := first + i - 1
+			if inning < g.line[t].size():
+				draw_string(font, Vector2(left + col * i, y), str(g.line[t][inning]), HORIZONTAL_ALIGNMENT_CENTER, col, 28, LED)
+		var figures := [g.score[t], scene.scorer.book.hits[t], scene.scorer.book.errors[t]]
+		for k: int in 3:
+			draw_string(font, Vector2(left + col * (9.4 + k), y), str(figures[k]), HORIZONTAL_ALIGNMENT_CENTER, col, 28, AMBER if k == 0 else LED)
+	var lamps := [["B", g.balls, 3, Color(0.3, 0.9, 0.4)], ["S", g.strikes, 2, Color(1.0, 0.8, 0.2)], ["O", g.outs, 2, Color(1.0, 0.3, 0.25)]]
+	var lx := box.end.x - 230.0
+	for k: int in 3:
+		var y := box.position.y + 26.0 + k * 34.0
+		draw_string(font, Vector2(lx, y + 10.0), lamps[k][0], HORIZONTAL_ALIGNMENT_LEFT, -1, 26, DIM)
+		for n: int in int(lamps[k][2]):
+			draw_circle(Vector2(lx + 50.0 + n * 40.0, y), 13.0, lamps[k][3] if n < int(lamps[k][1]) else Color(1, 1, 1, 0.08))

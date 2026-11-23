@@ -21,11 +21,12 @@ func _draw() -> void:
 		return
 	begin()
 	var rect := Rect2(Vector2(view.x - SIZE.x - 16.0, view.y - BottomBar.HEIGHT - 26.0 - SIZE.y), SIZE)
-	panel(rect, UiTheme.PANEL, 12.0)
+	panel(rect, Color(UiTheme.PANEL, 0.82), 12.0)
+	# Its head in the pitching club's colours.
+	team_plate(Rect2(rect.position, Vector2(rect.size.x, 46.0)), scene.club(scene.game.fielding()), 12.0)
 	var title := "%s 코스" % _pitcher_name() if show_spread else "이번 타석"
-	heading(rect.position + Vector2(16.0, 32.0), title, "", UiTheme.CYAN, 18)
-	keycap(rect.position + Vector2(rect.size.x - 86.0, 32.0), "C", "전환", 14)
-	draw_line(rect.position + Vector2(14.0, 46.0), rect.position + Vector2(rect.size.x - 14.0, 46.0), Color(1, 1, 1, 0.1), 1.0)
+	text(rect.position + Vector2(16.0, 31.0), title, 18, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 800)
+	keycap(rect.position + Vector2(rect.size.x - 86.0, 31.0), "C", "전환", 14)
 	var zone := scene.duel.zone
 	# The zone takes the middle; a band around it shows pitches off the plate.
 	var area := Rect2(rect.position + Vector2(30.0, 54.0), Vector2(rect.size.x - 60.0, rect.size.y - 104.0))

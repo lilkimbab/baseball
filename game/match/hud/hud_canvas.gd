@@ -91,6 +91,66 @@ static func club_colour(club: Team) -> Color:
 	return c
 
 
+## A plate in a club's colours (the user, 2026-11-23: "less black, more colour — as a KBO
+## broadcast, 2K14 and The Show have it"): the club's colour from bright at the left to deep at
+## the right, a gloss along the top, a slanted stripe of its second colour, its emblem large and
+## faint behind, the plate's cut corners and shadow. Text on it stays white.
+func team_plate(rect: Rect2, club: Team, cut: float = 12.0, alpha: float = 0.96) -> void:
+	var base := HudCanvas.club_colour(club)
+	var accent := club.accent if club != null else UiTheme.ACCENT
+	if absf(accent.get_luminance() - base.get_luminance()) < 0.12:
+		accent = club.secondary if club != null else Color.WHITE
+	var shape := plate_shape(rect, cut)
+	var shadow := PackedVector2Array()
+	for p: Vector2 in shape:
+		shadow.append(p + Vector2(0.0, 5.0))
+	draw_colored_polygon(shadow, Color(0.0, 0.0, 0.0, 0.35 * alpha))
+	var bright := Color(base.lightened(0.08), alpha)
+	var deep := Color(base.darkened(0.62), alpha)
+	var shades := PackedColorArray()
+	for p: Vector2 in shape:
+		var u := (p.x - rect.position.x) / maxf(rect.size.x, 1.0)
+		var v := (p.y - rect.position.y) / maxf(rect.size.y, 1.0)
+		shades.append(bright.lerp(deep, clampf(u * 0.85 + v * 0.25, 0.0, 1.0)))
+	draw_polygon(shape, shades)
+	if club != null and rect.size.y >= 70.0:
+		# (Inside the plate, behind its right end.)
+		var side := rect.size.y - 10.0
+		var mark := Rect2(Vector2(rect.end.x - side - rect.size.x * 0.2, rect.position.y + 5.0), Vector2(side, side))
+		Emblem.draw_emblem(self, club, mark)
+		# (Pushed back into the plate: a wash of its deep colour over the emblem.)
+		var wash := PackedVector2Array([mark.position, Vector2(mark.end.x, mark.position.y), mark.end, Vector2(mark.position.x, mark.end.y)])
+		draw_colored_polygon(wash, Color(deep.lerp(bright, 0.25), 0.78))
+	# The slanted stripe of the second colour, and a gloss along the top.
+	var x := rect.position.x + rect.size.x * 0.62
+	draw_colored_polygon(PackedVector2Array([Vector2(x, rect.position.y), Vector2(x + 16.0, rect.position.y), Vector2(x + 16.0 - rect.size.y * 0.35, rect.end.y), Vector2(x - rect.size.y * 0.35, rect.end.y)]), Color(accent, 0.22 * alpha))
+	draw_rect(Rect2(rect.position + Vector2(cut, 1.0), Vector2(rect.size.x - cut, rect.size.y * 0.42)), Color(1.0, 1.0, 1.0, 0.07 * alpha))
+	draw_rect(Rect2(Vector2(rect.position.x, rect.end.y - 4.0), Vector2(rect.size.x - cut, 4.0)), Color(accent, 0.9 * alpha))
+	var edge := shape.duplicate()
+	edge.append(shape[0])
+	draw_polyline(edge, Color(1.0, 1.0, 1.0, 0.18 * alpha), 1.2, true)
+
+
+## The broadcast's own colour block (the inning, the bases, the count; a line of play-by-play):
+## a deep red running to a darker one, glossed.
+func brand_plate(rect: Rect2, cut: float = 10.0, alpha: float = 0.96) -> void:
+	var shape := plate_shape(rect, cut)
+	var shadow := PackedVector2Array()
+	for p: Vector2 in shape:
+		shadow.append(p + Vector2(0.0, 5.0))
+	draw_colored_polygon(shadow, Color(0.0, 0.0, 0.0, 0.35 * alpha))
+	var top := Color(0.86, 0.16, 0.2, alpha)
+	var foot := Color(0.42, 0.04, 0.09, alpha)
+	var shades := PackedColorArray()
+	for p: Vector2 in shape:
+		shades.append(top.lerp(foot, clampf((p.y - rect.position.y) / maxf(rect.size.y, 1.0) * 0.8 + (p.x - rect.position.x) / maxf(rect.size.x, 1.0) * 0.3, 0.0, 1.0)))
+	draw_polygon(shape, shades)
+	draw_rect(Rect2(rect.position + Vector2(cut, 1.0), Vector2(rect.size.x - cut, rect.size.y * 0.4)), Color(1.0, 1.0, 1.0, 0.08 * alpha))
+	var edge := shape.duplicate()
+	edge.append(shape[0])
+	draw_polyline(edge, Color(1.0, 1.0, 1.0, 0.2 * alpha), 1.2, true)
+
+
 ## A band of a club's colour down the left edge of a plate; with `cut`, its top follows the
 ## plate's cut corner.
 func club_band(rect: Rect2, colour: Color, cut: float = 0.0) -> void:

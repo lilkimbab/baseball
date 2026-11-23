@@ -123,3 +123,16 @@ static func key_for(result: PaResult.Kind, last_call: PitchDuel.Result) -> Strin
 		PaResult.Kind.REACHED_ON_ERROR:
 			return "reached_on_error"
 	return ""
+
+
+## How excited the caster is for a line of this template: a home run, a long hit, a walk-off, a
+## lead taken shouted ("hot"); a strikeout, a double play, a jam escaped, a run in lifted
+## ("warm"); the rest said ("calm").
+static func mood_of(key: String) -> StringName:
+	for hot: String in ["home_run", "walk_off", "grand_slam", "go_ahead", "double", "triple"]:
+		if key.contains(hot) and not key.begins_with("double_play"):
+			return &"hot"
+	for warm: String in ["strikeout", "double_play", "escape", "tying", "_rbi", "steal", "caught_stealing", "triple_play"]:
+		if key.contains(warm):
+			return &"warm"
+	return &"calm"

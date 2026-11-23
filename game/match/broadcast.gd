@@ -14,7 +14,7 @@ extends RefCounted
 enum Kind { PREGAME, HALF, BATTER, PITCHER_CHANGE, REPLAY, GAME_END, BOARD, FANS, WALK_OFF, BENCH_CLEAR, INJURY }
 
 ## How long each kind lasts (s).
-const LENGTH := {Kind.PREGAME: 21.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5, Kind.BOARD: 3.2, Kind.FANS: 2.8, Kind.WALK_OFF: 5.5, Kind.BENCH_CLEAR: 5.5, Kind.INJURY: 6.5}
+const LENGTH := {Kind.PREGAME: 21.5, Kind.HALF: 2.6, Kind.BATTER: 2.2, Kind.PITCHER_CHANGE: 2.8, Kind.REPLAY: 4.5, Kind.GAME_END: 3.5, Kind.BOARD: 3.2, Kind.FANS: 2.8, Kind.WALK_OFF: 5.5, Kind.BENCH_CLEAR: 8.5, Kind.INJURY: 12.0}
 
 
 ## A camera shot: from `at` seconds into its segment, moving from (from, to, fov) to (from2,

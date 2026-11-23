@@ -158,7 +158,7 @@ func build() -> void:
 			refresh())
 		where.body.add_child(table)
 	choices("프로 시즌 길이", ["36", "72", "144"], ["36경기", "72경기", "144경기"], str(games), func(v: String) -> void: games = int(v), where.body)
-	_start = UiKit.button("커리어 시작", begin, "play", "primary")
+	_start = UiKit.button("전설의 시작", begin, "play", "primary")
 	_start.add_theme_font_size_override("font_size", 26)
 	where.body.add_child(_start)
 	_update_start()

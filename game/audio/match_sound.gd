@@ -58,6 +58,14 @@ var _beat := 0.0
 var _muffled := false
 ## What was played (name → times), for tests.
 var played: Dictionary[String, int] = {}
+## The play-by-play caster (CasterVoice): a quick call as the ball is hit, the line after.
+var caster: CasterVoice
+var _log_seen := 0
+var _called_play: Object = null
+## The caster's calls as the ball goes (said before the play is over, kept ready by the server).
+const CALLS := {PaResult.Kind.HOME_RUN: ["큽니다, 큽니다, 넘어갑니다!", "넘어갔습니다!", "맞는 순간 홈런!"],
+	PaResult.Kind.DOUBLE: ["빠졌습니다! 장타!", "외야를 가릅니다!"], PaResult.Kind.TRIPLE: ["빠졌습니다! 장타!", "펜스까지 굴러갑니다!"],
+	PaResult.Kind.SINGLE: ["안타!", "빠져나갑니다!"]}
 
 
 func _ready() -> void:
@@ -110,6 +118,8 @@ func _ready() -> void:
 	if Settings.voices and audible:
 		var voices := DisplayServer.tts_get_voices_for_language("ko")
 		_voice = voices[0] if not voices.is_empty() else ""
+	caster = CasterVoice.new()
+	add_child(caster)
 
 
 func _process(delta: float) -> void:
@@ -132,6 +142,24 @@ func step(delta: float) -> void:
 		_listen_game(game)
 		_mix_crowd(game)
 		_cheering(game)
+		_cast()
+
+
+## The caster: a call as a ball in play goes (its outcome is known as it starts), and each new
+## line of the play-by-play once it is written.
+func _cast() -> void:
+	var m := scene as MatchScene
+	if m == null or caster == null or not Settings.voices:
+		return
+	if m._play != null and m._play != _called_play and not m._play.foul:
+		_called_play = m._play
+		var calls: Array = CALLS.get(m._play.result, [])
+		if not calls.is_empty():
+			caster.say(str(calls[_rng.next_int(calls.size())]), &"hot" if m._play.result != PaResult.Kind.SINGLE else &"warm")
+	if m.log.size() > _log_seen:
+		if _log_seen > 0 or m.log.size() == 1:
+			caster.say(m.log[m.log.size() - 1], m.last_mood)
+		_log_seen = m.log.size()
 
 
 func _game() -> GameState:

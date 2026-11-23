@@ -48,7 +48,7 @@ func set_mode(_new_mode: StringName) -> void:
 
 func help_keys() -> String:
 	if done:
-		return "홈런 %d개 · Enter %s로 돌아가기" % [home_runs, "리그" if league_batter != null else "커리어"]
+		return "홈런 %d개 · Enter %s로 돌아가기" % [home_runs, "리그" if league_batter != null else "전설의 시작"]
 	return "홈런 더비 · 홈런 %d개 · 아웃 %d/%d · 클릭 스윙" % [home_runs, outs, limit]
 
 

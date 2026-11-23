@@ -20,6 +20,11 @@ var fielding := FieldingRatings.new()
 var pitching: PitchingRatings
 ## Form ids for motion: "batting", "pitching".
 var forms: Dictionary[String, String] = {}
+## His real line for the roster pack's season (tools/kbo/season_records.py), for what the park's
+## scoreboard and the broadcast's cards show when no season of the game has its own numbers:
+## a batter's year, g, pa, avg, hr, rbi, h, sb, ops; a pitcher's year, g, w, l, sv, hld, era,
+## so, outs. Empty for made-up players.
+var record: Dictionary = {}
 ## &"" for a local player, &"foreign" for one of the club's foreign players, &"asia" for its
 ## Asia-quota player (docs/13 S7).
 var origin: StringName = &""

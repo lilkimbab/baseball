@@ -236,7 +236,7 @@ func _stage_frames(delta: float) -> bool:
 			_stage_step = 2
 			_scene._plan_bench_clear()
 			var clear := Broadcast.segment(Broadcast.Kind.BENCH_CLEAR)
-			clear.shots = [_scene.bench_clear_shot()]
+			clear.shots = _scene.bench_clear_shots()
 			b.push(clear)
 			return false
 		if _args.has("rush") and _stage_step == 2:

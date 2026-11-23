@@ -36,7 +36,7 @@ func test_the_hub_reaches_every_part_in_one_click() -> void:
 	add_child_autofree(hub)
 	var labels := _buttons(hub)
 	# The tabs of the top bar, its small buttons, and the cards.
-	for want: String in ["친선 경기", "리그", "커리어", "연습", "상점", "불러오기", "환경 설정", "게임 종료", "리그 모드", "커리어 모드", "연습 모드"]:
+	for want: String in ["친선 경기", "리그", "전설의 시작", "연습", "상점", "불러오기", "환경 설정", "게임 종료", "리그 모드", "연습 모드"]:
 		assert_true(labels.has(want), want)
 	var title := TITLE.instantiate() as TitleScreen
 	add_child_autofree(title)

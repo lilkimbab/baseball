@@ -60,7 +60,7 @@ class Winter:
 	var year := 0
 	## [team id, player name, age, role] of each man who retired.
 	var retired: Array = []
-	## [team id, player id] of each rookie drafted.
+	## [team id, player id] of each rookie drafted, in the order they were picked.
 	var rookies: Array = []
 	## [team id, player id, points gained over the season] of the ten who grew most.
 	var risers: Array = []
@@ -182,6 +182,10 @@ static func winter(season: Season) -> Winter:
 				risers.append([team_id, p.id, float(season.grown[p.id])])
 	risers.sort_custom(func(a: Array, b: Array) -> bool: return float(a[2]) > float(b[2]))
 	w.risers = risers.slice(0, 10)
+	# The retirements: a foreign player's place goes to a new foreign player signed at once; a
+	# local man's to a rookie from the draft (below).
+	var places: Dictionary[String, Array] = {}
+	var numbers_of: Dictionary[String, Dictionary] = {}
 	for team_id: String in team_ids:
 		var team: Team = season.teams[team_id]
 		var d := maxi(season.division_of(team_id), 0)
@@ -197,28 +201,28 @@ static func winter(season: Season) -> Winter:
 		var numbers: Dictionary[int, bool] = {}
 		for p: Player in team.players:
 			numbers[p.number] = true
+		numbers_of[team_id] = numbers
+		places[team_id] = []
 		for p: Player in leaving:
 			var was_first := team.is_registered(p.id)
 			w.retired.append([team_id, p.name, w.year - p.born, RosterMoves.kind_of(p)])
 			take_off(season, team, p)
 			var role := role_of(p)
-			var newcomer: Player
 			if p.origin != &"":
-				# A club replaces its foreign player with another, signed for the first team.
-				newcomer = gen.player(role, mean, p.origin)
+				var newcomer := gen.player(role, mean, p.origin)
 				newcomer.born += w.year - 2026
 				newcomer.potential = 0.0
+				newcomer.id = "r%d_%s_%d" % [w.year, team_id, w.rookies.size()]
+				newcomer.number = _free_number(newcomer, numbers, rng)
+				team.players.append(newcomer)
+				if was_first and not team.registered.is_empty():
+					team.registered.append(newcomer.id)
+				w.rookies.append([team_id, newcomer.id])
 			else:
-				newcomer = gen.player(role, mean - LeagueGenerator.FARM_GAP, &"", true)
-				var age := rng.next_int_range(ROOKIE_AGES.x, ROOKIE_AGES.y)
-				newcomer.born = w.year - age
-				newcomer.potential = initial_room(age, rng, true)
-			newcomer.id = "r%d_%s_%d" % [w.year, team_id, w.rookies.size()]
-			newcomer.number = _free_number(newcomer, numbers, rng)
-			team.players.append(newcomer)
-			if newcomer.origin != &"" and was_first and not team.registered.is_empty():
-				team.registered.append(newcomer.id)
-			w.rookies.append([team_id, newcomer.id])
+				(places[team_id] as Array).append(role)
+	_draft(season, w, places, numbers_of, names, rng)
+	for team_id: String in team_ids:
+		var team: Team = season.teams[team_id]
 		for p: Player in team.players:
 			decline(p, w.year - p.born)
 		RosterMoves.refill(season, team)
@@ -229,6 +233,70 @@ static func winter(season: Season) -> Winter:
 				RosterMoves.apply(season, team, m)
 	season.grown.clear()
 	return w
+
+
+## The rookie draft (the user, 2026-11-23: the league's rookies through a draft, as the career's
+## own player comes in): a class of the year's prospects, as many as there are local places to
+## fill, picked round by round in the reverse order of the season's table (the worst club
+## first; a lower division after a higher one's clubs), each club taking the best it sees —
+## its scouts are not exact — and a man for a place it has to fill over a slightly better one.
+## Each pick comes in as a second-team rookie, aged 19 to 22, with room to grow.
+static func _draft(season: Season, w: Winter, places: Dictionary[String, Array], numbers_of: Dictionary[String, Dictionary], names: NameTable, rng: Rng) -> void:
+	var gen := LeagueGenerator.new(names, season.catalog, hash("draft class:%d" % w.year))
+	var pool: Array[Player] = []
+	for team_id: String in places:
+		var d := maxi(season.division_of(team_id), 0)
+		var mean := LeagueGenerator.DIVISION_MEANS[mini(d, LeagueGenerator.DIVISION_MEANS.size() - 1)]
+		for role: String in places[team_id]:
+			var rookie := gen.player(role, mean - LeagueGenerator.FARM_GAP, &"", true)
+			var age := rng.next_int_range(ROOKIE_AGES.x, ROOKIE_AGES.y)
+			rookie.born = w.year - age
+			rookie.potential = initial_room(age, rng, true)
+			pool.append(rookie)
+	var value: Dictionary[Player, float] = {}
+	for p: Player in pool:
+		value[p] = ClubRules.player_ovr(p, season.ovr, season.catalog) + 0.5 * p.potential
+	var order := draft_order(season)
+	var guard := 0
+	while not pool.is_empty() and guard < 1000:
+		guard += 1
+		for team_id: String in order:
+			var needs: Array = places.get(team_id, [])
+			if needs.is_empty() or pool.is_empty():
+				continue
+			var best: Player = null
+			var best_score := -INF
+			for p: Player in pool:
+				var fits := needs.has(role_of(p))
+				var score := value[p] + (3.0 if fits else 0.0) + rng.next_normal() * 2.0
+				if score > best_score:
+					best_score = score
+					best = p
+			pool.erase(best)
+			var filled := needs.find(role_of(best))
+			needs.remove_at(filled if filled >= 0 else 0)
+			var team: Team = season.teams[team_id]
+			best.id = "r%d_%s_%d" % [w.year, team_id, w.rookies.size()]
+			best.number = _free_number(best, numbers_of[team_id] as Dictionary[int, bool], rng)
+			team.players.append(best)
+			w.rookies.append([team_id, best.id])
+
+
+## The draft's order: the clubs from the bottom of the season's table up, a lower division's
+## after a higher one's.
+static func draft_order(season: Season) -> PackedStringArray:
+	var out := PackedStringArray()
+	for d: int in season.divisions.size():
+		var ranked := season.standings[d].ranked() if d < season.standings.size() else []
+		var ids := PackedStringArray()
+		for row: StandingsRow in ranked:
+			ids.append(row.team_id)
+		for id: String in season.divisions[d]:
+			if not ids.has(id):
+				ids.append(id)
+		ids.reverse()
+		out.append_array(ids)
+	return out
 
 
 ## The role a man's place is filled with ("SP", "RP", or his positions as the generator names

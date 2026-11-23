@@ -64,10 +64,15 @@ void vertex() {
 	float bounce = 0.0;
 	bool props = poses >= 14;
 	if (person >= fans) {
-		// A cheerleader: her routine, a step a beat through the six pictures of her dance.
-		int step = int(floor(b)) % 8;
+		// A cheerleader: the routine, a step a beat through the six pictures of the dance, all
+		// of them together (on the beat itself, not each fan's own lag).
+		int step = int(floor(beat)) % 8;
 		pose = (step == 0 || step == 2 || step == 6) ? 0 : (step == 1 ? 1 : (step == 3 ? 2 : (step == 4 ? 3 : (step == 5 ? 4 : 5))));
-		bounce = 0.05 * abs(sin(b * 3.14159));
+		bounce = 0.05 * abs(sin(beat * 3.14159));
+	} else if (zone == 7) {
+		// The cheer leader on the stage: both arms up and one arm, on the beat, leading them.
+		pose = fract(beat * 0.5) < 0.5 ? CHEER : CHEER_ONE;
+		bounce = 0.06 * abs(sin(beat * 3.14159));
 	} else if (st > 2.5) {
 		// Clapping: hands together on the beat, apart between; a few just watch.
 		pose = who < 0.8 ? (fract(b) < 0.5 ? CLAP : SEATED) : LEAN;
@@ -131,7 +136,8 @@ void vertex() {
 		f += people * poses;
 	}
 	v_cell = vec2(float(f % columns), float(f / columns));
-	v_flip = step(0.5, fract(phase * 7.77 + INSTANCE_CUSTOM.w * 3.1));
+	// (Cheerleaders are never mirrored: the routine stays the same for all of them.)
+	v_flip = person >= fans ? 0.0 : step(0.5, fract(phase * 7.77 + INSTANCE_CUSTOM.w * 3.1));
 	v_tint = COLOR.rgb;
 	v_dyed = INSTANCE_CUSTOM.z;
 

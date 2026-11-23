@@ -1123,10 +1123,40 @@ func season_figures(p: Player) -> Array:
 			var b: BattingLine = s.book.batting.get(p.id)
 			if b != null and b.pa > 0:
 				return [["타율", BattingLine.rate_text(b.average())], ["홈런", "%d" % b.home_runs], ["타점", "%d" % b.rbi], ["OPS", BattingLine.rate_text(b.ops())]]
+	var real := record_figures(p)
+	if not real.is_empty():
+		return real
 	var o := ClubRules.player_ovr(p, LeagueEnvIO.load_overall(), catalog)
 	if p.is_pitcher():
 		return [["OVR", UiTheme.shown_text(o)], ["구위", UiTheme.shown_text(p.pitching.stuff(catalog))], ["제구", UiTheme.shown_text(p.pitching.control)], ["구속", "%d" % roundi(p.pitching.fastball_speed())]]
 	return [["OVR", UiTheme.shown_text(o)], ["컨택트", UiTheme.shown_text(p.batting.contact())], ["파워", UiTheme.shown_text(p.batting.power())], ["주력", UiTheme.shown_text(p.batting.speed)]]
+
+
+## His real season's line from the roster pack (Player.record) as four figures, or [].
+static func record_figures(p: Player) -> Array:
+	var r := p.record
+	if r.is_empty():
+		return []
+	if r.has("era"):
+		return [["평균자책점", "%.2f" % float(r["era"])], ["승-패", "%d-%d" % [int(r.get("w", 0)), int(r.get("l", 0))]], ["세이브" if int(r.get("sv", 0)) >= int(r.get("hld", 0)) else "홀드", str(maxi(int(r.get("sv", 0)), int(r.get("hld", 0))))], ["탈삼진", str(int(r.get("so", 0)))]]
+	return [["타율", BattingLine.rate_text(float(r.get("avg", 0.0)))], ["홈런", str(int(r.get("hr", 0)))], ["타점", str(int(r.get("rbi", 0)))], ["OPS", BattingLine.rate_text(float(r.get("ops", 0.0)))]]
+
+
+## A batter's season as the park's scoreboard shows it (the user, 2026-11-23: "a KBO board shows
+## the season, not ratings"): the game's season when he has one, else his real one from the roster
+## pack, else dashes. Strings by key: label, avg, ab, h, hr, rbi, sb, obp, slg.
+func board_stats(p: Player) -> Dictionary:
+	var s := _season()
+	if s != null and s.book.batting.has(p.id) and (s.book.batting[p.id] as BattingLine).pa > 0:
+		var b: BattingLine = s.book.batting[p.id]
+		return {"label": "%d 시즌" % s.season_year, "avg": BattingLine.rate_text(b.average()), "ab": str(b.ab), "h": str(b.hits), "hr": str(b.home_runs),
+			"rbi": str(b.rbi), "sb": str(b.stolen_bases), "obp": BattingLine.rate_text(b.on_base()), "slg": BattingLine.rate_text(b.slugging())}
+	var r := p.record
+	if not r.is_empty() and not r.has("era"):
+		return {"label": "%d 시즌" % int(r.get("year", 0)), "avg": BattingLine.rate_text(float(r.get("avg", 0.0))), "ab": str(int(r.get("ab", r.get("pa", 0)))), "h": str(int(r.get("h", 0))),
+			"hr": str(int(r.get("hr", 0))), "rbi": str(int(r.get("rbi", 0))), "sb": str(int(r.get("sb", 0))), "obp": BattingLine.rate_text(float(r.get("obp", 0.0))) if r.has("obp") else "-",
+			"slg": BattingLine.rate_text(float(r.get("slg", 0.0))) if r.has("slg") else "-"}
+	return {"label": "시즌 기록 없음"}
 
 
 ## A man may be hurt (Injuries): if he is, he is out of the game at once (AiManager.hurt) and
@@ -1500,7 +1530,7 @@ func _finish_pitch() -> void:
 		if tempers and broadcast.enabled and park != null:
 			_plan_bench_clear()
 			var clear := Broadcast.segment(Broadcast.Kind.BENCH_CLEAR)
-			clear.shots = [bench_clear_shot()]
+			clear.shots = bench_clear_shots()
 			broadcast.push(clear)
 	if play != null and not play.foul:
 		_play = play
@@ -1697,6 +1727,9 @@ func _apply(e: GameEvent) -> void:
 	manager.note_change(game, e)
 	if e.kind == GameEvent.Kind.PLATE_APPEARANCE:
 		_clear_track = true
+		if not pa_results.has(batter):
+			pa_results[batter] = PackedStringArray()
+		pa_results[batter].append(short_result(e.result))
 		# Reached on four balls or a pitch: he walks to first (the trot), and a hit batter may
 		# be hurt — replaced by a pinch runner at once, out of the game.
 		_trot = ""
@@ -1731,6 +1764,7 @@ func _apply(e: GameEvent) -> void:
 func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 	var team := game.teams[out.batting_before]
 	var pick := log.size()
+	last_mood = &"warm" if e.kind == GameEvent.Kind.STEAL or e.kind == GameEvent.Kind.PICKOFF else &"calm"
 	match e.kind:
 		GameEvent.Kind.PLATE_APPEARANCE:
 			var p := team.player(batter_id)
@@ -1750,6 +1784,7 @@ func _describe(e: GameEvent, out: FlowOutcome, batter_id: String) -> String:
 				key = "home_run_wind"
 			elif key == "fly_out" and wind < -2.5 and deep:
 				key = "fly_out_wind"
+			last_mood = Commentary.mood_of(key)
 			return commentary.line(key, pick, p.name if p != null else batter_id, GameSim.play_text(e, out), e.fielders, runs)
 		GameEvent.Kind.STEAL, GameEvent.Kind.PICKOFF:
 			var m := e.moves[0]
@@ -3202,12 +3237,6 @@ func _push_half() -> void:
 var _halves_shown := 0
 
 
-## The benches cleared: from behind the third-base side of the plate, low, closing in on the
-## two sides facing each other.
-func bench_clear_shot() -> Broadcast.Shot:
-	return Broadcast.Shot.make(0.0, Vector3(-6.5, -7.0, 3.6), Vector3(0.0, 5.0, 1.2), 36.0, Vector3(-4.5, -4.5, 3.0), Vector3(0.0, 5.0, 1.2), 30.0)
-
-
 ## The park's scoreboard from high behind the plate (over the batter), closing in on it.
 func board_shot() -> Broadcast.Shot:
 	var board := park.scoreboard_at
@@ -3220,9 +3249,10 @@ func stage_shot(side: int) -> Broadcast.Shot:
 	var at := Field.to_field(park.stage_spot(1.0 if side == GameState.HOME else -1.0))
 	var home := -Vector2(at.x, at.y).normalized()
 	var across := Vector2(home.y, -home.x)
-	var from := Vector3(at.x + home.x * 10.0 + across.x * 2.0, at.y + home.y * 10.0 + across.y * 2.0, at.z + 1.0)
-	var to := Vector3(at.x - home.x * 2.5, at.y - home.y * 2.5, at.z + 1.9)
-	var closer := Vector3(at.x + home.x * 8.0 + across.x * 1.6, at.y + home.y * 8.0 + across.y * 1.6, at.z + 1.1)
+	# (A little above the deck: the squad on its riser behind the leader shows over him.)
+	var from := Vector3(at.x + home.x * 10.0 + across.x * 2.0, at.y + home.y * 10.0 + across.y * 2.0, at.z + 2.3)
+	var to := Vector3(at.x - home.x * 1.2, at.y - home.y * 1.2, at.z + 1.7)
+	var closer := Vector3(at.x + home.x * 8.0 + across.x * 1.6, at.y + home.y * 8.0 + across.y * 1.6, at.z + 2.2)
 	return Broadcast.Shot.make(0.0, from, to, 34.0, closer, to, 31.0)
 
 
@@ -3322,71 +3352,94 @@ func _plan_walk_off(hero_id: String) -> void:
 		_rush_plan.append([side, from + Vector3(rng.next_range(-2.0, 2.0), rng.next_range(-1.5, 1.5), 0.0), plate + Vector3(cos(ang) * r, sin(ang) * r, 0.0), rng.next_range(0.0, 0.7), &"mob"])
 
 
-## The benches clear: both sides out of their dugouts to face each other between the plate and
-## the mound, a few of them with words and hands up; nobody throws a punch.
+## How excited the caster is for the last line (Commentary.mood_of).
+var last_mood := &"calm"
+
+
+## What each batter has done today, plate appearance by plate appearance, in the board's short
+## words ("안타", "삼진", "볼넷").
+var pa_results: Dictionary[String, PackedStringArray] = {}
+
+
+static func short_result(kind: PaResult.Kind) -> String:
+	match kind:
+		PaResult.Kind.SINGLE:
+			return "안타"
+		PaResult.Kind.DOUBLE:
+			return "2루타"
+		PaResult.Kind.TRIPLE:
+			return "3루타"
+		PaResult.Kind.HOME_RUN:
+			return "홈런"
+		PaResult.Kind.WALK:
+			return "볼넷"
+		PaResult.Kind.INTENTIONAL_WALK:
+			return "고의4구"
+		PaResult.Kind.HIT_BY_PITCH:
+			return "사구"
+		PaResult.Kind.STRIKEOUT:
+			return "삼진"
+		PaResult.Kind.DROPPED_THIRD_STRIKE:
+			return "낫아웃"
+		PaResult.Kind.GROUND_OUT:
+			return "땅볼"
+		PaResult.Kind.FLY_OUT, PaResult.Kind.POP_OUT:
+			return "뜬공"
+		PaResult.Kind.LINE_OUT:
+			return "직선타"
+		PaResult.Kind.DOUBLE_PLAY:
+			return "병살"
+		PaResult.Kind.TRIPLE_PLAY:
+			return "삼중살"
+		PaResult.Kind.SAC_FLY:
+			return "희비"
+		PaResult.Kind.SAC_BUNT:
+			return "희번"
+		PaResult.Kind.FIELDERS_CHOICE:
+			return "야선"
+		PaResult.Kind.REACHED_ON_ERROR:
+			return "실책"
+	return "-"
+
+
+## The staged cutscenes on the field: the benches clearing, a man carried off (FieldScenes).
+var field_scenes: FieldScenes
+
+
+func _field_scenes() -> FieldScenes:
+	if field_scenes == null:
+		field_scenes = FieldScenes.new(self)
+	return field_scenes
+
+
+## The benches clear (FieldScenes.plan_brawl).
 func _plan_bench_clear() -> void:
 	_rush_plan.clear()
-	var rng := Rng.new(hash("clear:%d:%d" % [seed_value, _pitch_count]))
-	var spot := Vector3(0.0, 5.0, 0.0)
-	var total := 0
-	for side: int in [GameState.AWAY, GameState.HOME]:
-		var men := _men_of(side, RUSH_CLEAR, "")
-		_rush_figures(total + men.size())
-		var from := _dugout(side)
-		var toward := 1.0 if side == GameState.HOME else -1.0
-		for i: int in men.size():
-			_dress_rush(_rush[total + i], side, men[i])
-			var to := spot + Vector3(toward * rng.next_range(0.9, 2.8), rng.next_range(-2.6, 2.6), 0.0)
-			_rush_plan.append([side, from + Vector3(rng.next_range(-2.0, 2.0), rng.next_range(-1.5, 1.5), 0.0), to, rng.next_range(0.0, 0.9), &"face_off"])
-		total += men.size()
+	_field_scenes().plan_brawl()
 
 
-## A man hurt at the plate: down where he was hit; the trainer and a teammate run out of his
-## dugout to him, and the three walk back to it slowly, one either side of him.
+## A man hurt at the plate is carried off on a stretcher to an ambulance (FieldScenes).
 func _plan_injury(hurt_id: String, side: int) -> void:
 	_rush_plan.clear()
-	var man := game.teams[side].player(hurt_id)
-	var helpers := _men_of(side, 2, hurt_id)
-	if man == null:
-		return
-	_rush_figures(1 + helpers.size())
-	var at := Vector3(_box.x * (-1.0 if settings.bats_left else 1.0), _box.y, 0.0)
-	var dugout := _dugout(side)
-	_dress_rush(_rush[0], side, man)
-	_rush_plan.append([side, at, dugout, INJURY_DOWN, &"hurt"])
-	for i: int in helpers.size():
-		_dress_rush(_rush[i + 1], side, helpers[i])
-		_rush_plan.append([side, dugout, at, 0.3 + 0.3 * i, &"helper", i])
+	_field_scenes().plan_medical(hurt_id, side)
 
 
-## Seconds he stays down before he is helped up, and how fast the three walk off (m/s).
-const INJURY_DOWN := 2.6
-const INJURY_WALK := 1.3
-
-
-## The injury from the side of the plate, then wider as he is helped toward the dugout.
 func injury_shots() -> Array[Broadcast.Shot]:
-	var bx := _box.x * (-1.0 if settings.bats_left else 1.0)
-	# (From his outside, toward the mound: the catcher and the umpire are not in the way.)
-	var out := signf(bx) if bx != 0.0 else -1.0
-	return [Broadcast.Shot.make(0.0, Vector3(bx + out * 4.2, 3.0, 1.5), Vector3(bx, 0.0, 0.6), 36.0, Vector3(bx + out * 3.6, 2.6, 1.4), Vector3(bx, 0.0, 0.7), 32.0),
-		Broadcast.Shot.make(INJURY_DOWN, Vector3(bx + 7.0, -8.0, 4.0), Vector3(bx * 0.3, 3.0, 1.0), 44.0, Vector3(bx + 8.0, -9.0, 4.5), Vector3(bx * 0.2, 6.0, 1.0), 48.0)]
+	return _field_scenes().medical_shots()
 
 
-## Where the hurt man is `t` seconds in: down at the plate, then walking off at a slow pace.
-func _hurt_at(plan: Array, t: float) -> Vector3:
-	var from: Vector3 = plan[1]
-	var to: Vector3 = plan[2]
-	var walked := maxf(t - INJURY_DOWN, 0.0) * INJURY_WALK
-	var span := Vector2(to.x - from.x, to.y - from.y)
-	return from.lerp(to, clampf(walked / maxf(span.length(), 0.01), 0.0, 1.0))
+func bench_clear_shots() -> Array[Broadcast.Shot]:
+	return _field_scenes().brawl_shots()
 
 
 ## The figures at `t` seconds into their scene (or all hidden, t < 0).
 func _show_rush(t: float) -> void:
 	_rush_shown = t >= 0.0
+	if field_scenes != null and field_scenes.kind != &"":
+		field_scenes.show(t)
+		return
 	# The hero is one of the figures: the batter's own figure steps aside meanwhile.
-	var hero_out: bool = t >= 0.0 and not _rush_plan.is_empty() and (_rush_plan[0] as Array)[4] in [&"hero", &"hurt"]
+	var hero_out: bool = t >= 0.0 and not _rush_plan.is_empty() and (_rush_plan[0] as Array)[4] == &"hero"
 	batter.visible = not hero_out
 	# The beaten catcher has walked off; the plate is theirs.
 	catcher.visible = not (hero_out and (_rush_plan[0] as Array)[4] == &"hero")
@@ -3407,34 +3460,7 @@ func _show_rush(t: float) -> void:
 		var look := Vector2(to.x, to.y) + flat.normalized()
 		var pose := PuppetClips.standing()
 		var lift := 0.0
-		if role == &"hurt":
-			# Down holding where it hit him, then up and walking slowly.
-			at = _hurt_at(plan, t)
-			if t < INJURY_DOWN:
-				pose = PuppetClips.kneel() if t > 0.4 else PuppetClips.flinch().blend(PuppetClips.kneel(), t / 0.4)
-				look = Vector2(at.x - 1.0, at.y + 1.0)
-			else:
-				pose = PuppetClips.walk((t - INJURY_DOWN) * 1.6)
-				look = Vector2(to.x, to.y)
-		elif role == &"helper":
-			# Out to him at a run; at his side as he walks.
-			var him := _hurt_at(_rush_plan[0], t)
-			var off_dir := Vector2(1.0, 0.0)
-			var back: Vector3 = (_rush_plan[0] as Array)[2]
-			var path := Vector2(back.x - him.x, back.y - him.y)
-			if path.length() > 0.1:
-				off_dir = path.normalized().orthogonal()
-			var beside := him + Vector3(off_dir.x, off_dir.y, 0.0) * (0.55 if int(plan[5]) == 0 else -0.55)
-			if t < INJURY_DOWN:
-				at = from.lerp(beside, u)
-				pose = PuppetClips.run_at((t - delay) * 3.0, 0.8) if u < 1.0 and t >= delay else PuppetClips.fielder_crouch()
-				look = Vector2(him.x, him.y) if u >= 1.0 else Vector2(beside.x, beside.y) + flat.normalized()
-			else:
-				at = beside
-				pose = PuppetClips.walk((t - INJURY_DOWN) * 1.6)
-				look = Vector2(back.x, back.y)
-			at.z = 0.0
-		elif role == &"hero":
+		if role == &"hero":
 			# Jumping at the plate, arms up.
 			lift = 0.22 * maxf(sin(t * 7.0), 0.0)
 			pose = PuppetClips.fist_pump() if fmod(t, 0.9) < 0.5 else PuppetClips.hold(2.0, 0.5, 0.1)

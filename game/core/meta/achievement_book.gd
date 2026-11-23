@@ -26,7 +26,7 @@ class Def:
 
 
 const TIER_NAMES: Array[String] = ["브론즈", "실버", "골드", "플래티넘"]
-const CATEGORY_NAMES := {"game": "경기", "batting": "타격", "pitching": "투구", "league": "리그", "career": "커리어", "shop": "수집", "all": "머니볼"}
+const CATEGORY_NAMES := {"game": "경기", "batting": "타격", "pitching": "투구", "league": "리그", "career": "전설의 시작", "shop": "수집", "all": "머니볼"}
 
 var defs: Array[Def] = []
 var tier_points := PackedInt32Array([100, 250, 600, 3000])

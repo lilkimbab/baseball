@@ -1,9 +1,10 @@
 cheer_scale 1.25
-people 15
-fans 13
+names kr_w01 kr_m01 kr_w02 kr_m02 kr_w03 kr_m03 kr_w04 kr_m04 kr_w05 kr_m05 kr_w06 kr_m06 kr_w07 kr_m07 kr_w08 kr_m08 kr_w09 kr_m09 Female_Adult_02 Male_Adult_01 Male_Adult_06 kr_cheer1 kr_cheer2
+people 23
+fans 21
 poses seated seated_lean seated_arms clapping standing standing_clap cheering cheer_one eating drinking phone sticks_up sticks_hit towel
 columns 16
-rows 27
+rows 41
 frame 128 256
 height_m 2.00
 views 2

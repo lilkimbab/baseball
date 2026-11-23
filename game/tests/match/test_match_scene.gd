@@ -628,7 +628,7 @@ func test_the_player_fields_only_the_balls_that_need_him() -> void:
 	assert_false(MatchScene.own_to_field(grounder, Position.Kind.RF), "a clean single is not")
 
 
-func test_a_walk_off_mobs_the_hero_and_the_benches_can_clear() -> void:
+func test_a_walk_off_mobs_the_hero() -> void:
 	var scene := _start(3)
 	var hero := scene.game.teams[GameState.HOME].batter_at(0)
 	scene._plan_walk_off(hero)
@@ -646,33 +646,44 @@ func test_a_walk_off_mobs_the_hero_and_the_benches_can_clear() -> void:
 	assert_true(scene.batter.visible)
 	for fig: Puppet in scene._rush:
 		assert_false(fig.visible)
-	scene._plan_bench_clear()
-	var sides := {}
-	for plan: Array in scene._rush_plan:
-		sides[int(plan[0])] = int(sides.get(int(plan[0]), 0)) + 1
-	assert_eq(sides.get(GameState.AWAY, 0), MatchScene.RUSH_CLEAR)
-	assert_eq(sides.get(GameState.HOME, 0), MatchScene.RUSH_CLEAR)
-	scene._show_rush(4.5)
-	for i: int in scene._rush_plan.size():
-		var at := Field.to_field(scene._rush[i].position)
-		var home: bool = int((scene._rush_plan[i] as Array)[0]) == GameState.HOME
-		assert_eq(at.x > 0.0, home, "each side on its own half, facing the other")
 
 
-func test_a_hurt_man_is_helped_off_to_his_dugout() -> void:
+func test_a_hurt_man_is_carried_off_to_an_ambulance() -> void:
 	var scene := _start(4)
 	var side := scene.game.batting()
 	var hurt := scene.game.batter_id()
 	scene._plan_injury(hurt, side)
-	assert_eq(scene._rush_plan.size(), 3, "he and the two who help him")
-	scene._show_rush(1.0)
+	var fs := scene.field_scenes
+	assert_eq(fs.kind, &"medical")
+	assert_eq(fs.plan.size(), 5, "he, his trainer and three medics")
+	assert_eq(scene.injury_shots().size(), 5)
+	fs.show(1.0)
+	assert_false(scene.batter.visible, "his own figure steps aside")
 	var down := Field.to_field(scene._rush[0].position)
-	scene._show_rush(MatchScene.INJURY_DOWN + 4.0)
-	var later := Field.to_field(scene._rush[0].position)
-	var dugout: Vector3 = (scene._rush_plan[0] as Array)[2]
-	assert_lt(Vector2(later.x - dugout.x, later.y - dugout.y).length(), Vector2(down.x - dugout.x, down.y - dugout.y).length() - 4.0, "walking off toward the dugout")
-	for i: int in [1, 2]:
-		var at := Field.to_field(scene._rush[i].position)
-		assert_lt(Vector2(at.x - later.x, at.y - later.y).length(), 0.8, "at his side")
-	scene._show_rush(-1.0)
+	fs.show(FieldScenes.LIFTED + 1.5)
+	var carried := Field.to_field(scene._rush[0].position)
+	assert_gt(Vector2(carried.x - down.x, carried.y - down.y).length(), 1.0, "carried toward the ambulance")
+	assert_gt(carried.z, 0.5, "on the stretcher, off the ground")
+	fs.show(FieldScenes.AT_DOORS + 1.0)
+	assert_false(scene._rush[0].visible, "aboard")
+	fs.show(-1.0)
 	assert_true(scene.batter.visible)
+	assert_eq(fs.kind, &"")
+
+
+func test_the_benches_clear_into_one_knot() -> void:
+	var scene := _start(5)
+	scene._plan_bench_clear()
+	var fs := scene.field_scenes
+	assert_eq(fs.kind, &"brawl")
+	assert_gt(fs.plan.size(), 20, "both sides: the men on the field and the benches")
+	fs.show(FieldScenes.BRAWL_LENGTH - 0.2)
+	var near := 0
+	for i: int in fs.plan.size():
+		var at := Field.to_field(scene._rush[i].position)
+		if Vector2(at.x - FieldScenes.BRAWL_AT.x, at.y - FieldScenes.BRAWL_AT.y).length() < 4.5:
+			near += 1
+	assert_gt(near, fs.plan.size() * 0.8, "nearly all of them in the knot by the end")
+	assert_false(scene.pitcher.visible, "the game's own cast hidden meanwhile")
+	fs.show(-1.0)
+	assert_true(scene.pitcher.visible)

@@ -24,7 +24,7 @@ const DOCK: Array[Array] = [
 	["hub", "홈", "house", HUB],
 	["quick", "친선 경기", "baseball", QUICK],
 	["league", "리그", "trophy", ""],
-	["career", "커리어", "user-circle", ""],
+	["career", "전설의 시작", "user-circle", ""],
 	["practice", "연습", "target", PRACTICE],
 	["shop", "상점", "storefront", SHOP],
 	["achievements", "업적", "medal", ACHIEVEMENTS],

@@ -43,9 +43,13 @@ func _draw() -> void:
 	panel(keys, UiTheme.PANEL_DARK, 0.0)
 	keycaps(Vector2(middle_x, keys.end.y - 10.0), scene.help_keys() + "   Tab 상세", middle_w, 15)
 	if scene.last_text != "" and Settings.commentary:
+		# The play-by-play on the broadcast's red, a white tab with the inning at its left.
 		var line := Rect2(Vector2(middle_x, top), Vector2(middle_w, 50.0))
-		panel(line, UiTheme.PANEL, 8.0)
-		text(line.position + Vector2(0.0, 34.0), scene.last_text, 20, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, line.size.x)
+		brand_plate(line, 10.0)
+		var tab := Rect2(line.position + Vector2(10.0, 9.0), Vector2(74.0, 32.0))
+		draw_colored_polygon(plate_shape(tab, 6.0), Color(1, 1, 1, 0.92))
+		text(tab.position + Vector2(0.0, 23.0), "%d회%s" % [g.inning, "초" if g.top else "말"], 16, Color(0.55, 0.05, 0.09), HORIZONTAL_ALIGNMENT_CENTER, tab.size.x, 800)
+		text(line.position + Vector2(92.0, 34.0), scene.last_text, 20, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, line.size.x - 100.0, 700)
 	if detail:
 		_batter_detail(Rect2(Vector2(20.0, top - 252.0), Vector2(CARD, 238.0)), batter, g)
 		_pitcher_detail(Rect2(Vector2(view.x - CARD - 20.0, top - 252.0), Vector2(CARD, 238.0)), pitcher, g)
@@ -54,18 +58,19 @@ func _draw() -> void:
 ## A player's card: the plate, his club's colour down the edge, a grey line over his name, the
 ## overall in a block of its own at the right (as the menus' player card has it).
 func _card(rect: Rect2, side: int, head: String, name: String, ovr: int) -> void:
-	panel(rect, UiTheme.PANEL, 12.0)
+	# In his club's colours, its emblem large behind (the user, 2026-11-23: "less black").
 	var club := scene.club(side)
-	var colour := HudCanvas.club_colour(club)
-	club_band(Rect2(rect.position, Vector2(7.0, rect.size.y)), colour, 12.0)
+	team_plate(rect, club, 12.0)
 	if club != null:
-		Emblem.draw_emblem(self, club, Rect2(rect.position + Vector2(20.0, 22.0), Vector2(46.0, 46.0)))
-	text(rect.position + Vector2(80.0, 32.0), head, 16, UiTheme.DIM, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 500)
-	text(rect.position + Vector2(80.0, 70.0), name, 30, UiTheme.INK, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
-	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK, rect.position.y), Vector2(OVR_BLOCK, rect.size.y))
-	draw_line(block.position + Vector2(0.0, 14.0), Vector2(block.position.x, block.end.y - 14.0), Color(1, 1, 1, 0.12), 1.2)
-	figure(block.position + Vector2(0.0, 58.0), UiTheme.shown_text(ovr), 44, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0, true)
-	figure(block.position + Vector2(0.0, 80.0), "OVR", 14, UiTheme.DIM, HORIZONTAL_ALIGNMENT_CENTER, block.size.x - 6.0)
+		Emblem.draw_emblem(self, club, Rect2(rect.position + Vector2(16.0, 18.0), Vector2(54.0, 54.0)))
+	text(rect.position + Vector2(80.0, 32.0), head, 16, Color(1, 1, 1, 0.8), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 600)
+	text(rect.position + Vector2(80.0, 72.0), name, 32, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 800)
+	# The overall on a gold tab.
+	var block := Rect2(Vector2(rect.end.x - OVR_BLOCK + 6.0, rect.position.y + 10.0), Vector2(OVR_BLOCK - 16.0, rect.size.y - 24.0))
+	draw_colored_polygon(plate_shape(block, 8.0), Color(0.0, 0.0, 0.0, 0.38))
+	draw_rect(Rect2(block.position, Vector2(block.size.x, 3.0)), UiTheme.ACCENT)
+	figure(block.position + Vector2(0.0, 46.0), UiTheme.shown_text(ovr), 42, UiTheme.ACCENT, HORIZONTAL_ALIGNMENT_CENTER, block.size.x, true)
+	figure(block.position + Vector2(0.0, 64.0), "OVR", 13, Color(1, 1, 1, 0.75), HORIZONTAL_ALIGNMENT_CENTER, block.size.x)
 
 
 func _batter_card(rect: Rect2, team: TeamInGame, p: Player, g: GameState) -> void:

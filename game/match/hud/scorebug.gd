@@ -31,13 +31,12 @@ func _draw() -> void:
 		return
 	begin()
 	var g := scene.game
-	var box := Rect2(AT, Vector2(WIDTH, HEIGHT))
-	panel(box, UiTheme.PANEL, 12.0)
+	# Each club's row in its own colours; the inning, the bases and the count on the broadcast's
+	# red (the user, 2026-11-23: "less black, more to look at").
+	brand_plate(Rect2(AT + Vector2(TEAMS - 6.0, 0.0), Vector2(INNING + SITUATION + 6.0, HEIGHT)), 0.0)
 	for t: int in 2:
 		_team_row(Rect2(AT + Vector2(0.0, ROW * t), Vector2(TEAMS, ROW)), t, g)
-	draw_line(AT + Vector2(10.0, ROW), AT + Vector2(TEAMS - 6.0, ROW), Color(1, 1, 1, 0.1), 1.0)
-	var rule := Color(1, 1, 1, 0.12)
-	draw_line(AT + Vector2(TEAMS, 10.0), AT + Vector2(TEAMS, HEIGHT - 10.0), rule, 1.2)
+	var rule := Color(1, 1, 1, 0.22)
 	draw_line(AT + Vector2(TEAMS + INNING, 10.0), AT + Vector2(TEAMS + INNING, HEIGHT - 10.0), rule, 1.2)
 	_inning(Rect2(AT + Vector2(TEAMS, 0.0), Vector2(INNING, HEIGHT)), g)
 	_draw_bases(AT + Vector2(TEAMS + INNING + 46.0, HEIGHT * 0.5 + 6.0), g)
@@ -58,21 +57,21 @@ func _pip_frame() -> void:
 	panel(r.grow(4.0), UiTheme.PANEL, 0.0)
 	var label := "주자 리드" if scene.game.runners_on() > 0 else "마운드"
 	var tab := Rect2(Vector2(r.end.x - 130.0, r.end.y + 4.0), Vector2(130.0, 26.0))
-	panel(tab, UiTheme.PANEL_DARK, 0.0)
-	draw_rect(Rect2(tab.position, Vector2(4.0, tab.size.y)), UiTheme.CYAN)
-	text(tab.position + Vector2(0.0, 19.0), label, 14, UiTheme.INK, HORIZONTAL_ALIGNMENT_CENTER, tab.size.x, 500)
+	brand_plate(tab, 0.0)
+	text(tab.position + Vector2(0.0, 19.0), label, 14, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, tab.size.x, 700)
 
 
 func _team_row(row: Rect2, t: int, g: GameState) -> void:
 	var team := g.teams[t]
 	var club := scene.club(t)
-	var colour := HudCanvas.club_colour(club)
-	club_band(Rect2(row.position, Vector2(7.0, row.size.y)), colour, 12.0 if t == 0 else 0.0)
+	team_plate(row, club, 12.0 if t == 0 else 0.0)
+	# The score in a dark well at the row's end.
+	draw_rect(Rect2(Vector2(row.end.x - 70.0, row.position.y + 5.0), Vector2(62.0, row.size.y - 10.0)), Color(0.0, 0.0, 0.0, 0.35))
 	if club != null:
-		Emblem.draw_emblem(self, club, Rect2(row.position + Vector2(17.0, 5.0), Vector2(30.0, 30.0)))
+		Emblem.draw_emblem(self, club, Rect2(row.position + Vector2(12.0, 4.0), Vector2(32.0, 32.0)))
 	var at_bat := g.batting() == t and not g.over
 	var name_x := row.position.x + 56.0
-	text(Vector2(name_x, row.position.y + 28.0), team.short_name, 21, UiTheme.INK if at_bat or g.over else Color(1, 1, 1, 0.78), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 700)
+	text(Vector2(name_x, row.position.y + 28.0), team.short_name, 21, Color.WHITE if at_bat or g.over else Color(1, 1, 1, 0.82), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 800)
 	if at_bat:
 		_ball(Vector2(name_x + text_width(team.short_name, 21, 700) + 14.0, row.position.y + ROW * 0.5))
 	figure(Vector2(row.end.x - 74.0, row.position.y + 33.0), str(g.score[t]), 34, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT, 60.0)

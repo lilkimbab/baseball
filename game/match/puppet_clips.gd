@@ -416,3 +416,30 @@ static func wave(t: float) -> PuppetPose:
 static func kneel() -> PuppetPose:
 	var a := PuppetPose.at
 	return _pose(a.call(0.0, 0.52, -0.05), 0.0, 12.0, 32.0, a.call(0.12, 0.72, 0.3), a.call(-0.16, 0.62, 0.32), a.call(0.16, 0.08, 0.32), a.call(-0.14, 0.12, -0.42))
+
+
+## Chest out at someone: shoulders back, hands low and out from the sides (a man squaring up).
+static func square_up() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.95, 0.03), 0.0, 0.0, 6.0, a.call(0.36, 0.95, 0.12), a.call(-0.36, 0.95, 0.12), a.call(0.16, 0.08, 0.1), a.call(-0.16, 0.08, -0.12))
+
+
+## A finger at someone across the way: the right arm out straight at face height.
+static func point_at() -> PuppetPose:
+	var a := PuppetPose.at
+	return _pose(a.call(0.0, 0.95, 0.04), 0.0, -10.0, 9.0, a.call(0.22, 1.5, 0.62), a.call(-0.24, 0.98, 0.1), a.call(0.15, 0.08, 0.16), a.call(-0.15, 0.08, -0.1))
+
+
+## Both hands into someone's chest, leaning in; `k` 0 hands drawn back to 1 arms out.
+static func shove(k: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var reach := lerpf(0.3, 0.58, k)
+	return _pose(a.call(0.0, 0.93, 0.06), 0.0, 0.0, 12.0 + 10.0 * k, a.call(0.2, 1.36, reach), a.call(-0.2, 1.36, reach), a.call(0.16, 0.08, 0.22), a.call(-0.16, 0.08, -0.22))
+
+
+## On his back (the figure is laid down by its node): a knee up, a hand on where it hurts, now
+## and then a turn of pain (`t` seconds).
+static func lying(t: float) -> PuppetPose:
+	var a := PuppetPose.at
+	var writhe := 0.5 + 0.5 * sin(t * 2.3)
+	return _pose(a.call(0.0, 0.95, 0.0), 0.0, 6.0 * writhe, 0.0, a.call(0.08, 1.28, 0.2), a.call(-0.3, 0.86, 0.05 + 0.1 * writhe), a.call(0.13, 0.42, 0.32), a.call(-0.12, 0.08, 0.0))

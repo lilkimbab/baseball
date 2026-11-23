@@ -33,7 +33,7 @@ func build() -> void:
 	var league := ModeTile.make("리그 모드", "", "trophy", func() -> void: go(dock_path("league")), colours["league"], "LEAGUE", "league")
 	if LeagueSession.season != null:
 		league.status = "진행 중"
-	var career := ModeTile.make("커리어 모드", "", "user-circle", func() -> void: go(dock_path("career")), colours["career"], "CAREER", "career")
+	var career := ModeTile.make("전설의 시작", "", "user-circle", func() -> void: go(dock_path("career")), colours["career"], "CAREER", "career")
 	if CareerSession.career_season != null:
 		career.status = "진행 중"
 	cards.add_child(ModeTile.make("친선 경기", "", "baseball", func() -> void: go(QUICK), colours["quick"], "EXHIBITION", "exhibition"))

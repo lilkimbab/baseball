@@ -145,6 +145,9 @@ static func player_from(entry: Dictionary) -> Player:
 	for key: String in forms:
 		if forms[key] != null:
 			p.forms[key] = str(forms[key])
+	var record: Variant = entry.get("record", {})
+	if record is Dictionary:
+		p.record = (record as Dictionary).duplicate()
 	return p
 
 
@@ -171,6 +174,8 @@ static func player_to(p: Player, exact: bool = false) -> Dictionary:
 		d["origin"] = String(p.origin)
 	if p.potential >= 0.0:
 		d["potential"] = snappedf(p.potential, 0.000001)
+	if not p.record.is_empty():
+		d["record"] = p.record.duplicate()
 	if p.pitching != null:
 		var arsenal: Array = []
 		for a: ArsenalPitch in p.pitching.arsenal:

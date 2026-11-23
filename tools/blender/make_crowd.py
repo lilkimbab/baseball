@@ -19,6 +19,7 @@ import bpy
 import numpy as np
 from mathutils import Matrix, Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 SOURCE = ARGS[0] if ARGS else "content-local/rocketbox"
 OUT = ARGS[1] if len(ARGS) > 1 else "game/assets/crowd"
@@ -51,6 +52,10 @@ def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
+# Rocketbox's people keep their own hair now (they are the few Westerners among the Korean crowd).
+DARK_HAIR = False
+
+
 def load_person(folder):
     name = os.path.basename(folder)
     fbx = os.path.join(folder, name + ".fbx")
@@ -73,7 +78,17 @@ def load_person(folder):
         if colour:
             img = nodes.new("ShaderNodeTexImage")
             img.image = bpy.data.images.load(colour)
-            links.new(img.outputs["Color"], bsdf.inputs["Base Color"])
+            if part == "opacity" and DARK_HAIR:
+                # The hair (and lashes): black to dark brown, as a Korean crowd's (the user,
+                # 2026-11-23: "make the faces Korean — they all look Western"); a few kept a
+                # little browner, as some dye theirs.
+                dark = nodes.new("ShaderNodeHueSaturation")
+                dark.inputs["Saturation"].default_value = 0.55
+                dark.inputs["Value"].default_value = 0.22 if sum(map(ord, name)) % 4 else 0.4
+                links.new(img.outputs["Color"], dark.inputs["Color"])
+                links.new(dark.outputs["Color"], bsdf.inputs["Base Color"])
+            else:
+                links.new(img.outputs["Color"], bsdf.inputs["Base Color"])
             if part == "opacity":
                 links.new(img.outputs["Alpha"], bsdf.inputs["Alpha"])
                 mat.blend_method = 'HASHED' if hasattr(mat, "blend_method") else mat.blend_method
@@ -87,13 +102,25 @@ def load_person(folder):
     return name, arm, mesh
 
 
+# The bones by Rocketbox's names; a MakeHuman person's are mapped (crowd_people.BONES).
+BONE_MAP = {}
+
+
+def bone(arm, name):
+    return arm.pose.bones[BONE_MAP.get(name, name)]
+
+
 def frame_axes(arm):
     """World up, the person's right and forward, from the eyes."""
     bpy.context.view_layer.update()
     mw = arm.matrix_world
-    pb = arm.pose.bones
-    l_eye = mw @ pb["Bip01 LEye"].head
-    r_eye = mw @ pb["Bip01 REye"].head
+    if "Bip01 LEye" in arm.pose.bones:
+        l_eye = mw @ arm.pose.bones["Bip01 LEye"].head
+        r_eye = mw @ arm.pose.bones["Bip01 REye"].head
+    else:
+        # (No eye bones on MakeHuman's game rig: the shoulders give the sides.)
+        l_eye = mw @ bone(arm, "Bip01 L UpperArm").head
+        r_eye = mw @ bone(arm, "Bip01 R UpperArm").head
     up = Vector((0.0, 0.0, 1.0))
     right = (r_eye - l_eye)
     right.z = 0.0
@@ -108,18 +135,21 @@ NEXT = {"Thigh": "Calf", "Calf": "Foot", "Foot": "Toe0", "UpperArm": "Forearm", 
 SPINE_NEXT = {"Bip01 Spine": "Bip01 Spine1", "Bip01 Spine1": "Bip01 Spine2", "Bip01 Spine2": "Bip01 Neck", "Bip01 Neck": "Bip01 Head"}
 
 
-def aim(arm, bone, direction):
+def aim(arm, bone_name, direction):
     """Turns a pose bone so its limb (joint to next joint) points along `direction` (world),
     children following."""
     bpy.context.view_layer.update()
-    pb = arm.pose.bones[bone]
-    if bone in SPINE_NEXT:
-        child = arm.pose.bones.get(SPINE_NEXT[bone])
-        if child is None:
+    name = bone_name
+    if BONE_MAP.get(name, name) not in arm.pose.bones:
+        return
+    pb = bone(arm, name)
+    if name in SPINE_NEXT:
+        if BONE_MAP.get(SPINE_NEXT[name], SPINE_NEXT[name]) not in arm.pose.bones:
             return
+        child = bone(arm, SPINE_NEXT[name])
     else:
-        side, part = bone.split(" ")[1], bone.split(" ")[-1]
-        child = arm.pose.bones["Bip01 %s %s" % (side, NEXT[part])]
+        side, part = name.split(" ")[1], name.split(" ")[-1]
+        child = bone(arm, "Bip01 %s %s" % (side, NEXT[part]))
     to_arm = arm.matrix_world.inverted().to_3x3()
     want = (to_arm @ direction).normalized()
     m = pb.matrix.copy()
@@ -264,9 +294,8 @@ def hand_at(arm, side):
     """Where a hand holds things (world), and the way its forearm points."""
     bpy.context.view_layer.update()
     mw = arm.matrix_world
-    pb = arm.pose.bones
-    wrist = mw @ pb["Bip01 %s Hand" % side].head
-    elbow = mw @ pb["Bip01 %s Forearm" % side].head
+    wrist = mw @ bone(arm, "Bip01 %s Hand" % side).head
+    elbow = mw @ bone(arm, "Bip01 %s Forearm" % side).head
     along = (wrist - elbow).normalized()
     return wrist + along * 0.07, along
 
@@ -358,10 +387,20 @@ def cap_for(arm, up, forward):
     """A baseball cap on the head: a crown and a peak."""
     bpy.context.view_layer.update()
     mw = arm.matrix_world
-    pb = arm.pose.bones
-    eyes = (mw @ pb["Bip01 LEye"].head + mw @ pb["Bip01 REye"].head) * 0.5
-    head = mw @ pb["Bip01 Head"].head
+    if "Bip01 LEye" in arm.pose.bones:
+        eyes = (mw @ arm.pose.bones["Bip01 LEye"].head + mw @ arm.pose.bones["Bip01 REye"].head) * 0.5
+    else:
+        # (MakeHuman's head bone runs from the skull's base to its top: the eyes a little
+        # under halfway up, in front.)
+        hb = bone(arm, "Bip01 Head")
+        eyes = (mw @ hb.head).lerp(mw @ hb.tail, 0.42) + forward * 0.085
+    head = mw @ bone(arm, "Bip01 Head").head
     centre = eyes + up * 0.045 - forward * 0.055
+    if "Bip01 LEye" not in arm.pose.bones:
+        # (MakeHuman: from the top of the skull, the head bone's tip, over the hair.)
+        top = mw @ bone(arm, "Bip01 Head").tail
+        centre = top - up * 0.075 - forward * 0.01
+        eyes = centre - up * 0.045 + forward * 0.055
     tilt = (up + forward * 0.08).normalized()
     crown = solid("ball", Vector((0.205, 0.215, 0.15)), centre + up * 0.02, tilt, (0.92, 0.92, 0.92), True, 0.7)
     peak = solid("box", Vector((0.17, 0.11, 0.012)), eyes + up * 0.05 + forward * 0.1, tilt, (0.92, 0.92, 0.92), True, 0.7)
@@ -467,25 +506,40 @@ def render_to(path):
     bpy.ops.render.render(write_still=True)
 
 
+# A few of Rocketbox's people among the Korean crowd (the user: "a very few Westerners").
+WESTERNERS = ["Female_Adult_02", "Male_Adult_01", "Male_Adult_06"]
+
+
 def main():
-    # Folders whose name starts with "_" are left out.
-    folders = sorted(os.path.join(SOURCE, d) for d in os.listdir(SOURCE)
-                     if os.path.isdir(os.path.join(SOURCE, d)) and not d.startswith("_"))
+    global BONE_MAP
+    import crowd_people
     tmp = os.path.join(OUT, "_frames")
     os.makedirs(tmp, exist_ok=True)
     names = []
-    # The fans, then the cheerleaders (a fan's folder used again, dressed for the stage).
-    jobs = [(f, False) for f in folders] + [(os.path.join(SOURCE, c), True) for c in CHEERLEADERS if os.path.isdir(os.path.join(SOURCE, c))]
-    for n, (folder, cheerleader) in enumerate(jobs):
+    # The Korean fans (MakeHuman), a few Westerners (Rocketbox), then the cheerleaders.
+    jobs = [("mh", spec, False) for spec in crowd_people.specs()]
+    jobs += [("rb", os.path.join(SOURCE, w), False) for w in WESTERNERS if os.path.isdir(os.path.join(SOURCE, w))]
+    jobs += [("mh", spec, True) for spec in crowd_people.cheerleader_specs()]
+    fans_count = sum(1 for j in jobs if not j[2])
+    for n, (source, what, cheerleader) in enumerate(jobs):
         reset()
-        name, arm, mesh = load_person(folder)
-        name = name + ("_cheer" if cheerleader else "")
+        if source == "mh":
+            name, arm, meshes, top = crowd_people.build(what, cheerleader)
+            BONE_MAP = crowd_people.BONES
+            for m in meshes:
+                if m.get("dyed_top"):
+                    mark_top(m, top)
+        else:
+            name, arm, mesh = load_person(what)
+            BONE_MAP = {}
+            meshes = [mesh]
+            mark_top(mesh, TOP_BONES + (("Pelvis", "L Thigh", "R Thigh") if cheerleader else ()))
+        name = name + ("_cheer" if cheerleader and not name.endswith(("cheer1", "cheer2")) else "")
         names.append(name)
-        mark_top(mesh, TOP_BONES + (("Pelvis", "L Thigh", "R Thigh") if cheerleader else ()))
         scene = bpy.context.scene
         setup_render(scene)
         up, right, forward = frame_axes(arm)
-        materials = list(mesh.data.materials)
+        materials = {m.name: list(m.data.materials) for m in meshes}
         mask = top_mask_material()
         mask_on, mask_off = flat_mask("MaskOn", True), flat_mask("MaskOff", False)
         views = None
@@ -503,8 +557,9 @@ def main():
             pose(arm, which, up, right, forward)
             # The person stands where the file puts him (feet on the ground; seated, at seat
             # height in his picture). (Moving the armature to put a seated man's feet on the
-            # ground did nothing: rendering plays the file's animation, which sets its place
-            # back — and the props, placed from the moved bones, were left floating.)
+            # ground did nothing for Rocketbox's people: rendering plays the file's animation,
+            # which sets its place back — and the props, placed from the moved bones, were left
+            # floating.)
             things = props_for(arm, which, up, right, forward, cheerleader) + (cap_for(arm, up, forward) if capped else [])
             if views is None:
                 # A cheerleader's picture covers more (her arms and pom-poms reach wide): the
@@ -517,12 +572,17 @@ def main():
                 scene.camera = cam
                 for other, (_, other_sun) in views.items():
                     other_sun.hide_render = other != view
-                for i in range(len(materials)):
-                    mesh.data.materials[i] = materials[i]
+                for m in meshes:
+                    for i, mat in enumerate(materials[m.name]):
+                        m.data.materials[i] = mat
                 kept = [(t, t.data.materials[0]) for t in things]
                 render_to(os.path.join(tmp, "%s_%s%s.png" % (name, p, view)))
-                for i in range(len(materials)):
-                    mesh.data.materials[i] = mask
+                # The mask: white where a club's colour goes (the top it dyes), black elsewhere
+                # (skin, hair, trousers, shoes all hide what is behind them).
+                for m in meshes:
+                    dyed = "top" in m.data.attributes
+                    for i in range(len(m.data.materials)):
+                        m.data.materials[i] = mask if dyed else mask_off
                 for t in things:
                     t.data.materials[0] = mask_on if t["dyed"] else mask_off
                 render_to(os.path.join(tmp, "%s_%s%s_mask.png" % (name, p, view)))
@@ -531,6 +591,7 @@ def main():
             for t in things:
                 bpy.data.objects.remove(t, do_unlink=True)
         print("make_crowd:", name, "done")
+    folders = [None] * fans_count
     fans = len(folders)
 
     # The fronts first (person by person, pose by pose), then the backs in the same order.
@@ -557,6 +618,7 @@ def main():
         img.save()
     with open(os.path.join(OUT, "crowd_atlas.txt"), "w") as f:
         f.write("cheer_scale %.2f\n" % CHEER_SCALE)
+        f.write("names %s\n" % " ".join(names))
         f.write("people %d\nfans %d\nposes %s\ncolumns %d\nrows %d\nframe %d %d\nheight_m %.2f\nviews %d\n" % (
             len(names), fans, " ".join(POSES), COLUMNS, rows, FRAME_W, FRAME_H, FRAME_HEIGHT_M, len(VIEWS)))
     print("make_crowd: wrote", os.path.join(OUT, "crowd_atlas.png"), len(names), "people")

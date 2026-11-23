@@ -98,7 +98,7 @@ func problem(item: Dictionary) -> String:
 		return "포인트가 부족합니다" if Profile.points < int(item["price"]) else ""
 	var c := CareerSession.career
 	if CareerSession.career_season == null or c == null:
-		return "커리어 모드를 진행 중일 때 구매할 수 있습니다"
+		return "전설의 시작을 진행 중일 때 구매할 수 있습니다"
 	var pitching := str(item.get("field", "")) == "pitching"
 	if pitching != c.is_pitcher():
 		return "투수 전용 상품입니다" if pitching else "타자 전용 상품입니다"

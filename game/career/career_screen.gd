@@ -19,7 +19,7 @@ var _tab := "home"
 
 
 func setup() -> void:
-	heading = "커리어 모드"
+	heading = "전설의 시작"
 	heading_latin = "CAREER"
 	vantage = &"field"
 	dock_id = "career"
@@ -60,7 +60,7 @@ func build() -> void:
 		var row := UiKit.hbox(20)
 		row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		content.add_child(row)
-		var p := panel("커리어 모드", "user-circle", row, 0.0, "CAREER")
+		var p := panel("전설의 시작", "user-circle", row, 0.0, "CAREER")
 		p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		if cs != null:
 			p.body.add_child(UiKit.heading("%s 선수는 은퇴했습니다" % cs.career.player.name, 26, UiTheme.ACCENT))
@@ -587,7 +587,7 @@ func _build_futures_table(cs: CareerSeason, parent: Control) -> void:
 func play_on_screen() -> void:
 	var cs := CareerSession.career_season
 	var g := cs.club_game()
-	var info := {"title": "커리어 · %s" % cs.career.player.name}
+	var info := {"title": "전설의 시작 · %s" % cs.career.player.name}
 	if g != null:
 		info["away"] = cs.side_team(g.away)
 		info["home"] = cs.side_team(g.home)
